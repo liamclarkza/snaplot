@@ -1,0 +1,19 @@
+{
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "site"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/snaplot",
+    "dev": "npm run dev -w site --",
+    "dev:host": "npm run dev -w site -- --host",
+    "dev:lib": "npm run dev -w packages/snaplot",
+    "build:site": "npm run build -w site",
+    "preview": "npm run build && npm run build:site && npm run preview -w site",
+    "typecheck": "npm run typecheck -w packages/snaplot"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

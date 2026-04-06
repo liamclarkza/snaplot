@@ -1,0 +1,26 @@
+**/node_modules/
+**/dist/
+*.local
+.DS_Store
+Thumbs.db
+*.log
+
+# Environment
+.env
+.env*.local
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# Project-internal
+specification.md
+.claude/
+
+# Build artifacts
+.vinxi/
+.output/
+.vercel/
+.netlify/
+.wrangler/
