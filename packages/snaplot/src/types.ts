@@ -64,13 +64,8 @@ export interface Layout {
   height: number;
   /** The data-rendering region */
   plot: { top: number; left: number; width: number; height: number };
-  /** Axis regions */
-  axes: {
-    top: { left: number; top: number; width: number; height: number };
-    bottom: { left: number; top: number; width: number; height: number };
-    left: { left: number; top: number; width: number; height: number };
-    right: { left: number; top: number; width: number; height: number };
-  };
+  /** Axis regions keyed by axis config key, with position and area */
+  axes: Record<string, { position: AxisPosition; area: { left: number; top: number; width: number; height: number } }>;
   /** Device pixel ratio */
   dpr: number;
 }
@@ -124,9 +119,9 @@ export interface SeriesConfig {
   binMethod?: 'sturges' | 'scott' | 'freedman-diaconis';
   binCount?: number;
 
-  // Scale binding
-  xScaleKey?: string;
-  yScaleKey?: string;
+  // Axis binding
+  xAxisKey?: string;
+  yAxisKey?: string;
 
   // Visibility
   visible?: boolean;
@@ -138,23 +133,14 @@ export interface SeriesConfig {
 
 export type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
 
+/** Configuration for an axis entry in ChartConfig.axes */
 export interface AxisConfig {
-  position: AxisPosition;
-  scaleType?: ScaleType;
-  scaleKey?: string;
-  label?: string;
-  tickCount?: number;
-  tickFormat?: (value: number) => string;
-  grid?: {
-    show?: boolean;
-    stroke?: string;
-    width?: number;
-    dash?: number[];
-  };
+  type?: ScaleType;
   min?: number;
   max?: number;
   auto?: boolean;
   padding?: number;
+  position?: AxisPosition;
 }
 
 // ============================================================
@@ -245,15 +231,6 @@ export interface ChartConfig {
     left?: number;
   };
 
-  scales?: Record<string, {
-    type?: ScaleType;
-    min?: number;
-    max?: number;
-    auto?: boolean;
-    padding?: number;
-    side?: 'left' | 'right';
-  }>;
-
   axes?: Record<string, AxisConfig>;
   series: SeriesConfig[];
 
@@ -338,10 +315,10 @@ export interface ChartInstance {
   /** Get current data */
   getData(): ColumnarData;
 
-  /** Update scale domain */
-  setScale(key: string, range: Partial<ScaleRange>): void;
-  /** Get a scale by key */
-  getScale(key: string): Scale | undefined;
+  /** Update axis domain */
+  setAxis(key: string, range: Partial<ScaleRange>): void;
+  /** Get a scale by axis key */
+  getAxis(key: string): Scale | undefined;
 
   /** Merge config updates (ECharts setOption style) */
   setOptions(config: DeepPartial<ChartConfig>): void;

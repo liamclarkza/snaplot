@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, For } from 'solid-js';
+import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js';
 import { lttb, m4, createLegendPlugin } from 'snaplot';
 import type { ColumnarData, ChartInstance } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
@@ -166,7 +166,12 @@ function Ex(props: { title: string; desc?: string; code: string; data: ColumnarD
 }
 
 function scrollTo(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const el = document.getElementById(id);
+  if (!el) return;
+  // Offset by the sticky nav height (56px) + a bit of breathing room
+  const navHeight = 56 + 16;
+  const y = el.getBoundingClientRect().top + window.scrollY - navHeight;
+  window.scrollTo({ top: y, behavior: 'smooth' });
 }
 
 // ─── Nav types ──────────────────────────────────────────────────
@@ -285,42 +290,159 @@ export default function Docs() {
     { type: 'link', id: 'api-types', label: 'Types' },
   ];
 
+  const [sidebarOpen, setSidebarOpen] = createSignal(false);
+
+  // Lock body scroll when mobile sidebar is open.
+  // iOS Safari: overflow:hidden on body doesn't work reliably.
+  // Instead, use position:fixed with preserved scroll offset.
+  let savedScrollY = 0;
+  let navTarget: string | null = null;
+  let wasOpen = false;
+
+  createEffect(() => {
+    const open = sidebarOpen();
+    if (open) {
+      savedScrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${savedScrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.overflow = 'hidden';
+      wasOpen = true;
+    } else if (wasOpen) {
+      wasOpen = false;
+      const target = navTarget;
+      navTarget = null;
+
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.overflow = '';
+
+      // Restore scroll position (undo position:fixed offset)
+      window.scrollTo(0, savedScrollY);
+
+      // If closing via nav click, scroll to target after restoring
+      if (target) {
+        requestAnimationFrame(() => scrollTo(target));
+      }
+    }
+  });
+
+  function navClick(id: string) {
+    if (sidebarOpen()) {
+      // Mobile: close sidebar first, then scroll after body unlocks
+      navTarget = id;
+      setSidebarOpen(false);
+    } else {
+      // Desktop: scroll immediately
+      scrollTo(id);
+    }
+  }
+
+  const sidebarContent = () => (
+    <For each={nav}>
+      {(item) =>
+        item.type === 'divider' ? (
+          <div style={{
+            'font-size': '10.5px',
+            'font-weight': '600',
+            'text-transform': 'uppercase',
+            'letter-spacing': '0.08em',
+            color: 'var(--text-secondary)',
+            opacity: '0.5',
+            padding: '12px 0 4px',
+            'user-select': 'none',
+          }}>
+            {item.label}
+          </div>
+        ) : (
+          <a
+            href="javascript:void(0)"
+            onClick={() => navClick(item.id)}
+            style={{
+              color: 'var(--text-secondary)',
+              'font-size': '13px',
+              padding: '3px 0 3px 8px',
+              cursor: 'pointer',
+              'text-decoration': 'none',
+            }}
+          >
+            {item.label}
+          </a>
+        )
+      }
+    </For>
+  );
+
   return (
     <div style={{ display: 'flex', 'max-width': 'var(--max-width)', margin: '0 auto', padding: '48px 24px 80px', gap: '48px' }}>
-      {/* Sidebar */}
-      <aside style={{ 'flex-shrink': '0', width: '190px', position: 'sticky', top: '72px', 'align-self': 'flex-start', display: 'flex', 'flex-direction': 'column', gap: '1px', 'max-height': 'calc(100vh - 96px)', 'overflow-y': 'auto' }}>
-        <For each={nav}>
-          {(item) =>
-            item.type === 'divider' ? (
-              <div style={{
-                'font-size': '10.5px',
-                'font-weight': '600',
-                'text-transform': 'uppercase',
-                'letter-spacing': '0.08em',
-                color: 'var(--text-secondary)',
-                opacity: '0.5',
-                padding: '12px 0 4px',
-                'user-select': 'none',
-              }}>
-                {item.label}
-              </div>
-            ) : (
-              <a
-                href="javascript:void(0)"
-                onClick={() => scrollTo(item.id)}
-                style={{
-                  color: 'var(--text-secondary)',
-                  'font-size': '13px',
-                  padding: '3px 0 3px 8px',
-                  cursor: 'pointer',
-                  'text-decoration': 'none',
-                }}
-              >
-                {item.label}
-              </a>
-            )
-          }
-        </For>
+
+      {/* Mobile hamburger button — visible below 768px */}
+      <button
+        class="docs-menu-btn"
+        onClick={() => setSidebarOpen(!sidebarOpen())}
+        style={{
+          position: 'fixed',
+          bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
+          right: '20px',
+          'z-index': '200',
+          width: '48px',
+          height: '48px',
+          'border-radius': '50%',
+          background: 'var(--accent)',
+          border: 'none',
+          color: '#fff',
+          'font-size': '22px',
+          'line-height': '1',
+          cursor: 'pointer',
+          display: 'none',
+          'box-shadow': '0 4px 16px rgba(0,0,0,0.4)',
+        }}
+      >
+        {sidebarOpen() ? (
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="4" x2="14" y2="14" /><line x1="14" y1="4" x2="4" y2="14" />
+          </svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="5" x2="15" y2="5" /><line x1="3" y1="9" x2="15" y2="9" /><line x1="3" y1="13" x2="15" y2="13" />
+          </svg>
+        )}
+      </button>
+
+      {/* Mobile sidebar overlay */}
+      <Show when={sidebarOpen()}>
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: '0',
+            background: 'rgba(0,0,0,0.5)',
+            'z-index': '149',
+          }}
+        />
+      </Show>
+
+      {/* Sidebar — desktop: static, mobile: slide-out drawer */}
+      <aside
+        class="docs-sidebar"
+        classList={{ 'docs-sidebar-open': sidebarOpen() }}
+        style={{
+          'flex-shrink': '0',
+          width: '190px',
+          position: 'sticky',
+          top: '72px',
+          'align-self': 'flex-start',
+          display: 'flex',
+          'flex-direction': 'column',
+          gap: '1px',
+          'max-height': 'calc(100vh - 96px)',
+          'overflow-y': 'auto',
+        }}
+      >
+        {sidebarContent()}
       </aside>
 
       {/* Content */}
@@ -364,7 +486,7 @@ const config: ChartConfig = {
           <Ex title="Live quick start" desc="A simple line chart — edit the config to experiment"
             data={d_quickstart()} height="240px"
             code={`{
-  scales: { x: { type: 'time' }, y: { type: 'linear' } },
+  axes: { x: { type: 'time' }, y: { type: 'linear' } },
   series: [
     { label: 'Metric', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
@@ -405,7 +527,7 @@ const data: ColumnarData = [
           <Ex title="Multi-series streaming line chart" desc="Try changing interpolation to 'linear' or 'step-after'"
             data={d_line()} onReady={(c) => { lineChart = c; }}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'CPU %', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Memory %', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
@@ -419,7 +541,7 @@ const data: ColumnarData = [
           <P>Area charts fill from the line down to the baseline with a gradient: alpha 0.3 at the top fading to 0.05 at the bottom. Use <code>fillGradient</code> to define custom gradient colors.</P>
           <Ex title="Gradient area chart" data={d_area()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'Requests/s', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Errors/s', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5 },
@@ -537,18 +659,18 @@ const data: ColumnarData = [
 
         <Section id="dual-axis" title="Dual Y-Axis">
           <P>
-            Bind series to different Y scales using <code>yScaleKey</code>. Define a second Y scale with <code>side: 'right'</code> to render its axis on the right edge of the chart.
+            Bind series to different Y axes using <code>yAxisKey</code>. Define a second Y axis with <code>position: 'right'</code> to render its axis on the right edge of the chart.
           </P>
           <Ex title="Temperature + Humidity" data={d_dual()}
             code={`{
-  scales: {
+  axes: {
     x: { type: 'time' },
     y: { type: 'linear' },
-    y2: { type: 'linear', side: 'right' },
+    y2: { type: 'linear', position: 'right' },
   },
   series: [
-    { label: 'Temp (\u00b0C)', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2, yScaleKey: 'y' },
-    { label: 'Humidity (%)', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5, yScaleKey: 'y2' },
+    { label: 'Temp (\u00b0C)', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2, yAxisKey: 'y' },
+    { label: 'Humidity (%)', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5, yAxisKey: 'y2' },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
@@ -577,7 +699,7 @@ const data: ColumnarData = [
           </P>
           <Ex title="Exponential growth on log scale" data={d_log()}
             code={`{
-  scales: { y: { type: 'log' } },
+  axes: { y: { type: 'log' } },
   series: [{ label: 'Growth', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
 }`} />
         </Section>
@@ -590,7 +712,7 @@ const data: ColumnarData = [
           <Ex title="Time scale with auto intervals" desc="Zoom in to see time intervals change from hours to minutes"
             data={d_time()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [{ label: 'Requests', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   zoom: { enabled: true, x: true },
   tooltip: { show: true },
@@ -677,7 +799,7 @@ axes: {
             data={d_interaction()}
             code={`{
   interaction: 'timeseries',
-  scales: { x: { type: 'time' }, y: { type: 'linear' } },
+  axes: { x: { type: 'time' }, y: { type: 'linear' } },
   series: [
     { label: 'Series A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
@@ -699,7 +821,7 @@ axes: {
           <Ex title="Zoom controls" desc="Drag to zoom, double-click to reset"
             data={d_zoom()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'Throughput', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Latency', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5 },
@@ -716,7 +838,7 @@ axes: {
           <Ex title="Pan demo" desc="Hold shift and drag to pan, or drag on an axis"
             data={d_pan()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'Series A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
@@ -738,7 +860,7 @@ axes: {
           <Ex title="Crosshair config" desc="Try setting snap to false, or enabling yLine"
             data={d_cursor()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'Series A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
@@ -781,7 +903,7 @@ axes: {
           <Ex title="Tooltip mode demo" desc="Change mode to 'nearest' or 'x'"
             data={d_tooltip_mode()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'CPU', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Memory', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
@@ -799,7 +921,7 @@ axes: {
           <Ex title="Custom tooltip HTML" desc="Edit the render function to change tooltip formatting"
             data={d_tooltip_custom()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'Revenue', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Cost', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
@@ -848,7 +970,7 @@ axes: {
             data={d_theme()}
             code={`{
   theme: oceanTheme,
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'Series A', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
@@ -889,7 +1011,7 @@ axes: {
     tooltipBackground: 'rgba(20, 20, 40, 0.95)',
     tooltipTextColor: '#eee',
   },
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'Series A', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
@@ -918,7 +1040,7 @@ axes: {
           <Ex title="CSS variable theming (no explicit theme)" desc="This chart reads colors from the site's CSS variables"
             data={d_css_vars()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [
     { label: 'Series A', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
@@ -968,7 +1090,7 @@ const [downX, downY] = lttb(xData, yData, 500);  // 25K \u2192 500 points`} />
           <div style={{ height: '12px' }} />
           <Ex title="LTTB downsampled (500 points from 25K)" data={d_lttb()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [{ label: '500 pts (LTTB)', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   tooltip: { show: true },
 }`} />
@@ -980,7 +1102,7 @@ const [downX, downY] = m4(xData, yData, pixelWidth, xMin, xMax);`} />
           <div style={{ height: '12px' }} />
           <Ex title="M4 downsampled (pixel-aware)" data={d_m4()}
             code={`{
-  scales: { x: { type: 'time' } },
+  axes: { x: { type: 'time' } },
   series: [{ label: 'M4', dataIndex: 1, type: 'line', interpolation: 'linear', lineWidth: 1.5 }],
   tooltip: { show: true },
 }`} />
@@ -1055,7 +1177,7 @@ const config = {
   id: 'threshold',
   afterDrawData(chart, ctx) {
     const layout = chart.getLayout();
-    const yScale = chart.getScale('y');
+    const yScale = chart.getAxis('y');
     if (!yScale) return;
     const py = yScale.dataToPixel(yValue);
     ctx.save();
@@ -1107,8 +1229,8 @@ plugins: [thresholdPlugin(75, '#e74c3c')]`} />
                   ['setData(data: ColumnarData)', 'Replace all chart data'],
                   ['appendData(data: ColumnarData, maxLen?: number)', 'Append data for streaming; maxLen caps buffer'],
                   ['getData(): ColumnarData', 'Get current data arrays'],
-                  ['setScale(key: string, range: Partial<ScaleRange>)', 'Set axis domain (min/max)'],
-                  ['getScale(key: string): Scale | undefined', 'Get a scale instance by key'],
+                  ['setAxis(key: string, range: Partial<ScaleRange>)', 'Set axis domain (min/max)'],
+                  ['getAxis(key: string): Scale | undefined', 'Get a scale instance by key'],
                   ['setOptions(config: DeepPartial<ChartConfig>)', 'Deep-merge config updates'],
                   ['getOptions(): ChartConfig', 'Get resolved config'],
                   ['getLayout(): Layout', 'Get current layout dimensions'],

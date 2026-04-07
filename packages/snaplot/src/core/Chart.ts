@@ -16,7 +16,7 @@ import { DirtyFlag } from '../types';
 import { CanvasManager } from './CanvasManager';
 import { RenderScheduler } from './RenderScheduler';
 import { EventBus, SyncGroup } from './EventBus';
-import { computeLayout } from './Layout';
+import { computeLayout, inferPosition } from './Layout';
 
 import { ColumnarStore } from '../data/ColumnarStore';
 import { createScale } from '../scales/createScale';
@@ -123,7 +123,7 @@ export class ChartCore implements ChartInstance {
     this.eventBus = new EventBus();
 
     // 6. Create scales
-    this.initScales();
+    this.initAxes();
 
     // 7. Compute initial layout
     this.updateLayout();
@@ -202,7 +202,7 @@ export class ChartCore implements ChartInstance {
     return this.store.getData();
   }
 
-  setScale(key: string, range: Partial<ScaleRange>): void {
+  setAxis(key: string, range: Partial<ScaleRange>): void {
     const scale = this.scales.get(key);
     if (!scale) return;
 
@@ -213,7 +213,7 @@ export class ChartCore implements ChartInstance {
     this.emitEvent('viewport:change', key, { min: scale.min, max: scale.max });
   }
 
-  getScale(key: string): Scale | undefined {
+  getAxis(key: string): Scale | undefined {
     return this.scales.get(key);
   }
 
@@ -233,7 +233,7 @@ export class ChartCore implements ChartInstance {
       this.tooltipManager.applyTheme(this.theme);
     }
 
-    this.initScales();
+    this.initAxes();
     this.updateLayout();
     this.updateScalePixelRanges();
     this.autoRange();
@@ -255,8 +255,8 @@ export class ChartCore implements ChartInstance {
   /** Reset zoom to full data extent (double-click handler) */
   resetZoom(): void {
     this.userHasZoomed = false;
-    this.autoRangeX();
-    this.autoRangeY();
+    this.autoRangeHorizontal();
+    this.autoRangeVertical();
     this.scheduler.markDirty(DirtyFlag.ALL);
   }
 
@@ -376,30 +376,32 @@ export class ChartCore implements ChartInstance {
     }
   }
 
-  private initScales(): void {
-    const scaleConfigs = this.config.scales ?? {};
+  private initAxes(): void {
+    const axisConfigs = this.config.axes ?? {};
 
-    // Ensure X and Y scales exist
-    if (!scaleConfigs.x) {
-      scaleConfigs.x = { type: 'linear' };
+    // Ensure X and Y axes exist
+    if (!axisConfigs.x) {
+      axisConfigs.x = { type: 'linear' };
     }
-    if (!scaleConfigs.y) {
-      scaleConfigs.y = { type: 'linear' };
+    if (!axisConfigs.y) {
+      axisConfigs.y = { type: 'linear' };
     }
+    // Write back so Layout and AxesRenderer can see all axes
+    this.config.axes = axisConfigs;
 
-    for (const [key, sc] of Object.entries(scaleConfigs)) {
+    for (const [key, ac] of Object.entries(axisConfigs)) {
       if (!this.scales.has(key)) {
         const scale = createScale(
-          sc.type ?? 'linear',
+          ac.type ?? 'linear',
           key,
-          sc.min,
-          sc.max,
+          ac.min,
+          ac.max,
         );
         this.scales.set(key, scale);
       } else {
         const existing = this.scales.get(key)!;
-        if (sc.min !== undefined) existing.min = sc.min;
-        if (sc.max !== undefined) existing.max = sc.max;
+        if (ac.min !== undefined) existing.min = ac.min;
+        if (ac.max !== undefined) existing.max = ac.max;
       }
     }
 
@@ -407,22 +409,29 @@ export class ChartCore implements ChartInstance {
   }
 
   /**
-   * Auto-range both X and Y scales to fit data.
+   * Auto-range both horizontal and vertical axes to fit data.
    * Called on data change (setData, appendData, init) — NOT on zoom.
    */
   private autoRange(): void {
-    this.autoRangeX();
-    this.autoRangeY();
+    this.autoRangeHorizontal();
+    this.autoRangeVertical();
   }
 
-  /** Auto-range X scale to full data extent. Skipped if the user has actively zoomed. */
-  private autoRangeX(): void {
+  /** Auto-range horizontal (bottom/top) axes to full data extent. Skipped if the user has actively zoomed. */
+  private autoRangeHorizontal(): void {
     if (this.store.length === 0) return;
     if (this.userHasZoomed) return;
 
-    const xScale = this.scales.get('x');
-    const xConfig = this.config.scales?.x;
-    if (xScale && (xConfig?.auto !== false) && xConfig?.min === undefined && xConfig?.max === undefined) {
+    const axisConfigs = this.config.axes ?? {};
+    for (const [key, ac] of Object.entries(axisConfigs)) {
+      const pos = inferPosition(key, ac.position);
+      if (pos !== 'bottom' && pos !== 'top') continue;
+
+      const scale = this.scales.get(key);
+      if (!scale) continue;
+      if (ac.auto === false) continue;
+      if (ac.min !== undefined && ac.max !== undefined) continue;
+
       const xMin = this.store.x[0];
       const xMax = this.store.x[this.store.length - 1];
       const hasBarSeries = this.config.series.some(
@@ -430,43 +439,46 @@ export class ChartCore implements ChartInstance {
       );
 
       if (xMin === xMax) {
-        xScale.min = xMin - 1;
-        xScale.max = xMax + 1;
+        scale.min = xMin - 1;
+        scale.max = xMax + 1;
       } else if (hasBarSeries && this.store.length > 1) {
         // Bar/histogram: pad by half a category width so edge bars aren't clipped
         const categoryPad = (xMax - xMin) / (this.store.length - 1) * 0.5;
-        xScale.min = xMin - categoryPad;
-        xScale.max = xMax + categoryPad;
+        scale.min = xMin - categoryPad;
+        scale.max = xMax + categoryPad;
       } else {
-        xScale.min = xMin;
-        xScale.max = xMax;
+        scale.min = xMin;
+        scale.max = xMax;
       }
 
       // nice() gives clean tick boundaries for scatter/line.
       // Skip for time (data extent is natural) and bar (category padding is exact).
-      if (xScale.type !== 'time' && !hasBarSeries) {
-        xScale.nice(DEFAULT_TICK_COUNT);
+      if (scale.type !== 'time' && !hasBarSeries) {
+        scale.nice(DEFAULT_TICK_COUNT);
       }
     }
   }
 
   /**
-   * Auto-range Y scales to fit the data visible in the current X viewport.
+   * Auto-range vertical (left/right) axes to fit the data visible in the current X viewport.
    * Called on zoom/pan (viewport change) AND on data change.
    * This is the key to "zoom X, Y follows" behavior.
    */
-  private autoRangeY(): void {
+  private autoRangeVertical(): void {
     if (this.store.length === 0) return;
 
+    const axisConfigs = this.config.axes ?? {};
     for (const [key, scale] of this.scales) {
-      if (key === 'x') continue;
-      const scaleConfig = this.config.scales?.[key];
-      if (scaleConfig?.min !== undefined && scaleConfig?.max !== undefined) continue;
-      if (scaleConfig?.auto === false) continue;
+      const ac = axisConfigs[key];
+      if (!ac) continue;
+      const pos = inferPosition(key, ac.position);
+      if (pos !== 'left' && pos !== 'right') continue;
+      if (ac.min !== undefined && ac.max !== undefined) continue;
+      if (ac.auto === false) continue;
 
-      // Find series bound to this scale
+      // Find series bound to this axis
       const seriesIndices = this.config.series
-        .filter(s => (s.yScaleKey ?? 'y') === key && s.visible !== false)
+        .filter(s => (s.yAxisKey ?? 'y') === key && s.visible !== false)
         .map(s => s.dataIndex - 1);
 
       if (seriesIndices.length === 0) continue;
@@ -482,8 +494,8 @@ export class ChartCore implements ChartInstance {
       const [yMin, yMax] = this.store.yRange(seriesIndices, startIdx, endIdx);
       const pad = (yMax - yMin) * AUTO_RANGE_PADDING;
 
-      if (scaleConfig?.min === undefined) scale.min = yMin - pad;
-      if (scaleConfig?.max === undefined) scale.max = yMax + pad;
+      if (ac.min === undefined) scale.min = yMin - pad;
+      if (ac.max === undefined) scale.max = yMax + pad;
 
       scale.nice(DEFAULT_TICK_COUNT);
     }
@@ -505,16 +517,17 @@ export class ChartCore implements ChartInstance {
 
   private updateScalePixelRanges(): void {
     const { plot } = this.layout;
+    const axisConfigs = this.config.axes ?? {};
 
-    const xScale = this.scales.get('x');
-    if (xScale) {
-      xScale.setPixelRange(plot.left, plot.left + plot.width);
-    }
-
-    // Y scales: pixel range is inverted (top = max, bottom = min)
     for (const [key, scale] of this.scales) {
-      if (key === 'x') continue;
-      scale.setPixelRange(plot.top + plot.height, plot.top);
+      const ac = axisConfigs[key];
+      const pos = inferPosition(key, ac?.position);
+      if (pos === 'bottom' || pos === 'top') {
+        scale.setPixelRange(plot.left, plot.left + plot.width);
+      } else {
+        // left/right: pixel range is inverted (top = max, bottom = min)
+        scale.setPixelRange(plot.top + plot.height, plot.top);
+      }
     }
   }
 
@@ -582,22 +595,30 @@ export class ChartCore implements ChartInstance {
       const pan = this.config.pan ?? { enabled: true, x: true };
       if (!pan.enabled) return;
 
-      // If axis hint provided (drag started on an axis area), only pan that axis
-      const panX = axis ? axis === 'x' : pan.x !== false;
-      const panY = axis ? axis === 'y' : !!pan.y;
+      const axisConfigs = this.config.axes ?? {};
 
-      if (panX) {
-        const xScale = this.scales.get('x');
-        if (xScale) {
-          const dataDx = xScale.pixelToData(0) - xScale.pixelToData(dx);
-          this.applyViewportChange('x', xScale.min + dataDx, xScale.max + dataDx);
+      if (axis) {
+        // Drag started on a specific axis — only pan that axis
+        const scale = this.scales.get(axis);
+        if (scale) {
+          const pos = inferPosition(axis, axisConfigs[axis]?.position);
+          const isHoriz = pos === 'bottom' || pos === 'top';
+          const delta = isHoriz ? dx : dy;
+          const dataD = scale.pixelToData(0) - scale.pixelToData(delta);
+          this.applyViewportChange(axis, scale.min + dataD, scale.max + dataD);
         }
-      }
-      if (panY) {
-        const yScale = this.scales.get('y');
-        if (yScale) {
-          const dataDy = yScale.pixelToData(0) - yScale.pixelToData(dy);
-          this.applyViewportChange('y', yScale.min + dataDy, yScale.max + dataDy);
+      } else {
+        // Drag in plot area — pan all enabled axes
+        for (const [key, scale] of this.scales) {
+          const pos = inferPosition(key, axisConfigs[key]?.position);
+          const isHoriz = pos === 'bottom' || pos === 'top';
+          if (isHoriz && pan.x !== false) {
+            const dataD = scale.pixelToData(0) - scale.pixelToData(dx);
+            this.applyViewportChange(key, scale.min + dataD, scale.max + dataD);
+          } else if (!isHoriz && pan.y) {
+            const dataD = scale.pixelToData(0) - scale.pixelToData(dy);
+            this.applyViewportChange(key, scale.min + dataD, scale.max + dataD);
+          }
         }
       }
     });
@@ -607,26 +628,46 @@ export class ChartCore implements ChartInstance {
       const zoom = this.config.zoom ?? { enabled: true, x: true };
       if (!zoom.enabled) return;
 
-      if ((axis === 'x' || axis === 'xy') && zoom.x !== false) {
-        const xScale = this.scales.get('x');
-        if (xScale) {
-          const anchor = xScale.pixelToData(anchorX);
-          const newMin = anchor - (anchor - xScale.min) * factor;
-          const newMax = anchor + (xScale.max - anchor) * factor;
-          const range = newMax - newMin;
-          if ((!zoom.minRange || range >= zoom.minRange) && (!zoom.maxRange || range <= zoom.maxRange)) {
-            this.applyViewportChange('x', newMin, newMax);
+      const axisConfigs = this.config.axes ?? {};
+
+      if (axis === 'xy') {
+        // Zoom all enabled axes
+        for (const [key, scale] of this.scales) {
+          const pos = inferPosition(key, axisConfigs[key]?.position);
+          const isHoriz = pos === 'bottom' || pos === 'top';
+          if (isHoriz && zoom.x !== false) {
+            const anchor = scale.pixelToData(anchorX);
+            const newMin = anchor - (anchor - scale.min) * factor;
+            const newMax = anchor + (scale.max - anchor) * factor;
+            const range = newMax - newMin;
+            if ((!zoom.minRange || range >= zoom.minRange) && (!zoom.maxRange || range <= zoom.maxRange)) {
+              this.applyViewportChange(key, newMin, newMax);
+            }
+          } else if (!isHoriz && zoom.y) {
+            const anchor = scale.pixelToData(anchorY);
+            const newMin = anchor - (anchor - scale.min) * factor;
+            const newMax = anchor + (scale.max - anchor) * factor;
+            this.applyViewportChange(key, newMin, newMax);
           }
         }
-      }
-
-      if ((axis === 'y' || axis === 'xy') && zoom.y) {
-        const yScale = this.scales.get('y');
-        if (yScale) {
-          const anchor = yScale.pixelToData(anchorY);
-          const newMin = anchor - (anchor - yScale.min) * factor;
-          const newMax = anchor + (yScale.max - anchor) * factor;
-          this.applyViewportChange('y', newMin, newMax);
+      } else {
+        // Zoom a specific axis by key
+        const scale = this.scales.get(axis);
+        if (scale) {
+          const pos = inferPosition(axis, axisConfigs[axis]?.position);
+          const isHoriz = pos === 'bottom' || pos === 'top';
+          const anchorPx = isHoriz ? anchorX : anchorY;
+          const anchor = scale.pixelToData(anchorPx);
+          const newMin = anchor - (anchor - scale.min) * factor;
+          const newMax = anchor + (scale.max - anchor) * factor;
+          const range = newMax - newMin;
+          if (isHoriz) {
+            if (zoom.x !== false && (!zoom.minRange || range >= zoom.minRange) && (!zoom.maxRange || range <= zoom.maxRange)) {
+              this.applyViewportChange(axis, newMin, newMax);
+            }
+          } else {
+            this.applyViewportChange(axis, newMin, newMax);
+          }
         }
       }
     });
@@ -748,13 +789,17 @@ export class ChartCore implements ChartInstance {
     const scale = this.scales.get(scaleKey);
     if (!scale) return;
 
-    if (scaleKey === 'x') this.userHasZoomed = true;
+    const ac = this.config.axes?.[scaleKey];
+    const pos = inferPosition(scaleKey, ac?.position);
+    const isHoriz = pos === 'bottom' || pos === 'top';
+
+    if (isHoriz) this.userHasZoomed = true;
 
     scale.min = min;
     scale.max = max;
 
-    if (scaleKey === 'x' && !this.config.zoom?.y) {
-      this.autoRangeY();
+    if (isHoriz && !this.config.zoom?.y) {
+      this.autoRangeVertical();
     }
 
     this.refreshCursor();
@@ -788,9 +833,10 @@ export class ChartCore implements ChartInstance {
           this.layout,
           this.scales,
           this.theme,
+          this.config,
           customXTicks,
         );
-        updateDOMLabels(this.canvasManager.domLayer, labels, this.theme);
+        updateDOMLabels(this.canvasManager.domLayer, labels, this.theme, this.layout);
         this.pluginManager.dispatch('afterDrawGrid', this, this.canvasManager.gridCtx);
       }
     }
@@ -831,8 +877,8 @@ export class ChartCore implements ChartInstance {
       if (series.visible === false) continue;
 
       const color = series.stroke ?? palette[si % palette.length];
-      const xScale = this.scales.get(series.xScaleKey ?? 'x')!;
-      const yScale = this.scales.get(series.yScaleKey ?? 'y')!;
+      const xScale = this.scales.get(series.xAxisKey ?? 'x')!;
+      const yScale = this.scales.get(series.yAxisKey ?? 'y')!;
       if (!xScale || !yScale) continue;
 
       const colIdx = series.dataIndex;
@@ -954,8 +1000,8 @@ export class ChartCore implements ChartInstance {
       const sc = this.config.series[point.seriesIndex];
       if (!sc) continue;
 
-      const xScale = this.scales.get(sc.xScaleKey ?? 'x');
-      const yScale = this.scales.get(sc.yScaleKey ?? 'y');
+      const xScale = this.scales.get(sc.xAxisKey ?? 'x');
+      const yScale = this.scales.get(sc.yAxisKey ?? 'y');
       if (!xScale || !yScale) continue;
 
       if (sc.type === 'histogram') {
@@ -1153,7 +1199,7 @@ export class ChartCore implements ChartInstance {
       if (yVal !== yVal) continue; // NaN
 
       const color = series.stroke ?? this.theme.palette[si % this.theme.palette.length];
-      const yScale = this.scales.get(series.yScaleKey ?? 'y');
+      const yScale = this.scales.get(series.yAxisKey ?? 'y');
 
       points.push({
         seriesIndex: si,
@@ -1200,8 +1246,8 @@ export class ChartCore implements ChartInstance {
 
         if (bins.edges.length > 0) {
           // Set histogram scales so axis renders at correct range
-          const xScale = this.scales.get(histSeries.xScaleKey ?? 'x');
-          const yScale = this.scales.get(histSeries.yScaleKey ?? 'y');
+          const xScale = this.scales.get(histSeries.xAxisKey ?? 'x');
+          const yScale = this.scales.get(histSeries.yAxisKey ?? 'y');
           if (xScale && yScale) {
             xScale.min = bins.edges[0];
             xScale.max = bins.edges[bins.edges.length - 1];

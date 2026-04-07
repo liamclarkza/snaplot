@@ -1,4 +1,4 @@
-import type { Layout, ChartConfig, Scale } from '../types';
+import type { Layout, ChartConfig, Scale, AxisPosition } from '../types';
 import { DEFAULT_PADDING, DEFAULT_TICK_COUNT } from '../constants';
 
 /**
@@ -40,6 +40,15 @@ function measureText(
   };
 }
 
+/**
+ * Infer axis position from key name if not explicitly set.
+ * Keys starting with 'x' → 'bottom', everything else → 'left'.
+ */
+export function inferPosition(key: string, explicit?: AxisPosition): AxisPosition {
+  if (explicit) return explicit;
+  return key === 'x' || key.startsWith('x') ? 'bottom' : 'left';
+}
+
 export function computeLayout(
   containerWidth: number,
   containerHeight: number,
@@ -56,38 +65,44 @@ export function computeLayout(
     left: config.padding?.left ?? DEFAULT_PADDING.left,
   };
 
-  // Measure Y-axis label widths from the left Y scale
+  // Accumulate space needed per side from all configured axes
   let leftAxisWidth = padding.left;
   let rightAxisWidth = padding.right;
-  const bottomAxisHeight = padding.bottom;
-  const topAxisHeight = padding.top;
+  let bottomAxisHeight = padding.bottom;
+  let topAxisHeight = padding.top;
 
-  // Try to measure actual tick label widths for better layout
-  const yScale = scales.get('y');
-  if (yScale) {
-    const ticks = yScale.ticks(DEFAULT_TICK_COUNT);
-    let maxWidth = 0;
-    for (const t of ticks) {
-      const label = yScale.tickFormat(t);
-      const { width } = measureText(label, fontFamily, fontSize);
-      if (width > maxWidth) maxWidth = width;
+  // Build a map of axis key → position for later use
+  const axisPositions = new Map<string, AxisPosition>();
+  const axisConfigs = config.axes ?? {};
+
+  for (const [key, ac] of Object.entries(axisConfigs)) {
+    const pos = inferPosition(key, ac.position);
+    axisPositions.set(key, pos);
+
+    const scale = scales.get(key);
+    if (!scale) continue;
+
+    if (pos === 'left' || pos === 'right') {
+      const ticks = scale.ticks(DEFAULT_TICK_COUNT);
+      let maxWidth = 0;
+      for (const t of ticks) {
+        const label = scale.tickFormat(t);
+        const { width } = measureText(label, fontFamily, fontSize);
+        if (width > maxWidth) maxWidth = width;
+      }
+      // Tick mark (4px) + gap (8px) + label width + margin (4px)
+      const needed = maxWidth + 16;
+      if (pos === 'left') {
+        leftAxisWidth = Math.max(leftAxisWidth, needed);
+      } else {
+        rightAxisWidth = Math.max(rightAxisWidth, needed);
+      }
     }
-    // Tick mark (4px) + gap (8px) + label width + margin (4px)
-    leftAxisWidth = Math.max(leftAxisWidth, maxWidth + 16);
+    // top/bottom axes don't need extra width measurement (height is from padding)
   }
 
-  const y2Scale = scales.get('y2');
-  if (y2Scale) {
-    const ticks = y2Scale.ticks(DEFAULT_TICK_COUNT);
-    let maxWidth = 0;
-    for (const t of ticks) {
-      const label = y2Scale.tickFormat(t);
-      const { width } = measureText(label, fontFamily, fontSize);
-      if (width > maxWidth) maxWidth = width;
-    }
-    rightAxisWidth = Math.max(rightAxisWidth, maxWidth + 16);
-
-    // Symmetric: when both axes have labels, use the wider of the two for both
+  // Symmetric: when both left and right axes have labels, use the wider for both
+  if (leftAxisWidth > padding.left && rightAxisWidth > padding.right) {
     const symmetric = Math.max(leftAxisWidth, rightAxisWidth);
     leftAxisWidth = symmetric;
     rightAxisWidth = symmetric;
@@ -98,6 +113,25 @@ export function computeLayout(
   const plotWidth = Math.max(0, containerWidth - leftAxisWidth - rightAxisWidth);
   const plotHeight = Math.max(0, containerHeight - topAxisHeight - bottomAxisHeight);
 
+  // Build axis regions keyed by axis config key
+  const axes: Layout['axes'] = {};
+  for (const [key, pos] of axisPositions) {
+    switch (pos) {
+      case 'top':
+        axes[key] = { position: 'top', area: { left: plotLeft, top: 0, width: plotWidth, height: topAxisHeight } };
+        break;
+      case 'bottom':
+        axes[key] = { position: 'bottom', area: { left: plotLeft, top: plotTop + plotHeight, width: plotWidth, height: bottomAxisHeight } };
+        break;
+      case 'left':
+        axes[key] = { position: 'left', area: { left: 0, top: plotTop, width: leftAxisWidth, height: plotHeight } };
+        break;
+      case 'right':
+        axes[key] = { position: 'right', area: { left: plotLeft + plotWidth, top: plotTop, width: rightAxisWidth, height: plotHeight } };
+        break;
+    }
+  }
+
   return {
     width: containerWidth,
     height: containerHeight,
@@ -107,32 +141,7 @@ export function computeLayout(
       width: plotWidth,
       height: plotHeight,
     },
-    axes: {
-      top: {
-        left: plotLeft,
-        top: 0,
-        width: plotWidth,
-        height: topAxisHeight,
-      },
-      bottom: {
-        left: plotLeft,
-        top: plotTop + plotHeight,
-        width: plotWidth,
-        height: bottomAxisHeight,
-      },
-      left: {
-        left: 0,
-        top: plotTop,
-        width: leftAxisWidth,
-        height: plotHeight,
-      },
-      right: {
-        left: plotLeft + plotWidth,
-        top: plotTop,
-        width: rightAxisWidth,
-        height: plotHeight,
-      },
-    },
+    axes,
     dpr,
   };
 }

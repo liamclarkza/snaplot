@@ -24,7 +24,7 @@ const heroConfig: ChartConfig = {
     gridOpacity: 0.25,
     axisLineColor: '#2a2b3d',
   },
-  scales: { x: { type: 'time' }, y: { type: 'linear' } },
+  axes: { x: { type: 'time' }, y: { type: 'linear' } },
   series: [
     { label: 'Throughput', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2, stroke: '#4f8fea' },
     { label: 'Latency', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: '#e69f00' },
@@ -45,7 +45,7 @@ const data = [
 
 <Chart
   config={{
-    scales: { x: { type: 'time' }, y: { type: 'linear' } },
+    axes: { x: { type: 'time' }, y: { type: 'linear' } },
     series: [
       { label: 'CPU %', dataIndex: 1, type: 'line' },
       { label: 'Memory %', dataIndex: 2, type: 'area' },

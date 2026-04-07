@@ -34,7 +34,7 @@ const data: ColumnarData = [
 
 <Chart
   config={{
-    scales: { x: { type: 'time' }, y: { type: 'linear' } },
+    axes: { x: { type: 'time' }, y: { type: 'linear' } },
     series: [{ label: 'CPU %', dataIndex: 1, type: 'line' }],
   }}
   data={data}

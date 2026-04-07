@@ -19,8 +19,8 @@ export interface EventMap {
   // Semantic action events (from GestureManager)
   'action:cursor': { x: number; y: number; pointerType: string };
   'action:cursor-leave': undefined;
-  'action:pan': { dx: number; dy: number; axis?: 'x' | 'y' };
-  'action:zoom': { factor: number; anchorX: number; anchorY: number; axis: 'x' | 'y' | 'xy' };
+  'action:pan': { dx: number; dy: number; axis?: string };
+  'action:zoom': { factor: number; anchorX: number; anchorY: number; axis: string };
   'action:box-start': { x: number; y: number };
   'action:box-update': { x: number; y: number };
   'action:box-end': { x1: number; y1: number; x2: number; y2: number };
@@ -112,7 +112,7 @@ export class SyncGroup {
     if (!group) return;
     for (const peer of group) {
       if (peer !== source) {
-        peer.setScale(scaleKey, range);
+        peer.setAxis(scaleKey, range);
       }
     }
   }

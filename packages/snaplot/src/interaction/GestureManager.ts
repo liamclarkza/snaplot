@@ -32,6 +32,11 @@ interface PointerState {
   pointerType: string;
 }
 
+interface AreaResult {
+  type: 'plot' | 'axis' | 'outside';
+  axisKey?: string;
+}
+
 export class GestureManager {
   private pointers = new Map<number, PointerState>();
   private state: 'idle' | 'dragging' | 'pinching' | 'long-pressing' | 'selecting' = 'idle';
@@ -42,11 +47,11 @@ export class GestureManager {
 
   // Scroll origin tracking: only zoom on axis if scroll STARTED on that axis.
   // Scrolls that start elsewhere (plot, page) always pass through.
-  private scrollStartArea: 'plot' | 'x-axis' | 'y-axis' | 'outside' | null = null;
+  private scrollStartArea: AreaResult | null = null;
   private scrollResetTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Track which area the drag started in (for axis-specific pan)
-  private dragStartArea: 'plot' | 'x-axis' | 'y-axis' | 'outside' = 'plot';
+  private dragStartArea: AreaResult = { type: 'plot' };
 
   // Tap detection
   private lastTapTime = 0;
@@ -132,23 +137,27 @@ export class GestureManager {
     return x >= plot.left && x <= plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height;
   }
 
-  private getAxisArea(x: number, y: number): 'plot' | 'x-axis' | 'y-axis' | 'outside' {
+  /**
+   * Determine which area a point falls in by checking against layout.axes entries.
+   * Returns { type: 'plot'|'axis'|'outside', axisKey?: string }.
+   */
+  private getAxisArea(x: number, y: number): AreaResult {
     const layout = this.getLayout();
-    const { plot, axes } = layout;
+    const { plot } = layout;
 
     if (x >= plot.left && x <= plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height) {
-      return 'plot';
+      return { type: 'plot' };
     }
-    if (y > plot.top + plot.height && x >= plot.left && x <= plot.left + plot.width) {
-      return 'x-axis';
+
+    // Check each configured axis region
+    for (const [key, entry] of Object.entries(layout.axes)) {
+      const { area } = entry;
+      if (x >= area.left && x <= area.left + area.width && y >= area.top && y <= area.top + area.height) {
+        return { type: 'axis', axisKey: key };
+      }
     }
-    if (x < plot.left && y >= plot.top && y <= plot.top + plot.height) {
-      return 'y-axis';
-    }
-    if (x > plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height) {
-      return 'y-axis'; // right Y-axis
-    }
-    return 'outside';
+
+    return { type: 'outside' };
   }
 
   private clearLongPress(): void {
@@ -178,7 +187,7 @@ export class GestureManager {
     if (mode === 'readonly') return false;
 
     // Drag on axis area always pans that axis
-    if (this.dragStartArea === 'x-axis' || this.dragStartArea === 'y-axis') return true;
+    if (this.dragStartArea.type === 'axis') return true;
 
     // Touch one-finger drag always pans (box-zoom via long-press)
     if (e.pointerType === 'touch') return true;
@@ -199,7 +208,7 @@ export class GestureManager {
 
     const { x, y } = this.localCoords(e);
     const area = this.getAxisArea(x, y);
-    if (area === 'outside') return;
+    if (area.type === 'outside') return;
 
     this.dragStartArea = area;
     this.target.setPointerCapture(e.pointerId);
@@ -271,7 +280,7 @@ export class GestureManager {
         const dx = Math.abs(pts[1].x - pts[0].x);
         const dy = Math.abs(pts[1].y - pts[0].y);
         const zoom = this.getZoomConfig();
-        let axis: 'x' | 'y' | 'xy' = 'xy';
+        let axis: string = 'xy';
         if (zoom.x && !zoom.y) axis = 'x';
         else if (!zoom.x && zoom.y) axis = 'y';
         else if (dx > 2 * dy) axis = 'x';
@@ -324,12 +333,10 @@ export class GestureManager {
     // Dragging — pan or box-zoom based on mode
     if (this.state === 'dragging') {
       if (this.dragIsPan(e)) {
-        // Pan: emit incremental delta with axis hint from drag start area
+        // Pan: emit incremental delta with axis key from drag start area
         const prevX = this.dragStartX;
         const prevY = this.dragStartY;
-        const panAxis = this.dragStartArea === 'x-axis' ? 'x' as const
-                      : this.dragStartArea === 'y-axis' ? 'y' as const
-                      : undefined;
+        const panAxis = this.dragStartArea.type === 'axis' ? this.dragStartArea.axisKey : undefined;
         this.eventBus.emit('action:pan', { dx: x - prevX, dy: y - prevY, axis: panAxis });
         this.dragStartX = x;
         this.dragStartY = y;
@@ -448,8 +455,8 @@ export class GestureManager {
       }, 200);
 
       // Only zoom if scroll STARTED on an axis area
-      const startedOnAxis = this.scrollStartArea === 'y-axis' || this.scrollStartArea === 'x-axis';
-      if (startedOnAxis && (area === 'y-axis' || area === 'x-axis')) {
+      const startedOnAxis = this.scrollStartArea.type === 'axis';
+      if (startedOnAxis && area.type === 'axis') {
         e.preventDefault();
         const zoom = this.getZoomConfig();
         if (!zoom.enabled) return;
@@ -457,7 +464,7 @@ export class GestureManager {
         const sensitivity = zoom.wheelFactor ?? DEFAULT_WHEEL_FACTOR;
         const delta = Math.min(Math.abs(e.deltaY), 20) * 0.005;
         const factor = e.deltaY > 0 ? 1 + delta * (sensitivity - 1) * 10 : 1 / (1 + delta * (sensitivity - 1) * 10);
-        const axis = this.scrollStartArea === 'y-axis' ? 'y' : 'x';
+        const axis = this.scrollStartArea.axisKey!;
 
         this.eventBus.emit('action:zoom', { factor, anchorX: x, anchorY: y, axis });
         return;
@@ -468,7 +475,7 @@ export class GestureManager {
     }
 
     // Pinch-to-zoom (ctrlKey on wheel)
-    if (!this.inPlotArea(x, y) && area !== 'x-axis' && area !== 'y-axis') return;
+    if (!this.inPlotArea(x, y) && area.type !== 'axis') return;
 
     e.preventDefault();
 
@@ -479,7 +486,7 @@ export class GestureManager {
     const delta = Math.min(Math.abs(e.deltaY), 20) * 0.005;
     const factor = e.deltaY > 0 ? 1 + delta * (sensitivity - 1) * 10 : 1 / (1 + delta * (sensitivity - 1) * 10);
 
-    let axis: 'x' | 'y' | 'xy' = 'xy';
+    let axis: string = 'xy';
     if (zoom.x && !zoom.y) axis = 'x';
     else if (!zoom.x && zoom.y) axis = 'y';
 

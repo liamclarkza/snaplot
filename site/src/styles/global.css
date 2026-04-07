@@ -78,3 +78,33 @@ code {
   --sh-keyword: #cc79a7;
   --sh-comment: #555570;
 }
+
+/* ─── Mobile responsive: docs sidebar ─── */
+@media (max-width: 768px) {
+  .docs-menu-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .docs-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0;
+    bottom: 0;
+    width: 260px !important;
+    max-height: 100vh !important;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    z-index: 150;
+    padding: 72px 20px calc(140px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .docs-sidebar-open {
+    transform: translateX(0) !important;
+  }
+}

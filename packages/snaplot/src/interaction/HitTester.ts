@@ -79,8 +79,8 @@ export class HitTester {
       const yVal = store.y(colIdx - 1)[idx];
       if (yVal !== yVal) continue; // NaN
 
-      const yScaleKey = sc.yScaleKey ?? 'y';
-      const yScale = scales.get(yScaleKey);
+      const yAxisKey = sc.yAxisKey ?? 'y';
+      const yScale = scales.get(yAxisKey);
       if (yScale) {
         const py = yScale.dataToPixel(yVal);
         closestYDist = Math.min(closestYDist, Math.abs(py - pixelY));
@@ -134,8 +134,8 @@ export class HitTester {
       const colIdx = sc.dataIndex;
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
-      const yScaleKey = sc.yScaleKey ?? 'y';
-      const yScale = scales.get(yScaleKey);
+      const yAxisKey = sc.yAxisKey ?? 'y';
+      const yScale = scales.get(yAxisKey);
       if (!yScale) continue;
 
       for (let i = startIdx; i <= endIdx; i++) {
