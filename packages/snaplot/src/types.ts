@@ -115,10 +115,6 @@ export interface SeriesConfig {
   /** Heatmap bin size in CSS pixels (default: 1 = one bin per physical pixel) */
   heatmapBinSize?: number;
 
-  // Histogram
-  binMethod?: 'sturges' | 'scott' | 'freedman-diaconis';
-  binCount?: number;
-
   // Axis binding
   xAxisKey?: string;
   yAxisKey?: string;

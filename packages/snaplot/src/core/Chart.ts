@@ -30,7 +30,7 @@ import { renderAxes, updateDOMLabels } from '../renderers/AxesRenderer';
 import { renderLine, renderArea } from '../renderers/LineRenderer';
 import { renderScatter } from '../renderers/ScatterRenderer';
 import { renderBars } from '../renderers/BarRenderer';
-import { calculateBins, renderHistogram } from '../renderers/HistogramRenderer';
+import { renderHistogram } from '../renderers/HistogramRenderer';
 import { renderCrosshair, renderSelectionBox } from '../renderers/InteractionRenderer';
 
 import { GestureManager } from '../interaction/GestureManager';
@@ -85,8 +85,6 @@ export class ChartCore implements ChartInstance {
   private selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
   /** True when the user has actively zoomed — suppresses auto-range X on data updates */
   private userHasZoomed = false;
-  /** Cached histogram bins per series index (computed on data change) */
-  private histogramBinsCache = new Map<number, import('../renderers/HistogramRenderer').HistogramBins>();
 
   // Event listeners
   private listeners = new Map<string, Set<Function>>();
@@ -494,10 +492,22 @@ export class ChartCore implements ChartInstance {
       const [yMin, yMax] = this.store.yRange(seriesIndices, startIdx, endIdx);
       const pad = (yMax - yMin) * AUTO_RANGE_PADDING;
 
-      if (ac.min === undefined) scale.min = yMin - pad;
-      if (ac.max === undefined) scale.max = yMax + pad;
+      // For bar/histogram series, always include 0 as the baseline
+      const hasBarOrHist = this.config.series.some(
+        s => (s.yAxisKey ?? 'y') === key && s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
+      );
+
+      if (ac.min === undefined) {
+        scale.min = hasBarOrHist ? Math.min(0, yMin - pad) : yMin - pad;
+      }
+      if (ac.max === undefined) {
+        scale.max = hasBarOrHist ? Math.max(0, yMax + pad) : yMax + pad;
+      }
 
       scale.nice(DEFAULT_TICK_COUNT);
+
+      // nice() can push min below 0 — clamp back for bar/histogram baseline
+      if (hasBarOrHist && yMin >= 0 && scale.min < 0) scale.min = 0;
     }
   }
 
@@ -910,16 +920,11 @@ export class ChartCore implements ChartInstance {
           barIdx++;
           break;
 
-        case 'histogram': {
-          // Bins and scales already computed in computeCustomXTicks() before axes render
-          const bins = this.histogramBinsCache.get(si) ?? calculateBins(yData, series.binMethod, series.binCount);
-          this.histogramBinsCache.set(si, bins);
-
-          if (bins.edges.length > 0) {
-            renderHistogram(ctx, bins, xScale, yScale, this.layout, series, color);
-          }
+        case 'histogram':
+          // Data format: X = bin edges (N+1), Y = counts (N+1, padded)
+          // Render bins directly from the data columns
+          renderHistogram(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color);
           break;
-        }
       }
     }
   }
@@ -1005,12 +1010,15 @@ export class ChartCore implements ChartInstance {
       if (!xScale || !yScale) continue;
 
       if (sc.type === 'histogram') {
-        const bins = this.histogramBinsCache.get(point.seriesIndex);
-        if (bins && point.dataIndex < bins.counts.length) {
-          const binIdx = point.dataIndex;
-          const x1 = xScale.dataToPixel(bins.edges[binIdx]);
-          const x2 = xScale.dataToPixel(bins.edges[binIdx + 1]);
-          const yTop = yScale.dataToPixel(bins.counts[binIdx]);
+        // Highlight hovered bin — edges from X data, counts from Y data
+        const edges = this.store.x;
+        const colIdx = sc.dataIndex;
+        const counts = colIdx >= 1 && colIdx <= this.store.seriesCount ? this.store.y(colIdx - 1) : null;
+        const binIdx = point.dataIndex;
+        if (counts && binIdx < edges.length - 1) {
+          const x1 = xScale.dataToPixel(edges[binIdx]);
+          const x2 = xScale.dataToPixel(edges[binIdx + 1]);
+          const yTop = yScale.dataToPixel(counts[binIdx]);
           const yBase = yScale.dataToPixel(0);
           ctx.fillStyle = `rgba(255, 255, 255, ${ringAlpha})`;
           ctx.fillRect(x1, Math.min(yTop, yBase), x2 - x1, Math.abs(yTop - yBase));
@@ -1129,34 +1137,36 @@ export class ChartCore implements ChartInstance {
   private findHistogramTooltipPoints(): TooltipPoint[] {
     const points: TooltipPoint[] = [];
     const xScale = this.scales.get('x');
-    if (!xScale || this.cursorX === null) return points;
+    if (!xScale || this.cursorX === null || this.store.length < 2) return points;
 
     const dataX = xScale.pixelToData(this.cursorX);
+    const edges = this.store.x; // X column = bin edges
 
     for (let si = 0; si < this.config.series.length; si++) {
       const series = this.config.series[si];
       if (series.visible === false || series.type !== 'histogram') continue;
 
-      const bins = this.histogramBinsCache.get(si);
-      if (!bins || bins.edges.length === 0) continue;
+      const colIdx = series.dataIndex;
+      if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
 
+      const counts = this.store.y(colIdx - 1);
       const color = series.stroke ?? this.theme.palette[si % this.theme.palette.length];
 
-      // Find which bin the cursor X falls into
-      for (let b = 0; b < bins.counts.length; b++) {
-        if (dataX >= bins.edges[b] && dataX < bins.edges[b + 1]) {
-          const binMin = bins.edges[b];
-          const binMax = bins.edges[b + 1];
-          const count = bins.counts[b];
+      // Find which bin the cursor X falls into (edges are sorted)
+      for (let b = 0; b < edges.length - 1; b++) {
+        if (dataX >= edges[b] && dataX < edges[b + 1]) {
+          const binMin = edges[b];
+          const binMax = edges[b + 1];
+          const count = counts[b];
 
           points.push({
             seriesIndex: si,
             dataIndex: b,
             label: series.label,
-            x: (binMin + binMax) / 2, // bin center
+            x: (binMin + binMax) / 2,
             y: count,
             color,
-            formattedX: `${binMin.toFixed(1)} – ${binMax.toFixed(1)}`,
+            formattedX: `${binMin.toFixed(1)} \u2013 ${binMax.toFixed(1)}`,
             formattedY: String(count),
           });
           break;
@@ -1233,46 +1243,22 @@ export class ChartCore implements ChartInstance {
   private computeCustomXTicks(): { values: number[]; format?: (v: number) => string } | undefined {
     const visibleSeries = this.config.series.filter(s => s.visible !== false);
 
-    // Histogram: use bin edges
+    // Histogram: X data = bin edges, use them as tick values
     const histSeries = visibleSeries.find(s => s.type === 'histogram');
-    if (histSeries) {
-      const si = this.config.series.indexOf(histSeries);
-      // Compute bins now (before data render) so we have edges for axis labels
-      const colIdx = histSeries.dataIndex;
-      if (colIdx >= 1 && colIdx <= this.store.seriesCount) {
-        const yData = this.store.y(colIdx - 1);
-        const bins = calculateBins(yData, histSeries.binMethod, histSeries.binCount);
-        this.histogramBinsCache.set(si, bins);
-
-        if (bins.edges.length > 0) {
-          // Set histogram scales so axis renders at correct range
-          const xScale = this.scales.get(histSeries.xAxisKey ?? 'x');
-          const yScale = this.scales.get(histSeries.yAxisKey ?? 'y');
-          if (xScale && yScale) {
-            xScale.min = bins.edges[0];
-            xScale.max = bins.edges[bins.edges.length - 1];
-            yScale.min = 0;
-            yScale.max = bins.maxCount * 1.1;
-            yScale.nice();
-            this.updateScalePixelRanges();
-          }
-
-          // Thin edges evenly if too many to fit as labels.
-          // No special-casing of first/last — even spacing looks cleanest.
-          let edgeValues = Array.from(bins.edges);
-          const plotWidth = this.layout.plot.width;
-          const maxLabels = Math.max(2, Math.floor(plotWidth / 65));
-          if (edgeValues.length > maxLabels) {
-            const step = Math.ceil(edgeValues.length / maxLabels);
-            edgeValues = edgeValues.filter((_, i) => i % step === 0);
-          }
-
-          return {
-            values: edgeValues,
-            format: (v) => Number.isInteger(v) ? String(v) : v.toFixed(1),
-          };
-        }
+    if (histSeries && this.store.length > 0) {
+      // X column contains bin edges directly (pre-computed by user)
+      let edgeValues = Array.from(this.store.x);
+      const plotWidth = this.layout.plot.width;
+      const maxLabels = Math.max(2, Math.floor(plotWidth / 65));
+      if (edgeValues.length > maxLabels) {
+        const step = Math.ceil(edgeValues.length / maxLabels);
+        edgeValues = edgeValues.filter((_, i) => i % step === 0);
       }
+
+      return {
+        values: edgeValues,
+        format: (v) => Number.isInteger(v) ? String(v) : v.toFixed(1),
+      };
     }
 
     // Bar chart: tick at each category X value

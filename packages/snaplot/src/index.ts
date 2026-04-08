@@ -30,8 +30,9 @@ export { lightTheme, darkTheme, oceanTheme, midnightTheme, resolveTheme } from '
 // Plugins
 export { createLegendPlugin } from './plugins/builtins/legendPlugin';
 
-// Histogram utilities
-export { calculateBins } from './renderers/HistogramRenderer';
+// Utilities
+export { histogram } from './utils/histogram';
+export type { HistogramBins, HistogramOptions } from './utils/histogram';
 
 // Types
 export type {

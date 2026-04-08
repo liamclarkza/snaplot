@@ -1,5 +1,5 @@
 import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js';
-import { lttb, m4, createLegendPlugin } from 'snaplot';
+import { lttb, m4, histogram, createLegendPlugin } from 'snaplot';
 import type { ColumnarData, ChartInstance } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
 import LiveEditor from '../components/LiveEditor';
@@ -38,12 +38,14 @@ function barData(): ColumnarData {
 }
 
 function histData(): ColumnarData {
-  const n = 5000, x = new Float64Array(n), y = new Float64Array(n);
+  // Generate raw bimodal data, then compute bins
+  const n = 5000;
+  const raw = new Float64Array(n);
   for (let i = 0; i < n; i++) {
-    x[i] = i;
-    y[i] = Math.random() < 0.6 ? 50 + (Math.random() + Math.random() + Math.random() - 1.5) * 20 : 80 + (Math.random() + Math.random() - 1) * 15;
+    raw[i] = Math.random() < 0.6 ? 50 + (Math.random() + Math.random() + Math.random() - 1.5) * 20 : 80 + (Math.random() + Math.random() - 1) * 15;
   }
-  return [x, y];
+  const bins = histogram(raw);
+  return [bins.edges, bins.counts];
 }
 
 function interpData(): ColumnarData {
@@ -593,17 +595,22 @@ const data: ColumnarData = [
 
         <Section id="histogram" title="Histogram">
           <P>
-            Histogram auto-bins Y values from the data. Three bin methods are available:
+            Histograms display pre-computed bins. Use the <code>histogram()</code> utility to compute bins from raw data, then pass the result as chart data:
           </P>
-          <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
-            <li><code>freedman-diaconis</code> — uses IQR, best for general-purpose data and detecting multimodal distributions</li>
-            <li><code>sturges</code> — assumes normality, good for roughly gaussian data with moderate sample sizes</li>
-            <li><code>scott</code> — uses standard deviation, a good middle ground for large datasets</li>
-          </ul>
-          <Ex title="Bimodal distribution (5K samples)" desc="Try changing binMethod to 'sturges' or 'scott'"
+          <CodeBlock code={`import { histogram } from 'snaplot';
+
+const raw = new Float64Array(values);
+const bins = histogram(raw, { method: 'freedman-diaconis' });
+// bins.edges = Float64Array (N+1 values)
+// bins.counts = Float64Array (N+1 values, last is padding 0)
+
+const data: ColumnarData = [bins.edges, bins.counts];`} />
+          <div style={{ height: '12px' }} />
+          <P>Three bin methods: <code>freedman-diaconis</code> (IQR, robust to outliers), <code>sturges</code> (assumes normality), <code>scott</code> (std deviation).</P>
+          <Ex title="Bimodal distribution (5K samples)"
             data={d_hist()}
             code={`{
-  series: [{ label: 'Response Time', dataIndex: 1, type: 'histogram', binMethod: 'freedman-diaconis' }],
+  series: [{ label: 'Response Time', dataIndex: 1, type: 'histogram' }],
   tooltip: { show: true },
 }`} />
         </Section>
