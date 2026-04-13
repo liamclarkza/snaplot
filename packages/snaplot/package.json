@@ -10,6 +10,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./legend-table.css": {
+      "import": "./dist/legend-table.css",
+      "default": "./dist/legend-table.css"
     }
   },
   "files": [

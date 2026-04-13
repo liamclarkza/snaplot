@@ -10,6 +10,20 @@ export { ChartCore } from './core/Chart';
 // Reactive primitive
 export { createChart } from './solid/createChart';
 
+// Cursor + highlight reactive primitives
+export { createCursorSnapshot } from './solid/createCursorSnapshot';
+export { createHighlight } from './solid/createHighlight';
+export { createChartGroup } from './solid/createChartGroup';
+export type { ChartGroup, ChartGroupBindings } from './solid/createChartGroup';
+
+// Solid legend table component
+export { LegendTable } from './solid/LegendTable';
+export type {
+  LegendTableProps,
+  LegendTableSolidColumn,
+  LegendTableFallback,
+} from './solid/LegendTable';
+
 // Data utilities (P3: user controls when/how to downsample)
 export { lttb } from './data/downsampling/lttb';
 export { m4 } from './data/downsampling/m4';
@@ -29,6 +43,21 @@ export { lightTheme, darkTheme, oceanTheme, midnightTheme, resolveTheme } from '
 
 // Plugins
 export { createLegendPlugin } from './plugins/builtins/legendPlugin';
+export { createLegendTablePlugin } from './plugins/builtins/legendTablePlugin';
+export type {
+  LegendTableOptions,
+} from './plugins/builtins/legendTablePlugin';
+export {
+  nameColumn,
+  valueColumn,
+  swatchColumn,
+  metricColumn,
+  column,
+} from './plugins/builtins/legendTableColumns';
+export type {
+  LegendTableColumn,
+  LegendCellContent,
+} from './plugins/builtins/legendTableColumns';
 
 // Utilities
 export { histogram } from './utils/histogram';
@@ -61,4 +90,9 @@ export type {
   InterpolationMode,
   RenderContext,
   ChartEventMap,
+  CursorSnapshot,
+  CursorSeriesPoint,
+  CursorSnapshotOptions,
+  HighlightConfig,
+  ZoomBoundsSpec,
 } from './types';
