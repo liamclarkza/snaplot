@@ -706,6 +706,19 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
             The default scale type. Uses Heckbert's nice numbers algorithm (with D3's integer-arithmetic trick) to produce clean tick boundaries — 0, 20, 40, 60 instead of 17.3, 34.6, 51.9.
             Y axis auto-ranges to fit the visible data in the current X viewport.
           </P>
+          <P>
+            <b>Range control per axis</b> — three knobs combine for any behaviour you need:
+          </P>
+          <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
+            <li><code>min</code> / <code>max</code> — pin the bounds. <code>resetZoom()</code> now restores to these values (previously a no-op).</li>
+            <li><code>padding</code> — fraction of the data range to pad each side. Default: <code>0</code> for horizontal axes, <code>0.05</code> for vertical.</li>
+            <li><code>nice</code> — whether to round bounds outward to clean tick boundaries. Default: <code>true</code>. Set to <code>false</code> for exact-extent rendering (no trailing gap on the right).</li>
+          </ul>
+          <CodeBlock code={`axes: {
+  x: { nice: false, padding: 0 },      // exact data extent
+  y: { nice: true,  padding: 0.1 },    // 10% pad + nice tick boundaries
+}`} />
+          <div style={{ height: '12px' }} />
           <Ex title="Linear scale with nice ticks" data={d_linear()} height="240px"
             code={`{
   series: [{ label: 'Value', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
@@ -832,14 +845,25 @@ axes: {
         <Section id="zoom" title="Zoom & Selection">
           <P>
             Drag to select a region to zoom into. For time series (<code>zoom.y: false</code>), the selection is a full-height band constraining only X.
-            For scatter plots (<code>zoom.y: true</code>), you get a free rectangle selecting both axes.
+            For scatter plots (<code>zoom.y: true</code>), you get a free rectangle selecting both axes. Drag endpoints are clamped to the plot rectangle, so releasing far outside the chart still zooms to within the data.
           </P>
           <P>
             <b>Double-click</b> (or double-tap) resets zoom to the full data extent.
             Use <code>minRange</code> and <code>maxRange</code> to set zoom limits. <code>wheelFactor</code> controls trackpad pinch sensitivity.
             The <code>onZoom</code> callback fires whenever the viewport changes.
           </P>
-          <Ex title="Zoom controls" desc="Drag to zoom, double-click to reset"
+          <P>
+            <b>Bounds</b> — by default, pan and zoom are clamped to the data extent so users can't navigate past the data. Override via <code>zoom.bounds</code>:
+          </P>
+          <CodeBlock code={`zoom: { bounds: true }                             // default (clamp X to data, Y unbounded)
+zoom: { bounds: false }                            // or 'unbounded' — classic infinite nav
+zoom: { bounds: 'data' }                           // clamp every axis to data extent
+zoom: { bounds: { x: 'data', y: 'unbounded' } }    // per-axis
+zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
+          <P>
+            Bounds are evaluated on every viewport change. Panning into the edge stops at the edge (range preserved); zoom-out past the full extent collapses to the full extent. The <code>'data'</code> bound tracks what <code>resetZoom()</code> would produce — including <code>nice()</code> expansion and any axis pins — so the zoom-out limit matches the initial view.
+          </P>
+          <Ex title="Zoom controls" desc="Drag to zoom, double-click to reset. Try zooming out past the edges — bounds prevent you from escaping the data."
             data={d_zoom()}
             code={`{
   axes: { x: { type: 'time' } },
@@ -847,7 +871,7 @@ axes: {
     { label: 'Throughput', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Latency', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5 },
   ],
-  zoom: { enabled: true, x: true, y: false, wheelFactor: 0.5 },
+  zoom: { enabled: true, x: true, y: false, wheelFactor: 0.5, bounds: true },
   tooltip: { show: true, mode: 'index' },
 }`} />
         </Section>
@@ -873,12 +897,12 @@ axes: {
         <Section id="cursor" title="Cursor & Crosshair">
           <P>
             Configure the cursor crosshair with <code>cursor</code>. Options include <code>show</code>, <code>snap</code> (snap to nearest data point),
-            <code>xLine</code>/<code>yLine</code> (toggle each crosshair line), <code>color</code>, and <code>dash</code> (dash pattern array).
+            <code>xLine</code>/<code>yLine</code> (toggle each crosshair line), <code>color</code>, <code>dash</code> (dash pattern array), and <code>indicators</code> (the per-series dot+ring drawn at each hit-tested point on hover — disable when a legend table already shows the values).
           </P>
           <P>
-            <b>Cross-chart sync:</b> set the same <code>cursor.syncKey</code> on multiple charts to synchronize their crosshair positions. Moving the cursor over one chart updates all others in the group.
+            <b>Cross-chart cursor sync:</b> set the same <code>cursor.syncKey</code> on multiple charts to synchronize their crosshair positions. See also <a href="javascript:void(0)" onClick={() => scrollTo('cross-chart-sync')}>Cross-chart Sync</a> for a more ergonomic one-line helper that bundles cursor + highlight sync together.
           </P>
-          <Ex title="Crosshair config" desc="Try setting snap to false, or enabling yLine"
+          <Ex title="Crosshair config" desc="Try disabling indicators, or enabling yLine"
             data={d_cursor()}
             code={`{
   axes: { x: { type: 'time' } },
@@ -886,7 +910,7 @@ axes: {
     { label: 'Series A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
-  cursor: { show: true, snap: true, xLine: true, yLine: false, dash: [4, 3] },
+  cursor: { show: true, snap: true, xLine: true, yLine: false, dash: [4, 3], indicators: true },
   tooltip: { show: true, mode: 'index' },
 }`} />
         </Section>
@@ -1417,6 +1441,10 @@ plugins: [thresholdPlugin(75, '#e74c3c')]`} />
                   ['use(plugin: Plugin)', 'Register a plugin at runtime'],
                   ['on(event, handler): () => void', 'Subscribe to events; returns unsubscribe fn'],
                   ['setCursorDataX(dataX: number | null)', 'Set cursor position externally (for sync)'],
+                  ['getCursorSnapshot(opts?): CursorSnapshot', 'Snapshot of every visible series at the cursor'],
+                  ['getCursorSnapshotInto(target, opts?): CursorSnapshot', 'Zero-alloc variant that mutates a reused buffer'],
+                  ['setHighlight(seriesIndex: number | null)', 'Focus a series; dims the others (data-layer only)'],
+                  ['getHighlight(): number | null', 'Current highlighted series index, or null'],
                 ].map(([method, desc]) => (
                   <tr style={{ 'border-bottom': '1px solid var(--border)' }}>
                     <td style={{ padding: '8px 12px', 'font-family': 'var(--font-mono)', 'font-size': '12px', 'white-space': 'nowrap' }}>{method}</td>
@@ -1452,6 +1480,7 @@ plugins: [thresholdPlugin(75, '#e74c3c')]`} />
               <tbody>
                 {[
                   ['cursor:move', '(dataX: number | null, dataIdx: number | null)', 'Cursor moved over chart or left'],
+                  ['highlight:change', '(seriesIndex: number | null)', 'Highlighted series changed (local or synced)'],
                   ['viewport:change', '(scaleKey: string, range: ScaleRange)', 'Scale domain changed (zoom/pan)'],
                   ['data:update', '(data: ColumnarData)', 'Data replaced or appended'],
                   ['resize', '(width: number, height: number)', 'Chart container resized'],
@@ -1482,7 +1511,7 @@ unsub();`} />
           <CodeBlock code={`import type {
   // Core
   ChartInstance,       // Public chart API (methods table above)
-  ChartConfig,         // Top-level configuration object
+  ChartConfig,         // Top-level configuration object (generic in TMeta)
   ChartType,           // 'line' | 'area' | 'scatter' | 'bar' | 'histogram'
   ColumnarData,        // [xValues: Float64Array, ...yValues: Float64Array[]]
   DeepPartial,         // Recursive partial utility type
@@ -1493,21 +1522,32 @@ unsub();`} />
   ScaleRange,          // { min: number; max: number }
 
   // Series
-  SeriesConfig,        // Per-series configuration
+  SeriesConfig,        // Per-series configuration (generic in TMeta)
   InterpolationMode,   // 'linear' | 'monotone' | 'step-before' | 'step-after' | 'step-middle'
 
   // Axes
-  AxisConfig,          // Axis configuration
+  AxisConfig,          // Axis configuration (min, max, padding, nice, auto)
   AxisPosition,        // 'top' | 'bottom' | 'left' | 'right'
 
   // Interactions
   InteractionMode,     // 'timeseries' | 'analytical' | 'readonly'
-  CursorConfig,        // Crosshair configuration
-  ZoomConfig,          // Zoom/selection configuration
+  CursorConfig,        // Crosshair config (show, snap, indicators, syncKey, ...)
+  ZoomConfig,          // Zoom/selection config (bounds, wheelFactor, ...)
+  ZoomBoundsSpec,      // 'data' | 'unbounded' | { min?, max? }
   PanConfig,           // Pan configuration
   TouchConfig,         // Touch gesture configuration
   TooltipConfig,       // Tooltip configuration
   TooltipPoint,        // Point data passed to tooltip renderer
+
+  // Cursor snapshot (legend table data source)
+  CursorSnapshot,      // { source, dataIndex, dataX, formattedX,
+                       //   activeSeriesIndex, points: CursorSeriesPoint[] }
+  CursorSeriesPoint,   // { seriesIndex, dataIndex, label, color,
+                       //   value, formattedValue, meta }
+  CursorSnapshotOptions, // { fallback?: 'hide' | 'latest' | 'first' }
+
+  // Highlight (cross-chart series focus)
+  HighlightConfig,     // { enabled, dimOpacity, syncKey }
 
   // Theme & Layout
   ThemeConfig,         // Full theme object
@@ -1517,6 +1557,20 @@ unsub();`} />
   Plugin,              // Plugin lifecycle interface
   ChartEventMap,       // Event name \u2192 handler signature map
   RenderContext,       // Internal render context (for advanced plugins)
+
+  // Legend table
+  LegendTableOptions,  // createLegendTablePlugin options
+  LegendTableColumn,   // Column spec shared by plugin and <LegendTable>
+  LegendCellContent,   // string | Node returned by cell()
+
+  // SolidJS component
+  LegendTableProps,        // <LegendTable> props
+  LegendTableSolidColumn,  // JSX-flavored column (cell returns JSX.Element)
+  LegendTableFallback,     // 'hide' | 'latest' | 'first' | 'series-only'
+
+  // Chart groups (multi-chart sync helpers)
+  ChartGroup,          // createChartGroup() handle
+  ChartGroupBindings,  // What bind() returns
 } from 'snaplot';`} />
         </Section>
       </div>
