@@ -3,13 +3,15 @@ import type {
   ChartConfig,
   ChartEventMap,
   ColumnarData,
+  CursorSnapshot,
+  CursorSnapshotOptions,
   DeepPartial,
   Layout,
   Scale,
   ScaleRange,
   ThemeConfig,
   TooltipPoint,
-  SeriesConfig,
+  ZoomBoundsSpec,
 } from '../types';
 import { DirtyFlag } from '../types';
 
@@ -92,6 +94,19 @@ export class ChartCore implements ChartInstance {
   // Cleanup
   private destroyed = false;
   private syncKey: string | null = null;
+  private highlightSyncKey: string | null = null;
+
+  // Highlight state
+  private highlightedSeries: number | null = null;
+
+  /**
+   * Per-axis "reset-zoom" extent — the scale's min/max after the last
+   * `autoRange*` pass (including axis-config pins and `nice()` expansion).
+   * Used by `zoom.bounds: 'data'` so zoom-out stops at the same range
+   * `resetZoom()` would produce, not a tighter raw-data extent that would
+   * visually clip the niced initial view.
+   */
+  private naturalExtent = new Map<string, [number, number]>();
 
   constructor(parent: HTMLElement, config: ChartConfig, data?: ColumnarData) {
     this.container = parent;
@@ -153,10 +168,17 @@ export class ChartCore implements ChartInstance {
     // 11. Attach gesture manager
     this.gestureManager.attach();
 
-    // 12. Join sync group if configured
+    // 12. Join sync group(s) if configured
     if (this.config.cursor?.syncKey) {
       this.syncKey = this.config.cursor.syncKey;
       SyncGroup.join(this.syncKey, this);
+    }
+    if (this.config.highlight?.syncKey) {
+      this.highlightSyncKey = this.config.highlight.syncKey;
+      // Cursor and highlight may share the same key — only join once.
+      if (this.highlightSyncKey !== this.syncKey) {
+        SyncGroup.join(this.highlightSyncKey, this);
+      }
     }
 
     // 13. Create render scheduler and schedule initial draw
@@ -278,6 +300,9 @@ export class ChartCore implements ChartInstance {
     if (this.syncKey) {
       SyncGroup.leave(this.syncKey, this);
     }
+    if (this.highlightSyncKey && this.highlightSyncKey !== this.syncKey) {
+      SyncGroup.leave(this.highlightSyncKey, this);
+    }
   }
 
   use(plugin: any): void {
@@ -348,6 +373,53 @@ export class ChartCore implements ChartInstance {
     }
 
     this.scheduler.markDirty(DirtyFlag.OVERLAY);
+  }
+
+  // ─── Cursor snapshot (legend table data source) ─────────────
+
+  /**
+   * Allocates and returns a fresh snapshot. For the cursor hot path
+   * (60Hz updates), prefer `getCursorSnapshotInto()` to avoid GC pressure.
+   */
+  getCursorSnapshot(opts?: CursorSnapshotOptions): CursorSnapshot {
+    const target: CursorSnapshot = {
+      dataIndex: null,
+      dataX: null,
+      formattedX: '',
+      points: [],
+      source: 'none',
+      activeSeriesIndex: null,
+    };
+    return this.fillSnapshot(target, opts);
+  }
+
+  /**
+   * Zero-allocation variant. Mutates and returns `target`. The
+   * `target.points` array is grown but never shrunk; trust
+   * `target.points.length` after the call (the buffer is truncated to
+   * the real row count via `length =`).
+   */
+  getCursorSnapshotInto(target: CursorSnapshot, opts?: CursorSnapshotOptions): CursorSnapshot {
+    return this.fillSnapshot(target, opts);
+  }
+
+  // ─── Highlight (cross-chart series highlight + dim) ─────────
+
+  setHighlight(seriesIndex: number | null): void {
+    // Equality guard: prevents redundant redraws and breaks sync loops.
+    if (this.highlightedSeries === seriesIndex) return;
+
+    this.highlightedSeries = seriesIndex;
+    this.scheduler.markDirty(DirtyFlag.DATA);
+    this.emitEvent('highlight:change', seriesIndex);
+
+    if (this.highlightSyncKey) {
+      SyncGroup.publishHighlight(this.highlightSyncKey, this, seriesIndex);
+    }
+  }
+
+  getHighlight(): number | null {
+    return this.highlightedSeries;
   }
 
   // ─── Private: Initialization ────────────────────────────────
@@ -428,7 +500,13 @@ export class ChartCore implements ChartInstance {
       const scale = this.scales.get(key);
       if (!scale) continue;
       if (ac.auto === false) continue;
-      if (ac.min !== undefined && ac.max !== undefined) continue;
+      // Both bounds pinned → restore to those values. Skipping here would
+      // leave zoomed state intact after `resetZoom()`.
+      if (ac.min !== undefined && ac.max !== undefined) {
+        scale.min = ac.min;
+        scale.max = ac.max;
+        continue;
+      }
 
       const xMin = this.store.x[0];
       const xMax = this.store.x[this.store.length - 1];
@@ -445,15 +523,23 @@ export class ChartCore implements ChartInstance {
         scale.min = xMin - categoryPad;
         scale.max = xMax + categoryPad;
       } else {
-        scale.min = xMin;
-        scale.max = xMax;
+        // Horizontal auto-range defaults to zero padding; users can opt in
+        // via `axes.[key].padding`.
+        const pad = (xMax - xMin) * (ac.padding ?? 0);
+        scale.min = xMin - pad;
+        scale.max = xMax + pad;
       }
 
       // nice() gives clean tick boundaries for scatter/line.
-      // Skip for time (data extent is natural) and bar (category padding is exact).
-      if (scale.type !== 'time' && !hasBarSeries) {
+      // Skip for time (data extent is natural), bar (category padding is exact),
+      // and whenever the user explicitly disables it per-axis.
+      if (scale.type !== 'time' && !hasBarSeries && ac.nice !== false) {
         scale.nice(DEFAULT_TICK_COUNT);
       }
+
+      // Remember the "full" extent so zoom.bounds: 'data' knows how far
+      // out reset-zoom would go.
+      this.naturalExtent.set(key, [scale.min, scale.max]);
     }
   }
 
@@ -471,8 +557,14 @@ export class ChartCore implements ChartInstance {
       if (!ac) continue;
       const pos = inferPosition(key, ac.position);
       if (pos !== 'left' && pos !== 'right') continue;
-      if (ac.min !== undefined && ac.max !== undefined) continue;
       if (ac.auto === false) continue;
+      // Both bounds pinned → restore to those values. Skipping here would
+      // leave zoomed state intact after `resetZoom()`.
+      if (ac.min !== undefined && ac.max !== undefined) {
+        scale.min = ac.min;
+        scale.max = ac.max;
+        continue;
+      }
 
       // Find series bound to this axis
       const seriesIndices = this.config.series
@@ -490,7 +582,9 @@ export class ChartCore implements ChartInstance {
       }
 
       const [yMin, yMax] = this.store.yRange(seriesIndices, startIdx, endIdx);
-      const pad = (yMax - yMin) * AUTO_RANGE_PADDING;
+      // Vertical auto-range defaults to 5% padding so line/area charts
+      // don't touch the plot edges; users can override per-axis.
+      const pad = (yMax - yMin) * (ac.padding ?? AUTO_RANGE_PADDING);
 
       // For bar/histogram series, always include 0 as the baseline
       const hasBarOrHist = this.config.series.some(
@@ -504,10 +598,15 @@ export class ChartCore implements ChartInstance {
         scale.max = hasBarOrHist ? Math.max(0, yMax + pad) : yMax + pad;
       }
 
-      scale.nice(DEFAULT_TICK_COUNT);
+      if (ac.nice !== false) {
+        scale.nice(DEFAULT_TICK_COUNT);
+        // nice() can push min below 0 — clamp back for bar/histogram baseline
+        if (hasBarOrHist && yMin >= 0 && scale.min < 0) scale.min = 0;
+      }
 
-      // nice() can push min below 0 — clamp back for bar/histogram baseline
-      if (hasBarOrHist && yMin >= 0 && scale.min < 0) scale.min = 0;
+      // Remember the "full" extent so zoom.bounds: 'data' knows how far
+      // out reset-zoom would go.
+      this.naturalExtent.set(key, [scale.min, scale.max]);
     }
   }
 
@@ -717,6 +816,15 @@ export class ChartCore implements ChartInstance {
       // Zero-area box = cancelled
       if (x1 === 0 && y1 === 0 && x2 === 0 && y2 === 0) return;
 
+      // Clamp the drag coordinates to the plot area. Without this, a drag
+      // that continues past the chart edge reads the cursor's absolute
+      // pixel position and zooms the axes to a range outside the data extent.
+      const { plot } = this.layout;
+      const clampX = (px: number) => Math.max(plot.left, Math.min(plot.left + plot.width, px));
+      const clampY = (py: number) => Math.max(plot.top, Math.min(plot.top + plot.height, py));
+      x1 = clampX(x1); x2 = clampX(x2);
+      y1 = clampY(y1); y2 = clampY(y2);
+
       const zoom = this.config.zoom ?? { enabled: true, x: true };
       const dx = Math.abs(x2 - x1);
       const dy = Math.abs(y2 - y1);
@@ -803,6 +911,12 @@ export class ChartCore implements ChartInstance {
     const pos = inferPosition(scaleKey, ac?.position);
     const isHoriz = pos === 'bottom' || pos === 'top';
 
+    // Clamp to configured bounds (defaults to data extent). Keeps pan at
+    // the edge when you push past it, and stops zoom-out at the full extent.
+    const clamped = this.clampViewportToBounds(scaleKey, pos, min, max);
+    min = clamped[0];
+    max = clamped[1];
+
     if (isHoriz) this.userHasZoomed = true;
 
     scale.min = min;
@@ -816,6 +930,98 @@ export class ChartCore implements ChartInstance {
     this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID | DirtyFlag.OVERLAY);
     this.emitEvent('viewport:change', scaleKey, { min, max });
     this.pluginManager.dispatch('onZoom', this, scaleKey, { min, max });
+  }
+
+  /**
+   * Resolve the `zoom.bounds` config for a specific axis.
+   *
+   * Returns `null` when no clamping should happen, or `{ min, max }` with
+   * either bound potentially `undefined` (half-open). The `'data'` literal
+   * is resolved here via `this.store` / Y-range over the visible X window.
+   */
+  private resolveBounds(
+    scaleKey: string,
+    pos: 'top' | 'bottom' | 'left' | 'right',
+  ): { min?: number; max?: number } | null {
+    const raw = this.config.zoom?.bounds;
+    if (raw === false || raw === 'unbounded') return null;
+
+    const isHoriz = pos === 'top' || pos === 'bottom';
+    let spec: ZoomBoundsSpec | undefined;
+
+    // Default (`undefined` / `true`): clamp X to data. Y stays unbounded by
+    // default because auto-range-Y drives it in the typical timeseries setup.
+    if (raw === undefined || raw === true) {
+      spec = isHoriz ? 'data' : 'unbounded';
+    } else if (typeof raw === 'string' || ('min' in (raw as any) || 'max' in (raw as any))) {
+      // Top-level scalar spec applies to every axis.
+      spec = raw as ZoomBoundsSpec;
+    } else {
+      const perAxis = raw as { x?: ZoomBoundsSpec; y?: ZoomBoundsSpec };
+      spec = (isHoriz ? perAxis.x : perAxis.y)
+        ?? (isHoriz ? 'data' : 'unbounded');
+    }
+
+    if (spec === 'unbounded' || spec === undefined) return null;
+
+    if (typeof spec === 'object') return { ...spec };
+
+    // spec === 'data' — use the cached natural extent (output of autoRange,
+    // which already honors axis pins and nice() expansion). Falls back to
+    // the raw data range if autoRange hasn't run yet for this axis.
+    const natural = this.naturalExtent.get(scaleKey);
+    if (natural) return { min: natural[0], max: natural[1] };
+
+    if (this.store.length === 0) return null;
+    if (isHoriz) {
+      return { min: this.store.x[0], max: this.store.x[this.store.length - 1] };
+    }
+    const seriesIndices = this.config.series
+      .filter((s) => (s.yAxisKey ?? 'y') === scaleKey && s.visible !== false)
+      .map((s) => s.dataIndex - 1);
+    if (seriesIndices.length === 0) return null;
+    const [yMin, yMax] = this.store.yRange(seriesIndices, 0, this.store.length - 1);
+    return { min: yMin, max: yMax };
+  }
+
+  /**
+   * Apply bounds clamping to a proposed [min, max] viewport. Preserves the
+   * viewport's span when shifting away from an edge (pan-into-wall stops
+   * at the wall); collapses to the full bounded extent when the proposed
+   * span exceeds the allowed one (zoom-out stops at data extent).
+   */
+  private clampViewportToBounds(
+    scaleKey: string,
+    pos: 'top' | 'bottom' | 'left' | 'right',
+    min: number,
+    max: number,
+  ): [number, number] {
+    const b = this.resolveBounds(scaleKey, pos);
+    if (!b) return [min, max];
+
+    const bMin = b.min;
+    const bMax = b.max;
+    const span = max - min;
+
+    if (bMin !== undefined && bMax !== undefined) {
+      const boundedSpan = bMax - bMin;
+      if (span >= boundedSpan) {
+        // User is trying to see more than the full range — clamp to it.
+        return [bMin, bMax];
+      }
+    }
+    if (bMin !== undefined && min < bMin) {
+      min = bMin;
+      max = min + span;
+    }
+    if (bMax !== undefined && max > bMax) {
+      max = bMax;
+      min = max - span;
+    }
+    // After shifting, the opposite edge may have crossed its bound.
+    if (bMin !== undefined && min < bMin) min = bMin;
+    if (bMax !== undefined && max > bMax) max = bMax;
+    return [min, max];
   }
 
   // ─── Private: Render pipeline ───────────────────────────────
@@ -876,55 +1082,80 @@ export class ChartCore implements ChartInstance {
     const ctx = this.canvasManager.dataCtx;
     const palette = this.theme.palette;
 
-    // Count bar-type series for grouped width calculation
+    // Count bar-type series for grouped width calculation. This mapping is
+    // position-based (which slot a bar occupies in each group), so it must
+    // be computed from config order — not affected by the highlight draw-last pass.
     const barSeries = this.config.series.filter(
       s => s.visible !== false && (s.type === 'bar'),
     );
-    let barIdx = 0;
+    const barIdxFor = new Map<number, number>();
+    {
+      let i = 0;
+      for (let si = 0; si < this.config.series.length; si++) {
+        const s = this.config.series[si];
+        if (s.visible !== false && s.type === 'bar') {
+          barIdxFor.set(si, i++);
+        }
+      }
+    }
 
-    for (let si = 0; si < this.config.series.length; si++) {
+    // Resolve highlight dimming once per draw.
+    const highlightCfg = this.config.highlight;
+    const highlightedSi = this.highlightedSeries;
+    const highlightActive =
+      highlightedSi !== null && (highlightCfg?.enabled !== false);
+    const dimOpacity = highlightCfg?.dimOpacity ?? 0.2;
+
+    // Draw order: when a highlight is active, draw every other series first
+    // (dimmed), then the highlighted series on top. Otherwise, draw in config
+    // order. This prevents the focused line from being visually composited
+    // under later dimmed series.
+    const drawOne = (si: number) => {
       const series = this.config.series[si];
-      if (series.visible === false) continue;
+      if (!series || series.visible === false) return;
 
       const color = series.stroke ?? palette[si % palette.length];
       const xScale = this.scales.get(series.xAxisKey ?? 'x')!;
       const yScale = this.scales.get(series.yAxisKey ?? 'y')!;
-      if (!xScale || !yScale) continue;
+      if (!xScale || !yScale) return;
 
       const colIdx = series.dataIndex;
-      if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
+      if (colIdx < 1 || colIdx > this.store.seriesCount) return;
 
-      // Viewport culling via binary search
       const [startIdx, endIdx] = this.store.getViewportIndices(xScale.min, xScale.max);
-
       const xData = this.store.x;
       const yData = this.store.y(colIdx - 1);
-
       const type = series.type ?? 'line';
+
+      const opacityMul = highlightActive && si !== highlightedSi ? dimOpacity : 1;
 
       switch (type) {
         case 'line':
-          renderLine(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color);
+          renderLine(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
           break;
-
         case 'area':
-          renderArea(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color);
+          renderArea(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
           break;
-
         case 'scatter':
-          renderScatter(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color);
+          renderScatter(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
           break;
-
         case 'bar':
-          renderBars(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, barIdx, barSeries.length);
-          barIdx++;
+          renderBars(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, barIdxFor.get(si) ?? 0, barSeries.length, opacityMul);
           break;
-
         case 'histogram':
-          // Data format: X = bin edges (N+1), Y = counts (N+1, padded)
-          // Render bins directly from the data columns
-          renderHistogram(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color);
+          renderHistogram(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
           break;
+      }
+    };
+
+    if (highlightActive) {
+      for (let si = 0; si < this.config.series.length; si++) {
+        if (si !== highlightedSi) drawOne(si);
+      }
+      drawOne(highlightedSi!);
+    } else {
+      for (let si = 0; si < this.config.series.length; si++) {
+        drawOne(si);
       }
     }
   }
@@ -951,8 +1182,12 @@ export class ChartCore implements ChartInstance {
         );
       }
 
-      // Draw data point indicators
-      this.drawPointIndicators(ctx);
+      // Draw data point indicators (dot + ring per hit-tested point).
+      // Skip when the caller has opted out — typically because a legend
+      // table already shows the values and the extra glyphs would be noise.
+      if (this.config.cursor?.indicators !== false) {
+        this.drawPointIndicators(ctx);
+      }
     }
 
     // Show tooltip — hide during selection or when cursor is disabled
@@ -1224,6 +1459,116 @@ export class ChartCore implements ChartInstance {
     }
 
     return points;
+  }
+
+  // ─── Private: Cursor snapshot helpers ───────────────────────
+
+  /**
+   * Mutate `target` to match the current snapshot. Shared implementation
+   * for both allocating and zero-alloc public variants.
+   */
+  private fillSnapshot(target: CursorSnapshot, opts?: CursorSnapshotOptions): CursorSnapshot {
+    const fallback = opts?.fallback ?? 'hide';
+    const length = this.store.length;
+
+    // Resolve the index to read from.
+    let idx: number | null = this.cursorDataIdx;
+    let source: CursorSnapshot['source'] = idx !== null ? 'cursor' : 'none';
+
+    if (idx === null && length > 0) {
+      if (fallback === 'latest') {
+        idx = length - 1;
+        source = 'latest';
+      } else if (fallback === 'first') {
+        idx = 0;
+        source = 'first';
+      }
+    }
+
+    if (idx === null || idx < 0 || idx >= length) {
+      target.dataIndex = null;
+      target.dataX = null;
+      target.formattedX = '';
+      target.points.length = 0;
+      target.source = 'none';
+      target.activeSeriesIndex = null;
+      return target;
+    }
+
+    const xVal = this.store.x[idx];
+    const xScale = this.scales.get('x');
+
+    target.dataIndex = idx;
+    target.dataX = xVal;
+    target.formattedX = xScale ? xScale.tickFormat(xVal) : String(xVal);
+    target.source = source;
+
+    const palette = this.theme.palette;
+    const seriesList = this.config.series;
+    const points = target.points;
+
+    // Track the series whose Y is nearest the cursor (pixel-space).
+    // Only meaningful when the snapshot is cursor-driven; otherwise null.
+    const cursorY = source === 'cursor' ? this.cursorY : null;
+    let nearestSi: number | null = null;
+    let nearestDist = Infinity;
+
+    // Walk visible series, mutate row objects in place; reuse rows
+    // across calls to keep the cursor hot path allocation-free.
+    let writeIdx = 0;
+    for (let si = 0; si < seriesList.length; si++) {
+      const s = seriesList[si];
+      if (s.visible === false) continue;
+
+      const colIdx = s.dataIndex;
+      if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
+
+      const yArr = this.store.y(colIdx - 1);
+      const value = yArr ? yArr[idx] : NaN;
+      const yScale = this.scales.get(s.yAxisKey ?? 'y');
+      const formattedValue = (value === value)
+        ? (yScale ? yScale.tickFormat(value) : String(value))
+        : '';
+      const color = s.stroke ?? palette[si % palette.length];
+
+      let row = points[writeIdx];
+      if (!row) {
+        row = {
+          seriesIndex: si,
+          dataIndex: idx,
+          label: s.label,
+          color,
+          value,
+          formattedValue,
+          meta: s.meta,
+        };
+        points[writeIdx] = row;
+      } else {
+        row.seriesIndex = si;
+        row.dataIndex = idx;
+        row.label = s.label;
+        row.color = color;
+        row.value = value;
+        row.formattedValue = formattedValue;
+        row.meta = s.meta;
+      }
+      writeIdx++;
+
+      // Nearest-series in pixel space: compare the series' Y pixel to
+      // the cursor's Y pixel. Skipped for NaN values or when no cursor.
+      if (cursorY !== null && yScale && value === value) {
+        const px = yScale.dataToPixel(value);
+        const d = Math.abs(px - cursorY);
+        if (d < nearestDist) {
+          nearestDist = d;
+          nearestSi = si;
+        }
+      }
+    }
+    points.length = writeIdx;
+    target.activeSeriesIndex = nearestSi;
+
+    return target;
   }
 
   // ─── Private: Helpers ───────────────────────────────────────

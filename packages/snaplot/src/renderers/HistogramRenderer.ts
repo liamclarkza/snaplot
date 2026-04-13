@@ -22,6 +22,8 @@ export function renderHistogram(
   layout: Layout,
   series: SeriesConfig,
   color: string,
+  /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
+  opacityMultiplier: number = 1,
 ): void {
   // X = bin edges, Y = bin counts. N+1 edges, N bins.
   // The last Y value is padding (0), so we render bins 0..N-1.
@@ -34,7 +36,7 @@ export function renderHistogram(
   ctx.clip();
 
   ctx.fillStyle = color;
-  ctx.globalAlpha = series.opacity ?? 0.75;
+  ctx.globalAlpha = (series.opacity ?? 0.75) * opacityMultiplier;
   ctx.strokeStyle = color;
   ctx.lineWidth = 0.5;
 

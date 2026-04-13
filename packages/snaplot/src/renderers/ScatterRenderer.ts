@@ -72,6 +72,8 @@ export function renderScatter(
   layout: Layout,
   series: SeriesConfig,
   color: string,
+  /** Multiplied with the per-point alpha. Used by the highlight system to dim non-highlighted series. */
+  opacityMultiplier: number = 1,
 ): void {
   const count = endIdx - startIdx + 1;
   if (count <= 0) return;
@@ -81,6 +83,8 @@ export function renderScatter(
   ctx.beginPath();
   ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
   ctx.clip();
+  // Multiplies cumulatively with the stamp's baked-in alpha during drawImage.
+  ctx.globalAlpha = opacityMultiplier;
 
   if (series.heatmap || count > 200_000) {
     drawHeatmap(ctx, xData, yData, startIdx, endIdx, scaleX, scaleY, layout, series.heatmapBinSize);

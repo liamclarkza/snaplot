@@ -24,6 +24,8 @@ export function renderBars(
   barSeriesIndex: number,
   /** Total number of bar-type series (for grouped width) */
   totalBarSeries: number,
+  /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
+  opacityMultiplier: number = 1,
 ): void {
   if (endIdx < startIdx) return;
 
@@ -37,7 +39,7 @@ export function renderBars(
   ctx.clip();
 
   ctx.fillStyle = color;
-  ctx.globalAlpha = series.opacity ?? 0.85;
+  ctx.globalAlpha = (series.opacity ?? 0.85) * opacityMultiplier;
 
   const outerPadding = 0.2;
   const innerPadding = 0.1;
