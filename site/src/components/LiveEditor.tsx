@@ -1,10 +1,21 @@
 import { createSignal, onCleanup, onMount } from 'solid-js';
 import { highlight } from 'sugar-high';
-import { Chart, darkTheme, lightTheme, oceanTheme, midnightTheme, createLegendPlugin } from 'snaplot';
+import {
+  Chart,
+  darkTheme, lightTheme, oceanTheme, midnightTheme,
+  createLegendPlugin,
+  createLegendTablePlugin,
+  nameColumn, valueColumn, swatchColumn, metricColumn, column,
+} from 'snaplot';
 import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
 
 // Available to user code inside the editor via new Function args
-const evalContext = { darkTheme, lightTheme, oceanTheme, midnightTheme, createLegendPlugin };
+const evalContext = {
+  darkTheme, lightTheme, oceanTheme, midnightTheme,
+  createLegendPlugin,
+  createLegendTablePlugin,
+  nameColumn, valueColumn, swatchColumn, metricColumn, column,
+};
 const evalArgNames = Object.keys(evalContext);
 const evalArgValues = Object.values(evalContext);
 

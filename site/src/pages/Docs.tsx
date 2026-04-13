@@ -3,6 +3,17 @@ import { lttb, m4, histogram, createLegendPlugin } from 'snaplot';
 import type { ColumnarData, ChartInstance } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
 import LiveEditor from '../components/LiveEditor';
+import {
+  DefaultLegendTableDemo,
+  CustomColumnsDemo,
+  CrossChartSyncDemo,
+  SidepanelHighlightDemo,
+  BenchmarkDemo,
+  HeadlessSnapshotDemo,
+} from '../components/LegendTableDemos';
+// In dev/build the site aliases `snaplot` → src/index.ts, so we import the CSS
+// directly from the package source. Published consumers use `'snaplot/legend-table.css'`.
+import '../../../packages/snaplot/src/styles/legendTable.css';
 
 // ─── Data generators ────────────────────────────────────────────
 
@@ -284,6 +295,9 @@ export default function Docs() {
 
     { type: 'divider', label: 'Plugins' },
     { type: 'link', id: 'legend-plugin', label: 'Legend Plugin' },
+    { type: 'link', id: 'legend-table', label: 'Legend Table' },
+    { type: 'link', id: 'cross-chart-sync', label: 'Cross-chart Sync' },
+    { type: 'link', id: 'cursor-snapshot', label: 'Cursor Snapshot' },
     { type: 'link', id: 'custom-plugins', label: 'Custom Plugins' },
 
     { type: 'divider', label: 'API Reference' },
@@ -1141,6 +1155,162 @@ const config = {
   plugins: [createLegendPlugin({ position: 'bottom' })],
   tooltip: { show: true, mode: 'index' },
 }`} />
+        </Section>
+
+        {/* ═══════════════════════════════════════════════════════
+            CURSOR SNAPSHOT, LEGEND TABLE, CROSS-CHART SYNC
+            ═══════════════════════════════════════════════════════ */}
+
+        <Section id="legend-table" title="Legend Table">
+          <P>
+            A cursor-synchronised table that shows the value of every visible series at the cursor's X position — the common ML-dashboard pattern for comparing many runs. Available in two forms with feature parity:
+          </P>
+          <ul style={{ color: 'var(--text-secondary)', 'margin-bottom': '16px', 'font-size': '14.5px', 'line-height': '1.7', 'padding-left': '20px' }}>
+            <li><code>createLegendTablePlugin()</code> — DOM-only, attaches to any chart.</li>
+            <li><code>&lt;LegendTable&gt;</code> — SolidJS component with JSX cells, typed <code>meta</code>, and a render-prop escape hatch.</li>
+          </ul>
+          <P>
+            Both share the same column helpers and the same CSS class names. Zero configuration produces a sensible default:
+          </P>
+          <CodeBlock code={`import { LegendTable } from 'snaplot';
+import 'snaplot/legend-table.css';
+
+<LegendTable chart={chart} />`} />
+          <div style={{ height: '12px' }} />
+          <DefaultLegendTableDemo />
+
+          <div style={{ height: '24px' }} />
+          <P>
+            <b>Custom columns</b> via the typed <code>meta</code> field on each series. Column helpers (<code>nameColumn</code>, <code>valueColumn</code>, <code>metricColumn</code>, <code>swatchColumn</code>, <code>column</code>) cover the common cases:
+          </P>
+          <CodeBlock code={`type RunMeta = { runId: string; metricKey: string; epoch: number };
+
+const config: ChartConfig<RunMeta> = {
+  series: runs.map(r => ({
+    label: r.name,
+    dataIndex: r.idx,
+    type: 'line',
+    meta: { runId: r.id, metricKey: 'eval/accuracy', epoch: r.epoch },
+  })),
+};
+
+<LegendTable<RunMeta>
+  chart={chart}
+  columns={[
+    swatchColumn(),
+    nameColumn({ swatch: false }),
+    metricColumn(p => p.meta.metricKey),  // p.meta is RunMeta, fully typed
+    column({ key: 'epoch', header: 'Epoch', align: 'right',
+             cell: p => String(p.meta.epoch) }),
+    valueColumn({ format: v => v.toFixed(6) }),
+  ]}
+/>`} />
+          <div style={{ height: '12px' }} />
+          <CustomColumnsDemo />
+
+          <div style={{ height: '24px' }} />
+          <P>
+            <b>Plain-DOM plugin</b> variant for non-Solid users — same defaults, same class names, edit live below:
+          </P>
+          <Ex
+            title="Legend table plugin (live-editable)"
+            desc="Renders Step + values in a table below the chart on hover; series-only fallback keeps the layout stable when the cursor leaves."
+            data={d_legend()}
+            code={`{
+  // nice: false keeps the X axis tight to the data extent.
+  axes: { x: { nice: false }, y: { padding: 0.05 } },
+  series: [
+    { label: 'live-training', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'failed-experiment', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'baseline-resnet50', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+  ],
+  plugins: [
+    createLegendTablePlugin({
+      fallback: 'series-only',
+      columns: [nameColumn(), valueColumn({ format: v => v.toFixed(4) })],
+    }),
+  ],
+  tooltip: { show: false },
+  cursor: { show: true, snap: true, indicators: false },
+}`}
+          />
+
+          <div style={{ height: '24px' }} />
+          <P>
+            <b>Headless render-prop</b> mode keeps the cursor + highlight wiring but lets you render anything in place of the table — ideal when your app already has a table component:
+          </P>
+          <CodeBlock code={`<LegendTable chart={chart}>
+  {(snapshot, highlight, setHighlight) => (
+    <MyCustomTable
+      data={snapshot()}
+      highlightedRow={highlight()}
+      onRowHover={setHighlight}
+    />
+  )}
+</LegendTable>`} />
+        </Section>
+
+        <Section id="cross-chart-sync" title="Cross-chart Sync">
+          <P>
+            <code>createChartGroup()</code> mints a fresh sync key and exposes <code>group.bind()</code> to spread into each chart's config. Cursor + series highlight propagate automatically across every chart in the group.
+          </P>
+          <CodeBlock code={`const group = createChartGroup();
+
+// group.apply(config) merges the sync keys into cursor/highlight
+// without clobbering your own cursor config (show, snap, indicators…).
+<Chart config={group.apply(myConfigA)} data={a} />
+<Chart config={group.apply(myConfigB)} data={b} />
+
+// External controls (e.g. a sidepanel):
+<button onMouseEnter={() => group.highlight(2)}
+        onMouseLeave={() => group.highlight(null)}>
+  Run #2
+</button>`} />
+          <div style={{ height: '12px' }} />
+          <CrossChartSyncDemo />
+
+          <div style={{ height: '24px' }} />
+          <P>
+            Pair the group with an external "runs" panel — hover a run and every chart dims everything else:
+          </P>
+          <SidepanelHighlightDemo />
+
+          <div style={{ height: '24px' }} />
+          <P>
+            <b>Performance check</b> — many series + a value-cell update per cursor frame. The legend table reuses row DOM (text-content swaps only on cursor moves), highlight redraws only the data canvas, and the snapshot is read into a single reused buffer.
+          </P>
+          <BenchmarkDemo />
+        </Section>
+
+        <Section id="cursor-snapshot" title="Cursor Snapshot (Headless)">
+          <P>
+            Both <code>&lt;LegendTable&gt;</code> and the plugin are built on the same primitive: <code>chart.getCursorSnapshot()</code>. Use it directly if you need cursor-synchronised data anywhere else in your UI.
+          </P>
+          <CodeBlock code={`import { createCursorSnapshot } from 'snaplot';
+
+const snapshot = createCursorSnapshot(chart);
+// Accessor<CursorSnapshot | null>:
+//   {
+//     source: 'cursor' | 'latest' | 'first' | 'none',
+//     dataIndex, dataX, formattedX,
+//     activeSeriesIndex,  // series nearest the cursor in pixel space
+//     points: [{ seriesIndex, label, color, value, formattedValue, meta }]
+//   }
+
+// Focus the line under the cursor in every chart in a group:
+createEffect(() => {
+  const s = snapshot();
+  group.highlight(s?.activeSeriesIndex ?? null);
+});
+
+// Imperative — zero-alloc variant for hot paths:
+const buf = chart.getCursorSnapshot();
+chart.on('cursor:move', () => {
+  chart.getCursorSnapshotInto(buf, { fallback: 'latest' });
+  // mutate the same buf each frame
+});`} />
+          <div style={{ height: '12px' }} />
+          <HeadlessSnapshotDemo />
         </Section>
 
         <Section id="custom-plugins" title="Custom Plugins">
