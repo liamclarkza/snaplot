@@ -3,6 +3,7 @@ import {
   Chart,
   LegendTable,
   createChartGroup,
+  createCursorSnapshot,
   nameColumn,
   valueColumn,
   metricColumn,
@@ -100,6 +101,13 @@ export function DefaultLegendTableDemo() {
   const data = runSeriesData(4, 200);
   const config = runConfig(4, 'eval/accuracy');
 
+  // Highlight the series nearest the cursor — the line under the mouse
+  // focuses itself and everything else dims.
+  const snap = createCursorSnapshot(chart);
+  createEffect(() => {
+    chart()?.setHighlight(snap()?.activeSeriesIndex ?? null);
+  });
+
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '260px' }}>
@@ -117,6 +125,11 @@ export function CustomColumnsDemo() {
   const [precision, setPrecision] = createSignal(4);
   const data = runSeriesData(5, 200);
   const config = runConfig(5, 'eval/accuracy');
+
+  const snap = createCursorSnapshot(chart);
+  createEffect(() => {
+    chart()?.setHighlight(snap()?.activeSeriesIndex ?? null);
+  });
 
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
@@ -257,6 +270,11 @@ export function BenchmarkDemo() {
 
   const data = runSeriesData(NUM_RUNS, POINTS);
   const cfg: ChartConfig<RunMeta> = runConfig(NUM_RUNS, 'eval/accuracy');
+
+  const snap = createCursorSnapshot(chart);
+  createEffect(() => {
+    chart()?.setHighlight(snap()?.activeSeriesIndex ?? null);
+  });
 
   // FPS counter — measures rAF cadence while the page is animating
   let frames = 0;
