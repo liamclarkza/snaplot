@@ -1315,7 +1315,14 @@ export class ChartCore implements ChartInstance {
     const ringColor = isDark ? '#ffffff' : '#333333';
     const ringAlpha = isDark ? 0.15 : 0.1;
 
+    // When a series is highlighted, only draw the indicator on that series —
+    // the others just get the crosshair line (matches Neptune/W&B behavior).
+    const hlActive = this.highlightedSeries !== null
+      && (this.config.highlight?.enabled !== false);
+
     for (const point of this.tooltipPoints) {
+      if (hlActive && point.seriesIndex !== this.highlightedSeries) continue;
+
       const sc = this.config.series[point.seriesIndex];
       if (!sc) continue;
 

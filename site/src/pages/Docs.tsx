@@ -1348,7 +1348,7 @@ const config: ChartConfig<RunMeta> = {
     }),
   ],
   tooltip: { show: false },
-  cursor: { show: true, snap: true, indicators: false },
+  cursor: { show: true, snap: true },
 }`}
           />
 

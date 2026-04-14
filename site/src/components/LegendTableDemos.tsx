@@ -87,10 +87,9 @@ function runConfig(numRuns: number, metric: string): ChartConfig<RunMeta> {
       meta: { runId: `r${i}`, metricKey: metric, epoch: i },
     })),
     tooltip: { show: false },
-    // `indicators: false` hides the per-series dot-and-ring on hover —
-    // the legend table below already shows the values, so the canvas
-    // glyphs would be visual noise.
-    cursor: { show: true, snap: true, indicators: false },
+    // With highlight active (via activeSeriesIndex), only the focused
+    // series gets a cursor dot — the rest just show the crosshair line.
+    cursor: { show: true, snap: true },
   };
 }
 
