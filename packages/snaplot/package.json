@@ -2,7 +2,7 @@
   "name": "snaplot",
   "version": "0.2.0",
   "type": "module",
-  "description": "High-performance canvas chart library for SolidJS",
+  "description": "High-performance charts that actually look good",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
