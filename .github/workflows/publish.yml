@@ -16,14 +16,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: 'https://registry.npmjs.org'
+          node-version: 24
           cache: npm
 
       - run: npm install
       - run: npm run build
 
-      # Clear the default token that setup-node injects so npm falls
-      # through to the OIDC trusted-publisher exchange.
-      # See: https://github.com/orgs/community/discussions/176761
-      - run: NODE_AUTH_TOKEN="" cd packages/snaplot && npm publish --provenance --access public
+      - run: cd packages/snaplot && npm publish --provenance --access public
