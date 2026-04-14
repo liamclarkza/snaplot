@@ -238,10 +238,28 @@ export class ChartCore implements ChartInstance {
   }
 
   setOptions(partial: DeepPartial<ChartConfig>): void {
-    this.config = deepMerge(
-      this.config as unknown as Record<string, unknown>,
-      partial as unknown as Record<string, unknown>,
-    ) as unknown as ChartConfig;
+    // Plugins are object instances — deep-merge would corrupt them.
+    // Handle plugin updates separately: destroy old, install new.
+    const newPlugins = (partial as Partial<ChartConfig>).plugins;
+    if (newPlugins) {
+      this.pluginManager.destroyAll(this);
+      // Remove plugins from the merge input to avoid deep-merging instances
+      const { plugins: _, ...rest } = partial as Partial<ChartConfig>;
+      this.config = deepMerge(
+        this.config as unknown as Record<string, unknown>,
+        rest as unknown as Record<string, unknown>,
+      ) as unknown as ChartConfig;
+      this.config.plugins = newPlugins;
+      for (const plugin of newPlugins) {
+        this.pluginManager.register(plugin);
+      }
+      this.pluginManager.installAll(this);
+    } else {
+      this.config = deepMerge(
+        this.config as unknown as Record<string, unknown>,
+        partial as unknown as Record<string, unknown>,
+      ) as unknown as ChartConfig;
+    }
 
     if (partial.interaction) {
       this.applyModePresets();

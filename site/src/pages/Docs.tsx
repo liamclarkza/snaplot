@@ -314,6 +314,7 @@ export default function Docs() {
     { type: 'link', id: 'downsampling', label: 'Downsampling' },
 
     { type: 'divider', label: 'Plugins' },
+    { type: 'link', id: 'reference-lines', label: 'Reference Lines' },
     { type: 'link', id: 'legend-plugin', label: 'Legend Plugin' },
     { type: 'link', id: 'legend-table', label: 'Legend Table' },
     { type: 'link', id: 'cross-chart-sync', label: 'Cross-chart Sync' },
@@ -1217,6 +1218,37 @@ const [downX, downY] = m4(xData, yData, pixelWidth, xMin, xMax);`} />
         {/* ═══════════════════════════════════════════════════════
             PLUGINS
             ═══════════════════════════════════════════════════════ */}
+
+        <Section id="reference-lines" title="Reference Lines">
+          <P>
+            The reference lines plugin renders horizontal or vertical marker lines at fixed data values.
+            Use it for thresholds, baselines, targets, or event markers. Lines respond to zoom/pan and
+            scale changes. Labels are positioned automatically within the plot area.
+          </P>
+          <Ex title="Threshold and baseline markers" desc="Horizontal lines at y=75 (target) and y=40 (floor), with a dashed style"
+            data={d_line()}
+            code={`{
+  axes: { x: { type: 'time' }, y: { type: 'linear' } },
+  series: [
+    { label: 'Metric A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Metric B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+  ],
+  plugins: [
+    createReferenceLinesPlugin({
+      lines: [
+        { axis: 'y', value: 75, label: 'Target', color: '#e74c3c', dash: [6, 3], lineWidth: 1.5 },
+        { axis: 'y', value: 40, label: 'Floor', color: '#888', lineWidth: 1 },
+      ],
+    }),
+  ],
+  tooltip: { show: true, mode: 'index' },
+}`} />
+          <P>
+            Call <code>refLines.setLines(newLines)</code> to update lines dynamically after creation.
+            The plugin renders in the <code>afterDrawData</code> hook — above series data but below
+            the overlay (crosshair, selection box).
+          </P>
+        </Section>
 
         <Section id="legend-plugin" title="Legend Plugin">
           <P>
