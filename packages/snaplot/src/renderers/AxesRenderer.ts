@@ -42,6 +42,13 @@ export function renderAxes(
   ctx.fillStyle = theme.backgroundColor;
   ctx.fillRect(0, 0, layout.width, layout.height);
 
+  // Clip gridlines to the rounded plot area so they don't bleed into the corners.
+  const borderRadius = 4;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(plot.left, plot.top, plot.width, plot.height, borderRadius);
+  ctx.clip();
+
   // Track which positions have already drawn gridlines (only first axis per position draws them)
   const gridDrawn = new Set<AxisPosition>();
 
@@ -131,16 +138,22 @@ export function renderAxes(
     result.labels.set(key, labels);
   }
 
-  // ─── Plot area border ─────────────────────────────────────────
+  // Release the rounded clip used for gridlines.
+  ctx.restore();
+
+  // ─── Plot area border (rounded corners) ──────────────────────
+  // Draw at the same opacity as the gridlines so the border and grid
+  // read as one cohesive tone.
   ctx.strokeStyle = theme.axisLineColor;
   ctx.lineWidth = 1;
+  ctx.globalAlpha = theme.gridOpacity;
+  const bx = Math.round(plot.left) + offset;
+  const by = Math.round(plot.top) + offset;
+  const r = 4; // corner radius in CSS pixels
+  ctx.beginPath();
+  ctx.roundRect(bx, by, plot.width, plot.height, r);
+  ctx.stroke();
   ctx.globalAlpha = 1;
-  ctx.strokeRect(
-    Math.round(plot.left) + offset,
-    Math.round(plot.top) + offset,
-    plot.width,
-    plot.height,
-  );
 
   return result;
 }

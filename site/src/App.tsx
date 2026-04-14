@@ -1,4 +1,5 @@
 import { createSignal, onCleanup, Show } from 'solid-js';
+import { ThemeProvider } from './ThemeContext';
 import Nav from './components/Nav';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -18,11 +19,11 @@ export default function App() {
   onCleanup(() => window.removeEventListener('hashchange', onHash));
 
   return (
-    <>
+    <ThemeProvider>
       <Nav />
       <Show when={page() === 'home'}><Home /></Show>
       <Show when={page() === 'docs'}><Docs /></Show>
       <Footer />
-    </>
+    </ThemeProvider>
   );
 }

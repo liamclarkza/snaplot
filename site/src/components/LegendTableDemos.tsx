@@ -9,8 +9,10 @@ import {
   metricColumn,
   swatchColumn,
   column,
+  lightTheme,
   darkTheme,
 } from 'snaplot';
+import { useTheme } from '../ThemeContext';
 import type {
   ChartConfig,
   ChartInstance,
@@ -96,9 +98,14 @@ function runConfig(numRuns: number, metric: string): ChartConfig<RunMeta> {
 // ─── Demo 1: Default LegendTable ────────────────────────────────
 
 export function DefaultLegendTableDemo() {
+  const { theme: siteTheme } = useTheme();
   const [chart, setChart] = createSignal<ChartInstance | undefined>();
   const data = runSeriesData(4, 200);
-  const config = runConfig(4, 'eval/accuracy');
+
+  const config = createMemo(() => ({
+    ...runConfig(4, 'eval/accuracy'),
+    theme: siteTheme() === 'light' ? lightTheme : darkTheme,
+  }));
 
   // Highlight the series nearest the cursor — the line under the mouse
   // focuses itself and everything else dims.
@@ -110,7 +117,7 @@ export function DefaultLegendTableDemo() {
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '260px' }}>
-        <Chart config={config} data={data} onReady={setChart} />
+        <Chart config={config()} data={data} onReady={setChart} />
       </div>
       <LegendTable<RunMeta> chart={chart} />
     </div>
@@ -120,10 +127,15 @@ export function DefaultLegendTableDemo() {
 // ─── Demo 2: Custom columns with typed meta ─────────────────────
 
 export function CustomColumnsDemo() {
+  const { theme: siteTheme } = useTheme();
   const [chart, setChart] = createSignal<ChartInstance | undefined>();
   const [precision, setPrecision] = createSignal(4);
   const data = runSeriesData(5, 200);
-  const config = runConfig(5, 'eval/accuracy');
+
+  const config = createMemo(() => ({
+    ...runConfig(5, 'eval/accuracy'),
+    theme: siteTheme() === 'light' ? lightTheme : darkTheme,
+  }));
 
   const snap = createCursorSnapshot(chart);
   createEffect(() => {
@@ -133,7 +145,7 @@ export function CustomColumnsDemo() {
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '260px' }}>
-        <Chart config={config} data={data} onReady={setChart} />
+        <Chart config={config()} data={data} onReady={setChart} />
       </div>
       <LegendTable<RunMeta>
         chart={chart}
@@ -170,32 +182,36 @@ export function CustomColumnsDemo() {
 // ─── Demo 3: Cross-chart sync (cursor + highlight) ──────────────
 
 export function CrossChartSyncDemo() {
+  const { theme: siteTheme } = useTheme();
   const group = createChartGroup();
   const [chartA, setChartA] = createSignal<ChartInstance | undefined>();
   const [chartB, setChartB] = createSignal<ChartInstance | undefined>();
   const data = runSeriesData(4, 200);
-  const baseConfig = runConfig(4, 'eval/accuracy');
 
-  // `group.apply(config)` merges the group's sync keys into `cursor`/`highlight`
-  // without clobbering the caller's own settings (e.g. `indicators: false`).
-  const configA = group.apply(baseConfig);
+  const configA = createMemo(() => group.apply({
+    ...runConfig(4, 'eval/accuracy'),
+    theme: siteTheme() === 'light' ? lightTheme : darkTheme,
+  }));
 
-  // Chart B: same data, different metric label in `meta`.
-  const configB = group.apply({
-    ...baseConfig,
-    series: baseConfig.series.map((s) => ({
-      ...s,
-      meta: { ...s.meta!, metricKey: 'train/loss' },
-    })),
+  const configB = createMemo(() => {
+    const base = runConfig(4, 'eval/accuracy');
+    return group.apply({
+      ...base,
+      theme: siteTheme() === 'light' ? lightTheme : darkTheme,
+      series: base.series.map((s) => ({
+        ...s,
+        meta: { ...s.meta!, metricKey: 'train/loss' },
+      })),
+    });
   });
 
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '180px' }}>
-        <Chart config={configA} data={data} onReady={setChartA} />
+        <Chart config={configA()} data={data} onReady={setChartA} />
       </div>
       <div style={{ height: '180px', 'border-top': '1px solid var(--border)' }}>
-        <Chart config={configB} data={data} onReady={setChartB} />
+        <Chart config={configB()} data={data} onReady={setChartB} />
       </div>
       <LegendTable<RunMeta>
         chart={chartA}
@@ -217,10 +233,14 @@ export function CrossChartSyncDemo() {
 // ─── Demo 4: External highlight from a sidepanel ────────────────
 
 export function SidepanelHighlightDemo() {
+  const { theme: siteTheme } = useTheme();
   const group = createChartGroup();
   const [chart, setChart] = createSignal<ChartInstance | undefined>();
   const data = runSeriesData(6, 200);
-  const config = group.apply(runConfig(6, 'eval/accuracy'));
+  const config = createMemo(() => group.apply({
+    ...runConfig(6, 'eval/accuracy'),
+    theme: siteTheme() === 'light' ? lightTheme : darkTheme,
+  }));
   const names = runNames(6);
 
   return (
@@ -251,7 +271,7 @@ export function SidepanelHighlightDemo() {
       </div>
       <div style={{ flex: '1', display: 'flex', 'flex-direction': 'column' }}>
         <div style={{ height: '260px' }}>
-          <Chart config={config} data={data} onReady={setChart} />
+          <Chart config={config()} data={data} onReady={setChart} />
         </div>
         <LegendTable<RunMeta> chart={chart} />
       </div>
@@ -262,13 +282,17 @@ export function SidepanelHighlightDemo() {
 // ─── Demo 5: Many runs benchmark with FPS counter ───────────────
 
 export function BenchmarkDemo() {
+  const { theme: siteTheme } = useTheme();
   const NUM_RUNS = 50;
   const POINTS = 2_000;
   const [chart, setChart] = createSignal<ChartInstance | undefined>();
   const [fps, setFps] = createSignal(60);
 
   const data = runSeriesData(NUM_RUNS, POINTS);
-  const cfg: ChartConfig<RunMeta> = runConfig(NUM_RUNS, 'eval/accuracy');
+  const cfg = createMemo(() => ({
+    ...runConfig(NUM_RUNS, 'eval/accuracy'),
+    theme: siteTheme() === 'light' ? lightTheme : darkTheme,
+  } as ChartConfig<RunMeta>));
 
   const snap = createCursorSnapshot(chart);
   createEffect(() => {
@@ -296,7 +320,7 @@ export function BenchmarkDemo() {
   return (
     <div style={{ position: 'relative', border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '260px' }}>
-        <Chart config={cfg} data={data} onReady={setChart} />
+        <Chart config={cfg()} data={data} onReady={setChart} />
       </div>
       <LegendTable<RunMeta>
         chart={chart}
@@ -326,14 +350,18 @@ export function BenchmarkDemo() {
 // ─── Demo 6: Headless cursor snapshot via render-prop ───────────
 
 export function HeadlessSnapshotDemo() {
+  const { theme: siteTheme } = useTheme();
   const [chart, setChart] = createSignal<ChartInstance | undefined>();
   const data = runSeriesData(2, 150);
-  const config = runConfig(2, 'eval/accuracy');
+  const config = createMemo(() => ({
+    ...runConfig(2, 'eval/accuracy'),
+    theme: siteTheme() === 'light' ? lightTheme : darkTheme,
+  }));
 
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '220px' }}>
-        <Chart config={config} data={data} onReady={setChart} />
+        <Chart config={config()} data={data} onReady={setChart} />
       </div>
       <LegendTable<RunMeta> chart={chart}>
         {(snap) => {

@@ -35,7 +35,7 @@ export function renderBars(
   // Clip to plot area
   ctx.save();
   ctx.beginPath();
-  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
+  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
   ctx.clip();
 
   ctx.fillStyle = color;

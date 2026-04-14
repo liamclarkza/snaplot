@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount } from 'solid-js';
+import { createSignal, createMemo, onCleanup, onMount } from 'solid-js';
 import { highlight } from 'sugar-high';
 import {
   Chart,
@@ -9,6 +9,7 @@ import {
   nameColumn, valueColumn, swatchColumn, metricColumn, column,
 } from 'snaplot';
 import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
+import { useTheme } from '../ThemeContext';
 
 // Available to user code inside the editor via new Function args
 const evalContext = {
@@ -34,9 +35,22 @@ export default function LiveEditor(props: {
   height?: string;
   onReady?: (chart: ChartInstance) => void;
 }) {
+  const { theme: siteTheme } = useTheme();
   const [error, setError] = createSignal(false);
-  const [config, setConfig] = createSignal<ChartConfig>(evalConfig(props.defaultCode));
+  const [userConfig, setUserConfig] = createSignal<ChartConfig>(evalConfig(props.defaultCode));
   const [copied, setCopied] = createSignal(false);
+
+  // Merge the site-wide theme so all live-editor charts respond to
+  // the light/dark toggle without the user needing to type `theme:` in
+  // the editor. If the user's code explicitly sets a theme, it wins
+  // because the user config is spread last.
+  const config = createMemo(() => {
+    const uc = userConfig();
+    return {
+      theme: siteTheme() === 'light' ? lightTheme : darkTheme,
+      ...uc,
+    } as ChartConfig;
+  });
 
   let editorRef!: HTMLDivElement;
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -93,7 +107,7 @@ export default function LiveEditor(props: {
     debounceTimer = setTimeout(() => {
       try {
         const result = new Function(...evalArgNames, 'return (' + text + ')')(...evalArgValues);
-        setConfig(result as ChartConfig);
+        setUserConfig(result as ChartConfig);
         setError(false);
       } catch {
         setError(true);

@@ -33,7 +33,7 @@ export class CanvasManager {
 
     // Container
     this.container = document.createElement('div');
-    this.container.style.cssText = 'position:relative;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;';
+    this.container.style.cssText = 'position:relative;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;border-radius:6px;';
     parent.appendChild(this.container);
 
     // Create canvases

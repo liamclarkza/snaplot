@@ -35,6 +35,25 @@ export class TooltipManager {
     this.el.style.color = theme.tooltipTextColor;
     this.el.style.border = `1px solid ${theme.tooltipBorderColor}`;
     this.el.style.fontFamily = theme.fontFamily;
+    // Subtle shadow on light backgrounds; deeper glow on dark.
+    const isDark = this.isBackgroundDark(theme.tooltipBackground);
+    this.el.style.boxShadow = isDark
+      ? '0 4px 12px rgba(0, 0, 0, 0.4)'
+      : '0 2px 8px rgba(0, 0, 0, 0.1)';
+  }
+
+  private isBackgroundDark(bg: string): boolean {
+    if (bg.startsWith('#')) {
+      const r = parseInt(bg.slice(1, 3), 16);
+      const g = parseInt(bg.slice(3, 5), 16);
+      const b = parseInt(bg.slice(5, 7), 16);
+      return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+    }
+    const m = bg.match(/\d+/g);
+    if (m && m.length >= 3) {
+      return (Number(m[0]) * 0.299 + Number(m[1]) * 0.587 + Number(m[2]) * 0.114) < 128;
+    }
+    return true;
   }
 
   show(

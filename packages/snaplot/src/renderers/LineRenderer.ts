@@ -34,7 +34,7 @@ export function renderLine(
   // Clip to plot area
   ctx.save();
   ctx.beginPath();
-  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
+  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
   ctx.clip();
 
   ctx.strokeStyle = color;
@@ -79,7 +79,7 @@ export function renderArea(
   // Clip to plot area
   ctx.save();
   ctx.beginPath();
-  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
+  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
   ctx.clip();
   ctx.globalAlpha = opacityMultiplier;
 
@@ -177,7 +177,7 @@ export function renderBand(
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
+  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
   ctx.clip();
 
   // ── 1. Collect indices where all three columns are valid ──

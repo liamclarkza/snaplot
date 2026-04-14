@@ -1306,14 +1306,17 @@ export class ChartCore implements ChartInstance {
     // Clip all indicators to the plot area
     ctx.save();
     ctx.beginPath();
-    ctx.rect(this.layout.plot.left, this.layout.plot.top, this.layout.plot.width, this.layout.plot.height);
+    ctx.roundRect(this.layout.plot.left, this.layout.plot.top, this.layout.plot.width, this.layout.plot.height, 4);
     ctx.clip();
 
-    // Determine ring color based on theme luminance (white ring on dark, dark ring on light)
+    // Ring around cursor dots: white works on both light and dark backgrounds.
+    // On dark themes it reads as a subtle glow; on light themes it separates
+    // the vibrant fill from the white canvas. Alpha varies by luminance so
+    // the ring is visible but never harsh.
     const bg = this.theme.backgroundColor;
     const isDark = this.isThemeDark(bg);
-    const ringColor = isDark ? '#ffffff' : '#333333';
-    const ringAlpha = isDark ? 0.15 : 0.1;
+    const ringColor = '#ffffff';
+    const ringAlpha = isDark ? 0.15 : 0.08;
 
     // When a series is highlighted, only draw the indicator on that series —
     // the others just get the crosshair line (matches Neptune/W&B behavior).
@@ -1391,16 +1394,30 @@ export class ChartCore implements ChartInstance {
       const py = yScale.dataToPixel(point.y);
       const r = sc.type === 'scatter' ? (sc.pointRadius ?? 3) : 4;
 
-      // Filled center
+      // On light backgrounds, a subtle drop-shadow gives the dot depth
+      // without needing a dark ring stroke.
+      if (!isDark) {
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.18)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 1;
+      }
+
+      // White ring slightly larger than the fill — acts as a clean halo.
+      ctx.beginPath();
+      ctx.arc(px, py, r + 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+
+      // Clear shadow for the inner fill so it's crisp.
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+
+      // Filled center with the series color
       ctx.beginPath();
       ctx.arc(px, py, r, 0, Math.PI * 2);
       ctx.fillStyle = point.color;
       ctx.fill();
-
-      // Ring directly around the dot (no gap)
-      ctx.strokeStyle = ringColor;
-      ctx.lineWidth = 2;
-      ctx.stroke();
     }
 
     ctx.restore();

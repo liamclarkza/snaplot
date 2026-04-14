@@ -15,20 +15,30 @@ export const PALETTE_OKABE_ITO = [
   '#000000', // black
 ] as const;
 
+/**
+ * Light theme — designed around a coordinated grey scale:
+ *
+ *   #ffffff  background
+ *   #d8dae0  grid lines (at 0.6 opacity)
+ *   #c0c4cc  axis lines (soft frame)
+ *   #9098a8  crosshair
+ *   #8890a0  tick labels (muted blue-grey, readable but not harsh)
+ *   #2a2a35  text (near-black)
+ */
 export const DEFAULT_THEME: ThemeConfig = {
   backgroundColor: '#ffffff',
-  textColor: '#333333',
+  textColor: '#2a2a35',
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   fontSize: 11,
-  gridColor: '#e0e0e0',
-  gridOpacity: 0.3,
+  gridColor: '#d8dae0',
+  gridOpacity: 0.6,
   palette: [...PALETTE_OKABE_ITO],
-  axisLineColor: '#666666',
-  tickColor: '#999999',
-  crosshairColor: '#666666',
-  tooltipBackground: 'rgba(0, 0, 0, 0.8)',
-  tooltipTextColor: '#ffffff',
-  tooltipBorderColor: 'rgba(255, 255, 255, 0.15)',
+  axisLineColor: '#d8dae0',
+  tickColor: '#8890a0',
+  crosshairColor: '#9098a8',
+  tooltipBackground: '#ffffff',
+  tooltipTextColor: '#2a2a35',
+  tooltipBorderColor: '#d8dae0',
 };
 
 export const DARK_THEME: ThemeConfig = {

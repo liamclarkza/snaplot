@@ -20,6 +20,11 @@ export function renderCrosshair(
   if (y < plot.top || y > plot.top + plot.height) return;
 
   ctx.save();
+  // Clip to rounded plot area so crosshair lines don't poke into corners.
+  ctx.beginPath();
+  ctx.roundRect(plot.left, plot.top, plot.width, plot.height, 4);
+  ctx.clip();
+
   ctx.strokeStyle = color;
   ctx.lineWidth = 1;
   ctx.setLineDash(config.dash ?? [4, 4]);

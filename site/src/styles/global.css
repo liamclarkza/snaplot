@@ -1,3 +1,4 @@
+/* ─── Dark (default) ─── */
 :root {
   --bg: #0f1117;
   --bg-surface: #1a1b2e;
@@ -16,6 +17,22 @@
   --radius: 8px;
   --radius-lg: 12px;
   --max-width: 1120px;
+}
+
+/* ─── Light ─── */
+[data-theme="light"] {
+  --bg: #f5f6f8;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f0f0f4;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-secondary: #d97706;
+  --text: #1a1a2e;
+  --text-secondary: #64748b;
+  --text-dim: #94a3b8;
+  --border: #e2e4e9;
+  --border-light: #d1d5db;
+  --code-bg: #f1f3f5;
 }
 
 *, *::before, *::after {
@@ -65,6 +82,14 @@ code {
   --chart-tooltip-bg: rgba(20, 20, 40, 0.95);
   --chart-tooltip-text: #e0e0e0;
 }
+[data-theme="light"] {
+  --chart-bg: #ffffff;
+  --chart-text: #2a2a35;
+  --chart-grid: #d8dae0;
+  --chart-axis: #d8dae0;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-text: #2a2a35;
+}
 
 /* sugar-high syntax highlighting token colors (dark theme) */
 :root {
@@ -77,6 +102,17 @@ code {
   --sh-string: #009e73;
   --sh-keyword: #cc79a7;
   --sh-comment: #555570;
+}
+[data-theme="light"] {
+  --sh-class: #b45309;
+  --sh-identifier: #1a1a2e;
+  --sh-sign: #64748b;
+  --sh-property: #2563eb;
+  --sh-entity: #b45309;
+  --sh-jsxliterals: #0369a1;
+  --sh-string: #047857;
+  --sh-keyword: #9333ea;
+  --sh-comment: #94a3b8;
 }
 
 /* ─── Mobile responsive: docs sidebar ─── */
@@ -94,7 +130,7 @@ code {
     bottom: 0;
     width: 260px !important;
     max-height: 100vh !important;
-    background: var(--bg);
+    background: var(--bg) !important;
     border-right: 1px solid var(--border);
     z-index: 150;
     padding: 72px 20px calc(140px + env(safe-area-inset-bottom, 0px));
