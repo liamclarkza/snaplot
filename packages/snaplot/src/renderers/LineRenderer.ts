@@ -43,6 +43,11 @@ export function renderLine(
   ctx.lineCap = 'round';
   ctx.globalAlpha = (series.opacity ?? 1) * opacityMultiplier;
 
+  // Apply dash pattern (if configured)
+  if (series.lineDash && series.lineDash.length > 0) {
+    ctx.setLineDash(series.lineDash);
+  }
+
   if (interp === 'monotone') {
     drawMonotoneCubic(ctx, xData, yData, startIdx, endIdx, scaleX, scaleY);
   } else if (interp.startsWith('step')) {
@@ -139,6 +144,9 @@ export function renderArea(
   ctx.strokeStyle = color;
   ctx.lineWidth = series.lineWidth ?? 1.5;
   ctx.lineJoin = 'round';
+  if (series.lineDash && series.lineDash.length > 0) {
+    ctx.setLineDash(series.lineDash);
+  }
   ctx.stroke();
 
   ctx.restore();

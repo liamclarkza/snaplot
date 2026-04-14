@@ -100,6 +100,21 @@ export interface SeriesConfig<TMeta = unknown> {
 
   // Line/area
   interpolation?: InterpolationMode;
+  /**
+   * Dash pattern for line strokes, following the Canvas `setLineDash()` spec.
+   * Array of segment lengths alternating between dash and gap (e.g. `[6, 3]`
+   * for a 6px dash with 3px gap). `undefined` or `[]` renders a solid line.
+   *
+   * Applied to both line and area outline strokes.
+   *
+   * @example
+   * ```ts
+   * { lineDash: [6, 3] }       // standard dash
+   * { lineDash: [2, 2] }       // dotted
+   * { lineDash: [10, 4, 2, 4] } // dash-dot
+   * ```
+   */
+  lineDash?: number[];
 
   // Area
   fillGradient?: { top: string; bottom: string };

@@ -211,6 +211,7 @@ export default function Docs() {
   const [d_linear] = createSignal(linearData());
   const [d_time] = createSignal(timeScaleData());
   const [d_styling] = createSignal(stylingData());
+  const [d_dash] = createSignal(timeSeries(300, 3));
   const [d_legend] = createSignal(legendData());
   const [d_interaction] = createSignal(timeSeries(400, 2));
   const [d_zoom] = createSignal(timeSeries(500, 2));
@@ -263,6 +264,7 @@ export default function Docs() {
     { type: 'divider', label: 'Series Options' },
     { type: 'link', id: 'interpolation', label: 'Interpolation' },
     { type: 'link', id: 'styling', label: 'Styling' },
+    { type: 'link', id: 'line-dash', label: 'Line Dash' },
     { type: 'link', id: 'nan-gaps', label: 'NaN Gaps' },
     { type: 'link', id: 'dual-axis', label: 'Dual Y-Axis' },
 
@@ -661,6 +663,25 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
     { label: 'Thick', dataIndex: 1, type: 'line', stroke: '#e74c3c', lineWidth: 3, interpolation: 'monotone' },
     { label: 'Dashed area', dataIndex: 2, type: 'area', stroke: '#2ecc71', opacity: 0.6, fillGradient: { top: 'rgba(46,204,113,0.3)', bottom: 'rgba(46,204,113,0.02)' }, interpolation: 'monotone', lineWidth: 2 },
     { label: 'Points', dataIndex: 3, type: 'scatter', stroke: '#9b59b6', pointRadius: 4 },
+  ],
+  tooltip: { show: true, mode: 'index' },
+}`} />
+        </Section>
+
+        <Section id="line-dash" title="Line Dash">
+          <P>
+            Use <code>lineDash</code> to render dashed or dotted lines. The value follows the
+            Canvas <code>setLineDash()</code> spec — an array of segment lengths alternating
+            between dash and gap. Applied to both line strokes and area outlines.
+          </P>
+          <Ex title="Dash patterns" desc="Solid, dashed, and dotted lines side by side"
+            data={d_dash()}
+            code={`{
+  axes: { x: { type: 'time' }, y: { type: 'linear' } },
+  series: [
+    { label: 'Solid', dataIndex: 1, type: 'line', stroke: '#4f8fea', lineWidth: 2 },
+    { label: 'Dashed', dataIndex: 2, type: 'line', stroke: '#e69f00', lineWidth: 2, lineDash: [8, 4] },
+    { label: 'Dotted', dataIndex: 3, type: 'line', stroke: '#2ecc71', lineWidth: 2, lineDash: [2, 3] },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
