@@ -745,6 +745,12 @@ export class ChartCore implements ChartInstance {
       this.tooltipManager.hide();
       this.scheduler.markDirty(DirtyFlag.OVERLAY);
 
+      // Notify listeners and plugins that the cursor is gone — without
+      // this, a fast mouse-leave skips the "cursor outside plot area"
+      // path in action:cursor and the legend table never blanks its values.
+      this.emitEvent('cursor:move', null, null);
+      this.pluginManager.dispatch('onCursorMove', this, null, null);
+
       if (this.syncKey) {
         SyncGroup.publishCursor(this.syncKey, this, null);
       }
