@@ -39,6 +39,10 @@
     "url": "git+https://github.com/liamclarkza/snaplot.git"
   },
   "license": "MIT",
+  "homepage": "https://github.com/liamclarkza/snaplot",
+  "bugs": {
+    "url": "https://github.com/liamclarkza/snaplot/issues"
+  },
   "keywords": [
     "solidjs",
     "chart",
@@ -47,6 +51,10 @@
     "dashboard",
     "heatmap",
     "scatter",
-    "histogram"
+    "histogram",
+    "line-chart",
+    "bar-chart",
+    "time-series",
+    "plotting"
   ]
 }
