@@ -24,4 +24,9 @@ jobs:
       - run: npm install
       - run: npm run build
 
+      # Clear the default auth token that setup-node writes to .npmrc.
+      # Without this, npm uses that token instead of the OIDC exchange,
+      # and trusted publishing fails with E404.
+      - run: npm config delete //registry.npmjs.org/:_authToken
+
       - run: cd packages/snaplot && npm publish --provenance --access public
