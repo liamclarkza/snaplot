@@ -6,12 +6,13 @@ let groupCounter = 0;
 
 /**
  * Bindings spread into each chart in the group. Sets matching
- * `cursor.syncKey` and `highlight.syncKey` so cross-chart sync works
- * out of the box without the caller picking strings.
+ * `cursor.syncKey`, `highlight.syncKey`, and optionally `zoom.syncKey`
+ * so cross-chart sync works out of the box without the caller picking strings.
  */
 export interface ChartGroupBindings {
   cursor: { syncKey: string };
   highlight: { syncKey: string };
+  zoom: { syncKey: string };
 }
 
 /**
@@ -85,6 +86,7 @@ export function createChartGroup(): ChartGroup {
       return {
         cursor: { syncKey },
         highlight: { syncKey },
+        zoom: { syncKey },
       };
     },
 
@@ -93,6 +95,7 @@ export function createChartGroup(): ChartGroup {
         ...config,
         cursor: { ...(config.cursor ?? {}), syncKey },
         highlight: { ...(config.highlight ?? {}), syncKey },
+        zoom: { ...(config.zoom ?? {}), syncKey },
       };
     },
 

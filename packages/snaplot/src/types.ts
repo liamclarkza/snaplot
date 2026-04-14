@@ -74,7 +74,7 @@ export interface Layout {
 // SERIES CONFIGURATION
 // ============================================================
 
-export type ChartType = 'line' | 'area' | 'scatter' | 'bar' | 'histogram';
+export type ChartType = 'line' | 'area' | 'band' | 'scatter' | 'bar' | 'histogram';
 
 export type InterpolationMode =
   | 'linear'
@@ -100,9 +100,49 @@ export interface SeriesConfig<TMeta = unknown> {
 
   // Line/area
   interpolation?: InterpolationMode;
+  /**
+   * Dash pattern for line strokes, following the Canvas `setLineDash()` spec.
+   * Array of segment lengths alternating between dash and gap (e.g. `[6, 3]`
+   * for a 6px dash with 3px gap). `undefined` or `[]` renders a solid line.
+   *
+   * Applied to both line and area outline strokes.
+   *
+   * @example
+   * ```ts
+   * { lineDash: [6, 3] }       // standard dash
+   * { lineDash: [2, 2] }       // dotted
+   * { lineDash: [10, 4, 2, 4] } // dash-dot
+   * ```
+   */
+  lineDash?: number[];
 
   // Area
   fillGradient?: { top: string; bottom: string };
+  // Band (confidence interval / error band)
+  /**
+   * Column index for the upper bound of a `type: 'band'` series.
+   * Required when `type` is `'band'`. Ignored for other chart types.
+   */
+  upperDataIndex?: number;
+  /**
+   * Column index for the lower bound of a `type: 'band'` series.
+   * Required when `type` is `'band'`. Ignored for other chart types.
+   *
+   * A band series renders three elements as a single visual unit:
+   * 1. Filled region between `upperDataIndex` and `lowerDataIndex`
+   * 2. Center line at `dataIndex` (used for tooltip values and cursor snapping)
+   *
+   * @example
+   * ```ts
+   * // data = [x, yMean, yUpper, yLower]
+   * series: [
+   *   { label: 'Loss', type: 'band', dataIndex: 1,
+   *     upperDataIndex: 2, lowerDataIndex: 3,
+   *     stroke: '#4f8fea', fill: '#4f8fea', opacity: 0.15 },
+   * ]
+   * ```
+   */
+  lowerDataIndex?: number;
 
   // Bar
   barWidthRatio?: number;
@@ -226,6 +266,15 @@ export interface ZoomConfig {
    */
   bounds?: boolean | ZoomBoundsSpec | { x?: ZoomBoundsSpec; y?: ZoomBoundsSpec };
   onZoom?: (xMin: number, xMax: number) => void;
+  /**
+   * Sync key for cross-chart zoom coordination. Charts sharing the same
+   * key will synchronize their X-axis viewport: zooming or panning one
+   * chart applies the same range to all peers. Reset-zoom propagates too.
+   *
+   * Uses the same SyncGroup registry as cursor/highlight sync. An
+   * equality guard prevents infinite broadcast loops.
+   */
+  syncKey?: string;
 }
 
 export interface PanConfig {

@@ -59,6 +59,22 @@ function histData(): ColumnarData {
   return [bins.edges, bins.counts];
 }
 
+function bandData(): ColumnarData {
+  const n = 200, x = new Float64Array(n);
+  const mean = new Float64Array(n), upper = new Float64Array(n), lower = new Float64Array(n);
+  const now = Date.now();
+  for (let i = 0; i < n; i++) {
+    x[i] = now - (n - i) * 60_000;
+    const t = i / n;
+    const m = 60 + 20 * Math.sin(t * Math.PI * 3) + (Math.random() - 0.5) * 4;
+    const spread = 8 + 6 * Math.abs(Math.sin(t * Math.PI * 5));
+    mean[i] = m;
+    upper[i] = m + spread;
+    lower[i] = m - spread;
+  }
+  return [x, mean, upper, lower];
+}
+
 function interpData(): ColumnarData {
   const n = 15, x = new Float64Array(n), y = new Float64Array(n);
   for (let i = 0; i < n; i++) { x[i] = i; y[i] = 30 + 25 * Math.sin(i * 0.6) + (Math.random() - 0.5) * 10; }
@@ -210,7 +226,9 @@ export default function Docs() {
   const [d_theme] = createSignal(timeSeries(200, 2));
   const [d_linear] = createSignal(linearData());
   const [d_time] = createSignal(timeScaleData());
+  const [d_band] = createSignal(bandData());
   const [d_styling] = createSignal(stylingData());
+  const [d_dash] = createSignal(timeSeries(300, 3));
   const [d_legend] = createSignal(legendData());
   const [d_interaction] = createSignal(timeSeries(400, 2));
   const [d_zoom] = createSignal(timeSeries(500, 2));
@@ -255,6 +273,7 @@ export default function Docs() {
     { type: 'divider', label: 'Chart Types' },
     { type: 'link', id: 'line', label: 'Line' },
     { type: 'link', id: 'area', label: 'Area' },
+    { type: 'link', id: 'band', label: 'Band (Fill Between)' },
     { type: 'link', id: 'scatter', label: 'Scatter' },
     { type: 'link', id: 'heatmap', label: 'Density Heatmap' },
     { type: 'link', id: 'bar', label: 'Bar' },
@@ -263,6 +282,7 @@ export default function Docs() {
     { type: 'divider', label: 'Series Options' },
     { type: 'link', id: 'interpolation', label: 'Interpolation' },
     { type: 'link', id: 'styling', label: 'Styling' },
+    { type: 'link', id: 'line-dash', label: 'Line Dash' },
     { type: 'link', id: 'nan-gaps', label: 'NaN Gaps' },
     { type: 'link', id: 'dual-axis', label: 'Dual Y-Axis' },
 
@@ -294,6 +314,7 @@ export default function Docs() {
     { type: 'link', id: 'downsampling', label: 'Downsampling' },
 
     { type: 'divider', label: 'Plugins' },
+    { type: 'link', id: 'reference-lines', label: 'Reference Lines' },
     { type: 'link', id: 'legend-plugin', label: 'Legend Plugin' },
     { type: 'link', id: 'legend-table', label: 'Legend Table' },
     { type: 'link', id: 'cross-chart-sync', label: 'Cross-chart Sync' },
@@ -566,6 +587,28 @@ const data: ColumnarData = [
 }`} />
         </Section>
 
+        <Section id="band" title="Band (Fill Between)">
+          <P>
+            Use <code>type: 'band'</code> to render a confidence interval, error band, or min/max
+            range as a single series. A band series combines three data columns into one visual unit:
+            a filled region between <code>upperDataIndex</code> and <code>lowerDataIndex</code>,
+            with a center line at <code>dataIndex</code>. The center line is what the tooltip
+            and cursor snap to — the fill is purely decorative.
+          </P>
+          <Ex title="Mean line with ±σ confidence band" desc="One series, three columns: mean (1), upper (2), lower (3)"
+            data={d_band()}
+            code={`{
+  axes: { x: { type: 'time' }, y: { type: 'linear' } },
+  series: [
+    { label: 'Loss', type: 'band', dataIndex: 1,
+      upperDataIndex: 2, lowerDataIndex: 3,
+      stroke: '#4f8fea', fill: '#4f8fea', opacity: 0.15,
+      lineWidth: 2, interpolation: 'monotone' },
+  ],
+  tooltip: { show: true, mode: 'index' },
+}`} />
+        </Section>
+
         <Section id="scatter" title="Scatter">
           <P>
             Scatter plots use stamp-based rendering — a single point shape is pre-rendered to an offscreen canvas, then stamped at each data position. This makes scatter rendering scale to tens of thousands of points with minimal overhead.
@@ -661,6 +704,25 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
     { label: 'Thick', dataIndex: 1, type: 'line', stroke: '#e74c3c', lineWidth: 3, interpolation: 'monotone' },
     { label: 'Dashed area', dataIndex: 2, type: 'area', stroke: '#2ecc71', opacity: 0.6, fillGradient: { top: 'rgba(46,204,113,0.3)', bottom: 'rgba(46,204,113,0.02)' }, interpolation: 'monotone', lineWidth: 2 },
     { label: 'Points', dataIndex: 3, type: 'scatter', stroke: '#9b59b6', pointRadius: 4 },
+  ],
+  tooltip: { show: true, mode: 'index' },
+}`} />
+        </Section>
+
+        <Section id="line-dash" title="Line Dash">
+          <P>
+            Use <code>lineDash</code> to render dashed or dotted lines. The value follows the
+            Canvas <code>setLineDash()</code> spec — an array of segment lengths alternating
+            between dash and gap. Applied to both line strokes and area outlines.
+          </P>
+          <Ex title="Dash patterns" desc="Solid, dashed, and dotted lines side by side"
+            data={d_dash()}
+            code={`{
+  axes: { x: { type: 'time' }, y: { type: 'linear' } },
+  series: [
+    { label: 'Solid', dataIndex: 1, type: 'line', stroke: '#4f8fea', lineWidth: 2 },
+    { label: 'Dashed', dataIndex: 2, type: 'line', stroke: '#e69f00', lineWidth: 2, lineDash: [8, 4] },
+    { label: 'Dotted', dataIndex: 3, type: 'line', stroke: '#2ecc71', lineWidth: 2, lineDash: [2, 3] },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
@@ -1157,6 +1219,37 @@ const [downX, downY] = m4(xData, yData, pixelWidth, xMin, xMax);`} />
             PLUGINS
             ═══════════════════════════════════════════════════════ */}
 
+        <Section id="reference-lines" title="Reference Lines">
+          <P>
+            The reference lines plugin renders horizontal or vertical marker lines at fixed data values.
+            Use it for thresholds, baselines, targets, or event markers. Lines respond to zoom/pan and
+            scale changes. Labels are positioned automatically within the plot area.
+          </P>
+          <Ex title="Threshold and baseline markers" desc="Horizontal lines at y=75 (target) and y=40 (floor), with a dashed style"
+            data={d_line()}
+            code={`{
+  axes: { x: { type: 'time' }, y: { type: 'linear' } },
+  series: [
+    { label: 'Metric A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Metric B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+  ],
+  plugins: [
+    createReferenceLinesPlugin({
+      lines: [
+        { axis: 'y', value: 75, label: 'Target', color: '#e74c3c', dash: [6, 3], lineWidth: 1.5 },
+        { axis: 'y', value: 40, label: 'Floor', color: '#888', lineWidth: 1 },
+      ],
+    }),
+  ],
+  tooltip: { show: true, mode: 'index' },
+}`} />
+          <P>
+            Call <code>refLines.setLines(newLines)</code> to update lines dynamically after creation.
+            The plugin renders in the <code>afterDrawData</code> hook — above series data but below
+            the overlay (crosshair, selection box).
+          </P>
+        </Section>
+
         <Section id="legend-plugin" title="Legend Plugin">
           <P>
             The built-in legend plugin creates a clickable legend above or below the chart. Click a series name to toggle its visibility. Long-press (or shift-click) to solo a series.
@@ -1276,7 +1369,7 @@ const config: ChartConfig<RunMeta> = {
 
         <Section id="cross-chart-sync" title="Cross-chart Sync">
           <P>
-            <code>createChartGroup()</code> mints a fresh sync key and exposes <code>group.bind()</code> to spread into each chart's config. Cursor + series highlight propagate automatically across every chart in the group.
+            <code>createChartGroup()</code> mints a fresh sync key and exposes <code>group.bind()</code> or <code>group.apply(config)</code> to spread into each chart's config. Cursor position, series highlight, and zoom/pan viewport all propagate automatically across every chart in the group. Zooming one chart zooms all peers to the same X range; double-click reset propagates too.
           </P>
           <CodeBlock code={`const group = createChartGroup();
 

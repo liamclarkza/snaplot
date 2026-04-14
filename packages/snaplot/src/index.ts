@@ -44,6 +44,8 @@ export { lightTheme, darkTheme, oceanTheme, midnightTheme, resolveTheme } from '
 // Plugins
 export { createLegendPlugin } from './plugins/builtins/legendPlugin';
 export { createLegendTablePlugin } from './plugins/builtins/legendTablePlugin';
+export { createReferenceLinesPlugin } from './plugins/builtins/referenceLinesPlugin';
+export type { ReferenceLine } from './plugins/builtins/referenceLinesPlugin';
 export type {
   LegendTableOptions,
 } from './plugins/builtins/legendTablePlugin';

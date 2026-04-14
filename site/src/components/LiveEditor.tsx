@@ -5,6 +5,7 @@ import {
   darkTheme, lightTheme, oceanTheme, midnightTheme,
   createLegendPlugin,
   createLegendTablePlugin,
+  createReferenceLinesPlugin,
   nameColumn, valueColumn, swatchColumn, metricColumn, column,
 } from 'snaplot';
 import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
@@ -14,6 +15,7 @@ const evalContext = {
   darkTheme, lightTheme, oceanTheme, midnightTheme,
   createLegendPlugin,
   createLegendTablePlugin,
+  createReferenceLinesPlugin,
   nameColumn, valueColumn, swatchColumn, metricColumn, column,
 };
 const evalArgNames = Object.keys(evalContext);
