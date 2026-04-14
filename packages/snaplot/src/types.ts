@@ -266,6 +266,15 @@ export interface ZoomConfig {
    */
   bounds?: boolean | ZoomBoundsSpec | { x?: ZoomBoundsSpec; y?: ZoomBoundsSpec };
   onZoom?: (xMin: number, xMax: number) => void;
+  /**
+   * Sync key for cross-chart zoom coordination. Charts sharing the same
+   * key will synchronize their X-axis viewport: zooming or panning one
+   * chart applies the same range to all peers. Reset-zoom propagates too.
+   *
+   * Uses the same SyncGroup registry as cursor/highlight sync. An
+   * equality guard prevents infinite broadcast loops.
+   */
+  syncKey?: string;
 }
 
 export interface PanConfig {

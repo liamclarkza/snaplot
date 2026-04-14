@@ -95,6 +95,9 @@ export class ChartCore implements ChartInstance {
   private destroyed = false;
   private syncKey: string | null = null;
   private highlightSyncKey: string | null = null;
+  private zoomSyncKey: string | null = null;
+  /** Guard to suppress zoom sync publishing when applying a peer's broadcast */
+  private suppressZoomSync = false;
 
   // Highlight state
   private highlightedSeries: number | null = null;
@@ -180,6 +183,12 @@ export class ChartCore implements ChartInstance {
         SyncGroup.join(this.highlightSyncKey, this);
       }
     }
+    if (this.config.zoom?.syncKey) {
+      this.zoomSyncKey = this.config.zoom.syncKey;
+      if (this.zoomSyncKey !== this.syncKey && this.zoomSyncKey !== this.highlightSyncKey) {
+        SyncGroup.join(this.zoomSyncKey, this);
+      }
+    }
 
     // 13. Create render scheduler and schedule initial draw
     this.scheduler = new RenderScheduler((flags) => this.render(flags));
@@ -229,8 +238,21 @@ export class ChartCore implements ChartInstance {
     if (range.min !== undefined) scale.min = range.min;
     if (range.max !== undefined) scale.max = range.max;
 
-    this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID);
+    // When X axis changes (e.g. from a zoom sync peer), re-fit Y axis
+    // to the new visible X range — otherwise the band/data may clip.
+    const ac = this.config.axes?.[key];
+    const pos = inferPosition(key, ac?.position);
+    const isHoriz = pos === 'bottom' || pos === 'top';
+    if (isHoriz && !this.config.zoom?.y) {
+      this.autoRangeVertical();
+    }
+
+    // Suppress zoom sync to prevent infinite peer→peer loops.
+    // setAxis is the entry point for SyncGroup.publishScale() peers.
+    this.suppressZoomSync = true;
+    this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID | DirtyFlag.OVERLAY);
     this.emitEvent('viewport:change', key, { min: scale.min, max: scale.max });
+    this.suppressZoomSync = false;
   }
 
   getAxis(key: string): Scale | undefined {
@@ -320,6 +342,9 @@ export class ChartCore implements ChartInstance {
     }
     if (this.highlightSyncKey && this.highlightSyncKey !== this.syncKey) {
       SyncGroup.leave(this.highlightSyncKey, this);
+    }
+    if (this.zoomSyncKey && this.zoomSyncKey !== this.syncKey && this.zoomSyncKey !== this.highlightSyncKey) {
+      SyncGroup.leave(this.zoomSyncKey, this);
     }
   }
 
@@ -893,6 +918,13 @@ export class ChartCore implements ChartInstance {
     // ── Reset zoom ──
     this.eventBus.on('action:reset-zoom', () => {
       this.resetZoom();
+      // Broadcast the reset X range to zoom sync peers
+      if (this.zoomSyncKey) {
+        const xScale = this.scales.get('x');
+        if (xScale) {
+          SyncGroup.publishScale(this.zoomSyncKey, this, 'x', { min: xScale.min, max: xScale.max });
+        }
+      }
     });
 
     // ── Tap (touch: show/persist tooltip) ──
@@ -956,6 +988,11 @@ export class ChartCore implements ChartInstance {
     this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID | DirtyFlag.OVERLAY);
     this.emitEvent('viewport:change', scaleKey, { min, max });
     this.pluginManager.dispatch('onZoom', this, scaleKey, { min, max });
+
+    // Broadcast to zoom sync peers (only for local gestures, not peer echoes)
+    if (this.zoomSyncKey && !this.suppressZoomSync) {
+      SyncGroup.publishScale(this.zoomSyncKey, this, scaleKey, { min, max });
+    }
   }
 
   /**

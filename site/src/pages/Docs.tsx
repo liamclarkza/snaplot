@@ -1369,7 +1369,7 @@ const config: ChartConfig<RunMeta> = {
 
         <Section id="cross-chart-sync" title="Cross-chart Sync">
           <P>
-            <code>createChartGroup()</code> mints a fresh sync key and exposes <code>group.bind()</code> to spread into each chart's config. Cursor + series highlight propagate automatically across every chart in the group.
+            <code>createChartGroup()</code> mints a fresh sync key and exposes <code>group.bind()</code> or <code>group.apply(config)</code> to spread into each chart's config. Cursor position, series highlight, and zoom/pan viewport all propagate automatically across every chart in the group. Zooming one chart zooms all peers to the same X range; double-click reset propagates too.
           </P>
           <CodeBlock code={`const group = createChartGroup();
 
