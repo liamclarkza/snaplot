@@ -74,7 +74,7 @@ export interface Layout {
 // SERIES CONFIGURATION
 // ============================================================
 
-export type ChartType = 'line' | 'area' | 'scatter' | 'bar' | 'histogram';
+export type ChartType = 'line' | 'area' | 'band' | 'scatter' | 'bar' | 'histogram';
 
 export type InterpolationMode =
   | 'linear'
@@ -118,6 +118,31 @@ export interface SeriesConfig<TMeta = unknown> {
 
   // Area
   fillGradient?: { top: string; bottom: string };
+  // Band (confidence interval / error band)
+  /**
+   * Column index for the upper bound of a `type: 'band'` series.
+   * Required when `type` is `'band'`. Ignored for other chart types.
+   */
+  upperDataIndex?: number;
+  /**
+   * Column index for the lower bound of a `type: 'band'` series.
+   * Required when `type` is `'band'`. Ignored for other chart types.
+   *
+   * A band series renders three elements as a single visual unit:
+   * 1. Filled region between `upperDataIndex` and `lowerDataIndex`
+   * 2. Center line at `dataIndex` (used for tooltip values and cursor snapping)
+   *
+   * @example
+   * ```ts
+   * // data = [x, yMean, yUpper, yLower]
+   * series: [
+   *   { label: 'Loss', type: 'band', dataIndex: 1,
+   *     upperDataIndex: 2, lowerDataIndex: 3,
+   *     stroke: '#4f8fea', fill: '#4f8fea', opacity: 0.15 },
+   * ]
+   * ```
+   */
+  lowerDataIndex?: number;
 
   // Bar
   barWidthRatio?: number;

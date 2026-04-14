@@ -59,6 +59,22 @@ function histData(): ColumnarData {
   return [bins.edges, bins.counts];
 }
 
+function bandData(): ColumnarData {
+  const n = 200, x = new Float64Array(n);
+  const mean = new Float64Array(n), upper = new Float64Array(n), lower = new Float64Array(n);
+  const now = Date.now();
+  for (let i = 0; i < n; i++) {
+    x[i] = now - (n - i) * 60_000;
+    const t = i / n;
+    const m = 60 + 20 * Math.sin(t * Math.PI * 3) + (Math.random() - 0.5) * 4;
+    const spread = 8 + 6 * Math.abs(Math.sin(t * Math.PI * 5));
+    mean[i] = m;
+    upper[i] = m + spread;
+    lower[i] = m - spread;
+  }
+  return [x, mean, upper, lower];
+}
+
 function interpData(): ColumnarData {
   const n = 15, x = new Float64Array(n), y = new Float64Array(n);
   for (let i = 0; i < n; i++) { x[i] = i; y[i] = 30 + 25 * Math.sin(i * 0.6) + (Math.random() - 0.5) * 10; }
@@ -210,6 +226,7 @@ export default function Docs() {
   const [d_theme] = createSignal(timeSeries(200, 2));
   const [d_linear] = createSignal(linearData());
   const [d_time] = createSignal(timeScaleData());
+  const [d_band] = createSignal(bandData());
   const [d_styling] = createSignal(stylingData());
   const [d_dash] = createSignal(timeSeries(300, 3));
   const [d_legend] = createSignal(legendData());
@@ -256,6 +273,7 @@ export default function Docs() {
     { type: 'divider', label: 'Chart Types' },
     { type: 'link', id: 'line', label: 'Line' },
     { type: 'link', id: 'area', label: 'Area' },
+    { type: 'link', id: 'band', label: 'Band (Fill Between)' },
     { type: 'link', id: 'scatter', label: 'Scatter' },
     { type: 'link', id: 'heatmap', label: 'Density Heatmap' },
     { type: 'link', id: 'bar', label: 'Bar' },
@@ -563,6 +581,28 @@ const data: ColumnarData = [
   series: [
     { label: 'Requests/s', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Errors/s', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5 },
+  ],
+  tooltip: { show: true, mode: 'index' },
+}`} />
+        </Section>
+
+        <Section id="band" title="Band (Fill Between)">
+          <P>
+            Use <code>type: 'band'</code> to render a confidence interval, error band, or min/max
+            range as a single series. A band series combines three data columns into one visual unit:
+            a filled region between <code>upperDataIndex</code> and <code>lowerDataIndex</code>,
+            with a center line at <code>dataIndex</code>. The center line is what the tooltip
+            and cursor snap to — the fill is purely decorative.
+          </P>
+          <Ex title="Mean line with ±σ confidence band" desc="One series, three columns: mean (1), upper (2), lower (3)"
+            data={d_band()}
+            code={`{
+  axes: { x: { type: 'time' }, y: { type: 'linear' } },
+  series: [
+    { label: 'Loss', type: 'band', dataIndex: 1,
+      upperDataIndex: 2, lowerDataIndex: 3,
+      stroke: '#4f8fea', fill: '#4f8fea', opacity: 0.15,
+      lineWidth: 2, interpolation: 'monotone' },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />

@@ -29,7 +29,7 @@ import { DEFAULT_CONFIG } from '../config/defaults';
 import { resolveTheme } from '../config/theme';
 
 import { renderAxes, updateDOMLabels } from '../renderers/AxesRenderer';
-import { renderLine, renderArea } from '../renderers/LineRenderer';
+import { renderLine, renderArea, renderBand } from '../renderers/LineRenderer';
 import { renderScatter } from '../renderers/ScatterRenderer';
 import { renderBars } from '../renderers/BarRenderer';
 import { renderHistogram } from '../renderers/HistogramRenderer';
@@ -566,10 +566,18 @@ export class ChartCore implements ChartInstance {
         continue;
       }
 
-      // Find series bound to this axis
-      const seriesIndices = this.config.series
-        .filter(s => (s.yAxisKey ?? 'y') === key && s.visible !== false)
-        .map(s => s.dataIndex - 1);
+      // Find data column indices bound to this axis.
+      // Band series contribute their upper/lower columns in addition to dataIndex
+      // so the auto-range encompasses the full band extent.
+      const seriesIndices: number[] = [];
+      for (const s of this.config.series) {
+        if ((s.yAxisKey ?? 'y') !== key || s.visible === false) continue;
+        seriesIndices.push(s.dataIndex - 1);
+        if (s.type === 'band') {
+          if (s.upperDataIndex != null) seriesIndices.push(s.upperDataIndex - 1);
+          if (s.lowerDataIndex != null) seriesIndices.push(s.lowerDataIndex - 1);
+        }
+      }
 
       if (seriesIndices.length === 0) continue;
 
@@ -1136,6 +1144,16 @@ export class ChartCore implements ChartInstance {
         case 'area':
           renderArea(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
           break;
+        case 'band': {
+          const upperIdx = series.upperDataIndex;
+          const lowerIdx = series.lowerDataIndex;
+          if (upperIdx != null && lowerIdx != null) {
+            const upperYData = this.store.y(upperIdx - 1);
+            const lowerYData = this.store.y(lowerIdx - 1);
+            renderBand(ctx, xData, yData, upperYData, lowerYData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
+          }
+          break;
+        }
         case 'scatter':
           renderScatter(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
           break;

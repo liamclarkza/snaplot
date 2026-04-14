@@ -84,10 +84,8 @@ export function renderArea(
   ctx.globalAlpha = opacityMultiplier;
 
   // Build the line path (top of the area)
-  const interp = series.interpolation ?? 'linear';
   ctx.beginPath();
 
-  // Find first valid point to start from
   let firstPx = 0, lastPx = 0;
   let hasPath = false;
 
@@ -148,6 +146,101 @@ export function renderArea(
     ctx.setLineDash(series.lineDash);
   }
   ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * Render a band series: filled region between upper and lower Y columns,
+ * with a center line drawn on top. A single visual unit for confidence
+ * intervals, error bands, and min/max ranges.
+ *
+ * Tooltip and cursor snapping use `dataIndex` (the center line). The
+ * upper/lower fill is purely decorative.
+ */
+export function renderBand(
+  ctx: CanvasRenderingContext2D,
+  xData: Float64Array,
+  centerYData: Float64Array,
+  upperYData: Float64Array,
+  lowerYData: Float64Array,
+  startIdx: number,
+  endIdx: number,
+  scaleX: Scale,
+  scaleY: Scale,
+  layout: Layout,
+  series: SeriesConfig,
+  color: string,
+  opacityMultiplier: number = 1,
+): void {
+  if (endIdx <= startIdx) return;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
+  ctx.clip();
+
+  // ── 1. Collect indices where all three columns are valid ──
+  const validIndices: number[] = [];
+  for (let i = startIdx; i <= endIdx; i++) {
+    const u = upperYData[i], l = lowerYData[i];
+    if (u !== u || l !== l) continue; // NaN in either bound breaks the band
+    validIndices.push(i);
+  }
+
+  if (validIndices.length > 0) {
+    // ── 2. Fill the band region ─────────────────────────────
+    ctx.beginPath();
+
+    // Forward path along upper edge
+    let started = false;
+    for (const i of validIndices) {
+      const px = scaleX.dataToPixel(xData[i]);
+      const py = scaleY.dataToPixel(upperYData[i]);
+      if (!started) { ctx.moveTo(px, py); started = true; }
+      else { ctx.lineTo(px, py); }
+    }
+
+    // Reverse path along lower edge
+    for (let j = validIndices.length - 1; j >= 0; j--) {
+      const i = validIndices[j];
+      const px = scaleX.dataToPixel(xData[i]);
+      const py = scaleY.dataToPixel(lowerYData[i]);
+      ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+
+    // Fill with series fill color (or stroke color at default opacity)
+    const fillColor = series.fill ?? color;
+    const fillOpacity = series.opacity ?? 0.15;
+    ctx.fillStyle = fillColor;
+    ctx.globalAlpha = fillOpacity * opacityMultiplier;
+    ctx.fill();
+  }
+
+  // ── 3. Stroke the center line on top ──────────────────────
+  const strokeWidth = series.lineWidth ?? 1.5;
+  if (strokeWidth > 0) {
+    ctx.globalAlpha = opacityMultiplier;
+    ctx.beginPath();
+    let moved = false;
+    for (let i = startIdx; i <= endIdx; i++) {
+      const yVal = centerYData[i];
+      if (yVal !== yVal) { moved = false; continue; }
+      const px = scaleX.dataToPixel(xData[i]);
+      const py = scaleY.dataToPixel(yVal);
+      if (!moved) { ctx.moveTo(px, py); moved = true; }
+      else { ctx.lineTo(px, py); }
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    if (series.lineDash && series.lineDash.length > 0) {
+      ctx.setLineDash(series.lineDash);
+    }
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
