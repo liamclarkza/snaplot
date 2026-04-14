@@ -15,18 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Don't pass registry-url — it causes setup-node to write a default
+      # auth token to .npmrc that preempts the OIDC trusted-publisher flow.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: 'https://registry.npmjs.org'
           cache: npm
 
       - run: npm install
       - run: npm run build
-
-      # Clear the default auth token that setup-node writes to .npmrc.
-      # Without this, npm uses that token instead of the OIDC exchange,
-      # and trusted publishing fails with E404.
-      - run: npm config delete //registry.npmjs.org/:_authToken
 
       - run: cd packages/snaplot && npm publish --provenance --access public
