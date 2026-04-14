@@ -101,6 +101,21 @@ export class SyncGroup {
     }
   }
 
+  /**
+   * Publish a highlight (series-index) change to all peers.
+   * Peers may map this through their own highlight resolver if the index
+   * shape differs (orbit, for example, can use `meta.runId`).
+   */
+  static publishHighlight(key: string, source: ChartInstance, seriesIndex: number | null): void {
+    const group = this.groups.get(key);
+    if (!group) return;
+    for (const peer of group) {
+      if (peer !== source) {
+        peer.setHighlight(seriesIndex);
+      }
+    }
+  }
+
   /** Publish scale change from source to all peers */
   static publishScale(
     key: string,

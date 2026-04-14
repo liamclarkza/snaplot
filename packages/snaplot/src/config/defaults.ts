@@ -30,5 +30,9 @@ export const DEFAULT_CONFIG: ChartConfig = {
     snap: true,
     offset: 12,
   },
+  highlight: {
+    enabled: true,
+    dimOpacity: 0.2,
+  },
   plugins: [],
 };

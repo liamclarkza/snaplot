@@ -1,0 +1,69 @@
+/* snaplot — opt-in default styles for the legend table.
+ *
+ * Import via:  import 'snaplot/legend-table.css'
+ *
+ * All rules use plain class names + CSS custom properties so apps can
+ * fully restyle without specificity battles. The plugin and the Solid
+ * component share the same class names.
+ */
+
+:root {
+  --snaplot-legend-bg: transparent;
+  --snaplot-legend-border: rgba(127, 127, 127, 0.18);
+  --snaplot-legend-text: inherit;
+  --snaplot-legend-muted: rgba(127, 127, 127, 0.7);
+  --snaplot-legend-row-hover: rgba(127, 127, 127, 0.08);
+  --snaplot-legend-row-highlight: rgba(127, 127, 127, 0.15);
+  --snaplot-legend-row-dim-opacity: 0.4;
+  --snaplot-legend-step-color: var(--snaplot-legend-muted);
+}
+
+.snaplot-legend-table-root {
+  background: var(--snaplot-legend-bg);
+  border-top: 1px solid var(--snaplot-legend-border);
+  color: var(--snaplot-legend-text);
+}
+
+.snaplot-legend-step {
+  color: var(--snaplot-legend-step-color);
+}
+
+.snaplot-legend-table {
+  border-spacing: 0;
+}
+
+.snaplot-legend-header {
+  color: var(--snaplot-legend-muted);
+  user-select: none;
+}
+
+.snaplot-legend-row {
+  transition: background-color 0.1s ease, opacity 0.1s ease;
+}
+
+.snaplot-legend-row:hover,
+.snaplot-legend-row[data-highlighted='true'] {
+  background-color: var(--snaplot-legend-row-hover);
+}
+
+.snaplot-legend-row[data-highlighted='true'] {
+  background-color: var(--snaplot-legend-row-highlight);
+}
+
+.snaplot-legend-row[data-dimmed='true'] {
+  opacity: var(--snaplot-legend-row-dim-opacity);
+}
+
+.snaplot-legend-cell {
+  padding: 3px 8px 3px 0;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.snaplot-legend-cell--value {
+  font-variant-numeric: tabular-nums;
+}
+
+.snaplot-legend-swatch {
+  display: inline-block;
+}

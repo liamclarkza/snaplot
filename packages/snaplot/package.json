@@ -1,8 +1,8 @@
 {
   "name": "snaplot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "High-performance canvas chart library for SolidJS",
+  "description": "High-performance charts that actually look good",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,6 +10,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./legend-table.css": {
+      "import": "./dist/legend-table.css",
+      "default": "./dist/legend-table.css"
     }
   },
   "files": [
@@ -35,6 +39,10 @@
     "url": "git+https://github.com/liamclarkza/snaplot.git"
   },
   "license": "MIT",
+  "homepage": "https://github.com/liamclarkza/snaplot",
+  "bugs": {
+    "url": "https://github.com/liamclarkza/snaplot/issues"
+  },
   "keywords": [
     "solidjs",
     "chart",
@@ -43,6 +51,10 @@
     "dashboard",
     "heatmap",
     "scatter",
-    "histogram"
+    "histogram",
+    "line-chart",
+    "bar-chart",
+    "time-series",
+    "plotting"
   ]
 }

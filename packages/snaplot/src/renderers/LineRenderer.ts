@@ -23,6 +23,8 @@ export function renderLine(
   layout: Layout,
   series: SeriesConfig,
   color: string,
+  /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
+  opacityMultiplier: number = 1,
 ): void {
   if (endIdx <= startIdx) return;
 
@@ -39,7 +41,7 @@ export function renderLine(
   ctx.lineWidth = lineWidth;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  ctx.globalAlpha = series.opacity ?? 1;
+  ctx.globalAlpha = (series.opacity ?? 1) * opacityMultiplier;
 
   if (interp === 'monotone') {
     drawMonotoneCubic(ctx, xData, yData, startIdx, endIdx, scaleX, scaleY);
@@ -64,6 +66,8 @@ export function renderArea(
   layout: Layout,
   series: SeriesConfig,
   color: string,
+  /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
+  opacityMultiplier: number = 1,
 ): void {
   if (endIdx <= startIdx) return;
 
@@ -72,6 +76,7 @@ export function renderArea(
   ctx.beginPath();
   ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
   ctx.clip();
+  ctx.globalAlpha = opacityMultiplier;
 
   // Build the line path (top of the area)
   const interp = series.interpolation ?? 'linear';

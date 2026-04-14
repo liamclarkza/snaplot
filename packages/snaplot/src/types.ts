@@ -83,7 +83,7 @@ export type InterpolationMode =
   | 'step-after'
   | 'step-middle';
 
-export interface SeriesConfig {
+export interface SeriesConfig<TMeta = unknown> {
   /** Chart type for this series */
   type?: ChartType;
   /** Display label */
@@ -121,6 +121,14 @@ export interface SeriesConfig {
 
   // Visibility
   visible?: boolean;
+
+  /**
+   * Free-form per-series metadata for app-level data
+   * (e.g. `{ runId, metricKey }` for ML dashboards). Surfaced in
+   * `CursorSeriesPoint.meta` and to legend column renderers.
+   * Generic so consumers get type inference end-to-end.
+   */
+  meta?: TMeta;
 }
 
 // ============================================================
@@ -132,10 +140,29 @@ export type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
 /** Configuration for an axis entry in ChartConfig.axes */
 export interface AxisConfig {
   type?: ScaleType;
+  /** Fixed lower bound. Pinned — auto-range will restore to this value on reset. */
   min?: number;
+  /** Fixed upper bound. Pinned — auto-range will restore to this value on reset. */
   max?: number;
+  /**
+   * Master switch for auto-range. When `false`, the scale keeps whatever
+   * bounds it currently has (typically `min`/`max` or the last zoom).
+   * Default: `true`.
+   */
   auto?: boolean;
+  /**
+   * Fraction of the data range to pad on each side when auto-ranging.
+   * `0` → exact extent, `0.05` → 5% on each side.
+   * Default: `0` for horizontal axes, `0.05` for vertical axes.
+   */
   padding?: number;
+  /**
+   * Whether to call `scale.nice(DEFAULT_TICK_COUNT)` after auto-ranging,
+   * which rounds the bounds outward to produce clean tick boundaries.
+   * Default: `true`. Always skipped for `time` scales and bar/histogram
+   * X axes where exact-boundary rendering is required.
+   */
+  nice?: boolean;
   position?: AxisPosition;
 }
 
@@ -156,11 +183,28 @@ export interface CursorConfig {
   snap?: boolean;
   xLine?: boolean;
   yLine?: boolean;
+  /**
+   * Whether to draw the filled dot + ring at each series' hit-tested
+   * point while hovering. Default: `true`. Set to `false` when a legend
+   * table already surfaces per-series values below the chart and the
+   * extra glyphs would be visual noise.
+   */
+  indicators?: boolean;
   color?: string;
   dash?: number[];
   syncKey?: string;
   syncTooltip?: boolean;
 }
+
+/**
+ * Per-axis bounds for zoom and pan. `'data'` tracks the current data
+ * extent; an explicit `{ min?, max? }` pins custom limits (use
+ * `undefined` on one side for half-open bounds).
+ */
+export type ZoomBoundsSpec =
+  | 'data'
+  | 'unbounded'
+  | { min?: number; max?: number };
 
 export interface ZoomConfig {
   enabled?: boolean;
@@ -169,6 +213,18 @@ export interface ZoomConfig {
   wheelFactor?: number;
   minRange?: number;
   maxRange?: number;
+  /**
+   * Constrains pan + zoom so the viewport cannot escape the data (or a
+   * custom range). Applied on every viewport change — pan past the edge
+   * stops at the edge, zoom-out stops at the full extent.
+   *
+   * - `true` (default) → shorthand for `{ x: 'data', y: 'data' }`.
+   * - `false` / `'unbounded'` → no clamping, classic infinite zoom/pan.
+   * - Per-axis: `{ x: 'data' }` or `{ x: { min, max }, y: 'unbounded' }`.
+   *
+   * Axes not mentioned fall back to the top-level default.
+   */
+  bounds?: boolean | ZoomBoundsSpec | { x?: ZoomBoundsSpec; y?: ZoomBoundsSpec };
   onZoom?: (xMin: number, xMax: number) => void;
 }
 
@@ -212,10 +268,90 @@ export interface TooltipPoint {
 }
 
 // ============================================================
+// CURSOR SNAPSHOT (legend table data source)
+// ============================================================
+
+/**
+ * One row of a cursor snapshot — the value of a single visible series
+ * at a given X index, plus everything the legend table needs to render it.
+ */
+export interface CursorSeriesPoint<TMeta = unknown> {
+  seriesIndex: number;
+  dataIndex: number;
+  label: string;
+  color: string;
+  /** Raw y value, NaN when missing at this index */
+  value: number;
+  /** Pre-formatted via the y-axis tickFormat (or `''` for missing values) */
+  formattedValue: string;
+  meta?: TMeta;
+}
+
+/**
+ * Snapshot of all visible series at a given cursor (or fallback) index.
+ * Returned by `chart.getCursorSnapshot()` and consumed by the legend table.
+ *
+ * Safe to read on every `cursor:move`: the `points` array is reused
+ * across calls (mutated in place) when you use `getCursorSnapshotInto()`.
+ */
+export interface CursorSnapshot<TMeta = unknown> {
+  /** Index into the X column. `null` when source === 'none'. */
+  dataIndex: number | null;
+  /** Raw X value at `dataIndex`. `null` when source === 'none'. */
+  dataX: number | null;
+  /** Pre-formatted X for "Step: N" headers. Empty string when source === 'none'. */
+  formattedX: string;
+  /** One entry per *visible* series. */
+  points: CursorSeriesPoint<TMeta>[];
+  /** What produced this snapshot. Useful for empty-state styling. */
+  source: 'cursor' | 'latest' | 'first' | 'none';
+  /**
+   * The series whose Y-value at `dataIndex` is visually closest to the
+   * cursor (in pixel space). `null` when there is no cursor, when no
+   * series has a valid value at this index, or when `source !== 'cursor'`.
+   * Intended for "focus the line under the cursor" interactions —
+   * pair with `setHighlight(activeSeriesIndex)` to dim everything else.
+   */
+  activeSeriesIndex: number | null;
+}
+
+/** Options accepted by `getCursorSnapshot()` and the reactive primitive. */
+export interface CursorSnapshotOptions {
+  /**
+   * What to return when the cursor is not over the chart.
+   * - `hide`   → empty snapshot, source === 'none'
+   * - `latest` → snapshot at the last X value
+   * - `first`  → snapshot at the first X value
+   * Default: `'hide'`.
+   */
+  fallback?: 'hide' | 'latest' | 'first';
+}
+
+// ============================================================
+// HIGHLIGHT (cross-chart series highlight + dim)
+// ============================================================
+
+export interface HighlightConfig {
+  /** Master switch. Default: true. */
+  enabled?: boolean;
+  /**
+   * Opacity multiplier applied to non-highlighted series when a
+   * highlight is active. Default: 0.2.
+   */
+  dimOpacity?: number;
+  /**
+   * Sync key for cross-chart highlight propagation. Mirrors
+   * `cursor.syncKey` semantics — charts sharing a key publish/receive
+   * highlight changes from each other.
+   */
+  syncKey?: string;
+}
+
+// ============================================================
 // CHART CONFIGURATION (top-level)
 // ============================================================
 
-export interface ChartConfig {
+export interface ChartConfig<TMeta = unknown> {
   width?: number;
   height?: number;
   autoResize?: boolean;
@@ -228,7 +364,7 @@ export interface ChartConfig {
   };
 
   axes?: Record<string, AxisConfig>;
-  series: SeriesConfig[];
+  series: SeriesConfig<TMeta>[];
 
   /** Interaction mode preset — sets default gesture mappings */
   interaction?: InteractionMode;
@@ -239,6 +375,7 @@ export interface ChartConfig {
   selection?: SelectionConfig;
   tooltip?: TooltipConfig;
   touch?: TouchConfig;
+  highlight?: HighlightConfig;
 
   theme?: Partial<ThemeConfig>;
   plugins?: Plugin[];
@@ -340,6 +477,31 @@ export interface ChartInstance {
   /** Set cursor position from external source (sync) */
   setCursorDataX(dataX: number | null): void;
 
+  /**
+   * Snapshot of all visible series at the current cursor position
+   * (or fallback). Allocates a fresh snapshot — use
+   * `getCursorSnapshotInto()` in the cursor hot path to reuse buffers.
+   */
+  getCursorSnapshot(opts?: CursorSnapshotOptions): CursorSnapshot;
+
+  /**
+   * Zero-allocation variant of `getCursorSnapshot`. Mutates and returns
+   * `target`. The `target.points` array is grown but never shrunk; use
+   * `target.points.length` (after this call) as the row count.
+   */
+  getCursorSnapshotInto(target: CursorSnapshot, opts?: CursorSnapshotOptions): CursorSnapshot;
+
+  /**
+   * Set the highlighted series. Pass `null` to clear. Triggers a data-layer
+   * redraw (non-highlighted series dim per `highlight.dimOpacity`) and
+   * publishes to the sync group when `highlight.syncKey` is set.
+   * No-op when the value is unchanged.
+   */
+  setHighlight(seriesIndex: number | null): void;
+
+  /** Currently highlighted series index, or `null`. */
+  getHighlight(): number | null;
+
   /** The root DOM container */
   readonly container: HTMLElement;
 }
@@ -350,6 +512,7 @@ export interface ChartInstance {
 
 export interface ChartEventMap {
   'cursor:move': (dataX: number | null, dataIdx: number | null) => void;
+  'highlight:change': (seriesIndex: number | null) => void;
   'viewport:change': (scaleKey: string, range: ScaleRange) => void;
   'data:update': (data: ColumnarData) => void;
   'resize': (width: number, height: number) => void;
