@@ -1,4 +1,16 @@
-name: Publish to npm
+name: Publish & Release
+
+# Single entry point driven by version tags. A `vX.Y.Z` push runs:
+#   1. verify      — tag matches package.json, quality gates, extract
+#                    matching CHANGELOG section, bundle artifact.
+#   2. publish-npm — npm publish with OIDC provenance, scoped to the
+#                    `npm` environment so trusted-publisher config can
+#                    pin it and the publish shows up as a Deployment.
+#   3. release     — GitHub Release with the extracted changelog as
+#                    body + the packed tarball as an asset.
+#
+# Nothing publishes if verify fails; no Release gets created if
+# publish fails. Jobs are chained via `needs`.
 
 on:
   push:
@@ -6,11 +18,16 @@ on:
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  publish:
+  verify:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v6
 
@@ -20,9 +37,125 @@ jobs:
           cache: npm
 
       - run: npm install
-      - run: npm run build
 
-      # Copy root README + LICENSE into the package so npm renders them.
-      - run: cp README.md LICENSE packages/snaplot/
+      - id: meta
+        name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG#v}"
+          PKG=$(node -p "require('./packages/snaplot/package.json').version")
+          if [[ "$PKG" != "$VER" ]]; then
+            echo "::error::Tag $TAG does not match packages/snaplot/package.json ($PKG)"
+            exit 1
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
 
-      - run: cd packages/snaplot && npm publish --provenance --access public
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build library
+        run: npm run build
+
+      - name: Build site
+        run: npm run build:site
+
+      - name: Copy README + LICENSE into package
+        run: cp README.md LICENSE packages/snaplot/
+
+      - name: Extract matching CHANGELOG section
+        env:
+          VER: ${{ steps.meta.outputs.version }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const v = process.env.VER;
+            const s = fs.readFileSync('CHANGELOG.md', 'utf8');
+            const header = '## [' + v + ']';
+            const idx = s.indexOf(header);
+            if (idx === -1) {
+              console.error('No CHANGELOG entry for ' + v);
+              process.exit(1);
+            }
+            const rest = s.slice(idx + header.length);
+            const next = rest.search(/^## \[/m);
+            const body = next === -1 ? rest : rest.slice(0, next);
+            fs.writeFileSync('release-notes.md', body.trim() + '\n');
+          "
+          echo "::group::release-notes.md"
+          cat release-notes.md
+          echo "::endgroup::"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publish-bundle
+          path: |
+            packages/snaplot/dist/
+            packages/snaplot/package.json
+            packages/snaplot/README.md
+            packages/snaplot/LICENSE
+            release-notes.md
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-npm:
+    needs: verify
+    runs-on: ubuntu-latest
+    # Pin to the `npm` environment so npm's trusted-publisher config
+    # scopes OIDC to exactly this job. Surfaces each publish as a
+    # GitHub Deployment with a link to the new npm version.
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/snaplot/v/${{ needs.verify.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "lts/*"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: publish-bundle
+
+      - name: Publish to npm
+        run: cd packages/snaplot && npm publish --provenance --access public
+
+  release:
+    needs: [verify, publish-npm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: publish-bundle
+
+      - name: Pack tarball asset
+        env:
+          VER: ${{ needs.verify.outputs.version }}
+        run: |
+          cd packages/snaplot
+          npm pack --pack-destination=../../
+          mv "../../snaplot-${VER}.tgz" "../../snaplot-v${VER}.tgz"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: snaplot-v${{ needs.verify.outputs.version }}.tgz
+          draft: false
+          prerelease: false
+          generate_release_notes: false

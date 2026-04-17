@@ -66,10 +66,39 @@ Tests run in Node by default. DOM-dependent modules (gesture handlers, tooltips)
 
 ## Releases
 
-1. Merge to `main` with CI green.
-2. Bump `packages/snaplot/package.json` version.
-3. Update `CHANGELOG.md` (move `[Unreleased]` notes under the new version header).
-4. Commit: `chore: bump to X.Y.Z`.
-5. Tag: `git tag vX.Y.Z && git push --tags`.
+Flow is "edit CHANGELOG as you go, cut a release with one script":
 
-Tag push triggers `.github/workflows/publish.yml`, which builds and publishes to npm with provenance.
+1. Land changes on `main` with CI green; add bullets to `CHANGELOG.md` under
+   `## [Unreleased]` as you go.
+2. When you're ready to ship, run from a clean `main`:
+
+    ```bash
+    scripts/release.sh patch      # or: minor | major | 1.2.3
+    ```
+
+   That bumps `packages/snaplot/package.json`, promotes the `[Unreleased]`
+   section under a dated `## [X.Y.Z]` header (reseeding an empty
+   `[Unreleased]` on top), commits `chore: release vX.Y.Z`, and tags
+   `vX.Y.Z`. It stops short of pushing.
+3. Push:
+
+    ```bash
+    git push --follow-tags
+    ```
+
+### What the tag push triggers
+
+`.github/workflows/publish.yml` runs three jobs in sequence:
+
+1. **verify** — tag must match `packages/snaplot/package.json`; runs lint,
+   typecheck, tests, both builds; extracts the matching `CHANGELOG.md`
+   section for the release notes.
+2. **publish-npm** — `npm publish --provenance --access public`. Scoped to
+   the `npm` GitHub environment so npm's trusted-publisher OIDC trust
+   pins it there, and the publish shows up on the Deployments tab.
+3. **release** — creates a GitHub Release named `vX.Y.Z`, body is the
+   extracted CHANGELOG section, asset is the packed tarball.
+
+A failed `verify` blocks publish and release; a failed `publish-npm`
+blocks release. If either npm or GitHub is flaky mid-publish, re-run the
+failed job only — don't re-tag.
