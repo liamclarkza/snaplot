@@ -65,9 +65,11 @@ export function renderAxes(
     const isHorizontal = pos === 'bottom' || pos === 'top';
     const useCustomTicks = isHorizontal && customXTicks;
     const ticks = useCustomTicks ? customXTicks!.values : scale.ticks(DEFAULT_TICK_COUNT);
+    // Precedence: custom-tick formatter (bar/histogram path) → user's
+    // axes.x.tickFormat → the scale's built-in tickFormat.
     const formatTick = useCustomTicks && customXTicks!.format
       ? customXTicks!.format
-      : (v: number) => scale.tickFormat(v);
+      : ac.tickFormat ?? ((v: number) => scale.tickFormat(v));
 
     // Draw gridlines only for the first axis at each position
     const shouldDrawGrid = !gridDrawn.has(pos);

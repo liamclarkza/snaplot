@@ -87,7 +87,7 @@ export function renderScatter(
   ctx.globalAlpha = opacityMultiplier;
 
   if (series.heatmap || count > 200_000) {
-    drawHeatmap(ctx, xData, yData, startIdx, endIdx, scaleX, scaleY, layout, series.heatmapBinSize);
+    drawHeatmap(ctx, xData, yData, startIdx, endIdx, scaleX, scaleY, layout, series.heatmapBinSize, series.heatmapGradient);
   } else {
     drawStamped(ctx, xData, yData, startIdx, endIdx, scaleX, scaleY, layout, series, color);
   }
@@ -132,7 +132,9 @@ function drawStamped(
 
 // ─── Heatmap: 2D histogram for extreme point counts ────────────
 
-// Cache the rendered heatmap to avoid flicker on overlay-only redraws
+// Cache the rendered heatmap to avoid flicker on overlay-only redraws.
+// `gradientKey` is a stable join of the configured stops so a theme swap
+// invalidates the cache without us tracking the array identity.
 let heatmapCache: {
   canvas: OffscreenCanvas | HTMLCanvasElement;
   w: number;
@@ -143,7 +145,37 @@ let heatmapCache: {
   yMin: number;
   yMax: number;
   binSize: number;
+  gradientKey: string;
 } | null = null;
+
+/** Parse a #rrggbb or #rgb hex string into [r, g, b] 0–255. */
+function parseHex(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  return [
+    parseInt(full.slice(0, 2), 16) || 0,
+    parseInt(full.slice(2, 4), 16) || 0,
+    parseInt(full.slice(4, 6), 16) || 0,
+  ];
+}
+
+/**
+ * Sample a multi-stop gradient at t ∈ [0, 1]. Stops are spaced evenly;
+ * interpolation is linear in sRGB (fine for short, theme-matching ramps).
+ */
+function sampleGradient(stops: [number, number, number][], t: number): [number, number, number] {
+  if (stops.length === 1) return stops[0];
+  const scaled = t * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(scaled));
+  const f = scaled - i;
+  const a = stops[i];
+  const b = stops[i + 1];
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * f),
+    Math.round(a[1] + (b[1] - a[1]) * f),
+    Math.round(a[2] + (b[2] - a[2]) * f),
+  ];
+}
 
 function drawHeatmap(
   ctx: CanvasRenderingContext2D,
@@ -155,6 +187,7 @@ function drawHeatmap(
   scaleY: Scale,
   layout: Layout,
   binSizeCss?: number,
+  gradient?: string[],
 ): void {
   const { plot, dpr } = layout;
   const binPx = Math.max(1, Math.round((binSizeCss ?? 1) * dpr));
@@ -164,8 +197,9 @@ function drawHeatmap(
 
   const dataLen = end - start + 1;
   const bs = binSizeCss ?? 1;
+  const gradientKey = gradient?.join('|') ?? 'viridis';
 
-  // Check cache: reuse if data and viewport haven't changed
+  // Check cache: reuse if data, viewport, and gradient haven't changed
   if (
     heatmapCache &&
     heatmapCache.w === w &&
@@ -175,11 +209,17 @@ function drawHeatmap(
     heatmapCache.xMax === scaleX.max &&
     heatmapCache.yMin === scaleY.min &&
     heatmapCache.yMax === scaleY.max &&
-    heatmapCache.binSize === bs
+    heatmapCache.binSize === bs &&
+    heatmapCache.gradientKey === gradientKey
   ) {
     ctx.drawImage(heatmapCache.canvas, plot.left, plot.top, plot.width, plot.height);
     return;
   }
+
+  // Pre-parse the gradient once per render; fall back to Viridis.
+  const parsedStops = gradient && gradient.length >= 2
+    ? gradient.map(parseHex)
+    : null;
 
   // Bin all points
   const bins = new Uint32Array(w * h);
@@ -217,7 +257,7 @@ function drawHeatmap(
     if (bins[i] === 0) continue;
 
     const t = Math.log(1 + bins[i]) / Math.log(1 + maxCount);
-    const [r, g, b] = viridisColor(t);
+    const [r, g, b] = parsedStops ? sampleGradient(parsedStops, t) : viridisColor(t);
     const off = i * 4;
     data[off] = r;
     data[off + 1] = g;
@@ -228,7 +268,7 @@ function drawHeatmap(
   tmpCtx.putImageData(imageData, 0, 0);
 
   // Cache for subsequent frames (e.g. overlay-only redraws)
-  heatmapCache = { canvas: tmpCanvas, w, h, dataLen, xMin: scaleX.min, xMax: scaleX.max, yMin: scaleY.min, yMax: scaleY.max, binSize: bs };
+  heatmapCache = { canvas: tmpCanvas, w, h, dataLen, xMin: scaleX.min, xMax: scaleX.max, yMin: scaleY.min, yMax: scaleY.max, binSize: bs, gradientKey };
 
   ctx.drawImage(tmpCanvas, plot.left, plot.top, plot.width, plot.height);
 }

@@ -153,6 +153,13 @@ export interface SeriesConfig<TMeta = unknown> {
   heatmap?: boolean;
   /** Heatmap bin size in CSS pixels (default: 1 = one bin per physical pixel) */
   heatmapBinSize?: number;
+  /**
+   * Density-to-colour ramp for heatmap rendering. Array of 2+ hex colours
+   * interpolated linearly in sRGB; `t = 0` → first stop, `t = 1` → last.
+   * Defaults to Viridis. Use 3–5 stops matching your theme palette for
+   * a cohesive dashboard feel.
+   */
+  heatmapGradient?: string[];
 
   // Axis binding
   xAxisKey?: string;
@@ -203,6 +210,12 @@ export interface AxisConfig {
    */
   nice?: boolean;
   position?: AxisPosition;
+  /**
+   * Custom tick label formatter. Overrides the scale's default formatting
+   * for axis labels (including bar / histogram category labels). Return
+   * the label as a string; return `''` to hide a specific tick.
+   */
+  tickFormat?: (value: number) => string;
 }
 
 // ============================================================

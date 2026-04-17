@@ -1775,6 +1775,13 @@ export class ChartCore implements ChartInstance {
   private computeCustomXTicks(): { values: number[]; format?: (v: number) => string } | undefined {
     const visibleSeries = this.config.series.filter(s => s.visible !== false);
 
+    // User-provided formatter on the X axis wins over the default numeric
+    // one for categorical bar / histogram charts.
+    const xAxisCfg = this.config.axes?.x;
+    const userFormat = xAxisCfg?.tickFormat;
+    const defaultFormat = (v: number) =>
+      Number.isInteger(v) ? String(v) : v.toFixed(1);
+
     // Histogram: X data = bin edges, use them as tick values
     const histSeries = visibleSeries.find(s => s.type === 'histogram');
     if (histSeries && this.store.length > 0) {
@@ -1787,20 +1794,14 @@ export class ChartCore implements ChartInstance {
         edgeValues = edgeValues.filter((_, i) => i % step === 0);
       }
 
-      return {
-        values: edgeValues,
-        format: (v) => Number.isInteger(v) ? String(v) : v.toFixed(1),
-      };
+      return { values: edgeValues, format: userFormat ?? defaultFormat };
     }
 
     // Bar chart: tick at each category X value
     const barSeries = visibleSeries.find(s => s.type === 'bar');
     if (barSeries && this.store.length > 0) {
       const values = Array.from(this.store.x);
-      return {
-        values,
-        format: (v) => Number.isInteger(v) ? String(v) : v.toFixed(1),
-      };
+      return { values, format: userFormat ?? defaultFormat };
     }
 
     return undefined;

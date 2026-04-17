@@ -2,6 +2,7 @@ import { createSignal, createMemo, createEffect, onCleanup, For } from 'solid-js
 import {
   Chart,
   createLegendPlugin,
+  histogram,
   lightTheme,
   darkTheme,
   oceanTheme,
@@ -28,15 +29,33 @@ type ThemeEntry = {
   theme: ThemeConfig;
   /** true = dark background; drives elevation + contrast picks */
   dark: boolean;
+  /**
+   * Density ramp for the heatmap panel. 3–4 stops that walk from the
+   * page bg through the theme's primary into a hotter tertiary — gives
+   * every theme a distinct "hot spot" colour instead of always Viridis.
+   */
+  heatmapGradient: string[];
 };
 
 const THEMES: ThemeEntry[] = [
-  { key: 'light',  label: 'Paper',  theme: lightTheme,  dark: false },
-  { key: 'fog',    label: 'Fog',    theme: fogTheme,    dark: false },
-  { key: 'dark',   label: 'Slate',  theme: darkTheme,   dark: true  },
-  { key: 'ocean',  label: 'Ocean',  theme: oceanTheme,  dark: true  },
-  { key: 'forest', label: 'Forest', theme: forestTheme, dark: true  },
-  { key: 'violet', label: 'Violet', theme: violetTheme, dark: true  },
+  // Paper — warm cream through orange into red (Okabe-Ito warm arc)
+  { key: 'light',  label: 'Paper',  theme: lightTheme,  dark: false,
+    heatmapGradient: ['#fafbfc', '#e69f00', '#d55e00'] },
+  // Fog — cool blue family, picks up the productivity feel
+  { key: 'fog',    label: 'Fog',    theme: fogTheme,    dark: false,
+    heatmapGradient: ['#f5f7fb', '#60a5fa', '#2563eb', '#1e3a8a'] },
+  // Slate — classic cool-to-warm "viridis-lite" tuned to the slate bg
+  { key: 'dark',   label: 'Slate',  theme: darkTheme,   dark: true,
+    heatmapGradient: ['#14161f', '#1e3a8a', '#0891b2', '#22d3ee', '#fde68a'] },
+  // Ocean — deep water to surface sparkle
+  { key: 'ocean',  label: 'Ocean',  theme: oceanTheme,  dark: true,
+    heatmapGradient: ['#0b1a2b', '#1d4ed8', '#22d3ee', '#fef3c7'] },
+  // Forest — pine to leaf to sunlit canopy
+  { key: 'forest', label: 'Forest', theme: forestTheme, dark: true,
+    heatmapGradient: ['#0c1613', '#064e3b', '#10b981', '#fde68a'] },
+  // Violet — aubergine through lavender to hot magenta
+  { key: 'violet', label: 'Violet', theme: violetTheme, dark: true,
+    heatmapGradient: ['#100d1f', '#4c1d95', '#a78bfa', '#f0abfc'] },
 ];
 
 function genStream(points: number): ColumnarData {
@@ -99,6 +118,51 @@ function genHeatmap(n: number): ColumnarData {
   return [Float64Array.from(idx.map((i) => x[i])), Float64Array.from(idx.map((i) => y[i]))];
 }
 
+/**
+ * Top-N endpoints by request count — grouped bar with a 2xx
+ * and 5xx column per endpoint so the chart actually says something
+ * (not just random bars). Errors scale with traffic + a random
+ * failure rate to keep the shape realistic.
+ */
+function genBars(): ColumnarData {
+  const n = 6;
+  const x = new Float64Array(n);
+  const success = new Float64Array(n);
+  const errors = new Float64Array(n);
+  const baselines = [1200, 820, 640, 510, 390, 220];
+  // Per-endpoint error rate — a mix of healthy and unhealthy endpoints
+  // so the grouped bars actually tell a story instead of reading flat.
+  const errorRates = [0.04, 0.18, 0.08, 0.12, 0.02, 0.22];
+  for (let i = 0; i < n; i++) {
+    x[i] = i;
+    const traffic = baselines[i] * (0.9 + Math.random() * 0.2);
+    errors[i] = Math.round(traffic * errorRates[i] * (0.85 + Math.random() * 0.3));
+    success[i] = Math.round(traffic - errors[i]);
+  }
+  return [x, success, errors];
+}
+
+/**
+ * Response-time histogram — bimodal "fast cache hit / slow DB path"
+ * distribution typical of API latency. 8K samples, freedman-diaconis
+ * bins give a smooth shape without over-binning.
+ */
+function genHistogram(): ColumnarData {
+  const n = 8000;
+  const raw = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    if (Math.random() < 0.7) {
+      // fast path — tight around 30 ms
+      raw[i] = 30 + (Math.random() + Math.random() - 1) * 12;
+    } else {
+      // slow path — spread around 120 ms
+      raw[i] = 120 + (Math.random() + Math.random() + Math.random() - 1.5) * 35;
+    }
+  }
+  const bins = histogram(raw);
+  return [bins.edges, bins.counts];
+}
+
 export default function HeroDashboard() {
   const { theme: siteTheme } = useTheme();
   const [selected, setSelected] = createSignal<ThemeKey>(
@@ -114,6 +178,8 @@ export default function HeroDashboard() {
   const [streamData, setStreamData] = createSignal(genStream(240));
   const [scatter] = createSignal(genScatter(600));
   const [heat] = createSignal(genHeatmap(80_000));
+  const [bars] = createSignal(genBars());
+  const [hist] = createSignal(genHistogram());
 
   // ─── Chart configs (theme-reactive) ──────────────────────────
   let streamChart: ChartInstance | undefined;
@@ -146,11 +212,46 @@ export default function HeroDashboard() {
   const heatConfig = createMemo<ChartConfig>(() => ({
     theme: activeTheme(),
     axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-    series: [{ label: 'Density', dataIndex: 1, type: 'scatter', heatmap: true, heatmapBinSize: 1 }],
+    series: [{
+      label: 'Density',
+      dataIndex: 1,
+      type: 'scatter',
+      heatmap: true,
+      heatmapBinSize: 1,
+      heatmapGradient: activeEntry().heatmapGradient,
+    }],
     cursor: { show: true },
     zoom: { enabled: true, x: true, y: true },
     tooltip: { show: true, mode: 'nearest' },
     padding: { top: 20, right: 20, bottom: 36, left: 44 },
+  }));
+
+  const barConfig = createMemo<ChartConfig>(() => ({
+    theme: activeTheme(),
+    axes: {
+      x: {
+        type: 'linear',
+        tickFormat: (v: number) => ['/api', '/auth', '/users', '/search', '/upload', '/admin'][Math.round(v)] ?? '',
+      },
+      y: { type: 'linear' },
+    },
+    series: [
+      { label: '2xx', dataIndex: 1, type: 'bar' },
+      { label: '5xx', dataIndex: 2, type: 'bar' },
+    ],
+    cursor: { show: true },
+    tooltip: { show: true, mode: 'index' },
+    padding: { top: 20, right: 20, bottom: 36, left: 48 },
+    plugins: [createLegendPlugin({ position: 'bottom' })],
+  }));
+
+  const histConfig = createMemo<ChartConfig>(() => ({
+    theme: activeTheme(),
+    axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+    series: [{ label: 'Response time (ms)', dataIndex: 1, type: 'histogram' }],
+    cursor: { show: true },
+    tooltip: { show: true },
+    padding: { top: 20, right: 20, bottom: 36, left: 48 },
   }));
 
   // ─── Stream loop — appends one point every 1.5s ──────────────
@@ -321,9 +422,29 @@ export default function HeroDashboard() {
                 <Chart config={scatterConfig()} data={scatter()} />
               </div>
             </Panel>
-            <Panel title="Density heatmap" subtitle="80K points · Viridis">
+            <Panel title="Density heatmap" subtitle="80K points · themed gradient">
               <div style={{ height: 'clamp(220px, 32vh, 280px)' }}>
                 <Chart config={heatConfig()} data={heat()} />
+              </div>
+            </Panel>
+          </div>
+
+          {/* Row 3 — bar + histogram */}
+          <div
+            style={{
+              display: 'grid',
+              'grid-template-columns': 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: 'var(--space-4)',
+            }}
+          >
+            <Panel title="Top endpoints" subtitle="Requests · 2xx vs 5xx">
+              <div style={{ height: 'clamp(240px, 34vh, 300px)' }}>
+                <Chart config={barConfig()} data={bars()} />
+              </div>
+            </Panel>
+            <Panel title="Response time" subtitle="Bimodal · 8K samples">
+              <div style={{ height: 'clamp(240px, 34vh, 300px)' }}>
+                <Chart config={histConfig()} data={hist()} />
               </div>
             </Panel>
           </div>
