@@ -30,7 +30,9 @@ export default function ChartDemo(props: {
         border: '1px solid var(--border)',
         'border-radius': 'var(--radius-lg)',
         overflow: 'hidden',
-        height: props.height ?? '320px',
+        // Responsive: never below 240px, never above 360px, otherwise track
+        // viewport height so portrait mobile doesn't crush the plot.
+        height: props.height ?? 'clamp(240px, 45vh, 360px)',
       }}>
         {props.children}
       </div>
