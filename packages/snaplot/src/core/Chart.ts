@@ -1266,13 +1266,17 @@ export class ChartCore implements ChartInstance {
         s => s.visible === false || s.type === 'scatter',
       );
       if (!isScatterOnly) {
+        const cursorCfg = this.config.cursor ?? { show: true };
         renderCrosshair(
           ctx,
           this.cursorX,
           this.cursorY,
           this.layout,
-          this.config.cursor ?? { show: true },
-          this.theme.crosshairColor,
+          cursorCfg,
+          // `cursor.color` overrides the theme's crosshair colour when set —
+          // useful for matching a brand accent on one chart without changing
+          // the whole theme.
+          cursorCfg.color ?? this.theme.crosshairColor,
         );
       }
 
