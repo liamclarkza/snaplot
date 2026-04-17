@@ -35,6 +35,9 @@ export default function Nav() {
           <a href="#/docs" style={{ color: 'var(--text-secondary)', 'font-size': '14px', 'font-weight': '500' }}>
             Docs
           </a>
+          <a href="#/demos" style={{ color: 'var(--text-secondary)', 'font-size': '14px', 'font-weight': '500' }}>
+            Demos
+          </a>
 
           {/* Light / dark toggle */}
           <button

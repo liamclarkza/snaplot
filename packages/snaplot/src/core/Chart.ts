@@ -1044,6 +1044,18 @@ export class ChartCore implements ChartInstance {
   }
 
   /**
+   * Every visible series bound to this Y axis is a scatter. Used to
+   * default `zoom.bounds.y` to `'data'` on scatter-only charts where
+   * there is no viewport-driven Y auto-range to take up the slack.
+   */
+  private isScatterOnlyAxis(scaleKey: string): boolean {
+    const bound = this.config.series.filter(
+      (s) => (s.yAxisKey ?? 'y') === scaleKey && s.visible !== false,
+    );
+    return bound.length > 0 && bound.every((s) => s.type === 'scatter');
+  }
+
+  /**
    * Resolve the `zoom.bounds` config for a specific axis.
    *
    * Returns `null` when no clamping should happen, or `{ min, max }` with
@@ -1060,17 +1072,23 @@ export class ChartCore implements ChartInstance {
     const isHoriz = pos === 'top' || pos === 'bottom';
     let spec: ZoomBoundsSpec | undefined;
 
-    // Default (`undefined` / `true`): clamp X to data. Y stays unbounded by
-    // default because auto-range-Y drives it in the typical timeseries setup.
+    // Default for Y: line/area/bar charts auto-range Y from the visible
+    // X window, so leaving Y unbounded lets the user stretch the viewport
+    // while the data still fills it. Scatter-only axes have no such
+    // driver — a point cloud lives in both dimensions independently —
+    // so we default those to 'data' to match the X-axis behaviour.
+    const scatterDefault = !isHoriz && this.isScatterOnlyAxis(scaleKey);
+    const yDefault: ZoomBoundsSpec = scatterDefault ? 'data' : 'unbounded';
+
     if (raw === undefined || raw === true) {
-      spec = isHoriz ? 'data' : 'unbounded';
+      spec = isHoriz ? 'data' : yDefault;
     } else if (typeof raw === 'string' || (typeof raw === 'object' && ('min' in raw || 'max' in raw))) {
       // Top-level scalar spec applies to every axis.
       spec = raw as ZoomBoundsSpec;
     } else {
       const perAxis = raw as { x?: ZoomBoundsSpec; y?: ZoomBoundsSpec };
       spec = (isHoriz ? perAxis.x : perAxis.y)
-        ?? (isHoriz ? 'data' : 'unbounded');
+        ?? (isHoriz ? 'data' : yDefault);
     }
 
     if (spec === 'unbounded' || spec === undefined) return null;

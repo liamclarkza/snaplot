@@ -6,54 +6,36 @@ import {
   darkTheme,
   oceanTheme,
   forestTheme,
-  sunsetTheme,
   violetTheme,
   fogTheme,
-  ivoryTheme,
-  mintTheme,
 } from 'snaplot';
 import type { ColumnarData, ChartConfig, ChartInstance, ThemeConfig } from 'snaplot';
 import { useTheme } from '../ThemeContext';
 
 /**
- * Landing-page dashboard. Three panels share a single theme the visitor
- * picks from a chip row: a streaming multi-series area, a scatter, and a
- * density heatmap. A 1.5s timer appends fresh points to the streaming
- * panel so the page feels alive without a WebSocket.
- *
- * The chip row doubles as the marketing pitch ("here's the range the
- * library can paint") — every theme is a hand-tuned palette + background
- * + grid, not a recoloured default.
+ * Showcase dashboard on the /demos route. Six hand-tuned themes
+ * drive every surface on the page, not just the charts — the chip
+ * row rewrites the local CSS-var namespace so panels, chips and
+ * text pick up the selection too. Panels lean on layered elevation
+ * (inset highlight + soft ambient shadow) instead of hard borders.
  */
 
-type ThemeKey =
-  | 'dark'
-  | 'light'
-  | 'ocean'
-  | 'forest'
-  | 'sunset'
-  | 'violet'
-  | 'fog'
-  | 'ivory'
-  | 'mint';
+type ThemeKey = 'dark' | 'light' | 'fog' | 'ocean' | 'forest' | 'violet';
 
 type ThemeEntry = {
   key: ThemeKey;
   label: string;
   theme: ThemeConfig;
-  /** true = theme has a dark background; drives page-level contrast picks */
+  /** true = dark background; drives elevation + contrast picks */
   dark: boolean;
 };
 
 const THEMES: ThemeEntry[] = [
-  { key: 'dark',   label: 'Slate',  theme: darkTheme,   dark: true  },
   { key: 'light',  label: 'Paper',  theme: lightTheme,  dark: false },
   { key: 'fog',    label: 'Fog',    theme: fogTheme,    dark: false },
-  { key: 'ivory',  label: 'Ivory',  theme: ivoryTheme,  dark: false },
-  { key: 'mint',   label: 'Mint',   theme: mintTheme,   dark: false },
+  { key: 'dark',   label: 'Slate',  theme: darkTheme,   dark: true  },
   { key: 'ocean',  label: 'Ocean',  theme: oceanTheme,  dark: true  },
   { key: 'forest', label: 'Forest', theme: forestTheme, dark: true  },
-  { key: 'sunset', label: 'Sunset', theme: sunsetTheme, dark: true  },
   { key: 'violet', label: 'Violet', theme: violetTheme, dark: true  },
 ];
 
@@ -123,9 +105,10 @@ export default function HeroDashboard() {
     siteTheme() === 'light' ? 'light' : 'dark',
   );
 
-  const activeTheme = createMemo(
-    () => THEMES.find((t) => t.key === selected())?.theme ?? darkTheme,
+  const activeEntry = createMemo(
+    () => THEMES.find((t) => t.key === selected()) ?? THEMES[2],
   );
+  const activeTheme = createMemo(() => activeEntry().theme);
 
   // ─── Data ────────────────────────────────────────────────────
   const [streamData, setStreamData] = createSignal(genStream(240));
@@ -195,96 +178,140 @@ export default function HeroDashboard() {
   }, 1500);
   onCleanup(() => clearInterval(interval));
 
-  // Page-scope CSS variables. Re-declaring `--bg-surface`, `--text`,
-  // `--border` and `--accent` here overrides the site tokens for the
-  // dashboard subtree only — so panels / chips / headings all pick up
-  // the active theme without repainting the rest of the page.
+  // Page-scope CSS variables. The /demos route applies these to the
+  // whole main content area, so background, panels and chips all
+  // track the active theme — no hard wrapper needed around the
+  // dashboard. Elevation tokens (inset + shadow) are theme-aware
+  // so panels feel raised on light and glow-lit on dark.
   const cssVars = createMemo(() => {
-    const t = activeTheme();
-    const entry = THEMES.find((x) => x.key === selected());
-    const isDark = entry?.dark ?? true;
-    const tintedSurround = isDark
-      ? `color-mix(in srgb, ${t.backgroundColor} 80%, #000 8%)`
-      : `color-mix(in srgb, ${t.backgroundColor} 88%, #000 4%)`;
+    const { theme: t, dark } = activeEntry();
+    const panelSurface = dark
+      ? `color-mix(in srgb, ${t.backgroundColor} 88%, #fff 2%)`
+      : t.backgroundColor;
+    const elevInset = dark
+      ? 'inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+      : 'inset 0 1px 0 rgba(255, 255, 255, 0.80)';
+    const elevShadow = dark
+      ? '0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(0, 0, 0, 0.28)'
+      : '0 1px 2px rgba(30, 35, 60, 0.04), 0 10px 28px rgba(30, 35, 60, 0.08)';
     return {
-      '--bg': tintedSurround,
-      '--bg-surface': t.backgroundColor,
+      '--bg': t.backgroundColor,
+      '--bg-surface': panelSurface,
+      '--bg-surface-2': panelSurface,
       '--text': t.textColor,
       '--text-secondary': t.tickColor,
       '--border': t.borderColor,
+      '--border-light': t.gridColor,
       '--accent': t.palette[0],
+      '--accent-hover': t.palette[0],
+      '--elev-1-inset': elevInset,
+      '--elev-1-shadow': elevShadow,
+      '--code-bg': dark
+        ? `color-mix(in srgb, ${t.backgroundColor} 80%, #fff 4%)`
+        : `color-mix(in srgb, ${t.backgroundColor} 85%, #000 3%)`,
     } as Record<string, string>;
   });
 
   return (
-    <div
+    <section
+      class="demos-themed"
       style={{
-        display: 'flex',
-        'flex-direction': 'column',
-        gap: 'var(--space-3)',
-        padding: 'var(--space-4)',
-        'border-radius': 'var(--radius-lg)',
+        ...cssVars(),
         background: 'var(--bg)',
         color: 'var(--text)',
-        border: '1px solid var(--border)',
-        transition: 'background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out)',
-        ...cssVars(),
+        'min-height': 'calc(100vh - 56px)',
+        transition:
+          'background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out)',
       }}
     >
-      {/* Theme chip row */}
-      <div
-        role="tablist"
-        aria-label="Chart themes"
-        style={{
-          display: 'flex',
-          'flex-wrap': 'wrap',
-          gap: 'var(--space-2)',
-          'justify-content': 'center',
-          'margin-bottom': 'var(--space-2)',
-        }}
-      >
-        <For each={THEMES}>
-          {(t) => <ThemeChip entry={t} active={selected() === t.key} onPick={() => setSelected(t.key)} />}
-        </For>
-      </div>
-
-      {/* Dashboard grid */}
       <div
         style={{
-          display: 'grid',
-          'grid-template-columns': '1fr',
-          'grid-template-rows': 'auto auto',
-          gap: 'var(--space-3)',
+          'max-width': 'var(--max-width)',
+          margin: '0 auto',
+          padding: 'var(--space-7) var(--space-5) var(--space-8)',
         }}
       >
-        {/* Row 1 — streaming (full width) */}
-        <Panel title="Throughput & latency" subtitle="Streaming — 1.5s tick">
-          <div style={{ height: 'clamp(240px, 36vh, 320px)' }}>
-            <Chart config={streamConfig()} data={streamData()} onReady={(c) => { streamChart = c; }} />
-          </div>
-        </Panel>
+        <header style={{ 'text-align': 'center', 'margin-bottom': 'var(--space-6)' }}>
+          <h1
+            style={{
+              'font-size': 'clamp(28px, 4vw, 40px)',
+              'font-weight': 700,
+              'letter-spacing': '-0.02em',
+              'line-height': 1.15,
+              'margin-bottom': 'var(--space-2)',
+            }}
+          >
+            Themes & live dashboard
+          </h1>
+          <p
+            style={{
+              'font-size': 'var(--fs-md)',
+              color: 'var(--text-secondary)',
+              'max-width': '560px',
+              margin: '0 auto',
+              'line-height': 1.55,
+            }}
+          >
+            Pick a theme — every surface on the page follows. Streaming area, scatter
+            cloud, and 80K-point density heatmap all re-render against the palette.
+          </p>
+        </header>
 
-        {/* Row 2 — scatter + heatmap */}
+        {/* Theme chip row */}
+        <div
+          role="tablist"
+          aria-label="Chart themes"
+          style={{
+            display: 'flex',
+            'flex-wrap': 'wrap',
+            gap: 'var(--space-2)',
+            'justify-content': 'center',
+            'margin-bottom': 'var(--space-5)',
+          }}
+        >
+          <For each={THEMES}>
+            {(t) => <ThemeChip entry={t} active={selected() === t.key} onPick={() => setSelected(t.key)} />}
+          </For>
+        </div>
+
+        {/* Dashboard grid */}
         <div
           style={{
             display: 'grid',
-            'grid-template-columns': 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: 'var(--space-3)',
+            'grid-template-columns': '1fr',
+            'grid-template-rows': 'auto auto',
+            gap: 'var(--space-4)',
           }}
         >
-          <Panel title="Event cloud" subtitle="600 points, 3 clusters">
-            <div style={{ height: 'clamp(220px, 32vh, 280px)' }}>
-              <Chart config={scatterConfig()} data={scatter()} />
+          {/* Row 1 — streaming (full width) */}
+          <Panel title="Throughput & latency" subtitle="Streaming — 1.5s tick">
+            <div style={{ height: 'clamp(240px, 36vh, 320px)' }}>
+              <Chart config={streamConfig()} data={streamData()} onReady={(c) => { streamChart = c; }} />
             </div>
           </Panel>
-          <Panel title="Density heatmap" subtitle="80K points · Viridis">
-            <div style={{ height: 'clamp(220px, 32vh, 280px)' }}>
-              <Chart config={heatConfig()} data={heat()} />
-            </div>
-          </Panel>
+
+          {/* Row 2 — scatter + heatmap */}
+          <div
+            style={{
+              display: 'grid',
+              'grid-template-columns': 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: 'var(--space-4)',
+            }}
+          >
+            <Panel title="Event cloud" subtitle="600 points, 3 clusters">
+              <div style={{ height: 'clamp(220px, 32vh, 280px)' }}>
+                <Chart config={scatterConfig()} data={scatter()} />
+              </div>
+            </Panel>
+            <Panel title="Density heatmap" subtitle="80K points · Viridis">
+              <div style={{ height: 'clamp(220px, 32vh, 280px)' }}>
+                <Chart config={heatConfig()} data={heat()} />
+              </div>
+            </Panel>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -308,17 +335,21 @@ function ThemeChip(props: { entry: ThemeEntry; active: boolean; onPick: () => vo
         display: 'inline-flex',
         'align-items': 'center',
         gap: '8px',
-        padding: '6px 12px 6px 8px',
+        padding: '6px 14px 6px 8px',
         'border-radius': 'var(--radius-pill)',
-        border: `1px solid ${props.active ? 'var(--accent)' : 'var(--border)'}`,
+        border: 'none',
         background: props.active
-          ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
+          ? 'color-mix(in srgb, var(--accent) 14%, var(--bg-surface))'
           : 'var(--bg-surface)',
         color: 'inherit',
         'font-size': 'var(--fs-sm)',
         'font-weight': props.active ? 600 : 500,
         cursor: 'pointer',
-        transition: 'background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+        'box-shadow': props.active
+          ? `var(--elev-1-inset), 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent)`
+          : 'var(--elev-1-inset), var(--elev-1-shadow)',
+        transition:
+          'background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
     >
       <span
@@ -328,7 +359,6 @@ function ThemeChip(props: { entry: ThemeEntry; active: boolean; onPick: () => vo
           padding: '2px',
           'border-radius': 'var(--radius-pill)',
           background: props.entry.theme.backgroundColor,
-          border: `1px solid ${props.entry.theme.borderColor}`,
         }}
       >
         <For each={preview()}>
@@ -351,14 +381,14 @@ function ThemeChip(props: { entry: ThemeEntry; active: boolean; onPick: () => vo
   );
 }
 
-/** Panel card with header + chart slot. Mirrors the site's `Card` style. */
+/** Panel with header + chart slot. Soft-UI elevation, no hard border. */
 function Panel(props: { title: string; subtitle?: string; children: any }) {
   return (
     <div
       style={{
         background: 'var(--bg-surface)',
         'border-radius': 'var(--radius-lg)',
-        border: '1px solid var(--border)',
+        'box-shadow': 'var(--elev-1-inset), var(--elev-1-shadow)',
         overflow: 'hidden',
         display: 'flex',
         'flex-direction': 'column',
@@ -366,11 +396,10 @@ function Panel(props: { title: string; subtitle?: string; children: any }) {
     >
       <div
         style={{
-          padding: '10px 14px',
+          padding: '12px 16px',
           display: 'flex',
           'align-items': 'baseline',
           'justify-content': 'space-between',
-          'border-bottom': '1px solid var(--border)',
         }}
       >
         <div style={{ 'font-size': 'var(--fs-sm)', 'font-weight': 600 }}>{props.title}</div>

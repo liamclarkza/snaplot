@@ -1,6 +1,23 @@
+import { createSignal, createMemo, onCleanup } from 'solid-js';
+import { Chart, darkTheme, lightTheme } from 'snaplot';
+import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
 import { Card, Button } from '../components/ui';
-import HeroDashboard from '../components/HeroDashboard';
+import { useTheme } from '../ThemeContext';
+
+function generateHeroData(points: number): ColumnarData {
+  const now = Date.now();
+  const x = new Float64Array(points);
+  const y1 = new Float64Array(points);
+  const y2 = new Float64Array(points);
+  for (let i = 0; i < points; i++) {
+    x[i] = now - (points - i) * 60_000;
+    const t = i / points;
+    y1[i] = 50 + 25 * Math.sin(t * Math.PI * 4) + 8 * Math.sin(t * Math.PI * 13) + (Math.random() - 0.5) * 5;
+    y2[i] = 35 + 20 * Math.cos(t * Math.PI * 3 + 1) + 6 * Math.sin(t * Math.PI * 9) + (Math.random() - 0.5) * 5;
+  }
+  return [x, y1, y2];
+}
 
 const quickExample = `import { Chart } from 'snaplot';
 
@@ -29,6 +46,37 @@ const features = [
 ];
 
 export default function Home() {
+  const [heroData] = createSignal(generateHeroData(300));
+  let heroChart: ChartInstance | undefined;
+  const { theme } = useTheme();
+
+  // Theme-reactive hero config — flips with the site's light/dark toggle.
+  const heroConfig = createMemo<ChartConfig>(() => ({
+    theme: theme() === 'light' ? lightTheme : darkTheme,
+    axes: { x: { type: 'time' }, y: { type: 'linear' } },
+    series: [
+      { label: 'Throughput', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
+      { label: 'Latency', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+    ],
+    cursor: { show: true },
+    zoom: { enabled: true, x: true },
+    tooltip: { show: true, mode: 'index' },
+    padding: { top: 20, right: 20, bottom: 36, left: 48 },
+  }));
+
+  const interval = setInterval(() => {
+    if (!heroChart) return;
+    const d = heroChart.getData();
+    const x = d[0]; if (x.length === 0) return;
+    const last = x[x.length - 1];
+    heroChart.appendData([
+      new Float64Array([last + 60_000]),
+      new Float64Array([d[1][x.length - 1] + (Math.random() - 0.5) * 8]),
+      new Float64Array([d[2][x.length - 1] + (Math.random() - 0.5) * 6]),
+    ] as ColumnarData);
+  }, 1500);
+  onCleanup(() => clearInterval(interval));
+
   return (
     <main>
       {/* Hero */}
@@ -61,13 +109,20 @@ export default function Home() {
           </p>
           <div style={{ display: 'flex', gap: 'var(--space-3)', 'justify-content': 'center', 'flex-wrap': 'wrap' }}>
             <Button href="#/docs" variant="primary">Get Started</Button>
+            <Button href="#/demos" variant="secondary">Demos</Button>
             <Button href="https://github.com/liamclarkza/snaplot" target="_blank" rel="noopener" variant="secondary">GitHub</Button>
           </div>
         </div>
 
-        {/* Hero dashboard — theme-switchable, multi-panel showcase */}
-        <div style={{ 'margin-bottom': '48px' }}>
-          <HeroDashboard />
+        {/* Hero chart */}
+        <div style={{
+          height: 'clamp(240px, 40vh, 320px)',
+          'border-radius': 'var(--radius-lg)',
+          overflow: 'hidden',
+          'box-shadow': 'var(--elev-1-inset), var(--elev-1-shadow)',
+          'margin-bottom': '48px',
+        }}>
+          <Chart config={heroConfig()} data={heroData()} onReady={(c) => { heroChart = c; }} />
         </div>
 
         {/* Install */}

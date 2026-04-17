@@ -4,10 +4,12 @@ import Nav from './components/Nav';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import Docs from './pages/Docs';
+import Demos from './pages/Demos';
 
 function getPage() {
   const hash = window.location.hash.slice(1) || '/';
   if (hash.startsWith('/docs')) return 'docs';
+  if (hash.startsWith('/demos')) return 'demos';
   return 'home';
 }
 
@@ -23,6 +25,7 @@ export default function App() {
       <Nav />
       <Show when={page() === 'home'}><Home /></Show>
       <Show when={page() === 'docs'}><Docs /></Show>
+      <Show when={page() === 'demos'}><Demos /></Show>
       <Footer />
     </ThemeProvider>
   );

@@ -74,68 +74,70 @@ export const DARK_THEME: ThemeConfig = {
 };
 
 /**
- * Ocean — deep navy base with cyan/seafoam and warm coral/amber
- * accents. Less green than v0.4 — the first two slots now read as
- * ocean-blue rather than teal-heavy, and warm accents are reserved
- * for contrast series so the whole palette doesn't pull one way.
+ * Ocean — deep navy hero with a harmonised blue-to-warm cycle. Sky
+ * blue leads (so the first series always reads as "primary"); cyan
+ * and teal provide cool contrast; coral and amber are the single
+ * warm accents. The palette stays on an ocean-sun axis rather than
+ * fanning out into unrelated hues.
  */
 export const OCEAN_THEME: ThemeConfig = {
-  backgroundColor: '#0c1929',
-  textColor: '#cfe2f4',
+  backgroundColor: '#0b1a2b',
+  textColor: '#d6e4f2',
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
-  gridColor: '#1e3a5f',
-  gridOpacity: 0.55,
+  gridColor: '#1a3352',
+  gridOpacity: 0.45,
   palette: [
-    '#3b82f6', // ocean blue
-    '#06b6d4', // cyan
-    '#fb923c', // coral
-    '#a78bfa', // deep water
-    '#14b8a6', // teal
-    '#fbbf24', // sunset on water
+    '#60a5fa', // sky
+    '#22d3ee', // cyan
+    '#f59e0b', // amber (warm accent)
+    '#2dd4bf', // teal
+    '#fb7185', // coral
+    '#818cf8', // periwinkle
+    '#0ea5e9', // deep sky
     '#f472b6', // reef pink
-    '#94a3b8', // slate
   ],
-  axisLineColor: '#2a4a6b',
-  borderColor: '#2a4a6b',
-  borderOpacity: 0.7,
-  tickColor: '#6b9ac4',
+  axisLineColor: '#1a3352',
+  borderColor: '#1a3352',
+  borderOpacity: 0.55,
+  tickColor: '#6d8eae',
   crosshairColor: '#88c0f0',
-  tooltipBackground: 'rgba(8, 20, 35, 0.95)',
-  tooltipTextColor: '#cfe2f4',
-  tooltipBorderColor: 'rgba(120, 170, 220, 0.2)',
+  tooltipBackground: 'rgba(10, 20, 34, 0.96)',
+  tooltipTextColor: '#d6e4f2',
+  tooltipBorderColor: 'rgba(120, 170, 220, 0.18)',
 };
 
 /**
- * Forest — calm leaf / moss / pine on deep forest-black. Balances
- * bright leaf greens against sage, olive and dark pine so dense
- * multi-series charts read without pulling toward a single hue.
+ * Forest — deep pine base with a leaf-to-moss cycle. Emerald leads
+ * and every step stays in the green/teal/olive family so the theme
+ * reads as one cohesive forest rather than a random green palette;
+ * a single amber slot provides warm contrast for bar/histogram legends.
  */
 export const FOREST_THEME: ThemeConfig = {
-  backgroundColor: '#0e1613',
-  textColor: '#d5e8dc',
+  backgroundColor: '#0c1613',
+  textColor: '#d7ead9',
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
-  gridColor: '#1e2e26',
-  gridOpacity: 0.55,
+  gridColor: '#1a2a24',
+  gridOpacity: 0.45,
   palette: [
-    '#58d68d', // leaf
-    '#8fbc8f', // sage
-    '#3d8b5e', // pine
-    '#b5c99a', // light olive
-    '#2d5a3d', // dark forest
-    '#a0c878', // spring
-    '#c9e4a8', // pale lime
-    '#4e8272', // teal-green
+    '#34d399', // emerald
+    '#6ee7b7', // mint leaf
+    '#059669', // pine
+    '#a7d06a', // spring olive
+    '#14b8a6', // teal
+    '#fbbf24', // amber (warm accent)
+    '#84cc16', // lime
+    '#0d9488', // deep teal
   ],
-  axisLineColor: '#1e2e26',
-  borderColor: '#1e2e26',
-  borderOpacity: 0.7,
+  axisLineColor: '#1a2a24',
+  borderColor: '#1a2a24',
+  borderOpacity: 0.55,
   tickColor: '#7ea088',
   crosshairColor: '#a2c6ad',
-  tooltipBackground: 'rgba(14, 22, 19, 0.96)',
-  tooltipTextColor: '#d5e8dc',
-  tooltipBorderColor: 'rgba(180, 220, 180, 0.15)',
+  tooltipBackground: 'rgba(12, 22, 19, 0.96)',
+  tooltipTextColor: '#d7ead9',
+  tooltipBorderColor: 'rgba(180, 220, 180, 0.14)',
 };
 
 /**
@@ -172,68 +174,69 @@ export const SUNSET_THEME: ThemeConfig = {
 };
 
 /**
- * Violet — premium dark. Rich aubergine-black with lavender/indigo
- * accents; reads like Linear or Vercel's dashboard UI without leaning
- * "Halloween purple". The first palette slot is a refined lavender,
- * not a saturated magenta, so single-series charts feel understated.
+ * Violet — premium dark in the Linear / Vercel aesthetic. Rich
+ * aubergine-black with a cohesive lavender-to-indigo cycle; a single
+ * amber slot breaks the cool palette for legend legibility. No
+ * saturated magentas or fuchsias — restraint is the whole point.
  */
 export const VIOLET_THEME: ThemeConfig = {
-  backgroundColor: '#0f0d1e',
+  backgroundColor: '#100d1f',
   textColor: '#e4e0f0',
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
-  gridColor: '#2a2545',
-  gridOpacity: 0.55,
+  gridColor: '#242042',
+  gridOpacity: 0.45,
   palette: [
     '#a78bfa', // lavender
+    '#818cf8', // periwinkle
     '#6366f1', // indigo
-    '#f59e0b', // amber (warm contrast)
-    '#06b6d4', // cyan (cool contrast)
-    '#ec4899', // fuchsia
-    '#8b5cf6', // violet
+    '#c4b5fd', // pale violet
+    '#f59e0b', // amber (single warm contrast)
+    '#7c3aed', // deep violet
     '#60a5fa', // blue
-    '#d946ef', // magenta
+    '#e0d9ff', // lilac haze
   ],
-  axisLineColor: '#2a2545',
-  borderColor: '#2a2545',
-  borderOpacity: 0.7,
+  axisLineColor: '#242042',
+  borderColor: '#242042',
+  borderOpacity: 0.55,
   tickColor: '#8a85a8',
   crosshairColor: '#b8b0d4',
   tooltipBackground: 'rgba(18, 15, 32, 0.96)',
   tooltipTextColor: '#e4e0f0',
-  tooltipBorderColor: 'rgba(180, 160, 230, 0.18)',
+  tooltipBorderColor: 'rgba(180, 160, 230, 0.16)',
 };
 
 /**
- * Fog — cool, airy light theme. Blue-grey off-white bg with Tailwind-500
- * accents for a Linear-light / productivity app feel. First palette
- * slot is blue so single-series reads as "primary", not decorative.
+ * Fog — Linear / Notion dashboard light. Cool off-white bg with a
+ * restrained productivity palette: blue leads, emerald + violet for
+ * contrast, amber as the warm accent. Muted enough for a writing-app
+ * surface, saturated enough for >4 series to stay distinguishable.
  */
 export const FOG_THEME: ThemeConfig = {
-  backgroundColor: '#f4f6fa',
-  textColor: '#1e2432',
+  backgroundColor: '#f5f7fb',
+  textColor: '#1a2030',
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
-  gridColor: '#c3c9d6',
-  gridOpacity: 0.5,
+  gridColor: '#c8cfdc',
+  gridOpacity: 0.42,
   palette: [
-    '#3b82f6', // blue
-    '#10b981', // emerald
-    '#8b5cf6', // violet
-    '#f59e0b', // amber
-    '#ec4899', // pink
-    '#06b6d4', // cyan
-    '#6366f1', // indigo
-    '#14b8a6', // teal
+    '#2563eb', // blue
+    '#059669', // emerald
+    '#7c3aed', // violet
+    '#d97706', // amber
+    '#0891b2', // cyan
+    '#db2777', // pink
+    '#4f46e5', // indigo
+    '#0d9488', // teal
   ],
-  axisLineColor: '#c3c9d6',
-  borderColor: '#c3c9d6',
-  borderOpacity: 0.5,
+  axisLineColor: '#c8cfdc',
+  borderColor: '#c8cfdc',
+  borderOpacity: 0.42,
   tickColor: '#6a7386',
   crosshairColor: '#384050',
   tooltipBackground: '#ffffff',
-  tooltipTextColor: '#1e2432',
-  tooltipBorderColor: '#d4d9e3',
+  tooltipTextColor: '#1a2030',
+  tooltipBorderColor: '#d6dbe6',
 };
 
 /**
