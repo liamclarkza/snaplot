@@ -91,29 +91,42 @@ export default function Home() {
   let heroChart: ChartInstance | undefined;
   const { theme } = useTheme();
 
-  const heroConfig = createMemo<ChartConfig>(() => ({
-    theme: theme() === 'light' ? lightTheme : darkTheme,
-    axes: {
-      x: { type: 'time' },
-      y: {
-        type: 'linear',
-        min: 0,
-        max: 100,
-        tickFormat: (v: number) => `${v}%`,
+  // Per-mode hero palette. Light mode uses Observable/Tableau-10's
+  // first four (blue / green / orange / red) — the de facto standard
+  // for business dashboards, proven legible and cohesive. Dark mode
+  // uses the matching Tokyo Night quartet — softer pastels tuned
+  // specifically for dark backgrounds so no line glares.
+  const palette = () =>
+    theme() === 'light'
+      ? ['#4e79a7', '#59a14f', '#f28e2b', '#e15759']
+      : ['#7aa2f7', '#9ece6a', '#ff9e64', '#f7768e'];
+
+  const heroConfig = createMemo<ChartConfig>(() => {
+    const p = palette();
+    return {
+      theme: theme() === 'light' ? lightTheme : darkTheme,
+      axes: {
+        x: { type: 'time' },
+        y: {
+          type: 'linear',
+          min: 0,
+          max: 100,
+          tickFormat: (v: number) => `${v}%`,
+        },
       },
-    },
-    series: [
-      { label: 'Core 0', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
-      { label: 'Core 1', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
-      { label: 'Core 2', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
-      { label: 'Core 3', dataIndex: 4, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
-    ],
-    cursor: { show: true },
-    zoom: { enabled: true, x: true },
-    tooltip: { show: true, mode: 'index' },
-    padding: { top: 20, right: 20, bottom: 36, left: 56 },
-    plugins: [createLegendPlugin({ position: 'bottom' })],
-  }));
+      series: [
+        { label: 'Core 0', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[0] },
+        { label: 'Core 1', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[1] },
+        { label: 'Core 2', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[2] },
+        { label: 'Core 3', dataIndex: 4, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[3] },
+      ],
+      cursor: { show: true },
+      zoom: { enabled: true, x: true },
+      tooltip: { show: true, mode: 'index' },
+      padding: { top: 20, right: 20, bottom: 36, left: 56 },
+      plugins: [createLegendPlugin({ position: 'bottom' })],
+    };
+  });
 
   // 10 Hz tick. Each step shifts the window forward by one sample and
   // appends a fresh one — setData on the full column every 100 ms so the
@@ -177,7 +190,7 @@ export default function Home() {
           }}
         >
           A canvas chart library built for streaming data. Columnar typed arrays,
-          layered rendering, and a minimal reactive API — so your dashboards stay
+          layered rendering, and a minimal reactive API that ensures your dashboards stay
           responsive as data keeps arriving.
         </p>
         <div
