@@ -4,6 +4,13 @@ import type { Plugin, ChartInstance } from '../../types';
  * Built-in DOM legend plugin.
  * Creates a clickable legend above or below the chart.
  * Click a series name to toggle its visibility.
+ *
+ * Styling lives in `snaplot/legend-table.css` — import that stylesheet
+ * once in your app entry to pick up the default look (rounded pill on
+ * hover, subtle dimmed state for hidden series, touch-friendly tap
+ * targets). Every element carries a `snaplot-legend-*` class for
+ * consumers that want to override individual bits without fighting
+ * specificity.
  */
 export function createLegendPlugin(options?: {
   position?: 'top' | 'bottom';
@@ -29,16 +36,7 @@ export function createLegendPlugin(options?: {
       }
 
       container = document.createElement('div');
-      container.style.cssText = `
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px 16px;
-        padding: 8px 12px;
-        font-size: 12px;
-        justify-content: center;
-        pointer-events: auto;
-        flex-shrink: 0;
-      `;
+      container.className = 'snaplot-legend-root';
 
       const pos = options?.position ?? 'bottom';
       if (pos === 'top') {
@@ -69,37 +67,33 @@ function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
   const config = chart.getOptions();
   const palette = config.theme?.palette ?? FALLBACK_PALETTE;
 
-  // Wiping innerHTML detaches the old <div> items and their click handlers
-  // from the DOM; both become GC-eligible when this function returns.
+  // Wiping innerHTML detaches the old <button> items and their click
+  // handlers from the DOM; both become GC-eligible when this function
+  // returns.
   container.innerHTML = '';
 
   config.series.forEach((series, idx) => {
     const color = series.stroke ?? palette[idx % palette.length];
     const hidden = series.visible === false;
 
-    const item = document.createElement('div');
-    item.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      cursor: pointer;
-      user-select: none;
-      opacity: ${hidden ? '0.35' : '1'};
-      transition: opacity 0.15s;
-    `;
+    // <button> (not <div>) so the toggle is keyboard-reachable and
+    // screen-reader-announced. Styling comes from legend-table.css.
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'snaplot-legend-item';
+    if (hidden) item.dataset.hidden = 'true';
+    item.setAttribute(
+      'aria-label',
+      `Toggle ${series.label} ${hidden ? 'on' : 'off'}`,
+    );
 
     const dot = document.createElement('span');
-    dot.style.cssText = `
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: ${color};
-      flex-shrink: 0;
-    `;
+    dot.className = 'snaplot-legend-dot';
+    dot.style.background = color;
 
     const label = document.createElement('span');
+    label.className = 'snaplot-legend-label';
     label.textContent = series.label;
-    label.style.color = '#ccc';
 
     item.appendChild(dot);
     item.appendChild(label);

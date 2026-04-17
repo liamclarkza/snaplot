@@ -1,10 +1,14 @@
-/* snaplot — opt-in default styles for the legend table.
+/* snaplot — opt-in default styles for both legend plugins.
  *
- * Import via:  import 'snaplot/legend-table.css'
+ *   import 'snaplot/legend-table.css';
+ *
+ * Covers:
+ *   - `<LegendTable>` + createLegendTablePlugin() — cursor-synced tabular legend
+ *   - createLegendPlugin() — inline horizontal legend with click-to-toggle
  *
  * All rules use plain class names + CSS custom properties so apps can
- * fully restyle without specificity battles. The plugin and the Solid
- * component share the same class names.
+ * fully restyle without specificity battles. Rules are ordered from
+ * least to most specific so consumer overrides layer cleanly.
  */
 
 :root {
@@ -13,10 +17,15 @@
   --snaplot-legend-text: inherit;
   --snaplot-legend-muted: rgba(127, 127, 127, 0.7);
   --snaplot-legend-row-hover: rgba(127, 127, 127, 0.08);
-  --snaplot-legend-row-highlight: rgba(127, 127, 127, 0.15);
+  --snaplot-legend-row-highlight: rgba(127, 127, 127, 0.14);
   --snaplot-legend-row-dim-opacity: 0.4;
+  --snaplot-legend-row-radius: 6px;
   --snaplot-legend-step-color: var(--snaplot-legend-muted);
+  --snaplot-legend-ease: cubic-bezier(0.2, 0, 0, 1);
+  --snaplot-legend-dur: 150ms;
 }
+
+/* ─── Legend Table (cursor-synced) ─────────────────────────────── */
 
 .snaplot-legend-table-root {
   background: var(--snaplot-legend-bg);
@@ -29,7 +38,11 @@
 }
 
 .snaplot-legend-table {
+  /* `separate` lets individual cells round their corners so hover / highlight
+     render as a pill inside the row, not an edge-to-edge band. */
+  border-collapse: separate;
   border-spacing: 0;
+  width: 100%;
 }
 
 .snaplot-legend-header {
@@ -37,27 +50,20 @@
   user-select: none;
 }
 
-.snaplot-legend-row {
-  transition: background-color 0.1s ease, opacity 0.1s ease;
-}
-
-.snaplot-legend-row:hover,
-.snaplot-legend-row[data-highlighted='true'] {
-  background-color: var(--snaplot-legend-row-hover);
-}
-
-.snaplot-legend-row[data-highlighted='true'] {
-  background-color: var(--snaplot-legend-row-highlight);
-}
-
-.snaplot-legend-row[data-dimmed='true'] {
-  opacity: var(--snaplot-legend-row-dim-opacity);
-}
-
 .snaplot-legend-cell {
   padding: 3px 8px 3px 0;
   vertical-align: middle;
   white-space: nowrap;
+  transition: background-color var(--snaplot-legend-dur) var(--snaplot-legend-ease);
+}
+
+/* Outer cells take extra horizontal padding so the highlight pill sits
+   comfortably inside the row instead of butting against the container. */
+.snaplot-legend-cell:first-child {
+  padding-left: 8px;
+}
+.snaplot-legend-cell:last-child {
+  padding-right: 8px;
 }
 
 .snaplot-legend-cell--value {
@@ -68,10 +74,108 @@
   display: inline-block;
 }
 
+.snaplot-legend-row[data-dimmed='true'] {
+  opacity: var(--snaplot-legend-row-dim-opacity);
+  transition: opacity var(--snaplot-legend-dur) var(--snaplot-legend-ease);
+}
+
+/* Hover + highlight paint on the cells (so border-radius works).
+   Order matters: hover first, then highlight so an active highlight
+   "wins" the background even while the cursor is elsewhere. */
+.snaplot-legend-row:hover > .snaplot-legend-cell {
+  background-color: var(--snaplot-legend-row-hover);
+}
+
+.snaplot-legend-row[data-highlighted='true'] > .snaplot-legend-cell {
+  background-color: var(--snaplot-legend-row-highlight);
+}
+
+/* Round the outer cell corners → the highlight reads as a pill inside
+   the row, not a band. */
+.snaplot-legend-row:hover > .snaplot-legend-cell:first-child,
+.snaplot-legend-row[data-highlighted='true'] > .snaplot-legend-cell:first-child {
+  border-top-left-radius: var(--snaplot-legend-row-radius);
+  border-bottom-left-radius: var(--snaplot-legend-row-radius);
+}
+.snaplot-legend-row:hover > .snaplot-legend-cell:last-child,
+.snaplot-legend-row[data-highlighted='true'] > .snaplot-legend-cell:last-child {
+  border-top-right-radius: var(--snaplot-legend-row-radius);
+  border-bottom-right-radius: var(--snaplot-legend-row-radius);
+}
+
 /* Fat-finger tap targets on touch: rows need ~44px height per WCAG 2.5.5.
    `(pointer: coarse)` keeps dense-grid rows for mouse/trackpad users. */
 @media (pointer: coarse) {
   .snaplot-legend-cell {
     padding: 10px 12px 10px 0;
+  }
+  .snaplot-legend-cell:first-child {
+    padding-left: 12px;
+  }
+  .snaplot-legend-cell:last-child {
+    padding-right: 12px;
+  }
+}
+
+/* ─── Legend Plugin (inline horizontal) ────────────────────────── */
+
+.snaplot-legend-root {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 8px 8px;
+  font-size: 12px;
+  justify-content: center;
+  color: var(--snaplot-legend-text);
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.snaplot-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--snaplot-legend-row-radius);
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  transition:
+    background-color var(--snaplot-legend-dur) var(--snaplot-legend-ease),
+    opacity var(--snaplot-legend-dur) var(--snaplot-legend-ease);
+}
+
+.snaplot-legend-item:hover {
+  background-color: var(--snaplot-legend-row-hover);
+}
+
+.snaplot-legend-item[data-hidden='true'] {
+  opacity: 0.4;
+}
+
+.snaplot-legend-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent);
+}
+
+.snaplot-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.snaplot-legend-label {
+  line-height: 1.2;
+}
+
+/* Touch targets: each pill hits 44×44 under coarse pointers. */
+@media (pointer: coarse) {
+  .snaplot-legend-item {
+    padding: 10px 14px;
+    min-height: 44px;
   }
 }

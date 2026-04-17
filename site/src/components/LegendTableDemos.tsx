@@ -248,35 +248,54 @@ export function SidepanelHighlightDemo() {
       <div style={{ width: '180px', 'border-right': '1px solid var(--border)', padding: '12px 8px', 'font-size': '12px' }}>
         <div style={{ 'font-weight': 600, 'margin-bottom': '6px', opacity: 0.7 }}>Runs</div>
         <For each={names}>
-          {(name, i) => (
-            <button
-              type="button"
-              onMouseEnter={() => group.highlight(i())}
-              onMouseLeave={() => group.highlight(null)}
-              onFocus={() => group.highlight(i())}
-              onBlur={() => group.highlight(null)}
-              onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(127,127,127,0.1)')}
-              onMouseOut={(e) => (e.currentTarget.style.background = '')}
-              title={name}
-              style={{
-                display: 'block',
-                width: '100%',
-                'text-align': 'left',
-                padding: '4px 6px',
-                'border-radius': '4px',
-                border: '0',
-                background: 'transparent',
-                color: 'inherit',
-                cursor: 'pointer',
-                'white-space': 'nowrap',
-                overflow: 'hidden',
-                'text-overflow': 'ellipsis',
-                font: 'inherit',
-              }}
-            >
-              {name}
-            </button>
-          )}
+          {(name, i) => {
+            // Hover background + highlight dispatch share the same handler.
+            // Using mouseenter/leave (not mouseover/out) — those don't
+            // bubble from child nodes, so fast cursor movement can't leave
+            // a row stuck in the "hovered" state.
+            //
+            // Clearing back to `transparent` (not `""`) is load-bearing:
+            // `""` removes the inline background, letting the browser's
+            // UA `<button>` default (a light buttonface colour) show
+            // through. Explicit transparency keeps the panel dark.
+            const hoverBg = 'rgba(127, 127, 127, 0.08)';
+            const enter = (e: MouseEvent | FocusEvent) => {
+              (e.currentTarget as HTMLElement).style.background = hoverBg;
+              group.highlight(i());
+            };
+            const leave = (e: MouseEvent | FocusEvent) => {
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+              group.highlight(null);
+            };
+            return (
+              <button
+                type="button"
+                onMouseEnter={enter}
+                onMouseLeave={leave}
+                onFocus={enter}
+                onBlur={leave}
+                title={name}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  'text-align': 'left',
+                  padding: '4px 8px',
+                  'border-radius': 'var(--snaplot-legend-row-radius, 6px)',
+                  border: '0',
+                  background: 'transparent',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  'white-space': 'nowrap',
+                  overflow: 'hidden',
+                  'text-overflow': 'ellipsis',
+                  font: 'inherit',
+                  transition: 'background-color 150ms cubic-bezier(0.2, 0, 0, 1)',
+                }}
+              >
+                {name}
+              </button>
+            );
+          }}
         </For>
       </div>
       <div style={{ flex: '1', display: 'flex', 'flex-direction': 'column' }}>
