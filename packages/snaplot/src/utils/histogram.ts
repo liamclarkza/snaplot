@@ -14,7 +14,6 @@
  * counts (N+1, last element = 0) so both columns have equal length.
  */
 
-import type { ColumnarData } from '../types';
 
 export interface HistogramBins {
   /** Bin edge values (length = N+1 for N bins) */
@@ -119,7 +118,8 @@ function computeBinCount(
       return h > 0 ? Math.ceil(range / h) : Math.ceil(Math.log2(n) + 1);
     }
 
-    case 'freedman-diaconis':
+    // 'freedman-diaconis' falls through to the default — both paths compute
+    // IQR-based bin width, so the explicit case label is redundant.
     default: {
       const q1 = sorted[Math.floor(n * 0.25)];
       const q3 = sorted[Math.floor(n * 0.75)];

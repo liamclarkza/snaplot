@@ -20,7 +20,7 @@ export class TooltipManager {
   private el: HTMLDivElement;
   private visible = false;
 
-  constructor(private theme: ThemeConfig) {
+  constructor(theme: ThemeConfig) {
     this.el = document.createElement('div');
     this.el.style.cssText = `
       position: fixed;
@@ -40,7 +40,6 @@ export class TooltipManager {
   }
 
   applyTheme(theme: ThemeConfig): void {
-    this.theme = theme;
     this.el.style.backgroundColor = theme.tooltipBackground;
     this.el.style.color = theme.tooltipTextColor;
     this.el.style.border = `1px solid ${theme.tooltipBorderColor}`;

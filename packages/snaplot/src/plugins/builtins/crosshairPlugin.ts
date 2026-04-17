@@ -1,4 +1,4 @@
-import type { Plugin, ChartInstance } from '../../types';
+import type { Plugin } from '../../types';
 
 /**
  * Built-in crosshair plugin.

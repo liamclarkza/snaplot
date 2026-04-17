@@ -159,7 +159,6 @@ export class ChartCore implements ChartInstance {
       () => this.config.interaction ?? 'timeseries',
       () => this.layout,
       () => this.config.zoom ?? { enabled: true, x: true },
-      () => this.config.pan ?? { enabled: true, x: true },
       this.config.touch?.longPressMs,
     );
 

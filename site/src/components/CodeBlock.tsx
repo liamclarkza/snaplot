@@ -23,6 +23,7 @@ export default function CodeBlock(props: { code: string; lang?: string }) {
       overflow: 'auto',
     }}>
       <button
+        type="button"
         onClick={copy}
         style={{
           position: 'absolute',

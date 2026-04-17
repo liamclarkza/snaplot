@@ -70,7 +70,10 @@ export class HitTester {
     scales: Map<string, Scale>,
     seriesConfigs: SeriesConfig[],
     idx: number,
-    pixelX: number,
+    // pixelX is kept for API symmetry with nearestPoint — the distance check
+    // for 'index' mode is vertical-only (Y distance to the line at the
+    // indexed column).
+    _pixelX: number,
     pixelY: number,
     palette: string[],
     proximity: number,
@@ -122,7 +125,10 @@ export class HitTester {
     store: ColumnarStore,
     scales: Map<string, Scale>,
     seriesConfigs: SeriesConfig[],
-    idx: number,
+    // idx is the cursor's X index; kept for API symmetry with pointsAtIndex.
+    // 'nearest' mode searches a pixel-radius window around (pixelX, pixelY)
+    // directly via binary search in X so the pre-computed idx is redundant.
+    _idx: number,
     pixelX: number,
     pixelY: number,
     palette: string[],

@@ -1,5 +1,3 @@
-import type { Layout } from '../types';
-
 /**
  * Creates and manages the 3-layer canvas stack + DOM overlay.
  *

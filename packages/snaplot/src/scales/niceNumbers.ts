@@ -82,7 +82,7 @@ export function niceTicks(
   }
 
   const step = niceStep(min, max, count);
-  if (step === 0 || !isFinite(step)) return [min];
+  if (step === 0 || !Number.isFinite(step)) return [min];
 
   const nMin = Math.ceil(min / step) * step;
   const nMax = Math.floor(max / step) * step;

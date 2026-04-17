@@ -31,12 +31,15 @@ export class PluginManager {
    */
   dispatch(
     hook: keyof Plugin,
-    ...args: any[]
+    ...args: unknown[]
   ): boolean {
     for (const plugin of this.plugins) {
       const fn = plugin[hook];
       if (typeof fn === 'function') {
-        const result = (fn as Function).apply(plugin, args);
+        // Each hook has its own signature — the dispatch is intentionally
+        // variadic, so cast to a top-type callable to satisfy the compiler
+        // without reaching for `any` or `Function`.
+        const result = (fn as (...a: unknown[]) => unknown).apply(plugin, args);
         // before* hooks returning false cancel downstream processing
         if (hook.startsWith('before') && result === false) {
           return false;

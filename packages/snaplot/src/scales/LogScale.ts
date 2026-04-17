@@ -1,5 +1,4 @@
 import type { Scale, ScaleType } from '../types';
-import { DEFAULT_TICK_COUNT } from '../constants';
 
 /**
  * Logarithmic scale: maps data values to pixel coordinates via log10.

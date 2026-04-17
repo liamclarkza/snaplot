@@ -1,4 +1,4 @@
-import type { ChartConfig, ThemeConfig } from '../types';
+import type { ChartConfig } from '../types';
 import { DEFAULT_THEME, DEFAULT_PADDING } from '../constants';
 
 export { DEFAULT_THEME };

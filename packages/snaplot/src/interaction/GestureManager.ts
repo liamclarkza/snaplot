@@ -1,4 +1,4 @@
-import type { InteractionMode, Layout, ZoomConfig, PanConfig } from '../types';
+import type { InteractionMode, Layout, ZoomConfig } from '../types';
 import type { EventBus } from '../core/EventBus';
 import {
   MIN_DRAG_DISTANCE,
@@ -58,20 +58,18 @@ export class GestureManager {
   private lastTapX = 0;
   private lastTapY = 0;
 
-  // Pinch state
+  // Pinch state — just the distance; the centre point is recomputed each
+  // move because it depends on both pointer positions.
   private lastPinchDist = 0;
-  private lastPinchCenterX = 0;
-  private lastPinchCenterY = 0;
 
   // Pan drag start
   private dragStartX = 0;
   private dragStartY = 0;
 
-  // Pan velocity tracking (touch-only momentum)
-  private lastMoveX = 0;
-  private lastMoveY = 0;
+  // Pan velocity tracking (touch-only momentum).
+  // EMA velocity in px/ms, sampled during touch pan. `lastMoveTime` anchors
+  // the sample interval; the pointer positions live on the PointerState map.
   private lastMoveTime = 0;
-  // EMA velocity in px/ms, sampled during touch pan.
   private velocityX = 0;
   private velocityY = 0;
   private momentumFrame: number | null = null;
@@ -98,7 +96,6 @@ export class GestureManager {
     private getMode: () => InteractionMode,
     private getLayout: () => Layout,
     private getZoomConfig: () => ZoomConfig,
-    private getPanConfig: () => PanConfig,
     longPressMs?: number,
   ) {
     this.longPressMs = longPressMs ?? DEFAULT_LONG_PRESS_MS;
@@ -257,9 +254,6 @@ export class GestureManager {
       this.clearLongPress();
       this.state = 'pinching';
       this.lastPinchDist = this.pinchDistance();
-      const center = this.pinchCenter();
-      this.lastPinchCenterX = center.x;
-      this.lastPinchCenterY = center.y;
       return;
     }
 
@@ -280,8 +274,6 @@ export class GestureManager {
     this.dragStartY = y;
 
     // Reset pan-velocity sampler; first move will populate it.
-    this.lastMoveX = x;
-    this.lastMoveY = y;
     this.lastMoveTime = performance.now();
     this.velocityX = 0;
     this.velocityY = 0;
@@ -333,9 +325,6 @@ export class GestureManager {
       }
 
       this.lastPinchDist = newDist;
-      const c = this.pinchCenter();
-      this.lastPinchCenterX = c.x;
-      this.lastPinchCenterY = c.y;
       return;
     }
 
@@ -391,8 +380,6 @@ export class GestureManager {
           const a = 0.5;
           this.velocityX = a * instVX + (1 - a) * this.velocityX;
           this.velocityY = a * instVY + (1 - a) * this.velocityY;
-          this.lastMoveX = x;
-          this.lastMoveY = y;
           this.lastMoveTime = now;
           this.momentumAxis = panAxis;
         }
@@ -476,8 +463,6 @@ export class GestureManager {
         if (survivor) {
           this.dragStartX = survivor.x;
           this.dragStartY = survivor.y;
-          this.lastMoveX = survivor.x;
-          this.lastMoveY = survivor.y;
           this.lastMoveTime = performance.now();
           this.velocityX = 0;
           this.velocityY = 0;
