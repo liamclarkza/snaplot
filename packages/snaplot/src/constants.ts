@@ -16,27 +16,29 @@ export const PALETTE_OKABE_ITO = [
 ] as const;
 
 /**
- * Light theme — designed around a coordinated grey scale:
+ * Light theme — coordinated grey-blue scale. The background carries a
+ * whisper of brand-hue cool (≈2 %) instead of pure white per the Soft UI
+ * guide ("your 'white' should carry 1–2 % of your brand hue").
  *
- *   #ffffff  background
- *   #d8dae0  grid lines (at 0.6 opacity)
- *   #c0c4cc  axis lines (soft frame)
+ *   #fcfcfd  background      (barely cool off-white)
+ *   #d8dae0  grid lines      (at 0.45 opacity — softer than before)
+ *   #d8dae0  axis lines
  *   #9098a8  crosshair
- *   #8890a0  tick labels (muted blue-grey, readable but not harsh)
- *   #2a2a35  text (near-black)
+ *   #8890a0  tick labels     (muted blue-grey, readable but not harsh)
+ *   #2a2a35  text            (near-black, not pure)
  */
 export const DEFAULT_THEME: ThemeConfig = {
-  backgroundColor: '#ffffff',
+  backgroundColor: '#fcfcfd',
   textColor: '#2a2a35',
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   fontSize: 11,
   gridColor: '#d8dae0',
-  gridOpacity: 0.6,
+  gridOpacity: 0.45,
   palette: [...PALETTE_OKABE_ITO],
   axisLineColor: '#d8dae0',
   tickColor: '#8890a0',
   crosshairColor: '#9098a8',
-  tooltipBackground: '#ffffff',
+  tooltipBackground: '#fcfcfd',
   tooltipTextColor: '#2a2a35',
   tooltipBorderColor: '#d8dae0',
 };
@@ -46,10 +48,10 @@ export const DARK_THEME: ThemeConfig = {
   textColor: '#c0c0c0',
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
-  gridColor: '#555566',
-  gridOpacity: 0.5,
+  gridColor: '#3a3a4f',
+  gridOpacity: 0.45,
   palette: [...PALETTE_OKABE_ITO],
-  axisLineColor: '#666677',
+  axisLineColor: '#4a4a62',
   tickColor: '#888899',
   crosshairColor: '#aaaacc',
   tooltipBackground: 'rgba(20, 20, 40, 0.95)',
@@ -74,18 +76,49 @@ export const OCEAN_THEME: ThemeConfig = {
 };
 
 export const MIDNIGHT_THEME: ThemeConfig = {
-  backgroundColor: '#0a0a0a',
+  // Subtle blue tint instead of pure #0a0a0a — avoids the "void" look on
+  // LCD panels where #000 clips to slightly blueish anyway.
+  backgroundColor: '#0c0d12',
   textColor: '#d0d0d0',
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
-  gridColor: '#222222',
-  gridOpacity: 0.7,
+  gridColor: '#1f2028',
+  gridOpacity: 0.55,
   palette: ['#ff6b6b', '#51cf66', '#339af0', '#fcc419', '#cc5de8', '#ff922b', '#22b8cf', '#e599f7'],
-  axisLineColor: '#333333',
-  tickColor: '#666666',
-  crosshairColor: '#888888',
-  tooltipBackground: 'rgba(0, 0, 0, 0.95)',
+  axisLineColor: '#2a2b36',
+  tickColor: '#666677',
+  crosshairColor: '#888899',
+  tooltipBackground: 'rgba(10, 10, 15, 0.95)',
   tooltipTextColor: '#e0e0e0',
+  tooltipBorderColor: 'rgba(255, 255, 255, 0.08)',
+};
+
+/**
+ * Refined dark — a modern slate-based alternative to DARK_THEME for
+ * app dashboards that want the Soft-UI look: tinted neutrals, softer
+ * grid, blue accent as the hero. Keeps the Okabe–Ito palette so
+ * colorblind-safety isn't traded away.
+ *
+ *   #14161f  background      (slate, not navy)
+ *   #232634  grid            (at 0.4 opacity — quiet but legible)
+ *   #2e3244  axis            (a step above grid)
+ *   #8a8e9c  tick labels
+ *   #a0a5b8  crosshair
+ *   #e2e2e5  text            (warm off-white, avoids cold #fff)
+ */
+export const REFINED_DARK_THEME: ThemeConfig = {
+  backgroundColor: '#14161f',
+  textColor: '#e2e2e5',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#232634',
+  gridOpacity: 0.4,
+  palette: [...PALETTE_OKABE_ITO],
+  axisLineColor: '#2e3244',
+  tickColor: '#8a8e9c',
+  crosshairColor: '#a0a5b8',
+  tooltipBackground: 'rgba(20, 23, 32, 0.96)',
+  tooltipTextColor: '#e8e8eb',
   tooltipBorderColor: 'rgba(255, 255, 255, 0.08)',
 };
 

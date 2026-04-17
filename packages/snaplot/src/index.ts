@@ -39,7 +39,14 @@ export { niceTicks, niceRange, niceStep } from './scales/niceNumbers';
 
 // Config & theming
 export { deepMerge } from './config/merge';
-export { lightTheme, darkTheme, oceanTheme, midnightTheme, resolveTheme } from './config/theme';
+export {
+  lightTheme,
+  darkTheme,
+  oceanTheme,
+  midnightTheme,
+  refinedDarkTheme,
+  resolveTheme,
+} from './config/theme';
 
 // Plugins
 export { createLegendPlugin } from './plugins/builtins/legendPlugin';
