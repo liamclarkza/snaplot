@@ -97,4 +97,27 @@ describe('niceTicks', () => {
     const b = niceTicks(0, 100, 6);
     expect(a).toEqual(b);
   });
+
+  it('falls back to [min] when step degenerates (Infinity range)', () => {
+    const ticks = niceTicks(0, Infinity, 6);
+    expect(ticks).toEqual([0]);
+  });
+
+  it('falls back to [min] when min is NaN', () => {
+    // NaN propagates through the step calculation; the Number.isFinite
+    // guard catches it and we return the requested start value.
+    const ticks = niceTicks(NaN, 100, 6);
+    expect(ticks.length).toBeGreaterThan(0);
+    expect(Number.isNaN(ticks[0])).toBe(true);
+  });
+
+  it('handles a negative-to-positive range with zero as a tick', () => {
+    // niceTicks rounds inward, so the first/last tick can sit strictly
+    // inside [min, max]. What we actually guarantee is that zero is a
+    // tick for ranges straddling it.
+    const ticks = niceTicks(-50, 50, 6);
+    expect(ticks).toContain(0);
+    expect(ticks[0]).toBeGreaterThanOrEqual(-50);
+    expect(ticks[ticks.length - 1]).toBeLessThanOrEqual(50);
+  });
 });
