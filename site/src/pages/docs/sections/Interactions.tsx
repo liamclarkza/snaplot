@@ -167,7 +167,8 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
           Configure touch behavior with the <code>touch</code> config:
         </Prose>
         <CodeBlock code={`touch: {
-  hitRadius: 24,    // CSS pixels — larger radius for fat-finger tolerance
+  hitRadius: 44,    // CSS pixels. Defaults: 44 for touch, 32 for mouse
+                    // (per WCAG 2.5.5). Set here to override both.
   longPressMs: 400, // ms before long-press activates box zoom
 }`} />
       </Section>

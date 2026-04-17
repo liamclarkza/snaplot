@@ -299,7 +299,11 @@ export interface TooltipConfig {
 }
 
 export interface TouchConfig {
-  /** Hit-test radius in CSS pixels (default: 24 for touch, 32 for mouse) */
+  /**
+   * Global hit-test radius override in CSS pixels. When unset, the chart
+   * picks the radius per call from the pointer type: 44 px for touch
+   * (WCAG 2.5.5 tap-target minimum) and 32 px for mouse / pen.
+   */
   hitRadius?: number;
   /** Long-press duration in ms before box-zoom activates (default: 400) */
   longPressMs?: number;

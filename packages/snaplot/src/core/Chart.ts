@@ -152,7 +152,10 @@ export class ChartCore implements ChartInstance {
     this.updateLayout();
 
     // 8. Create interaction handlers
-    this.hitTester = new HitTester();
+    // If the user pinned a hitRadius via `touch.hitRadius`, that becomes
+    // the global override (applies to both touch and mouse). Otherwise
+    // HitTester picks per-pointer defaults: 44 px for touch, 32 for mouse.
+    this.hitTester = new HitTester(this.config.touch?.hitRadius);
     this.tooltipManager = new TooltipManager(this.theme);
 
     this.gestureManager = new GestureManager(
