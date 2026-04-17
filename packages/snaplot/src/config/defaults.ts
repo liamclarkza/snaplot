@@ -27,7 +27,6 @@ export const DEFAULT_CONFIG: ChartConfig = {
   tooltip: {
     show: true,
     mode: 'index',
-    snap: true,
     offset: 12,
   },
   highlight: {

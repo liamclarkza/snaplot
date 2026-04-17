@@ -293,7 +293,7 @@ export interface SelectionConfig {
 export interface TooltipConfig {
   show?: boolean;
   mode?: 'nearest' | 'index' | 'x';
-  snap?: boolean;
+  /** Pixel offset from the cursor. Defaults to TOOLTIP_OFFSET (12 px). */
   offset?: number;
   render?: (points: TooltipPoint[]) => string | HTMLElement;
 }
