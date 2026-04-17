@@ -50,6 +50,35 @@ export function renderCrosshair(
   ctx.restore();
 }
 
+/**
+ * Draw a short-lived ring at the tap point so touch users get feedback that
+ * the chart registered their gesture. The caller supplies `progress` in [0, 1]
+ * so this renderer stays stateless.
+ */
+export function renderTapRing(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  progress: number,
+  color: string,
+): void {
+  // Ease-out cubic — rapid initial growth, soft settle.
+  const eased = 1 - (1 - progress) ** 3;
+  const minRadius = 8;
+  const maxRadius = 26;
+  const radius = minRadius + (maxRadius - minRadius) * eased;
+  const alpha = 0.45 * (1 - progress);
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function renderSelectionBox(
   ctx: CanvasRenderingContext2D,
   startX: number,
