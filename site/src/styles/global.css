@@ -154,6 +154,15 @@ code {
   padding: 2px 6px;
   border-radius: 4px;
 }
+/* Inline-code styling must not leak into fenced blocks. Without this
+   override, the 6px left padding on <code> indents the first character
+   of every <pre><code> block. */
+pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  border-radius: 0;
+}
 
 ::selection {
   background: rgba(79, 143, 234, 0.3);

@@ -338,7 +338,7 @@ export default function Home() {
               'margin-bottom': 'var(--space-2)',
             }}
           >
-            The chart above, in ten lines
+            The chart above, from config to canvas
           </h2>
           <p
             style={{

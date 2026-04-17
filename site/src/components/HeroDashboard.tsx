@@ -372,7 +372,7 @@ export default function HeroDashboard() {
               'line-height': 1.55,
             }}
           >
-            Pick a theme — every surface on the page follows. Streaming area, scatter
+            Pick a theme and every surface on the page follows. Streaming area, scatter
             cloud, and 80K-point density heatmap all re-render against the palette.
           </p>
         </header>
@@ -404,7 +404,7 @@ export default function HeroDashboard() {
           }}
         >
           {/* Row 1 — streaming (full width) */}
-          <Panel title="Throughput & latency" subtitle="Streaming — 1.5s tick">
+          <Panel title="Throughput & latency" subtitle="Streaming, 1.5s tick">
             <div style={{ height: 'clamp(240px, 36vh, 320px)' }}>
               <Chart config={streamConfig()} data={streamData()} onReady={(c) => { streamChart = c; }} />
             </div>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Rounded slate square matches the chart background on dark themes. -->
+  <rect width="32" height="32" rx="7" fill="#14161f"/>
+  <!-- A single sparkline peaking at the highlighted data point. Reads as
+       "chart" at any size down to 16x16, and the accent colour matches
+       the hero chart's Tokyo-Night blue. -->
+  <path
+    d="M4 23 L 10 17 L 16 20 L 22 8 L 28 13"
+    fill="none"
+    stroke="#7aa2f7"
+    stroke-width="2.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="22" cy="8" r="2.6" fill="#7aa2f7"/>
+</svg>

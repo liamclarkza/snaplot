@@ -1,12 +1,12 @@
 # snaplot
 
-High-performance canvas chart library for [SolidJS](https://www.solidjs.com/). Line, area, scatter, bar, and histogram charts with sub-frame rendering at 100K+ points, cursor-synced legend tables, cross-chart interaction sync, and zero runtime dependencies beyond solid-js.
+A canvas chart library built for streaming data and interactive dashboards.
 
-Under 30KB gzipped.
+[Documentation](https://liamclarkza.github.io/snaplot/#/docs) · [Live demos](https://liamclarkza.github.io/snaplot/#/demos) · [npm](https://www.npmjs.com/package/snaplot)
 
-**[Live Documentation & Demos](https://liamclarkza.github.io/snaplot/#/docs)**
+snaplot renders line, area, scatter, bar, histogram, and band charts from columnar Float64Arrays. It handles 200,000+ points at 60 fps through a layered canvas pipeline, binary-search viewport culling, and ring-buffer streaming updates. The library never copies or mutates your data.
 
----
+Current bindings ship a SolidJS component and reactive primitives. The core (`ChartCore`) is framework-free and can be driven from any runtime.
 
 ## Install
 
@@ -14,7 +14,7 @@ Under 30KB gzipped.
 npm install snaplot
 ```
 
-Peer dependency: `solid-js ^1.9.0`.
+Requires `solid-js ^1.9.0`.
 
 ## Quick start
 
@@ -23,202 +23,82 @@ import { Chart } from 'snaplot';
 import type { ColumnarData } from 'snaplot';
 
 const data: ColumnarData = [
-  new Float64Array(timestamps),  // X values (must be sorted)
-  new Float64Array(values),      // Y series 1
+  new Float64Array(timestamps), // X values, sorted
+  new Float64Array(cpu),        // Y series 1
+  new Float64Array(memory),     // Y series 2
 ];
 
 <Chart
   config={{
     axes: { x: { type: 'time' }, y: { type: 'linear' } },
-    series: [{ label: 'CPU %', dataIndex: 1, type: 'line' }],
+    series: [
+      { label: 'CPU',    dataIndex: 1, type: 'line' },
+      { label: 'Memory', dataIndex: 2, type: 'area' },
+    ],
   }}
   data={data}
 />
 ```
 
-All data is columnar typed arrays — index 0 is always X, indices 1+ are Y series. This unlocks O(log n) binary-search viewport culling, cache-friendly sequential access, and zero GC pressure during 60fps streaming updates.
+Column 0 is always X. Columns 1+ are Y series referenced by `dataIndex`. This columnar layout is what makes binary-search viewport culling and zero-copy streaming possible.
+
+Full API reference and runnable examples are in the [documentation](https://liamclarkza.github.io/snaplot/#/docs).
 
 ## Features
 
 ### Chart types
 
-| Type | Description |
-|------|-------------|
-| **Line** | Linear, monotone cubic (Fritsch-Carlson), and stepped interpolation. NaN gaps handled automatically. |
-| **Area** | Gradient fill between line and baseline, with configurable top/bottom colors. |
-| **Scatter** | Stamp-based rendering up to 200K points; automatic Viridis density heatmap beyond that. |
-| **Bar** | Grouped side-by-side bars with configurable width ratio, outer/inner padding. |
-| **Histogram** | Pre-binned via the included `histogram()` utility (Freedman-Diaconis, Sturges, Scott, or fixed bin count). |
+Line (linear, monotone, stepped interpolation), area with gradient fill, scatter that switches to a density heatmap past 200K points, grouped bar, histogram via the included `histogram()` utility (Freedman-Diaconis, Sturges, Scott), and band (fill between upper and lower series).
 
 ### Interactions
 
-- **Drag-to-zoom** — box selection on X (timeseries) or XY (analytical). Selection is clamped to the plot area.
-- **Wheel / pinch zoom** — at the cursor position. Configurable `wheelFactor`.
-- **Pan** — shift+drag or drag on an axis gutter. One-finger drag on touch.
-- **Bounded navigation** — `zoom.bounds` (default: `true`) prevents pan/zoom past the data extent. Configurable per-axis or with custom `{ min, max }` walls.
-- **Double-click / double-tap** — reset zoom to full data extent.
-- **Proximity tooltips** — DOM-based (no canvas clipping), three modes: `index`, `nearest`, `x`. Custom renderer via `tooltip.render`.
-- **Touch support** — one-finger pan, two-finger pinch, long-press box-zoom, tap tooltips.
+Drag-to-zoom, wheel and pinch zoom at the cursor, pan on shift-drag or axis gutters, double-click reset, proximity tooltips in three modes (`index`, `nearest`, `x`), keyboard pan and zoom, and full touch gesture support.
 
-### Axis range control
+### Streaming
 
-Three knobs combine for any behaviour:
-
-```ts
-axes: {
-  x: { nice: false, padding: 0 },      // exact data extent, no trailing gap
-  y: { nice: true,  padding: 0.1 },    // 10% pad each side + nice tick boundaries
-  y2: { min: 0, max: 100 },            // pinned bounds (reset-zoom restores these)
-}
-```
+`setData` replaces the current window. `appendData` extends it with an optional `maxLen` for ring-buffer eviction. Both update at 60 fps on realistic dashboard datasets.
 
 ### Cursor-synced legend table
 
-A table below (or above) the chart showing the value of every visible series at the current cursor position — the standard ML experiment dashboard pattern. Available as a DOM plugin and a SolidJS component.
-
-```tsx
-import { Chart, LegendTable } from 'snaplot';
-import 'snaplot/legend-table.css';
-
-const [chart, setChart] = createSignal<ChartInstance>();
-
-<Chart config={config} data={data} onReady={setChart} />
-<LegendTable chart={chart} />
-```
-
-Zero config produces a sensible default (name + value columns, series-only fallback when the cursor leaves so the layout doesn't jump). Customize with typed column helpers:
-
-```tsx
-import { nameColumn, valueColumn, metricColumn, swatchColumn, column } from 'snaplot';
-
-type RunMeta = { runId: string; metricKey: string };
-
-<LegendTable<RunMeta>
-  chart={chart}
-  columns={[
-    swatchColumn(),
-    nameColumn({ swatch: false }),
-    metricColumn(p => p.meta.metricKey),
-    valueColumn({ format: v => v.toFixed(6) }),
-  ]}
-/>
-```
-
-A render-prop escape hatch lets you keep the cursor/highlight wiring but render your own layout:
-
-```tsx
-<LegendTable chart={chart}>
-  {(snapshot, highlight, setHighlight) => (
-    <MyCustomTable data={snapshot()} highlight={highlight()} onRowHover={setHighlight} />
-  )}
-</LegendTable>
-```
+A table that shows the value of every visible series at the cursor position. Available as a DOM plugin (`createLegendTablePlugin`) or a SolidJS component (`LegendTable`) with typed column helpers (`nameColumn`, `valueColumn`, `metricColumn`, `swatchColumn`).
 
 ### Cross-chart sync
 
-`createChartGroup()` coordinates cursor position and series highlighting across any number of charts:
-
-```tsx
-import { createChartGroup } from 'snaplot';
-
-const group = createChartGroup();
-
-<Chart config={group.apply(configA)} data={a} />
-<Chart config={group.apply(configB)} data={b} />
-
-// External controls (e.g. a sidepanel):
-<button
-  onMouseEnter={() => group.highlight(2)}
-  onMouseLeave={() => group.highlight(null)}
->Run #2</button>
-```
-
-When a series is highlighted, non-highlighted series dim (configurable via `highlight.dimOpacity`), and the highlighted series draws on top. The equality guard in `setHighlight` breaks cross-chart sync loops, so this is safe at any group size.
-
-### Series highlight
-
-```ts
-chart.setHighlight(seriesIndex);  // dim everything else
-chart.setHighlight(null);         // clear
-
-// Reactive (SolidJS):
-const [highlight, setHighlight] = createHighlight(chart);
-```
-
-Highlight state syncs across charts via `highlight.syncKey` (or automatically via `createChartGroup`). Redraws only the data canvas layer — grid and overlay are untouched.
-
-### Cursor snapshot (headless)
-
-The data behind the legend table is exposed as a first-class API:
-
-```ts
-import { createCursorSnapshot } from 'snaplot';
-
-const snapshot = createCursorSnapshot(chart, { fallback: 'latest' });
-// Accessor<CursorSnapshot>:
-//   source, dataIndex, dataX, formattedX, activeSeriesIndex,
-//   points: [{ seriesIndex, label, color, value, formattedValue, meta }]
-```
-
-`activeSeriesIndex` is the series whose Y value is visually closest to the cursor — pair with `setHighlight` to focus the line under the cursor.
-
-The zero-alloc `getCursorSnapshotInto(buffer)` variant reuses a caller-owned buffer so the cursor hot path stays allocation-free at 60fps with 100+ series.
-
-### Scales
-
-- **Linear** — Heckbert's nice numbers with D3's integer-arithmetic trick for clean ticks.
-- **Logarithmic** — powers of 10 with sub-ticks at 2x and 5x.
-- **Time** — automatic intervals from seconds to years with hierarchical date labels.
+`createChartGroup()` keeps cursor and highlight state in sync across any number of charts. External controls can drive the highlight too, for UIs like sidebars or experiment lists.
 
 ### Themes
 
-Five built-in themes (`lightTheme`, `darkTheme`, `oceanTheme`, `midnightTheme`, `refinedDarkTheme`) plus full custom `ThemeConfig` objects. The legend table uses CSS custom properties (`.snaplot-legend-table-root`, `[data-highlighted]`, `[data-dimmed]`) so apps can restyle without specificity battles.
+Twelve built-in themes (`lightTheme`, `darkTheme`, `oceanTheme`, `forestTheme`, `violetTheme`, `fogTheme`, `ivoryTheme`, `mintTheme`, `sunsetTheme`, `midnightTheme`, `marsTheme`, `refinedDarkTheme`). CSS variable overrides and full custom `ThemeConfig` objects are supported.
 
-### Performance
+### Plugins
 
-Built on the same architectural principles as [uPlot](https://github.com/leeoniya/uPlot): columnar typed arrays, layered canvas (grid / data / overlay), binary-search viewport culling, and zero internal data processing.
+Simple lifecycle hooks: `install`, `destroy`, `before`/`after` each canvas layer, `onCursorMove`, `onZoom`, `onClick`, `onSetData`, `onSetOptions`. The built-in legend, legend-table, and reference-line plugins use the same surface, and custom plugins can register at construction or via `chart.use(plugin)`.
 
-- **Rendering**: 100K+ in-viewport points at interactive frame rates.
-- **Streaming**: 60fps `appendData` with ring-buffer eviction.
-- **Legend table**: text-content swaps only on cursor move (no innerHTML rebuilds); per-cell SolidJS signals for fine-grained reactivity.
-- **Highlight**: redraws only the DATA canvas; overlay and grid untouched.
-- **Downsampling**: LTTB and M4 shipped as opt-in utilities — the library never touches your data.
+### TypeScript
 
-### Plugin system
+Strict types throughout, generic column helpers, no `any` in the public API.
 
-Plugins are plain objects with lifecycle hooks — `install`, `destroy`, `before/afterDraw{Grid,Data,Overlay}`, `onCursorMove`, `onZoom`, `onClick`, `onSetData`. Both per-chart and runtime registration are supported.
+## Performance notes
 
-```ts
-chart.use(myPlugin);
-// or in config:
-config.plugins = [createLegendTablePlugin({ fallback: 'series-only' })];
-```
-
-## API at a glance
-
-| Category | Exports |
-|----------|---------|
-| **Components** | `Chart`, `LegendTable` |
-| **Primitives** | `createChart`, `createCursorSnapshot`, `createHighlight`, `createChartGroup` |
-| **Plugins** | `createLegendPlugin`, `createLegendTablePlugin` |
-| **Column helpers** | `nameColumn`, `valueColumn`, `swatchColumn`, `metricColumn`, `column` |
-| **Data utilities** | `lttb`, `m4`, `histogram`, `ColumnarStore` |
-| **Scales** | `createScale`, `LinearScale`, `LogScale`, `TimeScale`, `niceTicks` |
-| **Themes** | `lightTheme`, `darkTheme`, `oceanTheme`, `midnightTheme`, `refinedDarkTheme`, `resolveTheme` |
-| **Core** | `ChartCore` (imperative, framework-free) |
-
-Full type exports and API reference in the [documentation](https://liamclarkza.github.io/snaplot/#/docs#api-types).
+- 200K+ point charts render well under one frame on a modern laptop.
+- Grid, data, and overlay are separate canvases. A cursor move repaints the overlay only. A data update skips the grid layer.
+- Viewport culling is a binary search on the X column, so off-screen points cost nothing.
+- snaplot never mutates, copies, or processes input arrays. Downsampling helpers (`lttb`, `m4`) are exported as opt-in utilities.
+- Legend table updates use `textContent` swaps in the cursor hot path, not `innerHTML` rebuilds.
 
 ## Development
 
 ```bash
-npm install          # install all workspaces
-npm run build        # build the library
-npm run dev          # run the docs site dev server
-npm run build:site   # build the static docs site
-npm run preview      # build everything + preview the site
-npm run typecheck    # type-check the library
+npm install          # installs all workspaces plus git hooks
+npm run dev          # docs site dev server with live HMR against the library
+npm run build        # library production build
+npm run build:site   # docs site production build
+npm test             # vitest
+npm run check        # biome lint + format check
+npm run typecheck    # tsc --noEmit
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, conventions, and release process.
 
 ## License
 
