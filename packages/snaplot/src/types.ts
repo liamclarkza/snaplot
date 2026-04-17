@@ -145,9 +145,8 @@ export interface SeriesConfig<TMeta = unknown> {
   lowerDataIndex?: number;
 
   // Bar
+  /** Fraction of the category width each bar occupies (0–1). Default 0.8. */
   barWidthRatio?: number;
-  stacked?: boolean;
-  stackGroup?: string;
 
   // Scatter
   /** Force heatmap (density) rendering for scatter plots regardless of point count */
