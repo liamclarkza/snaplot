@@ -170,6 +170,7 @@ export default function LiveEditor(props: {
       }}>
         {/* Copy button */}
         <button
+          type="button"
           onClick={copy}
           style={{
             position: 'absolute',
@@ -193,6 +194,10 @@ export default function LiveEditor(props: {
         <div
           ref={editorRef!}
           contentEditable
+          role="textbox"
+          aria-multiline="true"
+          aria-label="Edit chart config"
+          tabIndex={0}
           spellcheck={false}
           onInput={onInput}
           onKeyDown={onKeyDown}

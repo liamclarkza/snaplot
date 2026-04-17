@@ -181,15 +181,21 @@ export function SidebarUI(props: {
         )}
       </button>
 
-      {/* Mobile drawer scrim */}
+      {/* Mobile drawer scrim — a button so screen readers announce it and
+         Escape/Enter dismiss the drawer. Visually reset to look like the
+         semi-transparent overlay a div would give. */}
       <Show when={props.sidebarOpen()}>
-        <div
-          role="presentation"
+        <button
+          type="button"
+          aria-label="Close navigation"
           onClick={() => props.setSidebarOpen(false)}
           style={{
             position: 'fixed',
             inset: '0',
             background: 'rgba(0,0,0,0.5)',
+            border: '0',
+            cursor: 'pointer',
+            padding: '0',
             'z-index': '149',
           }}
         />

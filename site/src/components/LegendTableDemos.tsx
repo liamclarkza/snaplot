@@ -1,4 +1,4 @@
-import { createSignal, createMemo, createEffect, onCleanup, For, Show } from 'solid-js';
+import { createSignal, createMemo, createEffect, onCleanup, For } from 'solid-js';
 import {
   Chart,
   LegendTable,
@@ -249,23 +249,33 @@ export function SidepanelHighlightDemo() {
         <div style={{ 'font-weight': 600, 'margin-bottom': '6px', opacity: 0.7 }}>Runs</div>
         <For each={names}>
           {(name, i) => (
-            <div
+            <button
+              type="button"
               onMouseEnter={() => group.highlight(i())}
               onMouseLeave={() => group.highlight(null)}
+              onFocus={() => group.highlight(i())}
+              onBlur={() => group.highlight(null)}
+              onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(127,127,127,0.1)')}
+              onMouseOut={(e) => (e.currentTarget.style.background = '')}
+              title={name}
               style={{
+                display: 'block',
+                width: '100%',
+                'text-align': 'left',
                 padding: '4px 6px',
                 'border-radius': '4px',
+                border: '0',
+                background: 'transparent',
+                color: 'inherit',
                 cursor: 'pointer',
                 'white-space': 'nowrap',
                 overflow: 'hidden',
                 'text-overflow': 'ellipsis',
+                font: 'inherit',
               }}
-              onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(127,127,127,0.1)')}
-              onMouseOut={(e) => (e.currentTarget.style.background = '')}
-              title={name}
             >
               {name}
-            </div>
+            </button>
           )}
         </For>
       </div>
