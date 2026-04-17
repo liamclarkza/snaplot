@@ -1,24 +1,16 @@
 import { createSignal, createMemo, onCleanup, onMount } from 'solid-js';
 import { highlight } from 'sugar-high';
-import {
-  Chart,
-  darkTheme, lightTheme, oceanTheme, midnightTheme,
-  createLegendPlugin,
-  createLegendTablePlugin,
-  createReferenceLinesPlugin,
-  nameColumn, valueColumn, swatchColumn, metricColumn, column,
-} from 'snaplot';
+import * as snaplot from 'snaplot';
+import { Chart, darkTheme, lightTheme } from 'snaplot';
 import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
 import { useTheme } from '../ThemeContext';
 
-// Available to user code inside the editor via new Function args
-const evalContext = {
-  darkTheme, lightTheme, oceanTheme, midnightTheme,
-  createLegendPlugin,
-  createLegendTablePlugin,
-  createReferenceLinesPlugin,
-  nameColumn, valueColumn, swatchColumn, metricColumn, column,
-};
+// Everything snaplot exports is available as a bare identifier inside the
+// editor. This means new theme/plugin/column exports (e.g. refinedDarkTheme)
+// light up automatically — no hand-maintained allowlist to keep in sync.
+// `Chart` is excluded: it's a Solid component, not data, and can't be used
+// usefully from an expression-mode eval.
+const { Chart: _, ...evalContext } = snaplot;
 const evalArgNames = Object.keys(evalContext);
 const evalArgValues = Object.values(evalContext);
 
