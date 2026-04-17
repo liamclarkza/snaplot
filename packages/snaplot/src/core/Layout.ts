@@ -68,8 +68,8 @@ export function computeLayout(
   // Accumulate space needed per side from all configured axes
   let leftAxisWidth = padding.left;
   let rightAxisWidth = padding.right;
-  let bottomAxisHeight = padding.bottom;
-  let topAxisHeight = padding.top;
+  const bottomAxisHeight = padding.bottom;
+  const topAxisHeight = padding.top;
 
   // Build a map of axis key → position for later use
   const axisPositions = new Map<string, AxisPosition>();

@@ -11,9 +11,17 @@
     "dev:lib": "npm run dev -w packages/snaplot",
     "build:site": "npm run build -w site",
     "preview": "npm run build && npm run build:site && npm run preview -w site",
-    "typecheck": "npm run typecheck -w packages/snaplot"
+    "typecheck": "npm run typecheck -w packages/snaplot",
+    "lint": "biome lint",
+    "lint:fix": "biome lint --write",
+    "format": "biome format --write",
+    "check": "biome check",
+    "check:fix": "biome check --write"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.12"
   }
 }
