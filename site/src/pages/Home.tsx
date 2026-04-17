@@ -168,9 +168,11 @@ export default function Home() {
           {features.map(f => (
             <div style={{
               background: 'var(--bg-surface)',
-              border: '1px solid var(--border)',
               'border-radius': 'var(--radius-lg)',
-              padding: '24px',
+              padding: 'var(--space-5)',
+              // Elevation via layered shadow + inner top highlight — no 1px
+              // border, per the design guide (pick one signal for depth).
+              'box-shadow': 'var(--elev-1-inset), var(--elev-1-shadow)',
             }}>
               <div style={{
                 'font-size': '28px',
