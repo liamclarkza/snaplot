@@ -456,6 +456,18 @@ export interface ThemeConfig {
   gridOpacity: number;
   palette: string[];
   axisLineColor: string;
+  /**
+   * Plot-area frame. Kept separate from `axisLineColor` so you can tune
+   * the rectangle around the plot without touching axis ticks. Typically
+   * the same hue as the grid but more opaque — see `borderOpacity`.
+   */
+  borderColor: string;
+  /**
+   * Opacity of the plot-area frame. Intentionally distinct from
+   * `gridOpacity` so the border can sit one visual step above the grid
+   * while sharing its hue.
+   */
+  borderOpacity: number;
   tickColor: string;
   crosshairColor: string;
   tooltipBackground: string;

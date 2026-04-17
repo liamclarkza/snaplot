@@ -16,47 +16,59 @@ export const PALETTE_OKABE_ITO = [
 ] as const;
 
 /**
- * Light theme — coordinated grey-blue scale. The background carries a
- * whisper of brand-hue cool (≈2 %) instead of pure white per the Soft UI
- * guide ("your 'white' should carry 1–2 % of your brand hue").
+ * Light theme — Soft-UI defaults. Grid and border share a single slate
+ * hue and differentiate by opacity alone: the grid sits at 0.5 (quiet
+ * but legible), the border at 0.9 (a clear step above). Background is
+ * a barely-cool off-white (~2 % brand hue) per Soft UI guidance; text
+ * is near-black with a slight slate tint rather than pure #000.
  *
- *   #fcfcfd  background      (barely cool off-white)
- *   #d8dae0  grid lines      (at 0.45 opacity — softer than before)
- *   #d8dae0  axis lines
- *   #9098a8  crosshair
- *   #8890a0  tick labels     (muted blue-grey, readable but not harsh)
- *   #2a2a35  text            (near-black, not pure)
+ *   #fafbfc  background      (tinted off-white)
+ *   #c3c6cf  grid / border   (shared hue — opacity differentiates)
+ *   #6b7181  tick labels     (legible mid-contrast)
+ *   #3b4254  crosshair
+ *   #1a1d29  text            (near-black with cool tint)
  */
 export const DEFAULT_THEME: ThemeConfig = {
-  backgroundColor: '#fcfcfd',
-  textColor: '#2a2a35',
+  backgroundColor: '#fafbfc',
+  textColor: '#1a1d29',
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   fontSize: 11,
-  gridColor: '#d8dae0',
-  gridOpacity: 0.45,
+  gridColor: '#c3c6cf',
+  gridOpacity: 0.5,
   palette: [...PALETTE_OKABE_ITO],
-  axisLineColor: '#d8dae0',
-  tickColor: '#8890a0',
-  crosshairColor: '#9098a8',
-  tooltipBackground: '#fcfcfd',
-  tooltipTextColor: '#2a2a35',
-  tooltipBorderColor: '#d8dae0',
+  axisLineColor: '#c3c6cf',
+  borderColor: '#c3c6cf',
+  borderOpacity: 0.9,
+  tickColor: '#6b7181',
+  crosshairColor: '#3b4254',
+  tooltipBackground: '#ffffff',
+  tooltipTextColor: '#1a1d29',
+  tooltipBorderColor: '#dadde3',
 };
 
+/**
+ * Dark theme — Soft-UI slate. The old navy #1a1a2e gave way to a
+ * cooler slate (#14161f) that matches the `refinedDarkTheme` aesthetic:
+ * tinted neutrals, warm off-white text (#e2e2e5, not pure white),
+ * Okabe–Ito palette. Grid and border share one hue; opacity does the
+ * visual separation.
+ */
 export const DARK_THEME: ThemeConfig = {
-  backgroundColor: '#1a1a2e',
-  textColor: '#c0c0c0',
+  backgroundColor: '#14161f',
+  textColor: '#e2e2e5',
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
-  gridColor: '#3a3a4f',
-  gridOpacity: 0.45,
+  gridColor: '#2a2d3a',
+  gridOpacity: 0.55,
   palette: [...PALETTE_OKABE_ITO],
-  axisLineColor: '#4a4a62',
-  tickColor: '#888899',
-  crosshairColor: '#aaaacc',
-  tooltipBackground: 'rgba(20, 20, 40, 0.95)',
-  tooltipTextColor: '#e0e0e0',
-  tooltipBorderColor: 'rgba(255, 255, 255, 0.12)',
+  axisLineColor: '#2a2d3a',
+  borderColor: '#2a2d3a',
+  borderOpacity: 0.9,
+  tickColor: '#8a8e9c',
+  crosshairColor: '#a0a5b8',
+  tooltipBackground: 'rgba(20, 23, 32, 0.96)',
+  tooltipTextColor: '#e8e8eb',
+  tooltipBorderColor: 'rgba(255, 255, 255, 0.1)',
 };
 
 export const OCEAN_THEME: ThemeConfig = {
@@ -68,6 +80,8 @@ export const OCEAN_THEME: ThemeConfig = {
   gridOpacity: 0.6,
   palette: ['#00d4aa', '#4fc3f7', '#ff8a65', '#ba68c8', '#ffd54f', '#e57373', '#81c784', '#90a4ae'],
   axisLineColor: '#2a4a6b',
+  borderColor: '#2a4a6b',
+  borderOpacity: 0.9,
   tickColor: '#5a8aaa',
   crosshairColor: '#4fc3f7',
   tooltipBackground: 'rgba(8, 20, 35, 0.95)',
@@ -86,6 +100,8 @@ export const MIDNIGHT_THEME: ThemeConfig = {
   gridOpacity: 0.55,
   palette: ['#ff6b6b', '#51cf66', '#339af0', '#fcc419', '#cc5de8', '#ff922b', '#22b8cf', '#e599f7'],
   axisLineColor: '#2a2b36',
+  borderColor: '#2a2b36',
+  borderOpacity: 0.9,
   tickColor: '#666677',
   crosshairColor: '#888899',
   tooltipBackground: 'rgba(10, 10, 15, 0.95)',
@@ -94,17 +110,9 @@ export const MIDNIGHT_THEME: ThemeConfig = {
 };
 
 /**
- * Refined dark — a modern slate-based alternative to DARK_THEME for
- * app dashboards that want the Soft-UI look: tinted neutrals, softer
- * grid, blue accent as the hero. Keeps the Okabe–Ito palette so
- * colorblind-safety isn't traded away.
- *
- *   #14161f  background      (slate, not navy)
- *   #232634  grid            (at 0.4 opacity — quiet but legible)
- *   #2e3244  axis            (a step above grid)
- *   #8a8e9c  tick labels
- *   #a0a5b8  crosshair
- *   #e2e2e5  text            (warm off-white, avoids cold #fff)
+ * Refined dark — the original Soft-UI template that `DARK_THEME` now
+ * also follows. Kept as a named export for back-compat; the palette is
+ * effectively identical to `darkTheme` since 0.4.x.
  */
 export const REFINED_DARK_THEME: ThemeConfig = {
   backgroundColor: '#14161f',
@@ -112,9 +120,11 @@ export const REFINED_DARK_THEME: ThemeConfig = {
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
   gridColor: '#232634',
-  gridOpacity: 0.4,
+  gridOpacity: 0.5,
   palette: [...PALETTE_OKABE_ITO],
   axisLineColor: '#2e3244',
+  borderColor: '#2e3244',
+  borderOpacity: 0.9,
   tickColor: '#8a8e9c',
   crosshairColor: '#a0a5b8',
   tooltipBackground: 'rgba(20, 23, 32, 0.96)',

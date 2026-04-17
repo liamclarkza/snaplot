@@ -161,22 +161,26 @@ code {
   border-radius: inherit;
 }
 
-/* Chart theme via CSS variables — resolveTheme() reads these automatically */
+/* Chart theme via CSS variables — resolveTheme() reads these automatically.
+   Values track the refined built-in themes in `packages/snaplot/src/constants.ts`;
+   border shares the grid hue and is differentiated by opacity on the canvas. */
 :root {
-  --chart-bg: #1a1b2e;
-  --chart-text: #c0c0c0;
-  --chart-grid: #555566;
-  --chart-axis: #666677;
-  --chart-tooltip-bg: rgba(20, 20, 40, 0.95);
-  --chart-tooltip-text: #e0e0e0;
+  --chart-bg: #14161f;
+  --chart-text: #e2e2e5;
+  --chart-grid: #2a2d3a;
+  --chart-axis: #2a2d3a;
+  --chart-border: #2a2d3a;
+  --chart-tooltip-bg: rgba(20, 23, 32, 0.96);
+  --chart-tooltip-text: #e8e8eb;
 }
 [data-theme="light"] {
-  --chart-bg: #ffffff;
-  --chart-text: #2a2a35;
-  --chart-grid: #d8dae0;
-  --chart-axis: #d8dae0;
+  --chart-bg: #fafbfc;
+  --chart-text: #1a1d29;
+  --chart-grid: #c3c6cf;
+  --chart-axis: #c3c6cf;
+  --chart-border: #c3c6cf;
   --chart-tooltip-bg: #ffffff;
-  --chart-tooltip-text: #2a2a35;
+  --chart-tooltip-text: #1a1d29;
 }
 
 /* sugar-high syntax highlighting token colors (dark theme) */

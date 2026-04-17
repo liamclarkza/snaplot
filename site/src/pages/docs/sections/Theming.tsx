@@ -37,6 +37,8 @@ export default function Theming() {
   gridOpacity: number;
   palette: string[];          // series color cycle
   axisLineColor: string;
+  borderColor: string;        // plot-area frame
+  borderOpacity: number;      // independent of gridOpacity
   tickColor: string;
   crosshairColor: string;
   tooltipBackground: string;

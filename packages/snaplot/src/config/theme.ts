@@ -25,6 +25,7 @@ const CSS_VAR_MAP: Partial<Record<keyof ThemeConfig, string>> = {
   textColor: '--chart-text',
   gridColor: '--chart-grid',
   axisLineColor: '--chart-axis',
+  borderColor: '--chart-border',
   tooltipBackground: '--chart-tooltip-bg',
   tooltipTextColor: '--chart-tooltip-text',
 };

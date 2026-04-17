@@ -55,10 +55,7 @@ export default function Home() {
   // the theme and redraws the canvas. Without this accessor the hero stayed
   // dark even when the page was in light mode.
   const heroConfig = createMemo<ChartConfig>(() => ({
-    theme: {
-      ...(theme() === 'light' ? lightTheme : darkTheme),
-      gridOpacity: 0.25,
-    },
+    theme: theme() === 'light' ? lightTheme : darkTheme,
     axes: { x: { type: 'time' }, y: { type: 'linear' } },
     series: [
       { label: 'Throughput', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2, stroke: '#4f8fea' },

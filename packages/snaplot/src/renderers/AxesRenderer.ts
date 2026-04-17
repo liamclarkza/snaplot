@@ -142,11 +142,13 @@ export function renderAxes(
   ctx.restore();
 
   // ─── Plot area border (rounded corners) ──────────────────────
-  // Draw at the same opacity as the gridlines so the border and grid
-  // read as one cohesive tone.
-  ctx.strokeStyle = theme.axisLineColor;
+  // `borderColor` / `borderOpacity` are their own knobs so the frame
+  // can sit one visual step above the grid while sharing its hue.
+  // Falls back to `axisLineColor` / `gridOpacity` for themes that
+  // pre-date the split.
+  ctx.strokeStyle = theme.borderColor ?? theme.axisLineColor;
   ctx.lineWidth = 1;
-  ctx.globalAlpha = theme.gridOpacity;
+  ctx.globalAlpha = theme.borderOpacity ?? theme.gridOpacity;
   const bx = Math.round(plot.left) + offset;
   const by = Math.round(plot.top) + offset;
   const r = 4; // corner radius in CSS pixels
