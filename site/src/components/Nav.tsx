@@ -8,7 +8,9 @@ export default function Nav() {
       position: 'sticky',
       top: '0',
       'z-index': '100',
-      background: theme() === 'dark' ? 'rgba(15, 17, 23, 0.85)' : 'rgba(245, 246, 248, 0.85)',
+      // Uses `--bg` so /demos can repaint the nav via CSS-var overrides on
+      // the root element — the active theme paints the whole page surface.
+      background: 'color-mix(in srgb, var(--bg) 85%, transparent)',
       'backdrop-filter': 'blur(12px)',
       'border-bottom': '1px solid var(--border)',
       transition: 'background 0.2s',

@@ -1,4 +1,4 @@
-import { createSignal, createMemo, onCleanup, For } from 'solid-js';
+import { createSignal, createMemo, createEffect, onCleanup, For } from 'solid-js';
 import {
   Chart,
   createLegendPlugin,
@@ -178,11 +178,10 @@ export default function HeroDashboard() {
   }, 1500);
   onCleanup(() => clearInterval(interval));
 
-  // Page-scope CSS variables. The /demos route applies these to the
-  // whole main content area, so background, panels and chips all
-  // track the active theme — no hard wrapper needed around the
-  // dashboard. Elevation tokens (inset + shadow) are theme-aware
-  // so panels feel raised on light and glow-lit on dark.
+  // Page-scope CSS variables. Painted onto `document.documentElement`
+  // (not just the dashboard subtree) so the nav, footer and scrollbar
+  // gutter all track the active theme. On cleanup we remove the
+  // overrides so Home and Docs fall back to their site light/dark tokens.
   const cssVars = createMemo(() => {
     const { theme: t, dark } = activeEntry();
     const panelSurface = dark
@@ -212,11 +211,21 @@ export default function HeroDashboard() {
     } as Record<string, string>;
   });
 
+  // Paint (and repaint) onto <html> so nav + body reflect the theme.
+  createEffect(() => {
+    const vars = cssVars();
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+  });
+  onCleanup(() => {
+    const root = document.documentElement;
+    for (const k of Object.keys(cssVars())) root.style.removeProperty(k);
+  });
+
   return (
     <section
       class="demos-themed"
       style={{
-        ...cssVars(),
         background: 'var(--bg)',
         color: 'var(--text)',
         'min-height': 'calc(100vh - 56px)',
