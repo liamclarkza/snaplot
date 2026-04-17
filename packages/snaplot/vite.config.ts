@@ -7,7 +7,11 @@ import { copyFileSync, mkdirSync } from 'fs';
 export default defineConfig({
   plugins: [
     solid(),
-    dts({ include: ['src/**/*'], outDir: 'dist' }),
+    dts({
+      include: ['src/**/*'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+      outDir: 'dist',
+    }),
     {
       // Copy stylesheets to dist so consumers can `import 'snaplot/legend-table.css'`.
       name: 'snaplot:copy-css',
