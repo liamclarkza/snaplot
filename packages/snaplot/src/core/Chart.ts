@@ -1741,9 +1741,13 @@ export class ChartCore implements ChartInstance {
 
   private emitEvent(event: string, ...args: any[]): void {
     const handlers = this.listeners.get(event);
-    if (handlers) {
-      for (const handler of handlers) {
+    if (!handlers) return;
+    for (const handler of handlers) {
+      try {
         (handler as Function)(...args);
+      } catch (err) {
+        // One bad handler must not stop the render loop or other subscribers.
+        console.error(`[snaplot] '${event}' handler threw:`, err);
       }
     }
   }
