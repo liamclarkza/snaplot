@@ -225,7 +225,11 @@ export class GestureManager {
     if (area.type === 'outside') return;
 
     this.dragStartArea = area;
-    this.target.setPointerCapture(e.pointerId);
+    // setPointerCapture can throw when the UA has already retargeted the
+    // pointer (e.g. fast multi-touch under iOS, or synthetic events). Keep
+    // going either way — capture is an optimisation, not a correctness
+    // requirement for our state machine.
+    try { this.target.setPointerCapture(e.pointerId); } catch {}
 
     this.pointers.set(e.pointerId, {
       id: e.pointerId,
@@ -451,6 +455,20 @@ export class GestureManager {
       // Don't reset to idle yet if one finger is still down
       if (this.pointers.size === 1) {
         this.state = 'idle';
+        // Rebase pan state on the surviving finger's current position.
+        // Without this, `dragStartX/Y` still reflect the original (now-lifted)
+        // finger's down-position and the next pan emits a huge first-frame
+        // delta (pinch-to-drag jump bug).
+        const survivor = this.pointers.values().next().value;
+        if (survivor) {
+          this.dragStartX = survivor.x;
+          this.dragStartY = survivor.y;
+          this.lastMoveX = survivor.x;
+          this.lastMoveY = survivor.y;
+          this.lastMoveTime = performance.now();
+          this.velocityX = 0;
+          this.velocityY = 0;
+        }
       }
     }
 
@@ -466,7 +484,11 @@ export class GestureManager {
     this.resetState();
   }
 
-  private onPointerLeave(e: PointerEvent): void {
+  private onPointerLeave(_e: PointerEvent): void {
+    // Suppress cursor-leave while a gesture is in flight — pointer capture
+    // keeps the drag alive even when the pointer briefly leaves the canvas
+    // bounds. Without this guard the crosshair/tooltip flickers mid-pan.
+    if (this.state !== 'idle') return;
     this.eventBus.emit('action:cursor-leave', undefined);
   }
 
