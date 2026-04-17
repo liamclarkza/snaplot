@@ -2,7 +2,7 @@ import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js';
 import { lttb, m4, histogram, createLegendPlugin } from 'snaplot';
 import type { ColumnarData, ChartInstance } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
-import LiveEditor from '../components/LiveEditor';
+import { Section, Prose, Demo } from '../components/ui';
 import {
   DefaultLegendTableDemo,
   CustomColumnsDemo,
@@ -168,31 +168,6 @@ function legendData(): ColumnarData {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
-
-function Section(props: { id: string; title: string; children: any }) {
-  return (
-    <section id={props.id} style={{ 'margin-bottom': '56px' }}>
-      <h2 style={{ 'font-size': '20px', 'font-weight': '700', 'margin-bottom': '16px', 'padding-top': '20px', 'border-top': '1px solid var(--border)' }}>
-        {props.title}
-      </h2>
-      {props.children}
-    </section>
-  );
-}
-
-function P(props: { children: any }) {
-  return <p style={{ color: 'var(--text-secondary)', 'margin-bottom': '16px', 'font-size': '14.5px', 'line-height': '1.7' }}>{props.children}</p>;
-}
-
-function Ex(props: { title: string; desc?: string; code: string; data: ColumnarData; height?: string; onReady?: (c: ChartInstance) => void }) {
-  return (
-    <div style={{ 'margin-bottom': '32px' }}>
-      <h3 style={{ 'font-size': '14px', 'font-weight': '600', 'margin-bottom': '4px' }}>{props.title}</h3>
-      {props.desc && <p style={{ 'font-size': '13px', color: 'var(--text-secondary)', 'margin-bottom': '10px' }}>{props.desc}</p>}
-      <LiveEditor defaultCode={props.code} data={props.data} height={props.height} onReady={props.onReady} />
-    </div>
-  );
-}
 
 function scrollTo(id: string) {
   const el = document.getElementById(id);
@@ -485,10 +460,10 @@ export default function Docs() {
       {/* Content */}
       <div style={{ flex: '1', 'min-width': '0' }}>
         <h1 style={{ 'font-size': '28px', 'font-weight': '700', 'margin-bottom': '8px' }}>Documentation</h1>
-        <P>
+        <Prose>
           Every example below is <b>live and editable</b> — change the config and the chart updates instantly.
           Built-in theme variables are available in the editor: <code>darkTheme</code>, <code>lightTheme</code>, <code>oceanTheme</code>, <code>midnightTheme</code>, <code>refinedDarkTheme</code>.
-        </P>
+        </Prose>
 
         {/* ═══════════════════════════════════════════════════════
             GETTING STARTED
@@ -497,13 +472,13 @@ export default function Docs() {
         <Section id="install" title="Installation">
           <CodeBlock code="npm install snaplot" />
           <div style={{ height: '12px' }} />
-          <P>Zero runtime dependencies. Requires <code>solid-js ^1.9.0</code> as a peer dependency.</P>
+          <Prose>Zero runtime dependencies. Requires <code>solid-js ^1.9.0</code> as a peer dependency.</Prose>
           <CodeBlock code={`import { Chart } from 'snaplot';
 import type { ColumnarData, ChartConfig } from 'snaplot';`} />
         </Section>
 
         <Section id="quick-start" title="Quick Start">
-          <P>A minimal working chart: create columnar data, define a config, and render with <code>&lt;Chart&gt;</code>.</P>
+          <Prose>A minimal working chart: create columnar data, define a config, and render with <code>&lt;Chart&gt;</code>.</Prose>
           <CodeBlock code={`import { Chart } from 'snaplot';
 import type { ColumnarData, ChartConfig } from 'snaplot';
 
@@ -520,7 +495,7 @@ const config: ChartConfig = {
 
 <Chart config={config} data={data} />`} />
           <div style={{ height: '16px' }} />
-          <Ex title="Live quick start" desc="A simple line chart — edit the config to experiment"
+          <Demo title="Live quick start" desc="A simple line chart — edit the config to experiment"
             data={d_quickstart()} height="240px"
             code={`{
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
@@ -532,27 +507,27 @@ const config: ChartConfig = {
         </Section>
 
         <Section id="data-model" title="Data Model">
-          <P>
+          <Prose>
             snaplot uses a <b>columnar data format</b> built on <code>Float64Array</code>s. Index 0 is always the X axis (must be sorted ascending).
             Indices 1+ are Y series. All arrays must be the same length. <code>NaN</code> in any Y array creates a gap in that series.
-          </P>
+          </Prose>
           <CodeBlock code={`// Columnar format: [x, y1, y2, ...]
 const data: ColumnarData = [
   new Float64Array([1, 2, 3, 4, 5]),     // X values (sorted)
   new Float64Array([10, 20, NaN, 40, 50]), // Y series 1 (NaN = gap)
   new Float64Array([5, 15, 25, 35, 45]),   // Y series 2
 ];`} />
-          <P>
+          <Prose>
             <b>Why typed arrays?</b> Float64Arrays are contiguous in memory, giving excellent cache locality.
             No boxing overhead, no GC pressure from per-point objects. Combined with binary search for O(log n) viewport culling and hit-testing, this enables smooth 60fps rendering even with hundreds of thousands of points.
-          </P>
-          <P>
+          </Prose>
+          <Prose>
             <b>Immutable contract:</b> the library never mutates your data arrays. It reads from them during render passes.
             When you want to update data, call <code>setData()</code> with new arrays or use <code>appendData()</code> for streaming.
-          </P>
-          <P>
+          </Prose>
+          <Prose>
             <b>Render pipeline:</b> data change or resize triggers scale recomputation and marks all 3 canvas layers dirty. Scale change (zoom) marks data + grid dirty. Pointer events only mark the overlay dirty. A single <code>requestAnimationFrame</code> fires per frame, redrawing only the dirty layers. This means cursor movement at 60fps only redraws one lightweight overlay canvas — the data canvas with 100K+ points remains untouched.
-          </P>
+          </Prose>
         </Section>
 
         {/* ═══════════════════════════════════════════════════════
@@ -560,8 +535,8 @@ const data: ColumnarData = [
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="line" title="Line">
-          <P>Streaming multi-series line chart with monotone cubic interpolation. This chart auto-appends a data point every second via <code>appendData()</code>.</P>
-          <Ex title="Multi-series streaming line chart" desc="Try changing interpolation to 'linear' or 'step-after'"
+          <Prose>Streaming multi-series line chart with monotone cubic interpolation. This chart auto-appends a data point every second via <code>appendData()</code>.</Prose>
+          <Demo title="Multi-series streaming line chart" desc="Try changing interpolation to 'linear' or 'step-after'"
             data={d_line()} onReady={(c) => { lineChart = c; }}
             code={`{
   axes: { x: { type: 'time' } },
@@ -575,8 +550,8 @@ const data: ColumnarData = [
         </Section>
 
         <Section id="area" title="Area">
-          <P>Area charts fill from the line down to the baseline with a gradient: alpha 0.3 at the top fading to 0.05 at the bottom. Use <code>fillGradient</code> to define custom gradient colors.</P>
-          <Ex title="Gradient area chart" data={d_area()}
+          <Prose>Area charts fill from the line down to the baseline with a gradient: alpha 0.3 at the top fading to 0.05 at the bottom. Use <code>fillGradient</code> to define custom gradient colors.</Prose>
+          <Demo title="Gradient area chart" data={d_area()}
             code={`{
   axes: { x: { type: 'time' } },
   series: [
@@ -588,14 +563,14 @@ const data: ColumnarData = [
         </Section>
 
         <Section id="band" title="Band (Fill Between)">
-          <P>
+          <Prose>
             Use <code>type: 'band'</code> to render a confidence interval, error band, or min/max
             range as a single series. A band series combines three data columns into one visual unit:
             a filled region between <code>upperDataIndex</code> and <code>lowerDataIndex</code>,
             with a center line at <code>dataIndex</code>. The center line is what the tooltip
             and cursor snap to — the fill is purely decorative.
-          </P>
-          <Ex title="Mean line with ±σ confidence band" desc="One series, three columns: mean (1), upper (2), lower (3)"
+          </Prose>
+          <Demo title="Mean line with ±σ confidence band" desc="One series, three columns: mean (1), upper (2), lower (3)"
             data={d_band()}
             code={`{
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
@@ -610,11 +585,11 @@ const data: ColumnarData = [
         </Section>
 
         <Section id="scatter" title="Scatter">
-          <P>
+          <Prose>
             Scatter plots use stamp-based rendering — a single point shape is pre-rendered to an offscreen canvas, then stamped at each data position. This makes scatter rendering scale to tens of thousands of points with minimal overhead.
             Tooltip mode <code>'nearest'</code> uses euclidean (pixel-space) distance to find the closest point.
-          </P>
-          <Ex title="Clustered scatter (2K points)" data={d_scatter()}
+          </Prose>
+          <Demo title="Clustered scatter (2K points)" data={d_scatter()}
             code={`{
   series: [{ label: 'Latency vs Load', dataIndex: 1, type: 'scatter', pointRadius: 3 }],
   zoom: { enabled: true, x: true, y: true },
@@ -623,11 +598,11 @@ const data: ColumnarData = [
         </Section>
 
         <Section id="heatmap" title="Density Heatmap">
-          <P>
+          <Prose>
             Set <code>heatmap: true</code> on a scatter series for Viridis colormap density rendering. Adjust <code>heatmapBinSize</code> for coarser or finer bins.
             Density heatmaps auto-trigger when a scatter series exceeds 200K points, but you can opt in at any count with <code>heatmap: true</code>.
-          </P>
-          <Ex title="300K points, 4 gaussian clusters" data={d_heat()}
+          </Prose>
+          <Demo title="300K points, 4 gaussian clusters" data={d_heat()}
             code={`{
   series: [{ label: 'Density', dataIndex: 1, type: 'scatter', heatmap: true, heatmapBinSize: 1 }],
   zoom: { enabled: true, x: true, y: true },
@@ -636,11 +611,11 @@ const data: ColumnarData = [
         </Section>
 
         <Section id="bar" title="Bar">
-          <P>
+          <Prose>
             Grouped bars with automatic category width calculation. Multiple bar series at the same X value are grouped side by side.
             Hover over a bar to see it highlighted. Category padding is applied at chart edges so bars are never clipped.
-          </P>
-          <Ex title="Grouped bars" data={d_bar()}
+          </Prose>
+          <Demo title="Grouped bars" data={d_bar()}
             code={`{
   series: [
     { label: 'Revenue', dataIndex: 1, type: 'bar' },
@@ -651,9 +626,9 @@ const data: ColumnarData = [
         </Section>
 
         <Section id="histogram" title="Histogram">
-          <P>
+          <Prose>
             Histograms display pre-computed bins. Use the <code>histogram()</code> utility to compute bins from raw data, then pass the result as chart data:
-          </P>
+          </Prose>
           <CodeBlock code={`import { histogram } from 'snaplot';
 
 const raw = new Float64Array(values);
@@ -663,8 +638,8 @@ const bins = histogram(raw, { method: 'freedman-diaconis' });
 
 const data: ColumnarData = [bins.edges, bins.counts];`} />
           <div style={{ height: '12px' }} />
-          <P>Three bin methods: <code>freedman-diaconis</code> (IQR, robust to outliers), <code>sturges</code> (assumes normality), <code>scott</code> (std deviation).</P>
-          <Ex title="Bimodal distribution (5K samples)"
+          <Prose>Three bin methods: <code>freedman-diaconis</code> (IQR, robust to outliers), <code>sturges</code> (assumes normality), <code>scott</code> (std deviation).</Prose>
+          <Demo title="Bimodal distribution (5K samples)"
             data={d_hist()}
             code={`{
   series: [{ label: 'Response Time', dataIndex: 1, type: 'histogram' }],
@@ -677,7 +652,7 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="interpolation" title="Interpolation">
-          <P>Five interpolation modes for line and area series:</P>
+          <Prose>Five interpolation modes for line and area series:</Prose>
           <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
             <li><code>linear</code> — straight segments between points. Best for raw data where you want no smoothing.</li>
             <li><code>monotone</code> — Fritsch-Carlson monotone cubic. No overshoot. Best for continuous metrics (CPU, latency, temperature).</li>
@@ -685,7 +660,7 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
             <li><code>step-after</code> — vertical transition after each point. Best for event/state data (deployments, status changes).</li>
             <li><code>step-middle</code> — vertical transition at the midpoint between adjacent X values.</li>
           </ul>
-          <Ex title="Edit the interpolation mode" desc="Change 'monotone' to 'step-after', 'linear', 'step-before', or 'step-middle'"
+          <Demo title="Edit the interpolation mode" desc="Change 'monotone' to 'step-after', 'linear', 'step-before', or 'step-middle'"
             data={d_interp()} height="220px"
             code={`{
   series: [{ label: 'Signal', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2.5 }],
@@ -693,11 +668,11 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
         </Section>
 
         <Section id="styling" title="Styling">
-          <P>
+          <Prose>
             Control appearance per-series with <code>stroke</code>, <code>fill</code>, <code>opacity</code>, <code>lineWidth</code>, and <code>pointRadius</code>.
             For area charts, use <code>fillGradient</code> to specify custom top/bottom gradient colors.
-          </P>
-          <Ex title="Custom series styling" desc="Edit colors, opacity, and line widths"
+          </Prose>
+          <Demo title="Custom series styling" desc="Edit colors, opacity, and line widths"
             data={d_styling()}
             code={`{
   series: [
@@ -710,12 +685,12 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
         </Section>
 
         <Section id="line-dash" title="Line Dash">
-          <P>
+          <Prose>
             Use <code>lineDash</code> to render dashed or dotted lines. The value follows the
             Canvas <code>setLineDash()</code> spec — an array of segment lengths alternating
             between dash and gap. Applied to both line strokes and area outlines.
-          </P>
-          <Ex title="Dash patterns" desc="Solid, dashed, and dotted lines side by side"
+          </Prose>
+          <Demo title="Dash patterns" desc="Solid, dashed, and dotted lines side by side"
             data={d_dash()}
             code={`{
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
@@ -729,11 +704,11 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
         </Section>
 
         <Section id="nan-gaps" title="NaN Gaps">
-          <P>
+          <Prose>
             <code>NaN</code> values in Y arrays create gaps in the line. The library detects gaps with <code>value !== value</code> (the fastest NaN check).
             Combined with step interpolation, this is ideal for sensor data with dropouts or event streams with missing intervals.
-          </P>
-          <Ex title="Sensor data with dropouts" desc="Step interpolation with NaN gaps at indices 12-16, 30-33, and 48-50"
+          </Prose>
+          <Demo title="Sensor data with dropouts" desc="Step interpolation with NaN gaps at indices 12-16, 30-33, and 48-50"
             data={d_gap()}
             code={`{
   series: [{ label: 'Sensor', dataIndex: 1, type: 'line', interpolation: 'step-after', lineWidth: 2 }],
@@ -741,10 +716,10 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
         </Section>
 
         <Section id="dual-axis" title="Dual Y-Axis">
-          <P>
+          <Prose>
             Bind series to different Y axes using <code>yAxisKey</code>. Define a second Y axis with <code>position: 'right'</code> to render its axis on the right edge of the chart.
-          </P>
-          <Ex title="Temperature + Humidity" data={d_dual()}
+          </Prose>
+          <Demo title="Temperature + Humidity" data={d_dual()}
             code={`{
   axes: {
     x: { type: 'time' },
@@ -764,13 +739,13 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="linear-scale" title="Linear Scale">
-          <P>
+          <Prose>
             The default scale type. Uses Heckbert's nice numbers algorithm (with D3's integer-arithmetic trick) to produce clean tick boundaries — 0, 20, 40, 60 instead of 17.3, 34.6, 51.9.
             Y axis auto-ranges to fit the visible data in the current X viewport.
-          </P>
-          <P>
+          </Prose>
+          <Prose>
             <b>Range control per axis</b> — three knobs combine for any behaviour you need:
-          </P>
+          </Prose>
           <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
             <li><code>min</code> / <code>max</code> — pin the bounds. <code>resetZoom()</code> now restores to these values (previously a no-op).</li>
             <li><code>padding</code> — fraction of the data range to pad each side. Default: <code>0</code> for horizontal axes, <code>0.05</code> for vertical.</li>
@@ -781,7 +756,7 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
   y: { nice: true,  padding: 0.1 },    // 10% pad + nice tick boundaries
 }`} />
           <div style={{ height: '12px' }} />
-          <Ex title="Linear scale with nice ticks" data={d_linear()} height="240px"
+          <Demo title="Linear scale with nice ticks" data={d_linear()} height="240px"
             code={`{
   series: [{ label: 'Value', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   tooltip: { show: true },
@@ -789,11 +764,11 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
         </Section>
 
         <Section id="log-scale" title="Log Scale">
-          <P>
+          <Prose>
             Logarithmic Y axis compresses exponential growth into a readable range. Ticks are placed at powers of 10 with sub-ticks at 2x and 5x intervals.
             Use when your data spans multiple orders of magnitude (e.g. request latency percentiles, population growth).
-          </P>
-          <Ex title="Exponential growth on log scale" data={d_log()}
+          </Prose>
+          <Demo title="Exponential growth on log scale" data={d_log()}
             code={`{
   axes: { y: { type: 'log' } },
   series: [{ label: 'Growth', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
@@ -801,11 +776,11 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
         </Section>
 
         <Section id="time-scale" title="Time Scale">
-          <P>
+          <Prose>
             Time scale automatically selects tick intervals (seconds, minutes, hours, days, months) based on the visible range.
             Labels use hierarchical formatting — time-of-day labels show hours:minutes, while date boundaries show the date.
-          </P>
-          <Ex title="Time scale with auto intervals" desc="Zoom in to see time intervals change from hours to minutes"
+          </Prose>
+          <Demo title="Time scale with auto intervals" desc="Zoom in to see time intervals change from hours to minutes"
             data={d_time()}
             code={`{
   axes: { x: { type: 'time' } },
@@ -816,10 +791,10 @@ const data: ColumnarData = [bins.edges, bins.counts];`} />
         </Section>
 
         <Section id="tick-format" title="Custom Tick Formatting">
-          <P>
+          <Prose>
             Override the default tick label formatting with a <code>tickFormat</code> function on an axis config.
             This receives the raw numeric value and returns a display string.
-          </P>
+          </Prose>
           <CodeBlock code={`// In your chart config
 axes: {
   bottom: {
@@ -834,10 +809,10 @@ axes: {
   },
 }`} />
           <div style={{ height: '8px' }} />
-          <P>
+          <Prose>
             The <code>tickFormat</code> function is called for every visible tick label on each redraw.
             Keep it fast — avoid heavy date parsing or string operations in tight loops.
-          </P>
+          </Prose>
         </Section>
 
         {/* ═══════════════════════════════════════════════════════
@@ -845,9 +820,9 @@ axes: {
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="interaction-modes" title="Interaction Modes">
-          <P>
+          <Prose>
             Three interaction presets define default gesture-to-action mappings. Set via <code>interaction</code> on the config.
-          </P>
+          </Prose>
           <div style={{
             'overflow-x': 'auto',
             'margin-bottom': '20px',
@@ -891,7 +866,7 @@ axes: {
               </tbody>
             </table>
           </div>
-          <Ex title="Interaction mode demo" desc="Change 'timeseries' to 'analytical' (enables Y zoom + XY pinch) or 'readonly' (tooltip only)"
+          <Demo title="Interaction mode demo" desc="Change 'timeseries' to 'analytical' (enables Y zoom + XY pinch) or 'readonly' (tooltip only)"
             data={d_interaction()}
             code={`{
   interaction: 'timeseries',
@@ -905,27 +880,27 @@ axes: {
         </Section>
 
         <Section id="zoom" title="Zoom & Selection">
-          <P>
+          <Prose>
             Drag to select a region to zoom into. For time series (<code>zoom.y: false</code>), the selection is a full-height band constraining only X.
             For scatter plots (<code>zoom.y: true</code>), you get a free rectangle selecting both axes. Drag endpoints are clamped to the plot rectangle, so releasing far outside the chart still zooms to within the data.
-          </P>
-          <P>
+          </Prose>
+          <Prose>
             <b>Double-click</b> (or double-tap) resets zoom to the full data extent.
             Use <code>minRange</code> and <code>maxRange</code> to set zoom limits. <code>wheelFactor</code> controls trackpad pinch sensitivity.
             The <code>onZoom</code> callback fires whenever the viewport changes.
-          </P>
-          <P>
+          </Prose>
+          <Prose>
             <b>Bounds</b> — by default, pan and zoom are clamped to the data extent so users can't navigate past the data. Override via <code>zoom.bounds</code>:
-          </P>
+          </Prose>
           <CodeBlock code={`zoom: { bounds: true }                             // default (clamp X to data, Y unbounded)
 zoom: { bounds: false }                            // or 'unbounded' — classic infinite nav
 zoom: { bounds: 'data' }                           // clamp every axis to data extent
 zoom: { bounds: { x: 'data', y: 'unbounded' } }    // per-axis
 zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
-          <P>
+          <Prose>
             Bounds are evaluated on every viewport change. Panning into the edge stops at the edge (range preserved); zoom-out past the full extent collapses to the full extent. The <code>'data'</code> bound tracks what <code>resetZoom()</code> would produce — including <code>nice()</code> expansion and any axis pins — so the zoom-out limit matches the initial view.
-          </P>
-          <Ex title="Zoom controls" desc="Drag to zoom, double-click to reset. Try zooming out past the edges — bounds prevent you from escaping the data."
+          </Prose>
+          <Demo title="Zoom controls" desc="Drag to zoom, double-click to reset. Try zooming out past the edges — bounds prevent you from escaping the data."
             data={d_zoom()}
             code={`{
   axes: { x: { type: 'time' } },
@@ -939,10 +914,10 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         </Section>
 
         <Section id="pan" title="Pan">
-          <P>
+          <Prose>
             Enable panning with <code>pan: {'{ enabled: true, x: true, y: true }'}</code>. In the <code>timeseries</code> interaction mode, shift+drag activates pan. You can also drag on the axis areas to pan along a single axis.
-          </P>
-          <Ex title="Pan demo" desc="Hold shift and drag to pan, or drag on an axis"
+          </Prose>
+          <Demo title="Pan demo" desc="Hold shift and drag to pan, or drag on an axis"
             data={d_pan()}
             code={`{
   axes: { x: { type: 'time' } },
@@ -957,14 +932,14 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         </Section>
 
         <Section id="cursor" title="Cursor & Crosshair">
-          <P>
+          <Prose>
             Configure the cursor crosshair with <code>cursor</code>. Options include <code>show</code>, <code>snap</code> (snap to nearest data point),
             <code>xLine</code>/<code>yLine</code> (toggle each crosshair line), <code>color</code>, <code>dash</code> (dash pattern array), and <code>indicators</code> (the per-series dot+ring drawn at each hit-tested point on hover — disable when a legend table already shows the values).
-          </P>
-          <P>
+          </Prose>
+          <Prose>
             <b>Cross-chart cursor sync:</b> set the same <code>cursor.syncKey</code> on multiple charts to synchronize their crosshair positions. See also <a href="javascript:void(0)" onClick={() => scrollTo('cross-chart-sync')}>Cross-chart Sync</a> for a more ergonomic one-line helper that bundles cursor + highlight sync together.
-          </P>
-          <Ex title="Crosshair config" desc="Try disabling indicators, or enabling yLine"
+          </Prose>
+          <Demo title="Crosshair config" desc="Try disabling indicators, or enabling yLine"
             data={d_cursor()}
             code={`{
   axes: { x: { type: 'time' } },
@@ -978,7 +953,7 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         </Section>
 
         <Section id="touch" title="Touch Gestures">
-          <P>Touch-specific interaction behaviors:</P>
+          <Prose>Touch-specific interaction behaviors:</Prose>
           <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
             <li><b>One-finger drag</b> — pan along the X axis</li>
             <li><b>Two-finger pinch</b> — zoom (X-only in timeseries mode, XY in analytical mode). Axis locking is automatic based on the pinch direction.</li>
@@ -986,9 +961,9 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
             <li><b>Tap</b> — shows tooltip at the nearest data point</li>
             <li><b>Double-tap</b> — resets zoom to full data extent</li>
           </ul>
-          <P>
+          <Prose>
             Configure touch behavior with the <code>touch</code> config:
-          </P>
+          </Prose>
           <CodeBlock code={`touch: {
   hitRadius: 24,    // CSS pixels — larger radius for fat-finger tolerance
   longPressMs: 400, // ms before long-press activates box zoom
@@ -1000,14 +975,14 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="tooltip-modes" title="Tooltip Modes">
-          <P>Three tooltip modes determine how points are selected when the cursor moves:</P>
+          <Prose>Three tooltip modes determine how points are selected when the cursor moves:</Prose>
           <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
             <li><code>'index'</code> — shows all series at the same X position. Best for time series where all series share an X axis.</li>
             <li><code>'nearest'</code> — shows the single closest point by euclidean (pixel) distance. Best for scatter plots.</li>
             <li><code>'x'</code> — shows all series at the nearest X value. Similar to index but matches by X data value rather than index.</li>
           </ul>
-          <P>Tooltips are DOM elements (<code>position: fixed</code>), not canvas — better text rendering, no clipping, and easy styling.</P>
-          <Ex title="Tooltip mode demo" desc="Change mode to 'nearest' or 'x'"
+          <Prose>Tooltips are DOM elements (<code>position: fixed</code>), not canvas — better text rendering, no clipping, and easy styling.</Prose>
+          <Demo title="Tooltip mode demo" desc="Change mode to 'nearest' or 'x'"
             data={d_tooltip_mode()}
             code={`{
   axes: { x: { type: 'time' } },
@@ -1021,11 +996,11 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         </Section>
 
         <Section id="tooltip-custom" title="Custom Tooltip Renderer">
-          <P>
+          <Prose>
             Pass a <code>tooltip.render</code> function for full control over tooltip content.
             It receives an array of <code>TooltipPoint</code> objects and should return an HTML string or an <code>HTMLElement</code>.
-          </P>
-          <Ex title="Custom tooltip HTML" desc="Edit the render function to change tooltip formatting"
+          </Prose>
+          <Demo title="Custom tooltip HTML" desc="Edit the render function to change tooltip formatting"
             data={d_tooltip_custom()}
             code={`{
   axes: { x: { type: 'time' } },
@@ -1048,17 +1023,17 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
       '</div>',
   },
 }`} />
-          <P>Each <code>TooltipPoint</code> contains: <code>seriesIndex</code>, <code>dataIndex</code>, <code>label</code>, <code>x</code>, <code>y</code>, <code>color</code>, <code>formattedX</code>, <code>formattedY</code>.</P>
+          <Prose>Each <code>TooltipPoint</code> contains: <code>seriesIndex</code>, <code>dataIndex</code>, <code>label</code>, <code>x</code>, <code>y</code>, <code>color</code>, <code>formattedX</code>, <code>formattedY</code>.</Prose>
         </Section>
 
         <Section id="tooltip-snap" title="Proximity & Snap">
-          <P>
+          <Prose>
             <b>Proximity gating:</b> the tooltip only appears when the cursor is within 32px of a data point. Move further away and only the crosshair remains. This prevents tooltip clutter in sparse regions of the chart.
-          </P>
-          <P>
+          </Prose>
+          <Prose>
             <b>Cursor snap:</b> when <code>cursor.snap</code> is <code>true</code>, the crosshair snaps to the nearest data point rather than following the raw mouse position. This makes it easier to inspect exact values.
-          </P>
-          <Ex title="Proximity and snap" desc="Move the cursor around — tooltip only shows near points. Toggle snap to see the difference."
+          </Prose>
+          <Demo title="Proximity and snap" desc="Move the cursor around — tooltip only shows near points. Toggle snap to see the difference."
             data={d_tooltip_snap()}
             code={`{
   series: [{ label: 'Points', dataIndex: 1, type: 'scatter', pointRadius: 3 }],
@@ -1072,8 +1047,8 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="themes-builtin" title="Built-in Themes">
-          <P>Five built-in themes are available: <code>darkTheme</code>, <code>lightTheme</code>, <code>oceanTheme</code>, <code>midnightTheme</code>, and <code>refinedDarkTheme</code>. Pass any as the <code>theme</code> property in your config.</P>
-          <Ex title="Theme switcher" desc="Change oceanTheme to refinedDarkTheme, darkTheme, lightTheme, or midnightTheme"
+          <Prose>Five built-in themes are available: <code>darkTheme</code>, <code>lightTheme</code>, <code>oceanTheme</code>, <code>midnightTheme</code>, and <code>refinedDarkTheme</code>. Pass any as the <code>theme</code> property in your config.</Prose>
+          <Demo title="Theme switcher" desc="Change oceanTheme to refinedDarkTheme, darkTheme, lightTheme, or midnightTheme"
             data={d_theme()}
             code={`{
   theme: oceanTheme,
@@ -1087,9 +1062,9 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         </Section>
 
         <Section id="themes-custom" title="Custom Theme">
-          <P>
+          <Prose>
             Create a custom theme by providing a partial <code>ThemeConfig</code> object. Any properties you omit will fall back to the resolved defaults (CSS variables or the built-in dark theme).
-          </P>
+          </Prose>
           <CodeBlock code={`interface ThemeConfig {
   backgroundColor: string;
   textColor: string;
@@ -1106,7 +1081,7 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
   tooltipBorderColor: string;
 }`} />
           <div style={{ height: '12px' }} />
-          <Ex title="Custom palette theme" desc="Edit the palette colors or other theme properties"
+          <Demo title="Custom palette theme" desc="Edit the palette colors or other theme properties"
             data={d_theme()}
             code={`{
   theme: {
@@ -1128,10 +1103,10 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         </Section>
 
         <Section id="css-vars" title="CSS Variables">
-          <P>
+          <Prose>
             When no explicit <code>theme</code> is set in the config, the chart reads CSS custom properties from the container element.
             This integrates naturally with your site's dark/light mode toggle.
-          </P>
+          </Prose>
           <CodeBlock code={`:root {
   --chart-bg: #0a0a1a;
   --chart-text: #e0e0e8;
@@ -1139,12 +1114,12 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
   --chart-axis: #555570;
 }`} />
           <div style={{ height: '12px' }} />
-          <P>
+          <Prose>
             The <code>resolveTheme()</code> function reads these variables at chart creation and on each redraw.
             If a variable is missing, it falls back to the built-in dark theme default. This means every chart on the page inherits your site's
             colors automatically — no per-chart theme config needed.
-          </P>
-          <Ex title="CSS variable theming (no explicit theme)" desc="This chart reads colors from the site's CSS variables"
+          </Prose>
+          <Demo title="CSS variable theming (no explicit theme)" desc="This chart reads colors from the site's CSS variables"
             data={d_css_vars()}
             code={`{
   axes: { x: { type: 'time' } },
@@ -1161,13 +1136,13 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="streaming" title="Streaming">
-          <P>
+          <Prose>
             Use <code>appendData()</code> for real-time data. It appends new points without replacing the existing dataset.
             The user's zoom state is preserved — new data appears but the viewport stays where the user left it until they double-click to reset.
-          </P>
-          <P>
+          </Prose>
+          <Prose>
             Pass <code>maxLen</code> as the second argument to cap the buffer size. When the buffer overflows, the oldest points are dropped.
-          </P>
+          </Prose>
           <CodeBlock code={`// appendData signature
 chart.appendData(newData: ColumnarData, maxLen?: number);
 
@@ -1182,32 +1157,32 @@ setInterval(() => {
   ], 1000); // keep max 1000 points
 }, 1000);`} />
           <div style={{ height: '12px' }} />
-          <P>The streaming line chart in the <a href="javascript:void(0)" onClick={() => scrollTo('line')} style={{ color: 'var(--accent)' }}>Line</a> section above demonstrates this pattern live.</P>
+          <Prose>The streaming line chart in the <a href="javascript:void(0)" onClick={() => scrollTo('line')} style={{ color: 'var(--accent)' }}>Line</a> section above demonstrates this pattern live.</Prose>
         </Section>
 
         <Section id="downsampling" title="Downsampling">
-          <P>
+          <Prose>
             Two downsampling utilities are exported for reducing large datasets before rendering. The library never mutates or downsamples your data automatically — you call these explicitly.
-          </P>
-          <P>
+          </Prose>
+          <Prose>
             <b>LTTB</b> (Largest Triangle Three Buckets) — preserves visual shape by selecting the most visually significant points. Best for general-purpose downsampling where you want the chart to "look right."
-          </P>
+          </Prose>
           <CodeBlock code={`import { lttb } from 'snaplot';
 const [downX, downY] = lttb(xData, yData, 500);  // 25K \u2192 500 points`} />
           <div style={{ height: '12px' }} />
-          <Ex title="LTTB downsampled (500 points from 25K)" data={d_lttb()}
+          <Demo title="LTTB downsampled (500 points from 25K)" data={d_lttb()}
             code={`{
   axes: { x: { type: 'time' } },
   series: [{ label: '500 pts (LTTB)', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   tooltip: { show: true },
 }`} />
-          <P>
+          <Prose>
             <b>M4</b> — pixel-aware aggregation that preserves min/max per pixel column. Best when you know the chart's pixel width and want guaranteed fidelity of peaks and valleys.
-          </P>
+          </Prose>
           <CodeBlock code={`import { m4 } from 'snaplot';
 const [downX, downY] = m4(xData, yData, pixelWidth, xMin, xMax);`} />
           <div style={{ height: '12px' }} />
-          <Ex title="M4 downsampled (pixel-aware)" data={d_m4()}
+          <Demo title="M4 downsampled (pixel-aware)" data={d_m4()}
             code={`{
   axes: { x: { type: 'time' } },
   series: [{ label: 'M4', dataIndex: 1, type: 'line', interpolation: 'linear', lineWidth: 1.5 }],
@@ -1220,12 +1195,12 @@ const [downX, downY] = m4(xData, yData, pixelWidth, xMin, xMax);`} />
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="reference-lines" title="Reference Lines">
-          <P>
+          <Prose>
             The reference lines plugin renders horizontal or vertical marker lines at fixed data values.
             Use it for thresholds, baselines, targets, or event markers. Lines respond to zoom/pan and
             scale changes. Labels are positioned automatically within the plot area.
-          </P>
-          <Ex title="Threshold and baseline markers" desc="Horizontal lines at y=75 (target) and y=40 (floor), with a dashed style"
+          </Prose>
+          <Demo title="Threshold and baseline markers" desc="Horizontal lines at y=75 (target) and y=40 (floor), with a dashed style"
             data={d_line()}
             code={`{
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
@@ -1243,17 +1218,17 @@ const [downX, downY] = m4(xData, yData, pixelWidth, xMin, xMax);`} />
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
-          <P>
+          <Prose>
             Call <code>refLines.setLines(newLines)</code> to update lines dynamically after creation.
             The plugin renders in the <code>afterDrawData</code> hook — above series data but below
             the overlay (crosshair, selection box).
-          </P>
+          </Prose>
         </Section>
 
         <Section id="legend-plugin" title="Legend Plugin">
-          <P>
+          <Prose>
             The built-in legend plugin creates a clickable legend above or below the chart. Click a series name to toggle its visibility. Long-press (or shift-click) to solo a series.
-          </P>
+          </Prose>
           <CodeBlock code={`import { createLegendPlugin } from 'snaplot';
 
 const config = {
@@ -1261,7 +1236,7 @@ const config = {
   plugins: [createLegendPlugin({ position: 'bottom' })],
 };`} />
           <div style={{ height: '12px' }} />
-          <Ex title="Legend plugin" desc="Click a series name to toggle visibility"
+          <Demo title="Legend plugin" desc="Click a series name to toggle visibility"
             data={d_legend()}
             code={`{
   series: [
@@ -1279,16 +1254,16 @@ const config = {
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="legend-table" title="Legend Table">
-          <P>
+          <Prose>
             A cursor-synchronised table that shows the value of every visible series at the cursor's X position — the common ML-dashboard pattern for comparing many runs. Available in two forms with feature parity:
-          </P>
+          </Prose>
           <ul style={{ color: 'var(--text-secondary)', 'margin-bottom': '16px', 'font-size': '14.5px', 'line-height': '1.7', 'padding-left': '20px' }}>
             <li><code>createLegendTablePlugin()</code> — DOM-only, attaches to any chart.</li>
             <li><code>&lt;LegendTable&gt;</code> — SolidJS component with JSX cells, typed <code>meta</code>, and a render-prop escape hatch.</li>
           </ul>
-          <P>
+          <Prose>
             Both share the same column helpers and the same CSS class names. Zero configuration produces a sensible default:
-          </P>
+          </Prose>
           <CodeBlock code={`import { LegendTable } from 'snaplot';
 import 'snaplot/legend-table.css';
 
@@ -1297,9 +1272,9 @@ import 'snaplot/legend-table.css';
           <DefaultLegendTableDemo />
 
           <div style={{ height: '24px' }} />
-          <P>
+          <Prose>
             <b>Custom columns</b> via the typed <code>meta</code> field on each series. Column helpers (<code>nameColumn</code>, <code>valueColumn</code>, <code>metricColumn</code>, <code>swatchColumn</code>, <code>column</code>) cover the common cases:
-          </P>
+          </Prose>
           <CodeBlock code={`type RunMeta = { runId: string; metricKey: string; epoch: number };
 
 const config: ChartConfig<RunMeta> = {
@@ -1326,10 +1301,10 @@ const config: ChartConfig<RunMeta> = {
           <CustomColumnsDemo />
 
           <div style={{ height: '24px' }} />
-          <P>
+          <Prose>
             <b>Plain-DOM plugin</b> variant for non-Solid users — same defaults, same class names, edit live below:
-          </P>
-          <Ex
+          </Prose>
+          <Demo
             title="Legend table plugin (live-editable)"
             desc="Renders Step + values in a table below the chart on hover; series-only fallback keeps the layout stable when the cursor leaves."
             data={d_legend()}
@@ -1353,9 +1328,9 @@ const config: ChartConfig<RunMeta> = {
           />
 
           <div style={{ height: '24px' }} />
-          <P>
+          <Prose>
             <b>Headless render-prop</b> mode keeps the cursor + highlight wiring but lets you render anything in place of the table — ideal when your app already has a table component:
-          </P>
+          </Prose>
           <CodeBlock code={`<LegendTable chart={chart}>
   {(snapshot, highlight, setHighlight) => (
     <MyCustomTable
@@ -1368,9 +1343,9 @@ const config: ChartConfig<RunMeta> = {
         </Section>
 
         <Section id="cross-chart-sync" title="Cross-chart Sync">
-          <P>
+          <Prose>
             <code>createChartGroup()</code> mints a fresh sync key and exposes <code>group.bind()</code> or <code>group.apply(config)</code> to spread into each chart's config. Cursor position, series highlight, and zoom/pan viewport all propagate automatically across every chart in the group. Zooming one chart zooms all peers to the same X range; double-click reset propagates too.
-          </P>
+          </Prose>
           <CodeBlock code={`const group = createChartGroup();
 
 // group.apply(config) merges the sync keys into cursor/highlight
@@ -1387,22 +1362,22 @@ const config: ChartConfig<RunMeta> = {
           <CrossChartSyncDemo />
 
           <div style={{ height: '24px' }} />
-          <P>
+          <Prose>
             Pair the group with an external "runs" panel — hover a run and every chart dims everything else:
-          </P>
+          </Prose>
           <SidepanelHighlightDemo />
 
           <div style={{ height: '24px' }} />
-          <P>
+          <Prose>
             <b>Performance check</b> — many series + a value-cell update per cursor frame. The legend table reuses row DOM (text-content swaps only on cursor moves), highlight redraws only the data canvas, and the snapshot is read into a single reused buffer.
-          </P>
+          </Prose>
           <BenchmarkDemo />
         </Section>
 
         <Section id="cursor-snapshot" title="Cursor Snapshot (Headless)">
-          <P>
+          <Prose>
             Both <code>&lt;LegendTable&gt;</code> and the plugin are built on the same primitive: <code>chart.getCursorSnapshot()</code>. Use it directly if you need cursor-synchronised data anywhere else in your UI.
-          </P>
+          </Prose>
           <CodeBlock code={`import { createCursorSnapshot } from 'snaplot';
 
 const snapshot = createCursorSnapshot(chart);
@@ -1431,9 +1406,9 @@ chart.on('cursor:move', () => {
         </Section>
 
         <Section id="custom-plugins" title="Custom Plugins">
-          <P>
+          <Prose>
             Plugins hook into the chart lifecycle. Implement any subset of hooks on the <code>Plugin</code> interface:
-          </P>
+          </Prose>
           <CodeBlock code={`interface Plugin {
   id: string;
 
@@ -1464,9 +1439,9 @@ chart.on('cursor:move', () => {
   onSetData?(chart: ChartInstance, data: ColumnarData): void;
 }`} />
           <div style={{ height: '16px' }} />
-          <P>
+          <Prose>
             <b>Example:</b> an annotation plugin that draws a horizontal threshold line on the data layer:
-          </P>
+          </Prose>
           <CodeBlock code={`const thresholdPlugin = (yValue: number, color = '#e74c3c'): Plugin => ({
   id: 'threshold',
   afterDrawData(chart, ctx) {
@@ -1489,9 +1464,9 @@ chart.on('cursor:move', () => {
 // Usage:
 plugins: [thresholdPlugin(75, '#e74c3c')]`} />
           <div style={{ height: '8px' }} />
-          <P>
+          <Prose>
             Return <code>true</code> from any <code>before*</code> hook to skip the default rendering for that layer, giving you full control over what gets drawn.
-          </P>
+          </Prose>
         </Section>
 
         {/* ═══════════════════════════════════════════════════════
@@ -1499,7 +1474,7 @@ plugins: [thresholdPlugin(75, '#e74c3c')]`} />
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="api-methods" title="ChartInstance Methods">
-          <P>The <code>ChartInstance</code> object is returned by the <code>onReady</code> callback on <code>&lt;Chart&gt;</code>:</P>
+          <Prose>The <code>ChartInstance</code> object is returned by the <code>onReady</code> callback on <code>&lt;Chart&gt;</code>:</Prose>
           <div style={{
             'overflow-x': 'auto',
             'margin-bottom': '20px',
@@ -1550,7 +1525,7 @@ plugins: [thresholdPlugin(75, '#e74c3c')]`} />
         </Section>
 
         <Section id="api-events" title="Events">
-          <P>Subscribe to chart events with <code>chart.on(event, handler)</code>. The returned function unsubscribes.</P>
+          <Prose>Subscribe to chart events with <code>chart.on(event, handler)</code>. The returned function unsubscribes.</Prose>
           <div style={{
             'overflow-x': 'auto',
             'margin-bottom': '20px',
@@ -1600,7 +1575,7 @@ unsub();`} />
         </Section>
 
         <Section id="api-types" title="Types">
-          <P>Key type exports from <code>snaplot</code>:</P>
+          <Prose>Key type exports from <code>snaplot</code>:</Prose>
           <CodeBlock code={`import type {
   // Core
   ChartInstance,       // Public chart API (methods table above)

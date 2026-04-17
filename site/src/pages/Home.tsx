@@ -2,6 +2,7 @@ import { createSignal, createMemo, onCleanup } from 'solid-js';
 import { Chart, darkTheme, lightTheme } from 'snaplot';
 import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
+import { Card, Button } from '../components/ui';
 import { useTheme } from '../ThemeContext';
 
 function generateHeroData(points: number): ColumnarData {
@@ -112,29 +113,9 @@ export default function Home() {
             Canvas-based chart library built for interactive realtime dashboards.
             Columnar typed arrays, layered rendering, zero dependencies.
           </p>
-          <div style={{ display: 'flex', gap: '12px', 'justify-content': 'center', 'flex-wrap': 'wrap' }}>
-            <a href="#/docs" style={{
-              background: 'var(--accent)',
-              color: '#fff',
-              padding: '10px 24px',
-              'border-radius': '8px',
-              'font-weight': '600',
-              'font-size': '14px',
-              transition: 'background 0.15s',
-            }}>
-              Get Started
-            </a>
-            <a href="https://github.com/liamclarkza/snaplot" target="_blank" rel="noopener" style={{
-              background: 'rgba(255,255,255,0.06)',
-              color: 'var(--text)',
-              padding: '10px 24px',
-              'border-radius': '8px',
-              'font-weight': '600',
-              'font-size': '14px',
-              border: '1px solid var(--border)',
-            }}>
-              GitHub
-            </a>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', 'justify-content': 'center', 'flex-wrap': 'wrap' }}>
+            <Button href="#/docs" variant="primary">Get Started</Button>
+            <Button href="https://github.com/liamclarkza/snaplot" target="_blank" rel="noopener" variant="secondary">GitHub</Button>
           </div>
         </div>
 
@@ -172,30 +153,23 @@ export default function Home() {
           gap: '16px',
         }}>
           {features.map(f => (
-            <div style={{
-              background: 'var(--bg-surface)',
-              'border-radius': 'var(--radius-lg)',
-              padding: 'var(--space-5)',
-              // Elevation via layered shadow + inner top highlight — no 1px
-              // border, per the design guide (pick one signal for depth).
-              'box-shadow': 'var(--elev-1-inset), var(--elev-1-shadow)',
-            }}>
+            <Card>
               <div style={{
-                'font-size': '28px',
+                'font-size': 'var(--fs-xl)',
                 'font-weight': '700',
                 color: 'var(--accent)',
-                'margin-bottom': '8px',
+                'margin-bottom': 'var(--space-2)',
                 'font-variant-numeric': 'tabular-nums',
               }}>
                 {f.icon}
               </div>
-              <div style={{ 'font-weight': '600', 'margin-bottom': '6px', 'font-size': '15px' }}>
+              <div style={{ 'font-weight': '600', 'margin-bottom': '6px', 'font-size': 'var(--fs-base)' }}>
                 {f.title}
               </div>
-              <div style={{ color: 'var(--text-secondary)', 'font-size': '13px', 'line-height': '1.5' }}>
+              <div style={{ color: 'var(--text-secondary)', 'font-size': 'var(--fs-sm)', 'line-height': '1.5' }}>
                 {f.desc}
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       </section>
