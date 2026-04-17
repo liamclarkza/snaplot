@@ -1,6 +1,16 @@
 import type { TooltipPoint, TooltipConfig, ThemeConfig } from '../types';
 import { TOOLTIP_OFFSET } from '../constants';
 
+/** Escape the five characters that matter for HTML attribute + text contexts. */
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * DOM-based tooltip using position:fixed.
  * Shown only when cursor is near data points (proximity gated by HitTester).
@@ -67,7 +77,10 @@ export class TooltipManager {
       return;
     }
 
-    // Render content
+    // Render content. When the caller returns a string it is treated as
+    // trusted HTML (fast path, matches ChartConfig.tooltip.render's documented
+    // contract). Callers rendering user-controlled data should return a DOM
+    // node or pre-escape their string. The default renderer already escapes.
     if (config?.render) {
       const content = config.render(points);
       if (typeof content === 'string') {
@@ -98,22 +111,31 @@ export class TooltipManager {
     this.el.remove();
   }
 
+  /**
+   * Build the default tooltip DOM. All dynamic strings (labels, formatted
+   * values, colours) are HTML-escaped so a series name like
+   * `<img src=x onerror=alert(1)>` cannot execute.
+   *
+   * Colour strings are also escaped — they land in a `style` attribute, so
+   * a crafted colour could otherwise break out of the attribute context.
+   */
   private defaultRender(points: TooltipPoint[]): string {
+    const dot = (color: string) =>
+      `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${escapeHtml(color)};margin-right:6px;vertical-align:middle"></span>`;
+
     // Single point (nearest mode, e.g. scatter): show x, y as coordinate pair
     if (points.length === 1) {
       const p = points[0];
-      const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;vertical-align:middle"></span>`;
-      return `<div style="display:flex;align-items:center;gap:8px">${dot}<span style="font-variant-numeric:tabular-nums"><b>x</b> ${p.formattedX}&nbsp;&nbsp;<b>y</b> ${p.formattedY}</span></div>`;
+      return `<div style="display:flex;align-items:center;gap:8px">${dot(p.color)}<span style="font-variant-numeric:tabular-nums"><b>x</b> ${escapeHtml(p.formattedX)}&nbsp;&nbsp;<b>y</b> ${escapeHtml(p.formattedY)}</span></div>`;
     }
 
     // Multiple points (index mode, e.g. time series): header + rows
-    const header = `<div style="margin-bottom:4px;opacity:0.7;font-size:11px">${points[0].formattedX}</div>`;
+    const header = `<div style="margin-bottom:4px;opacity:0.7;font-size:11px">${escapeHtml(points[0].formattedX)}</div>`;
 
     const rows = points.map(p => {
-      const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px;vertical-align:middle"></span>`;
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <span>${dot}${p.label}</span>
-        <span style="font-weight:600">${p.formattedY}</span>
+        <span>${dot(p.color)}${escapeHtml(p.label)}</span>
+        <span style="font-weight:600">${escapeHtml(p.formattedY)}</span>
       </div>`;
     }).join('');
 
