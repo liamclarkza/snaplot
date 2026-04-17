@@ -576,9 +576,12 @@ export class GestureManager {
         const zoom = this.getZoomConfig();
         if (!zoom.enabled) return;
 
-        const sensitivity = zoom.wheelFactor ?? DEFAULT_WHEEL_FACTOR;
+        // Magnitude only — we always zoom out on deltaY > 0 and in on
+        // deltaY < 0. Using `sensitivity - 1` directly inverted the
+        // direction for `wheelFactor < 1`.
+        const strength = Math.abs((zoom.wheelFactor ?? DEFAULT_WHEEL_FACTOR) - 1);
         const delta = Math.min(Math.abs(e.deltaY), 20) * 0.005;
-        const factor = e.deltaY > 0 ? 1 + delta * (sensitivity - 1) * 10 : 1 / (1 + delta * (sensitivity - 1) * 10);
+        const factor = e.deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
         const axis = this.scrollStartArea.axisKey!;
 
         this.eventBus.emit('action:zoom', { factor, anchorX: x, anchorY: y, axis });
@@ -597,9 +600,9 @@ export class GestureManager {
     const zoom = this.getZoomConfig();
     if (!zoom.enabled) return;
 
-    const sensitivity = zoom.wheelFactor ?? DEFAULT_WHEEL_FACTOR;
+    const strength = Math.abs((zoom.wheelFactor ?? DEFAULT_WHEEL_FACTOR) - 1);
     const delta = Math.min(Math.abs(e.deltaY), 20) * 0.005;
-    const factor = e.deltaY > 0 ? 1 + delta * (sensitivity - 1) * 10 : 1 / (1 + delta * (sensitivity - 1) * 10);
+    const factor = e.deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
 
     let axis: string = 'xy';
     if (zoom.x && !zoom.y) axis = 'x';
