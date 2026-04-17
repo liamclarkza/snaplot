@@ -5,10 +5,12 @@ import {
   lightTheme,
   darkTheme,
   oceanTheme,
-  marsTheme,
   forestTheme,
   sunsetTheme,
-  midnightTheme,
+  violetTheme,
+  fogTheme,
+  ivoryTheme,
+  mintTheme,
 } from 'snaplot';
 import type { ColumnarData, ChartConfig, ChartInstance, ThemeConfig } from 'snaplot';
 import { useTheme } from '../ThemeContext';
@@ -28,25 +30,31 @@ type ThemeKey =
   | 'dark'
   | 'light'
   | 'ocean'
-  | 'mars'
   | 'forest'
   | 'sunset'
-  | 'midnight';
+  | 'violet'
+  | 'fog'
+  | 'ivory'
+  | 'mint';
 
 type ThemeEntry = {
   key: ThemeKey;
   label: string;
   theme: ThemeConfig;
+  /** true = theme has a dark background; drives page-level contrast picks */
+  dark: boolean;
 };
 
 const THEMES: ThemeEntry[] = [
-  { key: 'dark', label: 'Slate', theme: darkTheme },
-  { key: 'light', label: 'Paper', theme: lightTheme },
-  { key: 'ocean', label: 'Ocean', theme: oceanTheme },
-  { key: 'mars', label: 'Mars', theme: marsTheme },
-  { key: 'forest', label: 'Forest', theme: forestTheme },
-  { key: 'sunset', label: 'Sunset', theme: sunsetTheme },
-  { key: 'midnight', label: 'Midnight', theme: midnightTheme },
+  { key: 'dark',   label: 'Slate',  theme: darkTheme,   dark: true  },
+  { key: 'light',  label: 'Paper',  theme: lightTheme,  dark: false },
+  { key: 'fog',    label: 'Fog',    theme: fogTheme,    dark: false },
+  { key: 'ivory',  label: 'Ivory',  theme: ivoryTheme,  dark: false },
+  { key: 'mint',   label: 'Mint',   theme: mintTheme,   dark: false },
+  { key: 'ocean',  label: 'Ocean',  theme: oceanTheme,  dark: true  },
+  { key: 'forest', label: 'Forest', theme: forestTheme, dark: true  },
+  { key: 'sunset', label: 'Sunset', theme: sunsetTheme, dark: true  },
+  { key: 'violet', label: 'Violet', theme: violetTheme, dark: true  },
 ];
 
 function genStream(points: number): ColumnarData {
@@ -187,8 +195,42 @@ export default function HeroDashboard() {
   }, 1500);
   onCleanup(() => clearInterval(interval));
 
+  // Page-scope CSS variables. Re-declaring `--bg-surface`, `--text`,
+  // `--border` and `--accent` here overrides the site tokens for the
+  // dashboard subtree only — so panels / chips / headings all pick up
+  // the active theme without repainting the rest of the page.
+  const cssVars = createMemo(() => {
+    const t = activeTheme();
+    const entry = THEMES.find((x) => x.key === selected());
+    const isDark = entry?.dark ?? true;
+    const tintedSurround = isDark
+      ? `color-mix(in srgb, ${t.backgroundColor} 80%, #000 8%)`
+      : `color-mix(in srgb, ${t.backgroundColor} 88%, #000 4%)`;
+    return {
+      '--bg': tintedSurround,
+      '--bg-surface': t.backgroundColor,
+      '--text': t.textColor,
+      '--text-secondary': t.tickColor,
+      '--border': t.borderColor,
+      '--accent': t.palette[0],
+    } as Record<string, string>;
+  });
+
   return (
-    <div style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--space-3)' }}>
+    <div
+      style={{
+        display: 'flex',
+        'flex-direction': 'column',
+        gap: 'var(--space-3)',
+        padding: 'var(--space-4)',
+        'border-radius': 'var(--radius-lg)',
+        background: 'var(--bg)',
+        color: 'var(--text)',
+        border: '1px solid var(--border)',
+        transition: 'background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out)',
+        ...cssVars(),
+      }}
+    >
       {/* Theme chip row */}
       <div
         role="tablist"

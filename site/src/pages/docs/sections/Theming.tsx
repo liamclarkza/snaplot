@@ -10,8 +10,8 @@ export default function Theming() {
   return (
     <>
       <Section id="themes-builtin" title="Built-in Themes">
-        <Prose>Eight built-in themes ship with the library: <code>lightTheme</code>, <code>darkTheme</code>, <code>oceanTheme</code>, <code>marsTheme</code>, <code>forestTheme</code>, <code>sunsetTheme</code>, <code>midnightTheme</code>, and <code>refinedDarkTheme</code>. Pass any as the <code>theme</code> property in your config.</Prose>
-        <Demo title="Theme switcher" desc="Swap oceanTheme for marsTheme, forestTheme, sunsetTheme, darkTheme, lightTheme, midnightTheme, or refinedDarkTheme"
+        <Prose>The library ships with a curated set of themes, each hand-tuned (palette + background + grid + border chosen together). Dark: <code>darkTheme</code> (slate), <code>oceanTheme</code>, <code>forestTheme</code>, <code>sunsetTheme</code>, <code>violetTheme</code>. Light: <code>lightTheme</code> (paper), <code>fogTheme</code>, <code>ivoryTheme</code>, <code>mintTheme</code>. Back-compat: <code>midnightTheme</code>, <code>marsTheme</code>, <code>refinedDarkTheme</code>. Pass any as the <code>theme</code> property.</Prose>
+        <Demo title="Theme switcher" desc="Swap oceanTheme for violetTheme, forestTheme, sunsetTheme, fogTheme, ivoryTheme, mintTheme, darkTheme, or lightTheme"
           data={d_theme()}
           code={`{
   theme: oceanTheme,

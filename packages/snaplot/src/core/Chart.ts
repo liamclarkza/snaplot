@@ -565,6 +565,16 @@ export class ChartCore implements ChartInstance {
       const hasBarSeries = this.config.series.some(
         s => s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
       );
+      // Scatter/heatmap clouds don't benefit from nice() rounding — it pushes
+      // the axis out to the next round number (e.g. 18..93 → 0..100), leaving
+      // the cloud floating far from the frame edge. Default to a 5 % pad and
+      // skip nice() so the data fills the plot with just enough breathing room.
+      const isScatterOnly =
+        !hasBarSeries &&
+        this.config.series.length > 0 &&
+        this.config.series.every(
+          s => s.visible === false || s.type === 'scatter',
+        );
 
       if (xMin === xMax) {
         scale.min = xMin - 1;
@@ -574,6 +584,10 @@ export class ChartCore implements ChartInstance {
         const categoryPad = (xMax - xMin) / (this.store.length - 1) * 0.5;
         scale.min = xMin - categoryPad;
         scale.max = xMax + categoryPad;
+      } else if (isScatterOnly) {
+        const pad = (xMax - xMin) * (ac.padding ?? AUTO_RANGE_PADDING);
+        scale.min = xMin - pad;
+        scale.max = xMax + pad;
       } else {
         // Horizontal auto-range defaults to zero padding; users can opt in
         // via `axes.[key].padding`.
@@ -582,10 +596,16 @@ export class ChartCore implements ChartInstance {
         scale.max = xMax + pad;
       }
 
-      // nice() gives clean tick boundaries for scatter/line.
-      // Skip for time (data extent is natural), bar (category padding is exact),
-      // and whenever the user explicitly disables it per-axis.
-      if (scale.type !== 'time' && !hasBarSeries && ac.nice !== false) {
+      // nice() gives clean tick boundaries for line/area where the curve
+      // meets the frame. Skip for time (data extent is natural), bar
+      // (category padding is exact), scatter (padding beats nice() on point
+      // clouds), and whenever the user explicitly disables it per-axis.
+      if (
+        scale.type !== 'time' &&
+        !hasBarSeries &&
+        !isScatterOnly &&
+        ac.nice !== false
+      ) {
         scale.nice(DEFAULT_TICK_COUNT);
       }
 
@@ -650,6 +670,13 @@ export class ChartCore implements ChartInstance {
       const hasBarOrHist = this.config.series.some(
         s => (s.yAxisKey ?? 'y') === key && s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
       );
+      // Scatter clouds: skip nice() on Y too — same reason as the X axis,
+      // the padded extent keeps the cloud framed without round-number jumps.
+      const isScatterOnlyAxis =
+        !hasBarOrHist &&
+        this.config.series
+          .filter(s => (s.yAxisKey ?? 'y') === key && s.visible !== false)
+          .every(s => s.type === 'scatter');
 
       if (ac.min === undefined) {
         scale.min = hasBarOrHist ? Math.min(0, yMin - pad) : yMin - pad;
@@ -658,7 +685,7 @@ export class ChartCore implements ChartInstance {
         scale.max = hasBarOrHist ? Math.max(0, yMax + pad) : yMax + pad;
       }
 
-      if (ac.nice !== false) {
+      if (ac.nice !== false && !isScatterOnlyAxis) {
         scale.nice(DEFAULT_TICK_COUNT);
         // nice() can push min below 0 — clamp back for bar/histogram baseline
         if (hasBarOrHist && yMin >= 0 && scale.min < 0) scale.min = 0;

@@ -48,6 +48,10 @@ export {
   marsTheme,
   forestTheme,
   sunsetTheme,
+  violetTheme,
+  fogTheme,
+  ivoryTheme,
+  mintTheme,
   resolveTheme,
 } from './config/theme';
 

@@ -8,6 +8,10 @@ import {
   MARS_THEME,
   FOREST_THEME,
   SUNSET_THEME,
+  VIOLET_THEME,
+  FOG_THEME,
+  IVORY_THEME,
+  MINT_THEME,
 } from '../constants';
 import { deepMerge } from './merge';
 
@@ -20,6 +24,10 @@ export {
   MARS_THEME as marsTheme,
   FOREST_THEME as forestTheme,
   SUNSET_THEME as sunsetTheme,
+  VIOLET_THEME as violetTheme,
+  FOG_THEME as fogTheme,
+  IVORY_THEME as ivoryTheme,
+  MINT_THEME as mintTheme,
 };
 
 /**

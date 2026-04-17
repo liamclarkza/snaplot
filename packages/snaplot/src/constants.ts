@@ -73,75 +73,37 @@ export const DARK_THEME: ThemeConfig = {
   tooltipBorderColor: 'rgba(255, 255, 255, 0.1)',
 };
 
+/**
+ * Ocean — deep navy base with cyan/seafoam and warm coral/amber
+ * accents. Less green than v0.4 — the first two slots now read as
+ * ocean-blue rather than teal-heavy, and warm accents are reserved
+ * for contrast series so the whole palette doesn't pull one way.
+ */
 export const OCEAN_THEME: ThemeConfig = {
   backgroundColor: '#0c1929',
-  textColor: '#a8c8e8',
+  textColor: '#cfe2f4',
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
   gridColor: '#1e3a5f',
-  gridOpacity: 0.6,
-  palette: ['#00d4aa', '#4fc3f7', '#ff8a65', '#ba68c8', '#ffd54f', '#e57373', '#81c784', '#90a4ae'],
+  gridOpacity: 0.55,
+  palette: [
+    '#3b82f6', // ocean blue
+    '#06b6d4', // cyan
+    '#fb923c', // coral
+    '#a78bfa', // deep water
+    '#14b8a6', // teal
+    '#fbbf24', // sunset on water
+    '#f472b6', // reef pink
+    '#94a3b8', // slate
+  ],
   axisLineColor: '#2a4a6b',
   borderColor: '#2a4a6b',
   borderOpacity: 0.7,
-  tickColor: '#5a8aaa',
-  crosshairColor: '#4fc3f7',
+  tickColor: '#6b9ac4',
+  crosshairColor: '#88c0f0',
   tooltipBackground: 'rgba(8, 20, 35, 0.95)',
-  tooltipTextColor: '#c8e0f0',
-  tooltipBorderColor: 'rgba(79, 195, 247, 0.2)',
-};
-
-export const MIDNIGHT_THEME: ThemeConfig = {
-  // Subtle blue tint instead of pure #0a0a0a — avoids the "void" look on
-  // LCD panels where #000 clips to slightly blueish anyway.
-  backgroundColor: '#0c0d12',
-  textColor: '#d0d0d0',
-  fontFamily: DEFAULT_THEME.fontFamily,
-  fontSize: 11,
-  gridColor: '#1f2028',
-  gridOpacity: 0.55,
-  palette: ['#ff6b6b', '#51cf66', '#339af0', '#fcc419', '#cc5de8', '#ff922b', '#22b8cf', '#e599f7'],
-  axisLineColor: '#2a2b36',
-  borderColor: '#2a2b36',
-  borderOpacity: 0.7,
-  tickColor: '#666677',
-  crosshairColor: '#888899',
-  tooltipBackground: 'rgba(10, 10, 15, 0.95)',
-  tooltipTextColor: '#e0e0e0',
-  tooltipBorderColor: 'rgba(255, 255, 255, 0.08)',
-};
-
-/**
- * Mars — warm rust / amber / terracotta on deep burnt-umber. Designed
- * for dashboards that want a distinctive "embers" feel without sacrificing
- * legibility. The palette walks from bright amber through rose to brick
- * so multi-series charts stay distinguishable.
- */
-export const MARS_THEME: ThemeConfig = {
-  backgroundColor: '#1c100c',
-  textColor: '#f2d7c0',
-  fontFamily: DEFAULT_THEME.fontFamily,
-  fontSize: 11,
-  gridColor: '#3a1f17',
-  gridOpacity: 0.55,
-  palette: [
-    '#ff8a3d', // bright amber
-    '#e2504b', // red
-    '#f4c27c', // sand
-    '#c06548', // terracotta
-    '#8e3a1e', // deep rust
-    '#e8a272', // peach
-    '#b04a2f', // brick
-    '#f2d7c0', // cream
-  ],
-  axisLineColor: '#3a1f17',
-  borderColor: '#3a1f17',
-  borderOpacity: 0.7,
-  tickColor: '#a57a66',
-  crosshairColor: '#e2a074',
-  tooltipBackground: 'rgba(28, 16, 12, 0.96)',
-  tooltipTextColor: '#f5dcc4',
-  tooltipBorderColor: 'rgba(255, 170, 120, 0.18)',
+  tooltipTextColor: '#cfe2f4',
+  tooltipBorderColor: 'rgba(120, 170, 220, 0.2)',
 };
 
 /**
@@ -177,35 +139,214 @@ export const FOREST_THEME: ThemeConfig = {
 };
 
 /**
- * Sunset — dusk pink / purple / gold. Brighter palette for showy
- * dashboards; text and grid lean cool so the warm series pop. Pairs
- * especially well with area charts that benefit from richer accents.
+ * Sunset — dusk gold / orange / violet. Gold leads (not pink) so
+ * single-series charts land on a warm, grown-up accent; pink and
+ * fuchsia stay as later slots for contrast. Deep aubergine bg keeps
+ * the warm series popping without burning the eye.
  */
 export const SUNSET_THEME: ThemeConfig = {
   backgroundColor: '#1a1220',
-  textColor: '#f0d8d4',
+  textColor: '#f2e2d8',
   fontFamily: DEFAULT_THEME.fontFamily,
   fontSize: 11,
   gridColor: '#2e2133',
   gridOpacity: 0.55,
   palette: [
-    '#ff6b9d', // pink
-    '#ffa94d', // orange
-    '#9d4edd', // purple
-    '#ffd166', // gold
-    '#e8547d', // rose
-    '#7b5abc', // lavender
-    '#ffbe76', // peach
-    '#c77dff', // lilac
+    '#f59e0b', // amber (warm hero)
+    '#8b5cf6', // violet
+    '#fb923c', // orange
+    '#ec4899', // pink
+    '#fde047', // gold
+    '#c084fc', // lilac
+    '#e11d48', // sunset red
+    '#facc15', // honey
   ],
   axisLineColor: '#2e2133',
   borderColor: '#2e2133',
   borderOpacity: 0.7,
   tickColor: '#a590a8',
-  crosshairColor: '#d4a5c4',
+  crosshairColor: '#e4c0a0',
   tooltipBackground: 'rgba(26, 18, 32, 0.96)',
-  tooltipTextColor: '#f0d8d4',
-  tooltipBorderColor: 'rgba(255, 180, 200, 0.18)',
+  tooltipTextColor: '#f2e2d8',
+  tooltipBorderColor: 'rgba(230, 190, 150, 0.18)',
+};
+
+/**
+ * Violet — premium dark. Rich aubergine-black with lavender/indigo
+ * accents; reads like Linear or Vercel's dashboard UI without leaning
+ * "Halloween purple". The first palette slot is a refined lavender,
+ * not a saturated magenta, so single-series charts feel understated.
+ */
+export const VIOLET_THEME: ThemeConfig = {
+  backgroundColor: '#0f0d1e',
+  textColor: '#e4e0f0',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#2a2545',
+  gridOpacity: 0.55,
+  palette: [
+    '#a78bfa', // lavender
+    '#6366f1', // indigo
+    '#f59e0b', // amber (warm contrast)
+    '#06b6d4', // cyan (cool contrast)
+    '#ec4899', // fuchsia
+    '#8b5cf6', // violet
+    '#60a5fa', // blue
+    '#d946ef', // magenta
+  ],
+  axisLineColor: '#2a2545',
+  borderColor: '#2a2545',
+  borderOpacity: 0.7,
+  tickColor: '#8a85a8',
+  crosshairColor: '#b8b0d4',
+  tooltipBackground: 'rgba(18, 15, 32, 0.96)',
+  tooltipTextColor: '#e4e0f0',
+  tooltipBorderColor: 'rgba(180, 160, 230, 0.18)',
+};
+
+/**
+ * Fog — cool, airy light theme. Blue-grey off-white bg with Tailwind-500
+ * accents for a Linear-light / productivity app feel. First palette
+ * slot is blue so single-series reads as "primary", not decorative.
+ */
+export const FOG_THEME: ThemeConfig = {
+  backgroundColor: '#f4f6fa',
+  textColor: '#1e2432',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#c3c9d6',
+  gridOpacity: 0.5,
+  palette: [
+    '#3b82f6', // blue
+    '#10b981', // emerald
+    '#8b5cf6', // violet
+    '#f59e0b', // amber
+    '#ec4899', // pink
+    '#06b6d4', // cyan
+    '#6366f1', // indigo
+    '#14b8a6', // teal
+  ],
+  axisLineColor: '#c3c9d6',
+  borderColor: '#c3c9d6',
+  borderOpacity: 0.5,
+  tickColor: '#6a7386',
+  crosshairColor: '#384050',
+  tooltipBackground: '#ffffff',
+  tooltipTextColor: '#1e2432',
+  tooltipBorderColor: '#d4d9e3',
+};
+
+/**
+ * Ivory — warm cream light theme for documents-that-happen-to-have-charts
+ * (Notion, Bear, writing apps). Earth-tone palette leads with burnt
+ * orange so charts feel printed, not screen-blasted.
+ */
+export const IVORY_THEME: ThemeConfig = {
+  backgroundColor: '#faf8f3',
+  textColor: '#2a2418',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#d9d3c3',
+  gridOpacity: 0.5,
+  palette: [
+    '#c2410c', // burnt orange
+    '#0369a1', // deep sky
+    '#16a34a', // green
+    '#9333ea', // purple
+    '#ca8a04', // amber
+    '#dc2626', // red
+    '#0f766e', // teal
+    '#7c2d12', // mahogany
+  ],
+  axisLineColor: '#d9d3c3',
+  borderColor: '#d9d3c3',
+  borderOpacity: 0.5,
+  tickColor: '#7d7458',
+  crosshairColor: '#3f3826',
+  tooltipBackground: '#ffffff',
+  tooltipTextColor: '#2a2418',
+  tooltipBorderColor: '#e6dfcb',
+};
+
+/**
+ * Mint — fresh, cool light theme for wellness / health / environment
+ * dashboards. Barely-green bg with emerald lead; secondary accents
+ * stay saturated enough to distinguish >4 series.
+ */
+export const MINT_THEME: ThemeConfig = {
+  backgroundColor: '#f3faf7',
+  textColor: '#0f2a20',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#c5d9cf',
+  gridOpacity: 0.5,
+  palette: [
+    '#059669', // emerald
+    '#0891b2', // cyan
+    '#a16207', // yellow-brown
+    '#be185d', // pink-brown
+    '#7c3aed', // violet
+    '#2563eb', // blue
+    '#0d9488', // teal
+    '#ca8a04', // amber
+  ],
+  axisLineColor: '#c5d9cf',
+  borderColor: '#c5d9cf',
+  borderOpacity: 0.5,
+  tickColor: '#507066',
+  crosshairColor: '#1d4437',
+  tooltipBackground: '#ffffff',
+  tooltipTextColor: '#0f2a20',
+  tooltipBorderColor: '#d3e4db',
+};
+
+/**
+ * Midnight — the previous near-black theme. Kept as a named export
+ * for back-compat but no longer featured in the site's theme chip
+ * row. Prefer `darkTheme` (slate) for new work.
+ */
+export const MIDNIGHT_THEME: ThemeConfig = {
+  backgroundColor: '#0c0d12',
+  textColor: '#d0d0d0',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#1f2028',
+  gridOpacity: 0.55,
+  palette: ['#ff6b6b', '#51cf66', '#339af0', '#fcc419', '#cc5de8', '#ff922b', '#22b8cf', '#e599f7'],
+  axisLineColor: '#2a2b36',
+  borderColor: '#2a2b36',
+  borderOpacity: 0.7,
+  tickColor: '#666677',
+  crosshairColor: '#888899',
+  tooltipBackground: 'rgba(10, 10, 15, 0.95)',
+  tooltipTextColor: '#e0e0e0',
+  tooltipBorderColor: 'rgba(255, 255, 255, 0.08)',
+};
+
+/**
+ * Mars — warm rust/terracotta on burnt umber. Kept as a back-compat
+ * export; retired from the featured chip row in favour of `sunsetTheme`
+ * (gold-led warm) + `ivoryTheme` (cream light).
+ */
+export const MARS_THEME: ThemeConfig = {
+  backgroundColor: '#1c100c',
+  textColor: '#f2d7c0',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#3a1f17',
+  gridOpacity: 0.55,
+  palette: [
+    '#ff8a3d', '#e2504b', '#f4c27c', '#c06548',
+    '#8e3a1e', '#e8a272', '#b04a2f', '#f2d7c0',
+  ],
+  axisLineColor: '#3a1f17',
+  borderColor: '#3a1f17',
+  borderOpacity: 0.7,
+  tickColor: '#a57a66',
+  crosshairColor: '#e2a074',
+  tooltipBackground: 'rgba(28, 16, 12, 0.96)',
+  tooltipTextColor: '#f5dcc4',
+  tooltipBorderColor: 'rgba(255, 170, 120, 0.18)',
 };
 
 /**
