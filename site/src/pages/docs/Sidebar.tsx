@@ -1,4 +1,4 @@
-import { createSignal, createEffect, For, Show } from 'solid-js';
+import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js';
 import type { Accessor } from 'solid-js';
 
 export type NavItem =
@@ -99,40 +99,31 @@ export function SidebarUI(props: {
   sidebarOpen: Accessor<boolean>;
   setSidebarOpen: (v: boolean) => void;
 }) {
-  // iOS-Safari-friendly body-scroll lock when the mobile drawer is open.
-  // overflow:hidden on body is flaky there; position:fixed + saved offset
-  // is the reliable pattern.
-  let savedScrollY = 0;
   let navTarget: string | null = null;
-  let wasOpen = false;
 
+  // Lock the page behind the drawer while it's open. Previously we
+  // used the position:fixed + saved-scroll-offset dance, but rapid
+  // toggling jumped the viewport around — every close ran a fresh
+  // `window.scrollTo()`, and the body style swap caused reflows that
+  // compounded on each click. `overflow:hidden` on <html> locks the
+  // page in place without moving it, works fine across browsers, and
+  // is idempotent so it survives any number of rapid clicks.
   createEffect(() => {
     const open = props.sidebarOpen();
+    const html = document.documentElement;
     if (open) {
-      savedScrollY = window.scrollY;
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${savedScrollY}px`;
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.overflow = 'hidden';
-      wasOpen = true;
-    } else if (wasOpen) {
-      wasOpen = false;
-      const target = navTarget;
-      navTarget = null;
-
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.overflow = '';
-
-      window.scrollTo(0, savedScrollY);
-
-      if (target) {
+      html.style.overflow = 'hidden';
+    } else {
+      html.style.overflow = '';
+      if (navTarget) {
+        const target = navTarget;
+        navTarget = null;
         requestAnimationFrame(() => scrollTo(target));
       }
     }
+  });
+  onCleanup(() => {
+    document.documentElement.style.overflow = '';
   });
 
   function navClick(id: string) {

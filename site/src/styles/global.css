@@ -96,6 +96,11 @@
 
 html {
   scroll-behavior: smooth;
+  /* Prevent the browser's scroll-anchor feature from pulling the
+     viewport around as route swaps change content heights above the
+     current scroll position. Our App.tsx scroll-to-top on route
+     change owns the scroll reset; anchoring would fight it. */
+  overflow-anchor: none;
 }
 
 body {
