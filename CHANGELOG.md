@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Breaking
+- `ZoomConfig.wheelFactor` renamed to `ZoomConfig.wheelStep`, with new
+  semantics: it is now the zoom fraction per max wheel / pinch tick
+  rather than a scale factor. Default changes from `1.1` (10 % per
+  tick) to `0.1` (same 10 % per tick, stated directly). `0` disables
+  wheel zoom. Negative values are clamped to 0. Migration:
+  `wheelFactor: 1.1` → `wheelStep: 0.1`, `wheelFactor: 2` → `wheelStep: 1`.
+
 ### Added
 - Biome 2.4 for lint + format (`npm run lint`, `npm run check`).
 - Vitest for unit tests (`npm test`) — initial suites for

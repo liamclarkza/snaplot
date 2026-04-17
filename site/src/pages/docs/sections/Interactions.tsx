@@ -79,7 +79,7 @@ export default function Interactions() {
         </Prose>
         <Prose>
           <b>Double-click</b> (or double-tap) resets zoom to the full data extent.
-          Use <code>minRange</code> and <code>maxRange</code> to set zoom limits. <code>wheelFactor</code> controls trackpad pinch sensitivity.
+          Use <code>minRange</code> and <code>maxRange</code> to set zoom limits. <code>wheelStep</code> controls the zoom fraction per max wheel / pinch tick (default <code>0.1</code>; <code>0</code> disables wheel zoom).
           The <code>onZoom</code> callback fires whenever the viewport changes.
         </Prose>
         <Prose>
@@ -101,7 +101,7 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
     { label: 'Throughput', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'Latency', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5 },
   ],
-  zoom: { enabled: true, x: true, y: false, wheelFactor: 0.5, bounds: true },
+  zoom: { enabled: true, x: true, y: false, wheelStep: 0.05, bounds: true },
   tooltip: { show: true, mode: 'index' },
 }`} />
       </Section>

@@ -400,8 +400,8 @@ export const TOOLTIP_OFFSET = 12;
 /** Minimum drag distance before zoom/selection activates (CSS pixels) */
 export const MIN_DRAG_DISTANCE = 10;
 
-/** Default zoom wheel factor */
-export const DEFAULT_WHEEL_FACTOR = 1.1;
+/** Default zoom fraction per max wheel/pinch tick (10 % per tick). */
+export const DEFAULT_WHEEL_STEP = 0.1;
 
 /** Auto-range Y padding as fraction of range */
 export const AUTO_RANGE_PADDING = 0.05;

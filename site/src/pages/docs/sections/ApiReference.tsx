@@ -131,7 +131,7 @@ unsub();`} />
   // Interactions
   InteractionMode,     // 'timeseries' | 'analytical' | 'readonly'
   CursorConfig,        // Crosshair config (show, snap, indicators, syncKey, ...)
-  ZoomConfig,          // Zoom/selection config (bounds, wheelFactor, ...)
+  ZoomConfig,          // Zoom/selection config (bounds, wheelStep, ...)
   ZoomBoundsSpec,      // 'data' | 'unbounded' | { min?, max? }
   PanConfig,           // Pan configuration
   TouchConfig,         // Touch gesture configuration

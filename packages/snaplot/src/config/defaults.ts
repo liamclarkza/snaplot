@@ -17,7 +17,7 @@ export const DEFAULT_CONFIG: ChartConfig = {
     enabled: true,
     x: true,
     y: false,
-    wheelFactor: 1.1,
+    wheelStep: 0.1,
   },
   pan: {
     enabled: true,

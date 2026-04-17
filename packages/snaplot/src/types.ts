@@ -262,7 +262,13 @@ export interface ZoomConfig {
   enabled?: boolean;
   x?: boolean;
   y?: boolean;
-  wheelFactor?: number;
+  /**
+   * Zoom fraction per maximum wheel / pinch tick. 0 disables wheel zoom;
+   * 0.1 (the default) scales by up to 10% per tick; 0.3 is aggressive.
+   * Replaces the previous `wheelFactor` whose "1.0" meant "1x = no zoom",
+   * which was easy to misread.
+   */
+  wheelStep?: number;
   minRange?: number;
   maxRange?: number;
   /**

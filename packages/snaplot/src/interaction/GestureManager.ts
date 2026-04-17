@@ -2,7 +2,7 @@ import type { InteractionMode, Layout, ZoomConfig } from '../types';
 import type { EventBus } from '../core/EventBus';
 import {
   MIN_DRAG_DISTANCE,
-  DEFAULT_WHEEL_FACTOR,
+  DEFAULT_WHEEL_STEP,
   DEFAULT_LONG_PRESS_MS,
   TAP_TIMEOUT,
   DOUBLE_TAP_TIMEOUT,
@@ -576,10 +576,10 @@ export class GestureManager {
         const zoom = this.getZoomConfig();
         if (!zoom.enabled) return;
 
-        // Magnitude only — we always zoom out on deltaY > 0 and in on
-        // deltaY < 0. Using `sensitivity - 1` directly inverted the
-        // direction for `wheelFactor < 1`.
-        const strength = Math.abs((zoom.wheelFactor ?? DEFAULT_WHEEL_FACTOR) - 1);
+        // Magnitude only — direction comes from the sign of deltaY.
+        // Negative values are clamped to 0 (disabled); there's no
+        // legitimate use for an inverted wheel.
+        const strength = Math.max(0, zoom.wheelStep ?? DEFAULT_WHEEL_STEP);
         const delta = Math.min(Math.abs(e.deltaY), 20) * 0.005;
         const factor = e.deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
         const axis = this.scrollStartArea.axisKey!;
@@ -600,7 +600,7 @@ export class GestureManager {
     const zoom = this.getZoomConfig();
     if (!zoom.enabled) return;
 
-    const strength = Math.abs((zoom.wheelFactor ?? DEFAULT_WHEEL_FACTOR) - 1);
+    const strength = Math.max(0, zoom.wheelStep ?? DEFAULT_WHEEL_STEP);
     const delta = Math.min(Math.abs(e.deltaY), 20) * 0.005;
     const factor = e.deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
 
