@@ -307,6 +307,7 @@ export class ChartCore implements ChartInstance {
     this.updateScalePixelRanges();
     this.autoRange();
     this.scheduler.markDirty(DirtyFlag.ALL);
+    this.pluginManager.dispatch('onSetOptions', this);
   }
 
   getOptions(): ChartConfig {

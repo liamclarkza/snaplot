@@ -6,68 +6,88 @@ import { Button } from '../components/ui';
 import { useTheme } from '../ThemeContext';
 
 /**
- * One "day of a developer" — coffee intake paired with bug fixes,
- * observed hourly. The shape tells the joke: morning ramp, post-lunch
- * dip, evening second wind, midnight crash. Fake data, real pattern.
- *
- * The jitter() pass on an interval keeps the chart subtly alive
- * without pretending to stream real data — it's a nod to the fact
- * that the library repaints at 60 fps on any `setData` call.
+ * Four-core CPU usage. Each core is a bounded random walk with
+ * occasional workload bursts — the shape a real CPU chart would
+ * trace on an idle box that occasionally compiles something. Five
+ * thousand samples streaming at 10 Hz keeps the X axis sliding
+ * without the chart ever spiking off-scale.
  */
-function generateCoffeeBugs(): ColumnarData {
-  const hours = 24;
-  const base = new Date();
-  base.setHours(0, 0, 0, 0);
+const WINDOW_POINTS = 5000;
+const TICK_MS = 100; // 10 Hz
 
-  // Hand-tuned curves so the shape actually looks like a day, not noise.
-  // Coffee cups per hour: peak 8–10am, smaller 2pm bump, decline after 6.
-  const coffeeHourly = [
-    0, 0, 0, 0, 0, 0, 0.2, 1.4, 2.1, 2.6, 1.7, 1.0,
-    0.6, 1.6, 2.2, 1.1, 0.9, 0.5, 0.3, 0.2, 0.1, 0.4, 0.7, 0.2,
-  ];
-  // Bugs fixed per hour: ~90 min lag behind coffee, crash after 5pm,
-  // small "I just need to finish this" spike around 22:00.
-  const bugsHourly = [
-    0, 0, 0, 0, 0, 0, 0, 0.3, 1.6, 3.2, 4.2, 3.6,
-    1.4, 2.6, 4.1, 3.1, 2.3, 1.4, 0.9, 0.6, 0.5, 1.3, 0.8, 0.1,
-  ];
+type CoreState = number[]; // 4 values, one per core
 
-  const x = new Float64Array(hours);
-  const coffee = new Float64Array(hours);
-  const bugs = new Float64Array(hours);
-  for (let i = 0; i < hours; i++) {
-    x[i] = base.getTime() + i * 3_600_000;
-    coffee[i] = coffeeHourly[i];
-    bugs[i] = bugsHourly[i];
+function clamp(v: number, lo: number, hi: number) {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+function stepCores(prev: CoreState): CoreState {
+  const next: CoreState = [0, 0, 0, 0];
+  for (let i = 0; i < 4; i++) {
+    // Lazy random walk — drift toward the core's idle baseline
+    // (15–30 %), with occasional brief workloads that push one
+    // core up to 70–90 % for a few seconds.
+    const baseline = 18 + i * 4;
+    let v = prev[i] + (Math.random() - 0.5) * 3;
+    // Mean reversion toward baseline keeps long-term shape calm.
+    v += (baseline - v) * 0.03;
+    // Workload burst: rare, affects one core at a time.
+    if (Math.random() < 0.0012) {
+      v = clamp(v + 30 + Math.random() * 30, 0, 95);
+    }
+    next[i] = clamp(v, 2, 98);
   }
-  return [x, coffee, bugs];
+  return next;
+}
+
+function generateCores(): { data: ColumnarData; tail: CoreState } {
+  const now = Date.now();
+  const x = new Float64Array(WINDOW_POINTS);
+  const c0 = new Float64Array(WINDOW_POINTS);
+  const c1 = new Float64Array(WINDOW_POINTS);
+  const c2 = new Float64Array(WINDOW_POINTS);
+  const c3 = new Float64Array(WINDOW_POINTS);
+  let s: CoreState = [22, 26, 18, 24];
+  for (let i = 0; i < WINDOW_POINTS; i++) {
+    x[i] = now - (WINDOW_POINTS - i) * TICK_MS;
+    s = stepCores(s);
+    c0[i] = s[0];
+    c1[i] = s[1];
+    c2[i] = s[2];
+    c3[i] = s[3];
+  }
+  return { data: [x, c0, c1, c2, c3], tail: s };
 }
 
 const heroCode = `import { Chart, createLegendPlugin } from 'snaplot';
 
 <Chart
   config={{
-    axes: { x: { type: 'time' } },
+    axes: { x: { type: 'time' }, y: { type: 'linear', min: 0, max: 100 } },
     series: [
-      { label: 'Coffee (cups)', dataIndex: 1, type: 'area', interpolation: 'monotone' },
-      { label: 'Bugs fixed',    dataIndex: 2, type: 'line', interpolation: 'monotone' },
+      { label: 'Core 0', dataIndex: 1, type: 'line', interpolation: 'monotone' },
+      { label: 'Core 1', dataIndex: 2, type: 'line', interpolation: 'monotone' },
+      { label: 'Core 2', dataIndex: 3, type: 'line', interpolation: 'monotone' },
+      { label: 'Core 3', dataIndex: 4, type: 'line', interpolation: 'monotone' },
     ],
     tooltip: { show: true, mode: 'index' },
     plugins: [createLegendPlugin({ position: 'bottom' })],
   }}
-  data={[times, coffee, bugs]}
+  data={[times, core0, core1, core2, core3]}
 />`;
 
 type Stat = { value: string; label: string };
 const stats: Stat[] = [
-  { value: '200K+', label: 'points, 60 fps' },
-  { value: '< 20', label: 'kB gzipped' },
-  { value: '0',    label: 'runtime deps' },
-  { value: '5',    label: 'lines to a chart' },
+  { value: '200K+', label: 'points at 60 fps' },
+  { value: '< 20 kB', label: 'gzipped bundle' },
+  { value: '0',      label: 'runtime dependencies' },
+  { value: '5',      label: 'lines to a working chart' },
 ];
 
 export default function Home() {
-  const [chartData, setChartData] = createSignal(generateCoffeeBugs());
+  const initial = generateCores();
+  const [chartData, setChartData] = createSignal<ColumnarData>(initial.data);
+  let tail: CoreState = initial.tail;
   let heroChart: ChartInstance | undefined;
   const { theme } = useTheme();
 
@@ -75,35 +95,54 @@ export default function Home() {
     theme: theme() === 'light' ? lightTheme : darkTheme,
     axes: {
       x: { type: 'time' },
-      y: { type: 'linear', min: 0 },
+      y: {
+        type: 'linear',
+        min: 0,
+        max: 100,
+        tickFormat: (v: number) => `${v}%`,
+      },
     },
     series: [
-      { label: 'Coffee (cups)', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
-      { label: 'Bugs fixed',    dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+      { label: 'Core 0', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+      { label: 'Core 1', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+      { label: 'Core 2', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+      { label: 'Core 3', dataIndex: 4, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
     ],
     cursor: { show: true },
     zoom: { enabled: true, x: true },
     tooltip: { show: true, mode: 'index' },
-    padding: { top: 24, right: 24, bottom: 36, left: 48 },
+    padding: { top: 20, right: 20, bottom: 36, left: 56 },
     plugins: [createLegendPlugin({ position: 'bottom' })],
   }));
 
-  // Subtle aliveness — re-jitter the curves every 2.5s so a cursor
-  // on the page isn't sitting on a frozen screenshot. Repaints cost
-  // ~0.1ms; we could do this every frame and nobody would notice.
+  // 10 Hz tick. Each step shifts the window forward by one sample and
+  // appends a fresh one — setData on the full column every 100 ms so the
+  // page actually demonstrates sustained repaint throughput, not just
+  // an append-to-tail optimisation.
   const interval = setInterval(() => {
     setChartData((prev) => {
-      const [x, c, b] = prev;
-      const nc = new Float64Array(c.length);
-      const nb = new Float64Array(b.length);
-      for (let i = 0; i < c.length; i++) {
-        nc[i] = Math.max(0, c[i] * (1 + (Math.random() - 0.5) * 0.08));
-        nb[i] = Math.max(0, b[i] * (1 + (Math.random() - 0.5) * 0.08));
-      }
-      return [x, nc, nb];
+      const [x, c0, c1, c2, c3] = prev;
+      const len = x.length;
+      const nx = new Float64Array(len);
+      const n0 = new Float64Array(len);
+      const n1 = new Float64Array(len);
+      const n2 = new Float64Array(len);
+      const n3 = new Float64Array(len);
+      nx.set(x.subarray(1));
+      n0.set(c0.subarray(1));
+      n1.set(c1.subarray(1));
+      n2.set(c2.subarray(1));
+      n3.set(c3.subarray(1));
+      tail = stepCores(tail);
+      nx[len - 1] = x[len - 1] + TICK_MS;
+      n0[len - 1] = tail[0];
+      n1[len - 1] = tail[1];
+      n2[len - 1] = tail[2];
+      n3[len - 1] = tail[3];
+      return [nx, n0, n1, n2, n3];
     });
     heroChart?.setData(chartData());
-  }, 2500);
+  }, TICK_MS);
   onCleanup(() => clearInterval(interval));
 
   return (
@@ -119,28 +158,27 @@ export default function Home() {
       >
         <h1
           style={{
-            'font-size': 'clamp(36px, 6vw, 64px)',
+            'font-size': 'clamp(36px, 5.5vw, 60px)',
             'font-weight': 700,
-            'letter-spacing': '-0.035em',
-            'line-height': 1.05,
+            'letter-spacing': '-0.03em',
+            'line-height': 1.08,
             'margin-bottom': 'var(--space-4)',
           }}
         >
-          200K points.{' '}
-          <span style={{ color: 'var(--accent)' }}>60 fps.</span>{' '}
-          20 kB.
+          Charts that <span style={{ color: 'var(--accent)' }}>keep up</span>.
         </h1>
         <p
           style={{
             'font-size': 'var(--fs-md)',
             color: 'var(--text-secondary)',
-            'max-width': '560px',
+            'max-width': '620px',
             margin: '0 auto var(--space-5)',
             'line-height': 1.55,
           }}
         >
-          A canvas chart library that ships bytes, not opinions. Columnar typed
-          arrays in, interactive plots out — no wrapper tax.
+          A canvas chart library built for streaming data. Columnar typed arrays,
+          layered rendering, and a minimal reactive API — so your dashboards stay
+          responsive as data keeps arriving.
         </p>
         <div
           style={{
@@ -163,7 +201,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Hero chart — a quietly funny panel */}
+      {/* Hero chart — streaming latency dashboard */}
       <section
         style={{
           padding: '0 var(--space-5)',
@@ -190,7 +228,7 @@ export default function Home() {
                   'letter-spacing': '-0.01em',
                 }}
               >
-                Coffee intake vs bugs fixed
+                CPU usage
               </div>
               <div
                 style={{
@@ -199,7 +237,7 @@ export default function Home() {
                   'margin-top': '2px',
                 }}
               >
-                A working hypothesis — n = 1, tested daily
+                4 cores · 5,000 samples · 100 ms tick
               </div>
             </div>
             <div
@@ -207,29 +245,19 @@ export default function Home() {
                 'font-size': 'var(--fs-xs)',
                 color: 'var(--text-secondary)',
                 'font-variant-numeric': 'tabular-nums',
+                'text-align': 'right',
               }}
             >
               drag to zoom · hover to inspect · double-click to reset
             </div>
           </div>
-          <div style={{ height: 'clamp(280px, 44vh, 380px)', padding: '8px 0 4px' }}>
+          <div style={{ height: 'clamp(280px, 44vh, 380px)', padding: '8px 0 var(--space-2)' }}>
             <Chart config={heroConfig()} data={chartData()} onReady={(c) => { heroChart = c; }} />
-          </div>
-          <div
-            style={{
-              padding: '0 var(--space-5) var(--space-4)',
-              'font-size': 'var(--fs-xs)',
-              color: 'var(--text-secondary)',
-              'font-style': 'italic',
-              'text-align': 'center',
-            }}
-          >
-            Correlation ≠ causation. Try telling me that at 9 am.
           </div>
         </ChartPanel>
       </section>
 
-      {/* Stats strip — big numbers, small captions */}
+      {/* Stats strip */}
       <section
         style={{
           padding: '0 var(--space-5) var(--space-8)',
@@ -240,7 +268,7 @@ export default function Home() {
         <div
           style={{
             display: 'grid',
-            'grid-template-columns': 'repeat(auto-fit, minmax(160px, 1fr))',
+            'grid-template-columns': 'repeat(auto-fit, minmax(180px, 1fr))',
             gap: 'var(--space-5)',
             padding: 'var(--space-5) var(--space-4)',
             'border-top': '1px solid var(--border)',
@@ -303,12 +331,12 @@ export default function Home() {
             style={{
               color: 'var(--text-secondary)',
               'font-size': 'var(--fs-base)',
-              'max-width': '520px',
+              'max-width': '540px',
               margin: '0 auto',
             }}
           >
-            No wrapper components, no config trees. Pass Float64Arrays,
-            describe series, ship.
+            No wrapper components. No config trees. Pass Float64Arrays, describe
+            series, done.
           </p>
         </div>
         <CodeBlock code={heroCode} lang="tsx" />
@@ -330,8 +358,8 @@ export default function Home() {
             'margin-bottom': 'var(--space-4)',
           }}
         >
-          Nine built-in themes. Line, area, scatter, bar, histogram, band, density heatmap.
-          All reactive, all interactive, all tiny.
+          Six hand-tuned themes. Line, area, scatter, bar, histogram, band, density heatmap.
+          All reactive, all interactive.
         </div>
         <div
           style={{
@@ -350,9 +378,9 @@ export default function Home() {
 }
 
 /**
- * Soft-UI panel wrapping the hero chart. Matches the /demos aesthetic:
- * background = chart canvas colour (no seam at the chart edge), depth
- * from inset top highlight + ambient shadow, no hard border.
+ * Soft-UI panel wrapping the hero chart. Background matches the chart
+ * canvas so there's no seam at the plot edge; depth comes from the
+ * inset top highlight + ambient shadow tokens.
  */
 function ChartPanel(props: { children: any }) {
   return (

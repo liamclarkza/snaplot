@@ -286,13 +286,14 @@ export default function HeroDashboard() {
   const cssVars = createMemo(() => {
     const { theme: t, dark } = activeEntry();
     // Panel surface matches the chart canvas exactly so the header /
-    // footer blend seamlessly into the plot — no visible seam where
-    // a lighter card meets a darker chart. The page background is the
-    // tinted surround, so panels still feel contained even without a
-    // color step (elevation does the rest via inset + shadow).
+    // footer blend seamlessly into the plot. Page bg strategy differs
+    // by mode: dark themes darken the surround (shadows are muted on
+    // dark, so we need a colour step); light themes share the panel
+    // bg and let the ambient shadow do all the elevation work (a black
+    // mix-in on warm off-whites looked muddy — "cement" not "paper").
     const pageBg = dark
       ? `color-mix(in srgb, ${t.backgroundColor} 88%, #000 12%)`
-      : `color-mix(in srgb, ${t.backgroundColor} 92%, #000 8%)`;
+      : t.backgroundColor;
     // Dark: a dark drop-shadow under a dark card reads muddy. Skip
     // the ambient shadow and let the tinted page bg + inset top
     // highlight do the lifting — the soft-UI "lit from above" feel

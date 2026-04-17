@@ -48,7 +48,11 @@ export function createLegendPlugin(options?: {
       renderItems(chart, container);
     },
 
-    onSetData(chart: ChartInstance) {
+    // Only rebuild the legend when config actually changes (series
+    // added/removed/renamed/toggled). Rebuilding on every `setData`
+    // meant a 10 Hz stream would wipe the button under the cursor
+    // before a click could register.
+    onSetOptions(chart: ChartInstance) {
       if (container) renderItems(chart, container);
     },
 
@@ -100,7 +104,9 @@ function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
 
     item.addEventListener('click', () => {
       // Re-read the latest config inside the handler — the series array
-      // may have been replaced since this item was rendered.
+      // may have been replaced since this item was rendered. The
+      // subsequent `onSetOptions` hook is what re-renders the legend,
+      // so we don't need to call renderItems() here.
       const cfg = chart.getOptions();
       const currentlyVisible = cfg.series[idx]?.visible !== false;
       chart.setOptions({
@@ -108,7 +114,6 @@ function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
           i === idx ? { ...s, visible: !currentlyVisible } : s,
         ),
       });
-      renderItems(chart, container);
     });
 
     container.appendChild(item);

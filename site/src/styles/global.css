@@ -161,6 +161,24 @@ code {
   border-radius: inherit;
 }
 
+/* Live-data indicator — a small pulsing dot for "streaming now" badges. */
+@keyframes live-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.15); }
+}
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #10b981 24%, transparent);
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}
+
 /* Chart theme via CSS variables — resolveTheme() reads these automatically.
    Values track the refined built-in themes in `packages/snaplot/src/constants.ts`;
    border shares the grid hue and is differentiated by opacity on the canvas. */

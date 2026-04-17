@@ -318,16 +318,18 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
 
       // Subscribe to events.
       offHandlers.push(chart.on('cursor:move', refreshCells));
-      offHandlers.push(chart.on('data:update', () => {
-        rebuildRows();
-        refreshCells();
-      }));
+      // Data updates only change values — refresh cells, don't rebuild
+      // the row list. Rebuilding wipes <tr>s under the cursor/mouse at
+      // streaming tick rates, which swallows clicks and hovers.
+      offHandlers.push(chart.on('data:update', refreshCells));
       offHandlers.push(chart.on('highlight:change', applyHighlightHighlightAttr));
     },
 
-    onSetData() {
-      // setData also fires the 'data:update' event, but onSetData arrives
-      // first from the plugin manager. Defer to event flow above.
+    // Series added/removed/visibility flipped — rebuild row list, then
+    // reflow values.
+    onSetOptions() {
+      rebuildRows();
+      refreshCells();
     },
 
     destroy() {

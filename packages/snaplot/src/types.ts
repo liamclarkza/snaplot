@@ -513,6 +513,14 @@ export interface Plugin {
   onZoom?(chart: ChartInstance, scaleKey: string, range: ScaleRange): void;
   onClick?(chart: ChartInstance, dataX: number, dataIdx: number): void;
   onSetData?(chart: ChartInstance, data: ColumnarData): void;
+  /**
+   * Fires after `chart.setOptions()` merges a partial config. Use this
+   * for plugins whose DOM / visual state depends on config (series,
+   * axes, theme) rather than data — legends, toolbars, stat readouts.
+   * Avoid listening on `onSetData` for those: at high streaming rates
+   * it rebuilds the DOM underneath the user's cursor.
+   */
+  onSetOptions?(chart: ChartInstance): void;
 }
 
 // ============================================================
