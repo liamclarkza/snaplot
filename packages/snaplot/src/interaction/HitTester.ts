@@ -6,7 +6,7 @@ import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
 /**
  * Hit-testing for finding nearest data points to cursor position.
  *
- * For sorted time-series data, binary search is O(log n) — per spec §2:
+ * For sorted time-series data, binary search is O(log n), per spec §2:
  * "uPlot's exceptional cursor performance with 100K+ points relies entirely on this"
  *
  * Proximity is chosen per call based on pointer type: fingers get a larger
@@ -16,7 +16,7 @@ import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
 export type PointerKind = 'mouse' | 'touch' | 'pen';
 
 export class HitTester {
-  /** Optional override — takes precedence over the pointer-type default. */
+  /** Optional override, takes precedence over the pointer-type default. */
   private proximityOverride: number | null;
 
   constructor(proximityThreshold?: number) {
@@ -39,7 +39,7 @@ export class HitTester {
 
   /**
    * Find tooltip points near the cursor. Returns empty array if nothing is
-   * within the active proximity radius — tooltip should be hidden.
+   * within the active proximity radius, tooltip should be hidden.
    */
   findPoints(
     store: ColumnarStore,
@@ -70,7 +70,7 @@ export class HitTester {
     scales: Map<string, Scale>,
     seriesConfigs: SeriesConfig[],
     idx: number,
-    // pixelX is kept for API symmetry with nearestPoint — the distance check
+    // pixelX is kept for API symmetry with nearestPoint, the distance check
     // for 'index' mode is vertical-only (Y distance to the line at the
     // indexed column).
     _pixelX: number,

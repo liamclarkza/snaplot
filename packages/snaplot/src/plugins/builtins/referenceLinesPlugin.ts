@@ -1,7 +1,7 @@
 import type { Plugin, ChartInstance } from '../../types';
 
 /**
- * Configuration for a single reference line — a horizontal or vertical
+ * Configuration for a single reference line, a horizontal or vertical
  * marker rendered on the data canvas at a fixed data-space value.
  *
  * Reference lines respond to zoom/pan and scale changes. They render

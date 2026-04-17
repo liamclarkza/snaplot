@@ -3,7 +3,7 @@ import { lowerBound, upperBound, nearestIndex, viewportIndices } from './binaryS
 
 const arr = (values: number[]) => Float64Array.from(values);
 
-describe('lowerBound — first index with arr[i] >= value', () => {
+describe('lowerBound, first index with arr[i] >= value', () => {
   it('returns 0 when value precedes the array', () => {
     expect(lowerBound(arr([1, 2, 3]), 0)).toBe(0);
   });
@@ -35,7 +35,7 @@ describe('lowerBound — first index with arr[i] >= value', () => {
   });
 });
 
-describe('upperBound — last index with arr[i] <= value', () => {
+describe('upperBound, last index with arr[i] <= value', () => {
   it('returns -1 when value precedes the array', () => {
     expect(upperBound(arr([1, 2, 3]), 0)).toBe(-1);
   });
@@ -58,10 +58,10 @@ describe('upperBound — last index with arr[i] <= value', () => {
   });
 
   it('pairs with lowerBound to find a bin for histograms', () => {
-    // Histogram bin [edges[b], edges[b+1]) — upperBound gives b directly.
+    // Histogram bin [edges[b], edges[b+1]), upperBound gives b directly.
     const edges = arr([0, 1, 2, 3, 4]);
     expect(upperBound(edges, 0.5)).toBe(0); // bin [0, 1)
-    expect(upperBound(edges, 2.0)).toBe(2); // bin [2, 3) — left edge inclusive
+    expect(upperBound(edges, 2.0)).toBe(2); // bin [2, 3), left edge inclusive
     expect(upperBound(edges, 3.9)).toBe(3); // bin [3, 4)
     expect(upperBound(edges, 4.0)).toBe(4); // past the last bin, caller rejects
   });
@@ -101,7 +101,7 @@ describe('nearestIndex', () => {
   });
 });
 
-describe('viewportIndices — culling with ±1 margin', () => {
+describe('viewportIndices, culling with ±1 margin', () => {
   it('returns [0, 0] for an empty series', () => {
     expect(viewportIndices(arr([]), 0, 10)).toEqual([0, 0]);
   });

@@ -4,7 +4,7 @@ import { inferPosition } from '../core/Layout';
 
 /**
  * Renders gridlines on the static (grid) canvas and returns label
- * positions for DOM rendering (P2: hybrid — canvas marks, DOM text).
+ * positions for DOM rendering (P2: hybrid, canvas marks, DOM text).
  *
  * 0.5px offset trick: for 1px gridlines on non-retina (dpr===1),
  * offset coordinates by 0.5 to avoid blurry sub-pixel rendering.
@@ -38,7 +38,7 @@ export function renderAxes(
     labels: new Map(),
   };
 
-  // Fill background on grid canvas (opaque — alpha:false)
+  // Fill background on grid canvas (opaque, alpha:false)
   ctx.fillStyle = theme.backgroundColor;
   ctx.fillRect(0, 0, layout.width, layout.height);
 

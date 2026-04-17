@@ -16,7 +16,7 @@ export type LegendCellContent = string | Node;
  * the chart was constructed with a `ChartConfig<TMeta>`.
  */
 export interface LegendTableColumn<TMeta = unknown> {
-  /** Stable key — used for keying the row's cells. */
+  /** Stable key, used for keying the row's cells. */
   key: string;
   /** Header text. Pass empty string for unlabeled columns (e.g. swatch). */
   header: string;
@@ -129,7 +129,7 @@ export function valueColumn<TMeta = unknown>(
 }
 
 /**
- * A "Metric" column — for ML dashboards where every series shows the
+ * A "Metric" column, for ML dashboards where every series shows the
  * same metric (e.g. "eval/accuracy"), or each series carries its own
  * metric key in `meta`. Caller supplies the resolver.
  */

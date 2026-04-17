@@ -7,7 +7,7 @@ import { useTheme } from '../ThemeContext';
 
 /**
  * Four-core CPU usage. Each core is a bounded random walk with
- * occasional workload bursts — the shape a real CPU chart would
+ * occasional workload bursts, the shape a real CPU chart would
  * trace on an idle box that occasionally compiles something. Five
  * thousand samples streaming at 10 Hz keeps the X axis sliding
  * without the chart ever spiking off-scale.
@@ -24,7 +24,7 @@ function clamp(v: number, lo: number, hi: number) {
 function stepCores(prev: CoreState): CoreState {
   const next: CoreState = [0, 0, 0, 0];
   for (let i = 0; i < 4; i++) {
-    // Lazy random walk — drift toward the core's idle baseline
+    // Lazy random walk, drift toward the core's idle baseline
     // (15–30 %), with occasional brief workloads that push one
     // core up to 70–90 % for a few seconds.
     const baseline = 18 + i * 4;
@@ -92,9 +92,9 @@ export default function Home() {
   const { theme } = useTheme();
 
   // Per-mode hero palette. Light mode uses Observable/Tableau-10's
-  // first four (blue / green / orange / red) — the de facto standard
+  // first four (blue / green / orange / red), the de facto standard
   // for business dashboards, proven legible and cohesive. Dark mode
-  // uses the matching Tokyo Night quartet — softer pastels tuned
+  // uses the matching Tokyo Night quartet, softer pastels tuned
   // specifically for dark backgrounds so no line glares.
   const palette = () =>
     theme() === 'light'
@@ -129,7 +129,7 @@ export default function Home() {
   });
 
   // 10 Hz tick. Each step shifts the window forward by one sample and
-  // appends a fresh one — setData on the full column every 100 ms so the
+  // appends a fresh one, setData on the full column every 100 ms so the
   // page actually demonstrates sustained repaint throughput, not just
   // an append-to-tail optimisation.
   const interval = setInterval(() => {
@@ -214,7 +214,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Hero chart — streaming latency dashboard */}
+      {/* Hero chart, streaming latency dashboard */}
       <section
         style={{
           padding: '0 var(--space-5)',
@@ -316,7 +316,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Code — "here's the chart above" */}
+      {/* Code, "here's the chart above" */}
       <section
         style={{
           padding: '0 var(--space-5) var(--space-8)',

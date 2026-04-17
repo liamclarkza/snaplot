@@ -1,7 +1,7 @@
 import type { ThemeConfig } from './types';
 
 /**
- * Okabe-Ito palette — 8 colours optimised for colorblind accessibility.
+ * Okabe-Ito palette, 8 colours optimised for colorblind accessibility.
  * Recommended by Nature for scientific publishing.
  */
 export const PALETTE_OKABE_ITO = [
@@ -16,14 +16,14 @@ export const PALETTE_OKABE_ITO = [
 ] as const;
 
 /**
- * Light theme — Soft-UI defaults. Grid and border share a single slate
+ * Light theme, Soft-UI defaults. Grid and border share a single slate
  * hue and differentiate by opacity alone: the grid sits at 0.5 (quiet
  * but legible), the border at 0.9 (a clear step above). Background is
  * a barely-cool off-white (~2 % brand hue) per Soft UI guidance; text
  * is near-black with a slight slate tint rather than pure #000.
  *
  *   #fafbfc  background      (tinted off-white)
- *   #c3c6cf  grid / border   (shared hue — opacity differentiates)
+ *   #c3c6cf  grid / border   (shared hue, opacity differentiates)
  *   #6b7181  tick labels     (legible mid-contrast)
  *   #3b4254  crosshair
  *   #1a1d29  text            (near-black with cool tint)
@@ -38,7 +38,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   palette: [...PALETTE_OKABE_ITO],
   axisLineColor: '#c3c6cf',
   borderColor: '#c3c6cf',
-  // Same opacity as the grid — the frame is solid, the grid is dashed,
+  // Same opacity as the grid, the frame is solid, the grid is dashed,
   // so the solid line reads ~one step stronger without being harsh.
   borderOpacity: 0.5,
   tickColor: '#6b7181',
@@ -49,7 +49,7 @@ export const DEFAULT_THEME: ThemeConfig = {
 };
 
 /**
- * Dark theme — Soft-UI slate. The old navy #1a1a2e gave way to a
+ * Dark theme, Soft-UI slate. The old navy #1a1a2e gave way to a
  * cooler slate (#14161f) that matches the `refinedDarkTheme` aesthetic:
  * tinted neutrals, warm off-white text (#e2e2e5, not pure white),
  * Okabe–Ito palette. Grid and border share one hue; opacity does the
@@ -74,7 +74,7 @@ export const DARK_THEME: ThemeConfig = {
 };
 
 /**
- * Ocean — deep navy hero with a harmonised blue-to-warm cycle. Sky
+ * Ocean, deep navy hero with a harmonised blue-to-warm cycle. Sky
  * blue leads (so the first series always reads as "primary"); cyan
  * and teal provide cool contrast; coral and amber are the single
  * warm accents. The palette stays on an ocean-sun axis rather than
@@ -108,7 +108,7 @@ export const OCEAN_THEME: ThemeConfig = {
 };
 
 /**
- * Forest — deep pine base with a leaf-to-moss cycle. Emerald leads
+ * Forest, deep pine base with a leaf-to-moss cycle. Emerald leads
  * and every step stays in the green/teal/olive family so the theme
  * reads as one cohesive forest rather than a random green palette;
  * a single amber slot provides warm contrast for bar/histogram legends.
@@ -141,7 +141,7 @@ export const FOREST_THEME: ThemeConfig = {
 };
 
 /**
- * Sunset — dusk gold / orange / violet. Gold leads (not pink) so
+ * Sunset, dusk gold / orange / violet. Gold leads (not pink) so
  * single-series charts land on a warm, grown-up accent; pink and
  * fuchsia stay as later slots for contrast. Deep aubergine bg keeps
  * the warm series popping without burning the eye.
@@ -174,10 +174,10 @@ export const SUNSET_THEME: ThemeConfig = {
 };
 
 /**
- * Violet — premium dark in the Linear / Vercel aesthetic. Rich
+ * Violet, premium dark in the Linear / Vercel aesthetic. Rich
  * aubergine-black with a cohesive lavender-to-indigo cycle; a single
  * amber slot breaks the cool palette for legend legibility. No
- * saturated magentas or fuchsias — restraint is the whole point.
+ * saturated magentas or fuchsias, restraint is the whole point.
  */
 export const VIOLET_THEME: ThemeConfig = {
   backgroundColor: '#100d1f',
@@ -207,7 +207,7 @@ export const VIOLET_THEME: ThemeConfig = {
 };
 
 /**
- * Fog — Linear / Notion dashboard light. Cool off-white bg with a
+ * Fog, Linear / Notion dashboard light. Cool off-white bg with a
  * restrained productivity palette: blue leads, emerald + violet for
  * contrast, amber as the warm accent. Muted enough for a writing-app
  * surface, saturated enough for >4 series to stay distinguishable.
@@ -240,7 +240,7 @@ export const FOG_THEME: ThemeConfig = {
 };
 
 /**
- * Ivory — warm cream light theme for documents-that-happen-to-have-charts
+ * Ivory, warm cream light theme for documents-that-happen-to-have-charts
  * (Notion, Bear, writing apps). Earth-tone palette leads with burnt
  * orange so charts feel printed, not screen-blasted.
  */
@@ -272,7 +272,7 @@ export const IVORY_THEME: ThemeConfig = {
 };
 
 /**
- * Mint — fresh, cool light theme for wellness / health / environment
+ * Mint, fresh, cool light theme for wellness / health / environment
  * dashboards. Barely-green bg with emerald lead; secondary accents
  * stay saturated enough to distinguish >4 series.
  */
@@ -304,7 +304,7 @@ export const MINT_THEME: ThemeConfig = {
 };
 
 /**
- * Midnight — the previous near-black theme. Kept as a named export
+ * Midnight, the previous near-black theme. Kept as a named export
  * for back-compat but no longer featured in the site's theme chip
  * row. Prefer `darkTheme` (slate) for new work.
  */
@@ -327,7 +327,7 @@ export const MIDNIGHT_THEME: ThemeConfig = {
 };
 
 /**
- * Mars — warm rust/terracotta on burnt umber. Kept as a back-compat
+ * Mars, warm rust/terracotta on burnt umber. Kept as a back-compat
  * export; retired from the featured chip row in favour of `sunsetTheme`
  * (gold-led warm) + `ivoryTheme` (cream light).
  */
@@ -353,7 +353,7 @@ export const MARS_THEME: ThemeConfig = {
 };
 
 /**
- * Refined dark — the original Soft-UI template that `DARK_THEME` now
+ * Refined dark, the original Soft-UI template that `DARK_THEME` now
  * also follows. Kept as a named export for back-compat; the palette is
  * effectively identical to `darkTheme` since 0.4.x.
  */
@@ -409,10 +409,10 @@ export const AUTO_RANGE_PADDING = 0.05;
 /** Default long-press duration (ms) before box-zoom on touch */
 export const DEFAULT_LONG_PRESS_MS = 400;
 
-/** Default tap timeout (ms) — max time for a press to count as a tap */
+/** Default tap timeout (ms), max time for a press to count as a tap */
 export const TAP_TIMEOUT = 300;
 
-/** Double-tap timeout (ms) — max time between two taps */
+/** Double-tap timeout (ms), max time between two taps */
 export const DOUBLE_TAP_TIMEOUT = 300;
 
 /** Mouse hit-test radius (CSS pixels) */

@@ -1,6 +1,6 @@
 /* ─── Dark (default) ─── */
 :root {
-  /* Surfaces & text — existing palette retained so existing pages stay
+  /* Surfaces & text, existing palette retained so existing pages stay
      pixel-stable; oklch equivalents are noted for anyone migrating a
      component to the new scale. */
   --bg: #0f1117;                /* ≈ oklch(17% 0.013 260) */
@@ -17,14 +17,14 @@
   --border-light: #363750;
   --code-bg: #151622;
 
-  /* Stacked elevation — a tight contact shadow + a broad ambient one.
+  /* Stacked elevation, a tight contact shadow + a broad ambient one.
      Dark surfaces fake depth with a top-edge inner highlight because
      real shadows mostly disappear on dark backgrounds. */
   --elev-1-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --elev-1-shadow: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.24);
   --elev-2-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 16px 32px rgba(0, 0, 0, 0.30);
 
-  /* 8px rhythm — multiples of 8 with a 4 for fine adjustments. */
+  /* 8px rhythm, multiples of 8 with a 4 for fine adjustments. */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -35,7 +35,7 @@
   --space-8: 64px;
   --space-9: 80px;
 
-  /* Radius scale — obey the concentric rule (children ≥ 4px smaller). */
+  /* Radius scale, obey the concentric rule (children ≥ 4px smaller). */
   --radius-sm: 4px;
   --radius: 8px;
   --radius-md: 12px;
@@ -43,7 +43,7 @@
   --radius-xl: 24px;
   --radius-pill: 9999px;
 
-  /* Type scale — 8px-grid friendly, tight at the top, loose at the bottom. */
+  /* Type scale, 8px-grid friendly, tight at the top, loose at the bottom. */
   --fs-xs: 12px;
   --fs-sm: 13px;
   --fs-base: 15px;
@@ -53,7 +53,7 @@
   --fs-2xl: 32px;
   --fs-3xl: 40px;
 
-  /* Motion — never linear. Mid transitions ~220ms, micro ~150ms. */
+  /* Motion, never linear. Mid transitions ~220ms, micro ~150ms. */
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --dur-fast: 150ms;
@@ -109,7 +109,7 @@ body {
   color: var(--text);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  /* Soft crossfade on theme toggle — color on body cascades to most text. */
+  /* Soft crossfade on theme toggle, color on body cascades to most text. */
   transition: background-color 220ms cubic-bezier(0.2, 0, 0, 1),
     color 220ms cubic-bezier(0.2, 0, 0, 1);
 }
@@ -175,7 +175,7 @@ pre code {
   border-radius: inherit;
 }
 
-/* Live-data indicator — a small pulsing dot for "streaming now" badges. */
+/* Live-data indicator, a small pulsing dot for "streaming now" badges. */
 @keyframes live-pulse {
   0%, 100% { opacity: 0.6; transform: scale(1); }
   50%      { opacity: 1;   transform: scale(1.15); }
@@ -193,7 +193,7 @@ pre code {
   .live-dot { animation: none; }
 }
 
-/* Chart theme via CSS variables — resolveTheme() reads these automatically.
+/* Chart theme via CSS variables, resolveTheme() reads these automatically.
    Values track the refined built-in themes in `packages/snaplot/src/constants.ts`;
    border shares the grid hue and is differentiated by opacity on the canvas. */
 :root {

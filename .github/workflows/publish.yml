@@ -1,13 +1,13 @@
 name: Publish & Release
 
 # Single entry point driven by version tags. A `vX.Y.Z` push runs:
-#   1. verify      — tag matches package.json, quality gates, extract
-#                    matching CHANGELOG section, bundle artifact.
-#   2. publish-npm — npm publish with OIDC provenance, scoped to the
-#                    `npm` environment so trusted-publisher config can
-#                    pin it and the publish shows up as a Deployment.
-#   3. release     — GitHub Release with the extracted changelog as
-#                    body + the packed tarball as an asset.
+#   1. verify: tag matches package.json, quality gates, extract
+#      matching CHANGELOG section, bundle artifact.
+#   2. publish-npm: npm publish with OIDC provenance, scoped to the
+#      `npm` environment so trusted-publisher config can pin it and
+#      the publish shows up as a Deployment.
+#   3. release: GitHub Release with the extracted changelog as body
+#      and the packed tarball as an asset.
 #
 # Nothing publishes if verify fails; no Release gets created if
 # publish fails. Jobs are chained via `needs`.

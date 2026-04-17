@@ -12,16 +12,16 @@ export default function Scales() {
     <>
       <Section id="linear-scale" title="Linear Scale">
         <Prose>
-          The default scale type. Uses Heckbert's nice numbers algorithm (with D3's integer-arithmetic trick) to produce clean tick boundaries — 0, 20, 40, 60 instead of 17.3, 34.6, 51.9.
+          The default scale type. Uses Heckbert's nice numbers algorithm (with D3's integer-arithmetic trick) to produce clean tick boundaries, 0, 20, 40, 60 instead of 17.3, 34.6, 51.9.
           Y axis auto-ranges to fit the visible data in the current X viewport.
         </Prose>
         <Prose>
-          <b>Range control per axis</b> — three knobs combine for any behaviour you need:
+          <b>Range control per axis</b>, three knobs combine for any behaviour you need:
         </Prose>
         <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
-          <li><code>min</code> / <code>max</code> — pin the bounds. <code>resetZoom()</code> now restores to these values (previously a no-op).</li>
-          <li><code>padding</code> — fraction of the data range to pad each side. Default: <code>0</code> for horizontal axes, <code>0.05</code> for vertical.</li>
-          <li><code>nice</code> — whether to round bounds outward to clean tick boundaries. Default: <code>true</code>. Set to <code>false</code> for exact-extent rendering (no trailing gap on the right).</li>
+          <li><code>min</code> / <code>max</code>, pin the bounds. <code>resetZoom()</code> now restores to these values (previously a no-op).</li>
+          <li><code>padding</code>, fraction of the data range to pad each side. Default: <code>0</code> for horizontal axes, <code>0.05</code> for vertical.</li>
+          <li><code>nice</code>, whether to round bounds outward to clean tick boundaries. Default: <code>true</code>. Set to <code>false</code> for exact-extent rendering (no trailing gap on the right).</li>
         </ul>
         <CodeBlock code={`axes: {
   x: { nice: false, padding: 0 },      // exact data extent
@@ -50,7 +50,7 @@ export default function Scales() {
       <Section id="time-scale" title="Time Scale">
         <Prose>
           Time scale automatically selects tick intervals (seconds, minutes, hours, days, months) based on the visible range.
-          Labels use hierarchical formatting — time-of-day labels show hours:minutes, while date boundaries show the date.
+          Labels use hierarchical formatting, time-of-day labels show hours:minutes, while date boundaries show the date.
         </Prose>
         <Demo title="Time scale with auto intervals" desc="Zoom in to see time intervals change from hours to minutes"
           data={d_time()}
@@ -83,7 +83,7 @@ axes: {
         <div style={{ height: '8px' }} />
         <Prose>
           The <code>tickFormat</code> function is called for every visible tick label on each redraw.
-          Keep it fast — avoid heavy date parsing or string operations in tight loops.
+          Keep it fast, avoid heavy date parsing or string operations in tight loops.
         </Prose>
       </Section>
     </>

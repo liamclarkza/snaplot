@@ -1,4 +1,4 @@
-// snaplot — high-performance canvas chart library for SolidJS
+// snaplot, high-performance canvas chart library for SolidJS
 
 // Component (primary API)
 export { Chart } from './solid/Chart';

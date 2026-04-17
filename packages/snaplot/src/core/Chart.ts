@@ -45,7 +45,7 @@ import { PluginManager } from '../plugins/PluginManager';
 import { nearestIndex, upperBound } from '../data/binarySearch';
 
 /**
- * Chart — the composition root.
+ * Chart, the composition root.
  *
  * Wires together: CanvasManager, RenderScheduler, EventBus, ColumnarStore,
  * Scales, Layout, Renderers, Interaction handlers, Plugins.
@@ -81,16 +81,16 @@ export class ChartCore implements ChartInstance {
   private tooltipPoints: TooltipPoint[] = [];
   /** True when cursor position comes from local pointer events (not sync) */
   private cursorIsLocal = false;
-  /** Raw mouse position in CSS pixels (not snapped) — used for tooltip placement */
+  /** Raw mouse position in CSS pixels (not snapped), used for tooltip placement */
   private mouseX: number | null = null;
   private mouseY: number | null = null;
-  /** Pointer type of the most recent cursor event — drives hit-test radius. */
+  /** Pointer type of the most recent cursor event, drives hit-test radius. */
   private lastPointerType: 'mouse' | 'touch' | 'pen' = 'mouse';
   /** Active selection box (shift+drag) */
   private selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
-  /** Transient tap-feedback ring — cleared automatically once its lifetime expires. */
+  /** Transient tap-feedback ring, cleared automatically once its lifetime expires. */
   private tapFeedback: { x: number; y: number; startTime: number } | null = null;
-  /** True when the user has actively zoomed — suppresses auto-range X on data updates */
+  /** True when the user has actively zoomed, suppresses auto-range X on data updates */
   private userHasZoomed = false;
 
   // Event listeners. Handlers have per-event signatures (see ChartEventMap);
@@ -110,7 +110,7 @@ export class ChartCore implements ChartInstance {
   private highlightedSeries: number | null = null;
 
   /**
-   * Per-axis "reset-zoom" extent — the scale's min/max after the last
+   * Per-axis "reset-zoom" extent, the scale's min/max after the last
    * `autoRange*` pass (including axis-config pins and `nice()` expansion).
    * Used by `zoom.bounds: 'data'` so zoom-out stops at the same range
    * `resetZoom()` would produce, not a tighter raw-data extent that would
@@ -187,7 +187,7 @@ export class ChartCore implements ChartInstance {
     }
     if (this.config.highlight?.syncKey) {
       this.highlightSyncKey = this.config.highlight.syncKey;
-      // Cursor and highlight may share the same key — only join once.
+      // Cursor and highlight may share the same key, only join once.
       if (this.highlightSyncKey !== this.syncKey) {
         SyncGroup.join(this.highlightSyncKey, this);
       }
@@ -248,7 +248,7 @@ export class ChartCore implements ChartInstance {
     if (range.max !== undefined) scale.max = range.max;
 
     // When X axis changes (e.g. from a zoom sync peer), re-fit Y axis
-    // to the new visible X range — otherwise the band/data may clip.
+    // to the new visible X range, otherwise the band/data may clip.
     const ac = this.config.axes?.[key];
     const pos = inferPosition(key, ac?.position);
     const isHoriz = pos === 'bottom' || pos === 'top';
@@ -269,7 +269,7 @@ export class ChartCore implements ChartInstance {
   }
 
   setOptions(partial: DeepPartial<ChartConfig>): void {
-    // Plugins are object instances — deep-merge would corrupt them.
+    // Plugins are object instances, deep-merge would corrupt them.
     // Handle plugin updates separately: destroy old, install new.
     const newPlugins = (partial as Partial<ChartConfig>).plugins;
     if (newPlugins) {
@@ -533,7 +533,7 @@ export class ChartCore implements ChartInstance {
 
   /**
    * Auto-range both horizontal and vertical axes to fit data.
-   * Called on data change (setData, appendData, init) — NOT on zoom.
+   * Called on data change (setData, appendData, init), NOT on zoom.
    */
   private autoRange(): void {
     this.autoRangeHorizontal();
@@ -566,7 +566,7 @@ export class ChartCore implements ChartInstance {
       const hasBarSeries = this.config.series.some(
         s => s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
       );
-      // Scatter/heatmap clouds don't benefit from nice() rounding — it pushes
+      // Scatter/heatmap clouds don't benefit from nice() rounding, it pushes
       // the axis out to the next round number (e.g. 18..93 → 0..100), leaving
       // the cloud floating far from the frame edge. Default to a 5 % pad and
       // skip nice() so the data fills the plot with just enough breathing room.
@@ -671,7 +671,7 @@ export class ChartCore implements ChartInstance {
       const hasBarOrHist = this.config.series.some(
         s => (s.yAxisKey ?? 'y') === key && s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
       );
-      // Scatter clouds: skip nice() on Y too — same reason as the X axis,
+      // Scatter clouds: skip nice() on Y too, same reason as the X axis,
       // the padded extent keeps the cloud framed without round-number jumps.
       const isScatterOnlyAxis =
         !hasBarOrHist &&
@@ -688,7 +688,7 @@ export class ChartCore implements ChartInstance {
 
       if (ac.nice !== false && !isScatterOnlyAxis) {
         scale.nice(DEFAULT_TICK_COUNT);
-        // nice() can push min below 0 — clamp back for bar/histogram baseline
+        // nice() can push min below 0, clamp back for bar/histogram baseline
         if (hasBarOrHist && yMin >= 0 && scale.min < 0) scale.min = 0;
       }
 
@@ -785,7 +785,7 @@ export class ChartCore implements ChartInstance {
       this.tooltipManager.hide();
       this.scheduler.markDirty(DirtyFlag.OVERLAY);
 
-      // Notify listeners and plugins that the cursor is gone — without
+      // Notify listeners and plugins that the cursor is gone, without
       // this, a fast mouse-leave skips the "cursor outside plot area"
       // path in action:cursor and the legend table never blanks its values.
       this.emitEvent('cursor:move', null, null);
@@ -804,7 +804,7 @@ export class ChartCore implements ChartInstance {
       const axisConfigs = this.config.axes ?? {};
 
       if (axis) {
-        // Drag started on a specific axis — only pan that axis
+        // Drag started on a specific axis, only pan that axis
         const scale = this.scales.get(axis);
         if (scale) {
           const pos = inferPosition(axis, axisConfigs[axis]?.position);
@@ -814,7 +814,7 @@ export class ChartCore implements ChartInstance {
           this.applyViewportChange(axis, scale.min + dataD, scale.max + dataD);
         }
       } else {
-        // Drag in plot area — pan all enabled axes
+        // Drag in plot area, pan all enabled axes
         for (const [key, scale] of this.scales) {
           const pos = inferPosition(key, axisConfigs[key]?.position);
           const isHoriz = pos === 'bottom' || pos === 'top';
@@ -1009,7 +1009,7 @@ export class ChartCore implements ChartInstance {
     });
   }
 
-  /** Apply a viewport change — shared by pan, zoom, box-end, and sync */
+  /** Apply a viewport change, shared by pan, zoom, box-end, and sync */
   private applyViewportChange(scaleKey: string, min: number, max: number): void {
     const scale = this.scales.get(scaleKey);
     if (!scale) return;
@@ -1076,8 +1076,7 @@ export class ChartCore implements ChartInstance {
     // Default for Y: line/area/bar charts auto-range Y from the visible
     // X window, so leaving Y unbounded lets the user stretch the viewport
     // while the data still fills it. Scatter-only axes have no such
-    // driver — a point cloud lives in both dimensions independently —
-    // so we default those to 'data' to match the X-axis behaviour.
+    // driver, a point cloud lives in both dimensions independently,    // so we default those to 'data' to match the X-axis behaviour.
     const scatterDefault = !isHoriz && this.isScatterOnlyAxis(scaleKey);
     const yDefault: ZoomBoundsSpec = scatterDefault ? 'data' : 'unbounded';
 
@@ -1096,7 +1095,7 @@ export class ChartCore implements ChartInstance {
 
     if (typeof spec === 'object') return { ...spec };
 
-    // spec === 'data' — use the cached natural extent (output of autoRange,
+    // spec === 'data', use the cached natural extent (output of autoRange,
     // which already honors axis pins and nice() expansion). Falls back to
     // the raw data range if autoRange hasn't run yet for this axis.
     const natural = this.naturalExtent.get(scaleKey);
@@ -1136,7 +1135,7 @@ export class ChartCore implements ChartInstance {
     if (bMin !== undefined && bMax !== undefined) {
       const boundedSpan = bMax - bMin;
       if (span >= boundedSpan) {
-        // User is trying to see more than the full range — clamp to it.
+        // User is trying to see more than the full range, clamp to it.
         return [bMin, bMax];
       }
     }
@@ -1214,7 +1213,7 @@ export class ChartCore implements ChartInstance {
 
     // Count bar-type series for grouped width calculation. This mapping is
     // position-based (which slot a bar occupies in each group), so it must
-    // be computed from config order — not affected by the highlight draw-last pass.
+    // be computed from config order, not affected by the highlight draw-last pass.
     const barSeries = this.config.series.filter(
       s => s.visible !== false && (s.type === 'bar'),
     );
@@ -1305,9 +1304,9 @@ export class ChartCore implements ChartInstance {
     const cursorEnabled = this.config.cursor?.show !== false;
     const isSelecting = this.selectionBox !== null;
 
-    // During active selection, hide crosshair/tooltip/dots — only show the selection box
+    // During active selection, hide crosshair/tooltip/dots, only show the selection box
     if (!isSelecting && cursorEnabled && this.cursorX !== null && this.cursorY !== null) {
-      // Draw crosshair — skip for scatter-only charts
+      // Draw crosshair, skip for scatter-only charts
       const isScatterOnly = this.config.series.every(
         s => s.visible === false || s.type === 'scatter',
       );
@@ -1319,22 +1318,21 @@ export class ChartCore implements ChartInstance {
           this.cursorY,
           this.layout,
           cursorCfg,
-          // `cursor.color` overrides the theme's crosshair colour when set —
-          // useful for matching a brand accent on one chart without changing
+          // `cursor.color` overrides the theme's crosshair colour when set,          // useful for matching a brand accent on one chart without changing
           // the whole theme.
           cursorCfg.color ?? this.theme.crosshairColor,
         );
       }
 
       // Draw data point indicators (dot + ring per hit-tested point).
-      // Skip when the caller has opted out — typically because a legend
+      // Skip when the caller has opted out, typically because a legend
       // table already shows the values and the extra glyphs would be noise.
       if (this.config.cursor?.indicators !== false) {
         this.drawPointIndicators(ctx);
       }
     }
 
-    // Show tooltip — hide during selection or when cursor is disabled
+    // Show tooltip, hide during selection or when cursor is disabled
     if (
       !isSelecting &&
       cursorEnabled &&
@@ -1366,7 +1364,7 @@ export class ChartCore implements ChartInstance {
       );
     }
 
-    // Tap feedback — 220ms ring animation. Schedule another overlay frame
+    // Tap feedback, 220ms ring animation. Schedule another overlay frame
     // until the lifetime runs out, then clear state.
     if (this.tapFeedback) {
       const TAP_RING_MS = 220;
@@ -1402,8 +1400,7 @@ export class ChartCore implements ChartInstance {
     const isDark = this.isThemeDark(bg);
     const ringAlpha = isDark ? 0.15 : 0.08;
 
-    // When a series is highlighted, only draw the indicator on that series —
-    // the others just get the crosshair line (matches Neptune/W&B behavior).
+    // When a series is highlighted, only draw the indicator on that series,    // the others just get the crosshair line (matches Neptune/W&B behavior).
     const hlActive = this.highlightedSeries !== null
       && (this.config.highlight?.enabled !== false);
 
@@ -1418,7 +1415,7 @@ export class ChartCore implements ChartInstance {
       if (!xScale || !yScale) continue;
 
       if (sc.type === 'histogram') {
-        // Highlight hovered bin — edges from X data, counts from Y data
+        // Highlight hovered bin, edges from X data, counts from Y data
         const edges = this.store.x;
         const colIdx = sc.dataIndex;
         const counts = colIdx >= 1 && colIdx <= this.store.seriesCount ? this.store.y(colIdx - 1) : null;
@@ -1471,7 +1468,7 @@ export class ChartCore implements ChartInstance {
         continue;
       }
 
-      // Scatter (non-heatmap) and line/area — unified dot style
+      // Scatter (non-heatmap) and line/area, unified dot style
       if (sc.type === 'scatter' && sc.heatmap) continue;
 
       const px = xScale.dataToPixel(point.x);
@@ -1487,7 +1484,7 @@ export class ChartCore implements ChartInstance {
         ctx.shadowOffsetY = 1;
       }
 
-      // White ring slightly larger than the fill — acts as a clean halo.
+      // White ring slightly larger than the fill, acts as a clean halo.
       ctx.beginPath();
       ctx.arc(px, py, r + 1.5, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
@@ -1507,7 +1504,7 @@ export class ChartCore implements ChartInstance {
     ctx.restore();
   }
 
-  /** Quick luminance check — is the background dark? */
+  /** Quick luminance check, is the background dark? */
   private isThemeDark(bg: string): boolean {
     // Parse hex
     if (bg.startsWith('#')) {

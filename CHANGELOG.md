@@ -18,7 +18,7 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Biome 2.4 for lint + format (`npm run lint`, `npm run check`).
-- Vitest for unit tests (`npm test`) — initial suites for
+- Vitest for unit tests (`npm test`), initial suites for
   `data/binarySearch`, `scales/niceNumbers`, `config/merge`.
 - Lefthook pre-commit + pre-push hooks.
 - `.github/workflows/quality.yml` running lint + typecheck + tests + builds on PRs.
@@ -32,7 +32,7 @@ to [Semantic Versioning](https://semver.org/).
   or other subscribers on the same event (`ChartCore.emitEvent` is now wrapped
   in try/catch with console logging).
 - **Performance**: histogram tooltip bin lookup uses `upperBound` instead of
-  a linear scan — O(log n) vs O(n). Meaningful for charts with many bins.
+  a linear scan, O(log n) vs O(n). Meaningful for charts with many bins.
 
 ### Changed
 - Dropped unused `chartRef` and two `as any` casts in `legendPlugin`.

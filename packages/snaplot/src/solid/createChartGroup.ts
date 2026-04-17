@@ -17,7 +17,7 @@ export interface ChartGroupBindings {
 
 /**
  * A handle to a coordinated set of charts that share cursor + highlight
- * state. Spread `group.bind()` into each chart's config — that is the
+ * state. Spread `group.bind()` into each chart's config, that is the
  * entire wiring step.
  *
  * ```tsx
@@ -31,15 +31,14 @@ export interface ChartGroupBindings {
  *
  * `group.highlight()` and `group.cursor()` push state to every chart
  * via the existing SyncGroup registry. Reads (`group.highlightedSeries`)
- * reflect the last broadcast originating from the group itself —
- * peer-originated changes still flow through each chart's own
+ * reflect the last broadcast originating from the group itself, * peer-originated changes still flow through each chart's own
  * `'highlight:change'` event (use `createHighlight` to track those).
  */
 export interface ChartGroup {
   /**
    * Low-level: returns `{ cursor: { syncKey }, highlight: { syncKey } }`.
    * Spreading this into your config is fine when you don't have your
-   * own `cursor` / `highlight` config — otherwise a naïve spread will
+   * own `cursor` / `highlight` config, otherwise a naïve spread will
    * shadow your settings (including `cursor.show` and `indicators`).
    * Prefer `group.apply(config)` for the safe merge.
    */

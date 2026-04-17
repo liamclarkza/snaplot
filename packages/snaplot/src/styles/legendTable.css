@@ -1,10 +1,10 @@
-/* snaplot — opt-in default styles for both legend plugins.
+/* snaplot, opt-in default styles for both legend plugins.
  *
  *   import 'snaplot/legend-table.css';
  *
  * Covers:
- *   - `<LegendTable>` + createLegendTablePlugin() — cursor-synced tabular legend
- *   - createLegendPlugin() — inline horizontal legend with click-to-toggle
+ *   - `<LegendTable>` + createLegendTablePlugin(), cursor-synced tabular legend
+ *   - createLegendPlugin(), inline horizontal legend with click-to-toggle
  *
  * All rules use plain class names + CSS custom properties so apps can
  * fully restyle without specificity battles. Rules are ordered from

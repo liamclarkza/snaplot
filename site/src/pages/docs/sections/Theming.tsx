@@ -82,7 +82,7 @@ export default function Theming() {
         <Prose>
           The <code>resolveTheme()</code> function reads these variables at chart creation and on each redraw.
           If a variable is missing, it falls back to the built-in dark theme default. This means every chart on the page inherits your site's
-          colors automatically — no per-chart theme config needed.
+          colors automatically, no per-chart theme config needed.
         </Prose>
         <Demo title="CSS variable theming (no explicit theme)" desc="This chart reads colors from the site's CSS variables"
           data={d_css_vars()}

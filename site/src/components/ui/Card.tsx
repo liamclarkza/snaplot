@@ -11,7 +11,7 @@ export default function Card(props: {
   padding?: string;
   /** 'base' uses elev-1, 'raised' uses elev-2 for popovers/modals. */
   elevation?: 'base' | 'raised';
-  /** Extra inline styles — merged with the card's defaults. */
+  /** Extra inline styles, merged with the card's defaults. */
   style?: Record<string, string>;
 }) {
   const shadow = () =>

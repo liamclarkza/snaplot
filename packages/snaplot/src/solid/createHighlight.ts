@@ -13,7 +13,7 @@ import type { ChartInstance } from '../types';
  *   updates whenever a `'highlight:change'` event fires (including
  *   sync messages from peer charts in the same group).
  * - The setter calls `chart.setHighlight()`, which is itself a no-op
- *   when the value is unchanged — safe to call from `onMouseEnter`
+ *   when the value is unchanged, safe to call from `onMouseEnter`
  *   / `onMouseLeave` handlers without debouncing.
  *
  * Returns `[null, noop]` until the chart accessor resolves.

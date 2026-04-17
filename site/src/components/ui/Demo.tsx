@@ -2,7 +2,7 @@ import type { ColumnarData, ChartInstance } from 'snaplot';
 import LiveEditor from '../LiveEditor';
 
 /**
- * Demo section on the Docs page — a titled block with an editable live
+ * Demo section on the Docs page, a titled block with an editable live
  * chart. Renamed from the old `Ex` helper; same interface.
  */
 export default function Demo(props: {

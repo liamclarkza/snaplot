@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest. This is a small, opinionated project — we aim to stay that way.
+Thanks for your interest. This is a small, opinionated project, we aim to stay that way.
 
 ## Setup
 
@@ -62,7 +62,7 @@ PR descriptions: bullet points, short. The diff explains the what; the descripti
 
 New library code should come with a unit test when the logic is non-trivial. Co-locate tests next to sources: `foo.ts` + `foo.test.ts`.
 
-Tests run in Node by default. DOM-dependent modules (gesture handlers, tooltips) need `environment: 'jsdom'` set per file — we'll add that shared setup once there's a reason to.
+Tests run in Node by default. DOM-dependent modules (gesture handlers, tooltips) need `environment: 'jsdom'` set per file, we'll add that shared setup once there's a reason to.
 
 ## Releases
 
@@ -90,15 +90,15 @@ Flow is "edit CHANGELOG as you go, cut a release with one script":
 
 `.github/workflows/publish.yml` runs three jobs in sequence:
 
-1. **verify** — tag must match `packages/snaplot/package.json`; runs lint,
+1. **verify**, tag must match `packages/snaplot/package.json`; runs lint,
    typecheck, tests, both builds; extracts the matching `CHANGELOG.md`
    section for the release notes.
-2. **publish-npm** — `npm publish --provenance --access public`. Scoped to
+2. **publish-npm**, `npm publish --provenance --access public`. Scoped to
    the `npm` GitHub environment so npm's trusted-publisher OIDC trust
    pins it there, and the publish shows up on the Deployments tab.
-3. **release** — creates a GitHub Release named `vX.Y.Z`, body is the
+3. **release**, creates a GitHub Release named `vX.Y.Z`, body is the
    extracted CHANGELOG section, asset is the packed tarball.
 
 A failed `verify` blocks publish and release; a failed `publish-npm`
 blocks release. If either npm or GitHub is flaky mid-publish, re-run the
-failed job only — don't re-tag.
+failed job only, don't re-tag.

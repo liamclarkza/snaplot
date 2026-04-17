@@ -6,7 +6,7 @@
  * triangles with their neighbours. O(n) single pass, directly
  * controllable output size.
  *
- * This is a UTILITY — not called implicitly in the render path.
+ * This is a UTILITY, not called implicitly in the render path.
  * The user controls when and how to downsample (P3: library never touches your data).
  */
 export function lttb(
@@ -65,7 +65,7 @@ export function lttb(
     let maxIdx = bucketStart;
 
     for (let j = bucketStart; j < bucketEnd; j++) {
-      // Triangle area (doubled, no need for the 0.5 factor — we only compare)
+      // Triangle area (doubled, no need for the 0.5 factor, we only compare)
       const area = Math.abs(
         (pX - avgX) * (y[j] - pY) - (pX - x[j]) * (avgY - pY),
       );

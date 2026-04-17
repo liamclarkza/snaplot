@@ -66,7 +66,7 @@ export class EventBus {
 // ============================================================
 
 /**
- * SyncGroup — global registry for cross-chart cursor + zoom sync.
+ * SyncGroup, global registry for cross-chart cursor + zoom sync.
  * Charts with matching keys broadcast cursor positions in data coordinates.
  * Per spec §5.3: sync happens in data space, not pixel space.
  */

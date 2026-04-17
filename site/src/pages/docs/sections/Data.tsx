@@ -22,7 +22,7 @@ export default function Data() {
       <Section id="streaming" title="Streaming">
         <Prose>
           Use <code>appendData()</code> for real-time data. It appends new points without replacing the existing dataset.
-          The user's zoom state is preserved — new data appears but the viewport stays where the user left it until they double-click to reset.
+          The user's zoom state is preserved, new data appears but the viewport stays where the user left it until they double-click to reset.
         </Prose>
         <Prose>
           Pass <code>maxLen</code> as the second argument to cap the buffer size. When the buffer overflows, the oldest points are dropped.
@@ -57,10 +57,10 @@ setInterval(() => {
 
       <Section id="downsampling" title="Downsampling">
         <Prose>
-          Two downsampling utilities are exported for reducing large datasets before rendering. The library never mutates or downsamples your data automatically — you call these explicitly.
+          Two downsampling utilities are exported for reducing large datasets before rendering. The library never mutates or downsamples your data automatically, you call these explicitly.
         </Prose>
         <Prose>
-          <b>LTTB</b> (Largest Triangle Three Buckets) — preserves visual shape by selecting the most visually significant points. Best for general-purpose downsampling where you want the chart to "look right."
+          <b>LTTB</b> (Largest Triangle Three Buckets), preserves visual shape by selecting the most visually significant points. Best for general-purpose downsampling where you want the chart to "look right."
         </Prose>
         <CodeBlock code={`import { lttb } from 'snaplot';
 const [downX, downY] = lttb(xData, yData, 500);  // 25K \u2192 500 points`} />
@@ -72,7 +72,7 @@ const [downX, downY] = lttb(xData, yData, 500);  // 25K \u2192 500 points`} />
   tooltip: { show: true },
 }`} />
         <Prose>
-          <b>M4</b> — pixel-aware aggregation that preserves min/max per pixel column. Best when you know the chart's pixel width and want guaranteed fidelity of peaks and valleys.
+          <b>M4</b>, pixel-aware aggregation that preserves min/max per pixel column. Best when you know the chart's pixel width and want guaranteed fidelity of peaks and valleys.
         </Prose>
         <CodeBlock code={`import { m4 } from 'snaplot';
 const [downX, downY] = m4(xData, yData, pixelWidth, xMin, xMax);`} />

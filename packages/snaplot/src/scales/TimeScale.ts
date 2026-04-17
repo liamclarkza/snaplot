@@ -55,7 +55,7 @@ export class TimeScale implements Scale {
   }
 
   // `count` matches the Scale interface but TimeScale sizes its ticks from
-  // the available pixel width instead — so one label per ~100px at the
+  // the available pixel width instead, so one label per ~100px at the
   // current zoom. The param stays in the signature for interface conformance.
   ticks(_count: number = 6): number[] {
     const pxRange = this.pxMax - this.pxMin;

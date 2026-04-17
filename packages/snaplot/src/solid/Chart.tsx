@@ -6,7 +6,7 @@ import type { ChartConfig, ChartInstance, ColumnarData } from '../types';
 export interface ChartProps {
   /** Chart configuration */
   config: ChartConfig;
-  /** Columnar data (reactive — chart updates automatically when this changes) */
+  /** Columnar data (reactive, chart updates automatically when this changes) */
   data: ColumnarData;
   /** CSS class for the container div */
   class?: string;
@@ -17,7 +17,7 @@ export interface ChartProps {
 }
 
 /**
- * <Chart> — the SolidJS component wrapper for snaplot.
+ * <Chart>, the SolidJS component wrapper for snaplot.
  *
  * Fine-grained reactivity: signal changes → targeted canvas layer updates.
  * No virtual DOM diffing.

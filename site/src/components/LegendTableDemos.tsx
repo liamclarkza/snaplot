@@ -30,7 +30,7 @@ interface RunMeta {
 
 /**
  * Accuracy-like curves: each series starts near 0 and climbs toward a
- * random target in (0.5, 0.95) with diminishing noise — the shape of a
+ * random target in (0.5, 0.95) with diminishing noise, the shape of a
  * converging training metric. No hard clamp, so values can briefly
  * overshoot without being visibly flattened against the top of the chart.
  */
@@ -90,7 +90,7 @@ function runConfig(numRuns: number, metric: string): ChartConfig<RunMeta> {
     })),
     tooltip: { show: false },
     // With highlight active (via activeSeriesIndex), only the focused
-    // series gets a cursor dot — the rest just show the crosshair line.
+    // series gets a cursor dot, the rest just show the crosshair line.
     cursor: { show: true, snap: true },
   };
 }
@@ -107,7 +107,7 @@ export function DefaultLegendTableDemo() {
     theme: siteTheme() === 'light' ? lightTheme : darkTheme,
   }));
 
-  // Highlight the series nearest the cursor — the line under the mouse
+  // Highlight the series nearest the cursor, the line under the mouse
   // focuses itself and everything else dims.
   const snap = createCursorSnapshot(chart);
   createEffect(() => {
@@ -222,7 +222,7 @@ export function CrossChartSyncDemo() {
         ]}
       />
       <div style={{ padding: '6px 12px', 'border-top': '1px solid var(--border)', 'font-size': '11px', opacity: 0.7 }}>
-        Hover either chart — the cursor and step values sync. Hover a legend row — that series highlights in <i>both</i> charts.
+        Hover either chart, the cursor and step values sync. Hover a legend row, that series highlights in <i>both</i> charts.
         {/* Suppress unused warning */}
         <span style={{ display: 'none' }}>{String(chartB() ? '' : '')}</span>
       </div>
@@ -250,7 +250,7 @@ export function SidepanelHighlightDemo() {
         <For each={names}>
           {(name, i) => {
             // Hover background + highlight dispatch share the same handler.
-            // Using mouseenter/leave (not mouseover/out) — those don't
+            // Using mouseenter/leave (not mouseover/out), those don't
             // bubble from child nodes, so fast cursor movement can't leave
             // a row stuck in the "hovered" state.
             //
@@ -328,7 +328,7 @@ export function BenchmarkDemo() {
     chart()?.setHighlight(snap()?.activeSeriesIndex ?? null);
   });
 
-  // FPS counter — measures rAF cadence while the page is animating
+  // FPS counter, measures rAF cadence while the page is animating
   let frames = 0;
   let last = performance.now();
   let raf = 0;
@@ -395,8 +395,7 @@ export function HeadlessSnapshotDemo() {
       <LegendTable<RunMeta> chart={chart}>
         {(snap) => {
           // Focus the line nearest the cursor by pushing
-          // `activeSeriesIndex` through to the chart's highlight state —
-          // this is the "dim everything else" interaction demonstrated
+          // `activeSeriesIndex` through to the chart's highlight state,          // this is the "dim everything else" interaction demonstrated
           // via the cross-chart highlight API, but using a single chart.
           createEffect(() => {
             chart()?.setHighlight(snap()?.activeSeriesIndex ?? null);
@@ -409,7 +408,7 @@ export function HeadlessSnapshotDemo() {
                 'border-top': '1px solid var(--border)',
                 'font-family': 'var(--font-mono)',
                 'font-size': '11px',
-                // No max-height — the snapshot is small enough to show in full.
+                // No max-height, the snapshot is small enough to show in full.
                 overflow: 'auto',
                 background: 'var(--code-bg)',
                 'white-space': 'pre',
@@ -432,7 +431,7 @@ function snapshotPreview(s: CursorSnapshot<RunMeta> | null): string {
       dataIndex: s.dataIndex,
       formattedX: s.formattedX,
       // `activeSeriesIndex` is the series whose value at the current X
-      // is visually closest to the cursor Y — pair with `setHighlight`
+      // is visually closest to the cursor Y, pair with `setHighlight`
       // to focus the line under the cursor in every chart in the group.
       activeSeriesIndex: s.activeSeriesIndex,
       points: s.points.map((p) => ({

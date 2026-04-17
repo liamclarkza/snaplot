@@ -9,7 +9,7 @@ export default function Nav() {
       top: '0',
       'z-index': '100',
       // Uses `--bg` so /demos can repaint the nav via CSS-var overrides on
-      // the root element — the active theme paints the whole page surface.
+      // the root element, the active theme paints the whole page surface.
       background: 'color-mix(in srgb, var(--bg) 85%, transparent)',
       'backdrop-filter': 'blur(12px)',
       'border-bottom': '1px solid var(--border)',

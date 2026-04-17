@@ -2,7 +2,7 @@ import type { Layout, CursorConfig } from '../types';
 
 /**
  * Renders crosshair and selection box on the overlay canvas.
- * This layer redraws at 60fps on mouse move — keep it cheap.
+ * This layer redraws at 60fps on mouse move, keep it cheap.
  */
 
 export function renderCrosshair(
@@ -62,7 +62,7 @@ export function renderTapRing(
   progress: number,
   color: string,
 ): void {
-  // Ease-out cubic — rapid initial growth, soft settle.
+  // Ease-out cubic, rapid initial growth, soft settle.
   const eased = 1 - (1 - progress) ** 3;
   const minRadius = 8;
   const maxRadius = 26;

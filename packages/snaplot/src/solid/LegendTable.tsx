@@ -47,7 +47,7 @@ export interface LegendTableProps<TMeta = unknown> {
   /** The chart accessor (from `<Chart onReady>` or `createChart`). */
   chart: Accessor<ChartInstance | undefined>;
 
-  /** Default: `'series-only'` — the table stays in place when the cursor leaves, preventing layout jolt. */
+  /** Default: `'series-only'`, the table stays in place when the cursor leaves, preventing layout jolt. */
   fallback?: LegendTableFallback;
 
   /** Column definitions. Default: `[nameColumn(), valueColumn()]`. */
@@ -62,7 +62,7 @@ export interface LegendTableProps<TMeta = unknown> {
   /** Hovering a row sets `chart.setHighlight(seriesIndex)`. Default: `true`. */
   highlightOnHover?: boolean;
 
-  /** Optional max-height (CSS string) — useful for many series. */
+  /** Optional max-height (CSS string), useful for many series. */
   maxHeight?: string;
 
   /** Extra class added to the root container. */
@@ -73,7 +73,7 @@ export interface LegendTableProps<TMeta = unknown> {
 
   /**
    * Render-prop escape hatch. When provided, `LegendTable` renders only
-   * the children — but still wires cursor/highlight reactivity. Use this
+   * the children, but still wires cursor/highlight reactivity. Use this
    * for completely custom layouts (e.g. orbit's table with search and
    * "Add column" controls) that still want the heavy lifting done.
    */
@@ -87,7 +87,7 @@ export interface LegendTableProps<TMeta = unknown> {
 function isSolidColumn<T>(c: any): c is LegendTableSolidColumn<T> {
   // Solid columns return JSX (could be string, number, Element, array, function).
   // The DOM-plugin column type returns string | Node. Distinguish by checking
-  // whether `cell.length` (declared arity) is 3 — only Solid columns take api.
+  // whether `cell.length` (declared arity) is 3, only Solid columns take api.
   return typeof c.cell === 'function' && c.cell.length === 3;
 }
 
@@ -98,7 +98,7 @@ function renderPluginCell(content: string | Node): JSX.Element {
 }
 
 /**
- * Cursor-synchronised legend table — the SolidJS-native counterpart to
+ * Cursor-synchronised legend table, the SolidJS-native counterpart to
  * `createLegendTablePlugin`.
  *
  * Zero-config defaults produce a sensible ML-dashboard look:
@@ -121,7 +121,7 @@ function renderPluginCell(content: string | Node): JSX.Element {
  * />
  * ```
  *
- * Headless mode (orbit's path — keep your own table layout):
+ * Headless mode (orbit's path, keep your own table layout):
  *
  * ```tsx
  * <LegendTable chart={chart}>
@@ -166,7 +166,7 @@ export function LegendTable<TMeta = unknown>(
 
   /**
    * Look up a row by series index from the *current* snapshot buffer.
-   * Called in tracked cell scopes — reading `snapshot()` here is the
+   * Called in tracked cell scopes, reading `snapshot()` here is the
    * whole point: it establishes a dependency on the `equals: false`
    * signal so every cursor tick re-runs the cell, even though the
    * row object is reused by reference for zero-alloc updates.
@@ -174,14 +174,14 @@ export function LegendTable<TMeta = unknown>(
   const pointOf = (si: number): CursorSeriesPoint<TMeta> | undefined => {
     const snap = snapshot();
     if (!snap) return undefined;
-    // Linear scan is fine — `points` is small (visible series count).
+    // Linear scan is fine, `points` is small (visible series count).
     for (let i = 0; i < snap.points.length; i++) {
       if (snap.points[i].seriesIndex === si) return snap.points[i];
     }
     return undefined;
   };
 
-  /** True when there is anything to show — drives the "Step:" label. */
+  /** True when there is anything to show, drives the "Step:" label. */
   const haveStepValue = () => {
     const snap = snapshot();
     return !!snap && snap.dataX !== null && !isSeriesOnly();
@@ -210,7 +210,7 @@ export function LegendTable<TMeta = unknown>(
             }
       }
     >
-      {/* Step header — the slot is always reserved so cursor enter/leave
+      {/* Step header, the slot is always reserved so cursor enter/leave
          doesn't jolt the layout. Only the value visibility flips. */}
       <Show when={showStepHeader()}>
         <div
@@ -287,7 +287,7 @@ export function LegendTable<TMeta = unknown>(
                           ...(col.width ? { width: col.width } : {}),
                         }}
                       >
-                        {/* The IIFE runs inside a tracked scope — calling
+                        {/* The IIFE runs inside a tracked scope, calling
                            snapshot() via pointOf() forces re-evaluation on
                            every cursor tick, even though the row object
                            reference is reused for zero-alloc buffering. */}

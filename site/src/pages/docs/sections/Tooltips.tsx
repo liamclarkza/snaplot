@@ -12,11 +12,11 @@ export default function Tooltips() {
       <Section id="tooltip-modes" title="Tooltip Modes">
         <Prose>Three tooltip modes determine how points are selected when the cursor moves:</Prose>
         <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
-          <li><code>'index'</code> — shows all series at the same X position. Best for time series where all series share an X axis.</li>
-          <li><code>'nearest'</code> — shows the single closest point by euclidean (pixel) distance. Best for scatter plots.</li>
-          <li><code>'x'</code> — shows all series at the nearest X value. Similar to index but matches by X data value rather than index.</li>
+          <li><code>'index'</code>, shows all series at the same X position. Best for time series where all series share an X axis.</li>
+          <li><code>'nearest'</code>, shows the single closest point by euclidean (pixel) distance. Best for scatter plots.</li>
+          <li><code>'x'</code>, shows all series at the nearest X value. Similar to index but matches by X data value rather than index.</li>
         </ul>
-        <Prose>Tooltips are DOM elements (<code>position: fixed</code>), not canvas — better text rendering, no clipping, and easy styling.</Prose>
+        <Prose>Tooltips are DOM elements (<code>position: fixed</code>), not canvas, better text rendering, no clipping, and easy styling.</Prose>
         <Demo title="Tooltip mode demo" desc="Change mode to 'nearest' or 'x'"
           data={d_tooltip_mode()}
           code={`{
@@ -68,7 +68,7 @@ export default function Tooltips() {
         <Prose>
           <b>Cursor snap:</b> when <code>cursor.snap</code> is <code>true</code>, the crosshair snaps to the nearest data point rather than following the raw mouse position. This makes it easier to inspect exact values.
         </Prose>
-        <Demo title="Proximity and snap" desc="Move the cursor around — tooltip only shows near points. Toggle snap to see the difference."
+        <Demo title="Proximity and snap" desc="Move the cursor around, tooltip only shows near points. Toggle snap to see the difference."
           data={d_tooltip_snap()}
           code={`{
   series: [{ label: 'Points', dataIndex: 1, type: 'scatter', pointRadius: 3 }],

@@ -3,7 +3,7 @@ import { ChartCore } from '../core/Chart';
 import type { ChartConfig, ChartInstance, ColumnarData } from '../types';
 
 /**
- * createChart — lower-level reactive primitive for advanced use cases.
+ * createChart, lower-level reactive primitive for advanced use cases.
  *
  * Returns an accessor to the ChartInstance. The chart automatically
  * updates when data or config signals change.

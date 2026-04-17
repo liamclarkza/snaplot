@@ -43,7 +43,7 @@ export default function Plugins() {
 }`} />
         <Prose>
           Call <code>refLines.setLines(newLines)</code> to update lines dynamically after creation.
-          The plugin renders in the <code>afterDrawData</code> hook — above series data but below
+          The plugin renders in the <code>afterDrawData</code> hook, above series data but below
           the overlay (crosshair, selection box).
         </Prose>
       </Section>
@@ -74,11 +74,11 @@ const config = {
 
       <Section id="legend-table" title="Legend Table">
         <Prose>
-          A cursor-synchronised table that shows the value of every visible series at the cursor's X position — the common ML-dashboard pattern for comparing many runs. Available in two forms with feature parity:
+          A cursor-synchronised table that shows the value of every visible series at the cursor's X position, the common ML-dashboard pattern for comparing many runs. Available in two forms with feature parity:
         </Prose>
         <ul style={{ color: 'var(--text-secondary)', 'margin-bottom': '16px', 'font-size': '14.5px', 'line-height': '1.7', 'padding-left': '20px' }}>
-          <li><code>createLegendTablePlugin()</code> — DOM-only, attaches to any chart.</li>
-          <li><code>&lt;LegendTable&gt;</code> — SolidJS component with JSX cells, typed <code>meta</code>, and a render-prop escape hatch.</li>
+          <li><code>createLegendTablePlugin()</code>, DOM-only, attaches to any chart.</li>
+          <li><code>&lt;LegendTable&gt;</code>, SolidJS component with JSX cells, typed <code>meta</code>, and a render-prop escape hatch.</li>
         </ul>
         <Prose>
           Both share the same column helpers and the same CSS class names. Zero configuration produces a sensible default:
@@ -121,7 +121,7 @@ const config: ChartConfig<RunMeta> = {
 
         <div style={{ height: '24px' }} />
         <Prose>
-          <b>Plain-DOM plugin</b> variant for non-Solid users — same defaults, same class names, edit live below:
+          <b>Plain-DOM plugin</b> variant for non-Solid users, same defaults, same class names, edit live below:
         </Prose>
         <Demo
           title="Legend table plugin (live-editable)"
@@ -148,7 +148,7 @@ const config: ChartConfig<RunMeta> = {
 
         <div style={{ height: '24px' }} />
         <Prose>
-          <b>Headless render-prop</b> mode keeps the cursor + highlight wiring but lets you render anything in place of the table — ideal when your app already has a table component:
+          <b>Headless render-prop</b> mode keeps the cursor + highlight wiring but lets you render anything in place of the table, ideal when your app already has a table component:
         </Prose>
         <CodeBlock code={`<LegendTable chart={chart}>
   {(snapshot, highlight, setHighlight) => (
@@ -182,13 +182,13 @@ const config: ChartConfig<RunMeta> = {
 
         <div style={{ height: '24px' }} />
         <Prose>
-          Pair the group with an external "runs" panel — hover a run and every chart dims everything else:
+          Pair the group with an external "runs" panel, hover a run and every chart dims everything else:
         </Prose>
         <SidepanelHighlightDemo />
 
         <div style={{ height: '24px' }} />
         <Prose>
-          <b>Performance check</b> — many series + a value-cell update per cursor frame. The legend table reuses row DOM (text-content swaps only on cursor moves), highlight redraws only the data canvas, and the snapshot is read into a single reused buffer.
+          <b>Performance check</b>, many series + a value-cell update per cursor frame. The legend table reuses row DOM (text-content swaps only on cursor moves), highlight redraws only the data canvas, and the snapshot is read into a single reused buffer.
         </Prose>
         <BenchmarkDemo />
       </Section>
@@ -214,7 +214,7 @@ createEffect(() => {
   group.highlight(s?.activeSeriesIndex ?? null);
 });
 
-// Imperative — zero-alloc variant for hot paths:
+// Imperative, zero-alloc variant for hot paths:
 const buf = chart.getCursorSnapshot();
 chart.on('cursor:move', () => {
   chart.getCursorSnapshotInto(buf, { fallback: 'latest' });

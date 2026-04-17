@@ -4,7 +4,7 @@ import type { Scale, Layout, SeriesConfig } from '../types';
  * Scatter plot renderer.
  *
  * Performance strategy (inspired by uPlot):
- * - < 200K points: "Stamp" approach — draw a single circle into a tiny
+ * - < 200K points: "Stamp" approach, draw a single circle into a tiny
  *   offscreen canvas once, then drawImage() at each point. This is
  *   dramatically faster than arc() per point because:
  *   1. Arc rasterization happens once, not N times
@@ -118,7 +118,7 @@ function drawStamped(
   const stampSize = (radius * 2 + 2);
   const offset = radius + 1; // center of stamp in CSS pixels
 
-  // drawImage with a canvas source is a fast GPU blit — no path overhead
+  // drawImage with a canvas source is a fast GPU blit, no path overhead
   for (let i = start; i <= end; i++) {
     const yVal = yData[i];
     if (yVal !== yVal) continue; // NaN

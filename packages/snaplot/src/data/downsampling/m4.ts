@@ -1,11 +1,11 @@
 /**
- * M4 algorithm — pixel-perfect visual aggregation.
+ * M4 algorithm, pixel-perfect visual aggregation.
  * Jugel et al., VLDB 2014.
  *
  * For each pixel column, retains exactly 4 points: first, last, min, max.
  * Zero visual error compared to rendering all points. O(n) single pass.
  *
- * This is a UTILITY — not called implicitly in the render path.
+ * This is a UTILITY, not called implicitly in the render path.
  */
 export function m4(
   x: Float64Array,

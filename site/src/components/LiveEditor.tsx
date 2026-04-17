@@ -7,7 +7,7 @@ import { useTheme } from '../ThemeContext';
 
 // Everything snaplot exports is available as a bare identifier inside the
 // editor. This means new theme/plugin/column exports (e.g. refinedDarkTheme)
-// light up automatically — no hand-maintained allowlist to keep in sync.
+// light up automatically, no hand-maintained allowlist to keep in sync.
 // `Chart` is excluded: it's a Solid component, not data, and can't be used
 // usefully from an expression-mode eval.
 const { Chart: _, ...evalContext } = snaplot;
@@ -16,7 +16,7 @@ const evalArgValues = Object.values(evalContext);
 
 /**
  * Editable live example using a contenteditable div with syntax highlighting.
- * No textarea overlay — single element handles both editing and display.
+ * No textarea overlay, single element handles both editing and display.
  *
  * On input: extract plain text → re-highlight → update innerHTML
  * while preserving cursor position.

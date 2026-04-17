@@ -42,7 +42,7 @@ function configToString(config: ChartConfig, varName = 'config'): string {
 
 /**
  * Shows a live chart above its auto-generated config code.
- * Config is defined once — used for both the live chart and the code display.
+ * Config is defined once, used for both the live chart and the code display.
  */
 export default function LiveExample(props: {
   title: string;

@@ -7,7 +7,7 @@ export type NavItem =
 
 /**
  * Ordered navigation for the docs sidebar. Adding a section here also adds
- * it to the mobile drawer. Paired with anchor IDs inside Docs.tsx — the
+ * it to the mobile drawer. Paired with anchor IDs inside Docs.tsx, the
  * `scrollTo` helper jumps to the matching `<Section id="…">`.
  */
 export const NAV: NavItem[] = [
@@ -83,7 +83,7 @@ export function scrollTo(id: string) {
 }
 
 /**
- * Docs sidebar — desktop: static sticky aside. Mobile: slide-out drawer
+ * Docs sidebar, desktop: static sticky aside. Mobile: slide-out drawer
  * with a floating hamburger trigger (styled via .docs-menu-btn /
  * .docs-sidebar classes in global.css).
  *
@@ -103,7 +103,7 @@ export function SidebarUI(props: {
 
   // Lock the page behind the drawer while it's open. Previously we
   // used the position:fixed + saved-scroll-offset dance, but rapid
-  // toggling jumped the viewport around — every close ran a fresh
+  // toggling jumped the viewport around, every close ran a fresh
   // `window.scrollTo()`, and the body style swap caused reflows that
   // compounded on each click. `overflow:hidden` on <html> locks the
   // page in place without moving it, works fine across browsers, and
@@ -137,7 +137,7 @@ export function SidebarUI(props: {
 
   return (
     <>
-      {/* Mobile hamburger — visible below 768px via .docs-menu-btn media query. */}
+      {/* Mobile hamburger, visible below 768px via .docs-menu-btn media query. */}
       <button
         type="button"
         class="docs-menu-btn"
@@ -172,7 +172,7 @@ export function SidebarUI(props: {
         )}
       </button>
 
-      {/* Mobile drawer scrim — a button so screen readers announce it and
+      {/* Mobile drawer scrim, a button so screen readers announce it and
          Escape/Enter dismiss the drawer. Visually reset to look like the
          semi-transparent overlay a div would give. */}
       <Show when={props.sidebarOpen()}>

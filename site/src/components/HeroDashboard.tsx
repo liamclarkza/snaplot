@@ -15,7 +15,7 @@ import { useTheme } from '../ThemeContext';
 
 /**
  * Showcase dashboard on the /demos route. Six hand-tuned themes
- * drive every surface on the page, not just the charts — the chip
+ * drive every surface on the page, not just the charts, the chip
  * row rewrites the local CSS-var namespace so panels, chips and
  * text pick up the selection too. Panels lean on layered elevation
  * (inset highlight + soft ambient shadow) instead of hard borders.
@@ -31,29 +31,29 @@ type ThemeEntry = {
   dark: boolean;
   /**
    * Density ramp for the heatmap panel. 3–4 stops that walk from the
-   * page bg through the theme's primary into a hotter tertiary — gives
+   * page bg through the theme's primary into a hotter tertiary, gives
    * every theme a distinct "hot spot" colour instead of always Viridis.
    */
   heatmapGradient: string[];
 };
 
 const THEMES: ThemeEntry[] = [
-  // Paper — warm cream through orange into red (Okabe-Ito warm arc)
+  // Paper, warm cream through orange into red (Okabe-Ito warm arc)
   { key: 'light',  label: 'Paper',  theme: lightTheme,  dark: false,
     heatmapGradient: ['#fafbfc', '#e69f00', '#d55e00'] },
-  // Fog — cool blue family, picks up the productivity feel
+  // Fog, cool blue family, picks up the productivity feel
   { key: 'fog',    label: 'Fog',    theme: fogTheme,    dark: false,
     heatmapGradient: ['#f5f7fb', '#60a5fa', '#2563eb', '#1e3a8a'] },
-  // Slate — classic cool-to-warm "viridis-lite" tuned to the slate bg
+  // Slate, classic cool-to-warm "viridis-lite" tuned to the slate bg
   { key: 'dark',   label: 'Slate',  theme: darkTheme,   dark: true,
     heatmapGradient: ['#14161f', '#1e3a8a', '#0891b2', '#22d3ee', '#fde68a'] },
-  // Ocean — deep water to surface sparkle
+  // Ocean, deep water to surface sparkle
   { key: 'ocean',  label: 'Ocean',  theme: oceanTheme,  dark: true,
     heatmapGradient: ['#0b1a2b', '#1d4ed8', '#22d3ee', '#fef3c7'] },
-  // Forest — pine to leaf to sunlit canopy
+  // Forest, pine to leaf to sunlit canopy
   { key: 'forest', label: 'Forest', theme: forestTheme, dark: true,
     heatmapGradient: ['#0c1613', '#064e3b', '#10b981', '#fde68a'] },
-  // Violet — aubergine through lavender to hot magenta
+  // Violet, aubergine through lavender to hot magenta
   { key: 'violet', label: 'Violet', theme: violetTheme, dark: true,
     heatmapGradient: ['#100d1f', '#4c1d95', '#a78bfa', '#f0abfc'] },
 ];
@@ -119,7 +119,7 @@ function genHeatmap(n: number): ColumnarData {
 }
 
 /**
- * Top-N endpoints by request count — grouped bar with a 2xx
+ * Top-N endpoints by request count, grouped bar with a 2xx
  * and 5xx column per endpoint so the chart actually says something
  * (not just random bars). Errors scale with traffic + a random
  * failure rate to keep the shape realistic.
@@ -130,7 +130,7 @@ function genBars(): ColumnarData {
   const success = new Float64Array(n);
   const errors = new Float64Array(n);
   const baselines = [1200, 820, 640, 510, 390, 220];
-  // Per-endpoint error rate — a mix of healthy and unhealthy endpoints
+  // Per-endpoint error rate, a mix of healthy and unhealthy endpoints
   // so the grouped bars actually tell a story instead of reading flat.
   const errorRates = [0.04, 0.18, 0.08, 0.12, 0.02, 0.22];
   for (let i = 0; i < n; i++) {
@@ -143,7 +143,7 @@ function genBars(): ColumnarData {
 }
 
 /**
- * Response-time histogram — bimodal "fast cache hit / slow DB path"
+ * Response-time histogram, bimodal "fast cache hit / slow DB path"
  * distribution typical of API latency. 8K samples, freedman-diaconis
  * bins give a smooth shape without over-binning.
  */
@@ -152,10 +152,10 @@ function genHistogram(): ColumnarData {
   const raw = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     if (Math.random() < 0.7) {
-      // fast path — tight around 30 ms
+      // fast path, tight around 30 ms
       raw[i] = 30 + (Math.random() + Math.random() - 1) * 12;
     } else {
-      // slow path — spread around 120 ms
+      // slow path, spread around 120 ms
       raw[i] = 120 + (Math.random() + Math.random() + Math.random() - 1.5) * 35;
     }
   }
@@ -254,7 +254,7 @@ export default function HeroDashboard() {
     padding: { top: 20, right: 20, bottom: 36, left: 48 },
   }));
 
-  // ─── Stream loop — appends one point every 1.5s ──────────────
+  // ─── Stream loop, appends one point every 1.5s ──────────────
   const interval = setInterval(() => {
     // Keep a rolling window: push a new point, drop the oldest so the
     // X-range slides instead of stretching unbounded.
@@ -290,13 +290,13 @@ export default function HeroDashboard() {
     // by mode: dark themes darken the surround (shadows are muted on
     // dark, so we need a colour step); light themes share the panel
     // bg and let the ambient shadow do all the elevation work (a black
-    // mix-in on warm off-whites looked muddy — "cement" not "paper").
+    // mix-in on warm off-whites looked muddy, "cement" not "paper").
     const pageBg = dark
       ? `color-mix(in srgb, ${t.backgroundColor} 88%, #000 12%)`
       : t.backgroundColor;
     // Dark: a dark drop-shadow under a dark card reads muddy. Skip
     // the ambient shadow and let the tinted page bg + inset top
-    // highlight do the lifting — the soft-UI "lit from above" feel
+    // highlight do the lifting, the soft-UI "lit from above" feel
     // without the blob. Light: the layered shadow works as intended.
     const elevInset = dark
       ? 'inset 0 1px 0 rgba(255, 255, 255, 0.05)'
@@ -403,14 +403,14 @@ export default function HeroDashboard() {
             gap: 'var(--space-4)',
           }}
         >
-          {/* Row 1 — streaming (full width) */}
+          {/* Row 1, streaming (full width) */}
           <Panel title="Throughput & latency" subtitle="Streaming, 1.5s tick">
             <div style={{ height: 'clamp(240px, 36vh, 320px)' }}>
               <Chart config={streamConfig()} data={streamData()} onReady={(c) => { streamChart = c; }} />
             </div>
           </Panel>
 
-          {/* Row 2 — scatter + heatmap */}
+          {/* Row 2, scatter + heatmap */}
           <div
             style={{
               display: 'grid',
@@ -430,7 +430,7 @@ export default function HeroDashboard() {
             </Panel>
           </div>
 
-          {/* Row 3 — bar + histogram */}
+          {/* Row 3, bar + histogram */}
           <div
             style={{
               display: 'grid',
@@ -459,7 +459,7 @@ function clamp(v: number, lo: number, hi: number) {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-/** Single-theme picker button — a swatch row previewing the palette. */
+/** Single-theme picker button, a swatch row previewing the palette. */
 function ThemeChip(props: { entry: ThemeEntry; active: boolean; onPick: () => void }) {
   const preview = () => {
     const p = props.entry.theme.palette;
@@ -492,7 +492,7 @@ function ThemeChip(props: { entry: ThemeEntry; active: boolean; onPick: () => vo
           'background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
     >
-      {/* Avatar-stack preview — three overlapping dots on the chip
+      {/* Avatar-stack preview, three overlapping dots on the chip
           itself (no mini-pill). A ring in the chip's own bg colour
           separates them cleanly without adding a bright frame. */}
       <span aria-hidden="true" style={{ display: 'inline-flex' }}>

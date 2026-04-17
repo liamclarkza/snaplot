@@ -34,7 +34,7 @@ const config: ChartConfig = {
 
 <Chart config={config} data={data} />`} />
         <div style={{ height: '16px' }} />
-        <Demo title="Live quick start" desc="A simple line chart — edit the config to experiment"
+        <Demo title="Live quick start" desc="A simple line chart, edit the config to experiment"
           data={d_quickstart()} height="240px"
           code={`{
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
@@ -65,7 +65,7 @@ const data: ColumnarData = [
           When you want to update data, call <code>setData()</code> with new arrays or use <code>appendData()</code> for streaming.
         </Prose>
         <Prose>
-          <b>Render pipeline:</b> data change or resize triggers scale recomputation and marks all 3 canvas layers dirty. Scale change (zoom) marks data + grid dirty. Pointer events only mark the overlay dirty. A single <code>requestAnimationFrame</code> fires per frame, redrawing only the dirty layers. This means cursor movement at 60fps only redraws one lightweight overlay canvas — the data canvas with 100K+ points remains untouched.
+          <b>Render pipeline:</b> data change or resize triggers scale recomputation and marks all 3 canvas layers dirty. Scale change (zoom) marks data + grid dirty. Pointer events only mark the overlay dirty. A single <code>requestAnimationFrame</code> fires per frame, redrawing only the dirty layers. This means cursor movement at 60fps only redraws one lightweight overlay canvas, the data canvas with 100K+ points remains untouched.
         </Prose>
       </Section>
     </>

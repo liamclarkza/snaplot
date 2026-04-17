@@ -22,7 +22,7 @@ export default function App() {
     setPage(next);
     // Reset scroll on route change. Use `behavior: 'instant'` so the
     // global `html { scroll-behavior: smooth }` doesn't animate the
-    // reset — a smooth ramp competes with the user's next scroll and
+    // reset, a smooth ramp competes with the user's next scroll and
     // lands the page partway down. Skip on in-page anchor navigation
     // (prev === next).
     if (prev !== next) {

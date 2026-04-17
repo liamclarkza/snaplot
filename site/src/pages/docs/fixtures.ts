@@ -6,7 +6,7 @@ import type { ColumnarData } from 'snaplot';
  * (`[xValues, ...ySeries]`, all Float64Array) ready to pass into a chart.
  *
  * Generators are deterministic in shape but randomised in values so each
- * page load produces slightly different curves — keeps the docs feeling
+ * page load produces slightly different curves, keeps the docs feeling
  * alive without committing a large static fixture set.
  */
 

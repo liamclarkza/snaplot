@@ -20,7 +20,7 @@ export default function ChartTypes() {
   const [d_bar] = createSignal(barData());
   const [d_hist] = createSignal(histData());
 
-  // Streaming line chart — appends a data point every second so the Line
+  // Streaming line chart, appends a data point every second so the Line
   // demo is visibly alive when the reader scrolls past it.
   let lineChart: ChartInstance | undefined;
   const interval = setInterval(() => {
@@ -69,7 +69,7 @@ export default function ChartTypes() {
           range as a single series. A band series combines three data columns into one visual unit:
           a filled region between <code>upperDataIndex</code> and <code>lowerDataIndex</code>,
           with a center line at <code>dataIndex</code>. The center line is what the tooltip
-          and cursor snap to — the fill is purely decorative.
+          and cursor snap to, the fill is purely decorative.
         </Prose>
         <Demo title="Mean line with ±σ confidence band" desc="One series, three columns: mean (1), upper (2), lower (3)"
           data={d_band()}
@@ -87,7 +87,7 @@ export default function ChartTypes() {
 
       <Section id="scatter" title="Scatter">
         <Prose>
-          Scatter plots use stamp-based rendering — a single point shape is pre-rendered to an offscreen canvas, then stamped at each data position. This makes scatter rendering scale to tens of thousands of points with minimal overhead.
+          Scatter plots use stamp-based rendering, a single point shape is pre-rendered to an offscreen canvas, then stamped at each data position. This makes scatter rendering scale to tens of thousands of points with minimal overhead.
           Tooltip mode <code>'nearest'</code> uses euclidean (pixel-space) distance to find the closest point.
         </Prose>
         <Demo title="Clustered scatter (2K points)" data={d_scatter()}

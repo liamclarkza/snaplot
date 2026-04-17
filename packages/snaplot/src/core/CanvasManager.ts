@@ -6,7 +6,7 @@
  * Layer 2 (overlay): Crosshair, selection box. pointer-events:none.
  * DOM layer:         Axis labels, tick values, tooltip, legend.
  *
- * Per spec §3: overlay has pointer-events:none — events pass through
+ * Per spec §3: overlay has pointer-events:none, events pass through
  * to the data canvas (or a hit-test div).
  */
 export class CanvasManager {
@@ -29,8 +29,7 @@ export class CanvasManager {
   ) {
     this._dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
 
-    // Container. `tabindex="0"` makes the chart keyboard-focusable —
-    // arrow-key pan / +/- zoom / 0-reset get wired up by GestureManager.
+    // Container. `tabindex="0"` makes the chart keyboard-focusable,    // arrow-key pan / +/- zoom / 0-reset get wired up by GestureManager.
     // We don't set `:focus-visible` styling here; consumers can target
     // the container with their own CSS.
     this.container = document.createElement('div');
@@ -87,7 +86,7 @@ export class CanvasManager {
 
   /**
    * Resize all canvases. HiDPI: physical pixels = CSS pixels × dpr.
-   * Called once on init + on ResizeObserver callback — never per frame.
+   * Called once on init + on ResizeObserver callback, never per frame.
    */
   resize(width: number, height: number): void {
     this._dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;

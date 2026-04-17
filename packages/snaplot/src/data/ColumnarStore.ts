@@ -32,7 +32,7 @@ export class ColumnarStore {
   static validate(data: ColumnarData): void {
     if (!Array.isArray(data) && !(data && typeof (data as unknown as { length: number }).length === 'number')) {
       throw new Error(
-        'ColumnarData must be an array of Float64Arrays — received ' +
+        'ColumnarData must be an array of Float64Arrays, received ' +
           describeType(data) +
           '. Expected: [xValues, ...ySeries] where each column is a Float64Array.',
       );
@@ -45,12 +45,12 @@ export class ColumnarStore {
       );
     }
 
-    // Validate each column is a Float64Array — catches the common mistake of
+    // Validate each column is a Float64Array, catches the common mistake of
     // passing a plain `number[]` or the wrong typed array (Int32, Uint8, …).
     for (let c = 0; c < data.length; c++) {
       if (!(data[c] instanceof Float64Array)) {
         throw new Error(
-          `Column ${c} is a ${describeType(data[c])} — snaplot expects ` +
+          `Column ${c} is a ${describeType(data[c])}, snaplot expects ` +
             `Float64Array for every column. If you have a plain array, ` +
             `wrap it with \`new Float64Array(arr)\`.`,
         );
@@ -62,14 +62,14 @@ export class ColumnarStore {
       if (data[c].length !== len) {
         throw new Error(
           `Column length mismatch: X has ${len} values but column ${c} has ` +
-            `${data[c].length}. All columns must have the same length — each ` +
+            `${data[c].length}. All columns must have the same length, each ` +
             `Y value at index i pairs with the X value at index i.`,
         );
       }
     }
 
     // Verify X is sorted (monotonically non-decreasing). A single out-of-order
-    // point is enough — report it with neighbouring indices so the caller can
+    // point is enough, report it with neighbouring indices so the caller can
     // locate the source (usually a forgotten sort step).
     const x = data[0];
     for (let i = 1; i < x.length; i++) {
@@ -78,7 +78,7 @@ export class ColumnarStore {
           `X values must be sorted in non-decreasing order, but ` +
             `x[${i}] = ${x[i]} < x[${i - 1}] = ${x[i - 1]}. ` +
             `Sort the X column (and move Y values in lockstep) before ` +
-            `passing the data in — snaplot uses binary search on X for ` +
+            `passing the data in, snaplot uses binary search on X for ` +
             `viewport culling and hit-testing.`,
         );
       }
@@ -138,7 +138,7 @@ export class ColumnarStore {
       throw new Error(
         `append() expects ${this.columns.length} columns to match the initial ` +
           `data shape, but got ${data.length}. Pass the same number of ` +
-          `Float64Arrays you passed to setData/the constructor — one X column ` +
+          `Float64Arrays you passed to setData/the constructor, one X column ` +
           `plus one per Y series.`,
       );
     }

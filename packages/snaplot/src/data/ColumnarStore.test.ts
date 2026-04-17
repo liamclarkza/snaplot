@@ -10,7 +10,7 @@ describe('ColumnarStore construction + validate', () => {
   });
 
   it('rejects non-array payloads with a typed error', () => {
-    // null has no .length — hits the array-shape branch.
+    // null has no .length, hits the array-shape branch.
     expect(() => new ColumnarStore(null as unknown as ColumnarData))
       .toThrow(/array of Float64Arrays/);
     // Strings have a .length so we pass the shape guard but fail on the

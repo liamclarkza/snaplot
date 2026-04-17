@@ -7,7 +7,7 @@ import { DEFAULT_PADDING, DEFAULT_TICK_COUNT } from '../constants';
  * 2. Reserve space for axes (measured from widest tick label)
  * 3. Plot area gets whatever remains
  *
- * Computed once on init + on ResizeObserver — never per frame.
+ * Computed once on init + on ResizeObserver, never per frame.
  */
 
 /**

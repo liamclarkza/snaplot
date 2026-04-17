@@ -5,7 +5,7 @@ import type { Plugin, ChartInstance } from '../../types';
  * Creates a clickable legend above or below the chart.
  * Click a series name to toggle its visibility.
  *
- * Styling lives in `snaplot/legend-table.css` — import that stylesheet
+ * Styling lives in `snaplot/legend-table.css`, import that stylesheet
  * once in your app entry to pick up the default look (rounded pill on
  * hover, subtle dimmed state for hidden series, touch-friendly tap
  * targets). Every element carries a `snaplot-legend-*` class for
@@ -103,7 +103,7 @@ function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
     item.appendChild(label);
 
     item.addEventListener('click', () => {
-      // Re-read the latest config inside the handler — the series array
+      // Re-read the latest config inside the handler, the series array
       // may have been replaced since this item was rendered. The
       // subsequent `onSetOptions` hook is what re-renders the legend,
       // so we don't need to call renderItems() here.

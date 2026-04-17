@@ -9,7 +9,7 @@ import {
 } from '../constants';
 
 /**
- * GestureManager — unified gesture detection and action dispatch.
+ * GestureManager, unified gesture detection and action dispatch.
  *
  * Replaces PointerHandler + ZoomPanHandler. Handles:
  * - Mouse: drag, click, double-click, wheel, modifiers (shift, ctrl/cmd)
@@ -58,7 +58,7 @@ export class GestureManager {
   private lastTapX = 0;
   private lastTapY = 0;
 
-  // Pinch state — just the distance; the centre point is recomputed each
+  // Pinch state, just the distance; the centre point is recomputed each
   // move because it depends on both pointer positions.
   private lastPinchDist = 0;
 
@@ -121,7 +121,7 @@ export class GestureManager {
     // Keyboard events bubble up from the focused element, so attach to the
     // focusable container (the CanvasManager's tabindex=0 parent of dataCanvas).
     // Walking the parent chain keeps GestureManager's constructor signature
-    // stable — callers don't need to pass both targets separately.
+    // stable, callers don't need to pass both targets separately.
     this.keyboardTarget = this.target.parentElement;
     this.keyboardTarget?.addEventListener('keydown', this.boundKeyDown);
   }
@@ -227,7 +227,7 @@ export class GestureManager {
 
     if (e.button !== 0) return; // primary button only
 
-    // Cancel any in-flight pan momentum — grabbing the chart stops the glide.
+    // Cancel any in-flight pan momentum, grabbing the chart stops the glide.
     this.cancelMomentum();
 
     const { x, y } = this.localCoords(e);
@@ -237,7 +237,7 @@ export class GestureManager {
     this.dragStartArea = area;
     // setPointerCapture can throw when the UA has already retargeted the
     // pointer (e.g. fast multi-touch under iOS, or synthetic events). Keep
-    // going either way — capture is an optimisation, not a correctness
+    // going either way, capture is an optimisation, not a correctness
     // requirement for our state machine.
     try { this.target.setPointerCapture(e.pointerId); } catch {}
 
@@ -357,7 +357,7 @@ export class GestureManager {
       return;
     }
 
-    // Dragging — pan or box-zoom based on mode
+    // Dragging, pan or box-zoom based on mode
     if (this.state === 'dragging') {
       if (this.dragIsPan(e)) {
         // Pan: emit incremental delta with axis key from drag start area
@@ -376,7 +376,7 @@ export class GestureManager {
           const dt = Math.max(1, now - this.lastMoveTime);
           const instVX = dxPan / dt;
           const instVY = dyPan / dt;
-          // α = 0.5 — fast to react, stable enough against jitter.
+          // α = 0.5, fast to react, stable enough against jitter.
           const a = 0.5;
           this.velocityX = a * instVX + (1 - a) * this.velocityX;
           this.velocityY = a * instVY + (1 - a) * this.velocityY;
@@ -425,7 +425,7 @@ export class GestureManager {
           x2: x, y2: y,
         });
       } else {
-        // Cancelled — clear the box
+        // Cancelled, clear the box
         this.eventBus.emit('action:box-end', { x1: 0, y1: 0, x2: 0, y2: 0 });
       }
       this.resetState();
@@ -483,7 +483,7 @@ export class GestureManager {
   }
 
   private onPointerLeave(_e: PointerEvent): void {
-    // Suppress cursor-leave while a gesture is in flight — pointer capture
+    // Suppress cursor-leave while a gesture is in flight, pointer capture
     // keeps the drag alive even when the pointer briefly leaves the canvas
     // bounds. Without this guard the crosshair/tooltip flickers mid-pan.
     if (this.state !== 'idle') return;
@@ -501,7 +501,7 @@ export class GestureManager {
   // ─── Pan momentum (touch only) ────────────────────────────
 
   private startMomentum(): void {
-    // Threshold of 0.1 px/ms ≈ 100 px/s — below this it's just a static release.
+    // Threshold of 0.1 px/ms ≈ 100 px/s, below this it's just a static release.
     const vMag = Math.hypot(this.velocityX, this.velocityY);
     if (vMag < 0.1) return;
 
@@ -522,7 +522,7 @@ export class GestureManager {
       const dy = this.velocityY * dt;
       this.eventBus.emit('action:pan', { dx, dy, axis: this.momentumAxis });
 
-      // Exponential decay — halves roughly every ~130ms.
+      // Exponential decay, halves roughly every ~130ms.
       const decay = Math.exp(-dt / 180);
       this.velocityX *= decay;
       this.velocityY *= decay;
@@ -554,7 +554,7 @@ export class GestureManager {
     const { x, y } = this.localCoords(e);
     const area = this.getAxisArea(x, y);
 
-    // Only intercept pinch (ctrlKey) — regular scroll passes through to page
+    // Only intercept pinch (ctrlKey), regular scroll passes through to page
     const isPinch = e.ctrlKey || e.metaKey;
 
     if (!isPinch) {
@@ -576,7 +576,7 @@ export class GestureManager {
         const zoom = this.getZoomConfig();
         if (!zoom.enabled) return;
 
-        // Magnitude only — direction comes from the sign of deltaY.
+        // Magnitude only, direction comes from the sign of deltaY.
         // Negative values are clamped to 0 (disabled); there's no
         // legitimate use for an inverted wheel.
         const strength = Math.max(0, zoom.wheelStep ?? DEFAULT_WHEEL_STEP);
@@ -588,7 +588,7 @@ export class GestureManager {
         return;
       }
 
-      // Scroll started elsewhere — let it pass through to page
+      // Scroll started elsewhere, let it pass through to page
       return;
     }
 
@@ -611,7 +611,7 @@ export class GestureManager {
     this.eventBus.emit('action:zoom', { factor, anchorX: x, anchorY: y, axis });
   }
 
-  // ─── Double-click (mouse only — touch uses double-tap) ────
+  // ─── Double-click (mouse only, touch uses double-tap) ────
 
   private onDblClick(e: MouseEvent): void {
     const mode = this.getMode();
@@ -632,12 +632,12 @@ export class GestureManager {
    * Keyboard shortcuts for keyboard-only users. Active while the chart
    * container has focus.
    *
-   *   ArrowLeft / ArrowRight   — pan X by PAN_STEP
-   *   ArrowUp / ArrowDown      — pan Y by PAN_STEP (if pan.y enabled)
-   *   Shift + Arrow            — larger step (PAN_STEP_FAST)
-   *   `+` / `=`                — zoom in at the chart centre
-   *   `-` / `_`                — zoom out at the chart centre
-   *   `0` / `Home`             — reset zoom
+   *   ArrowLeft / ArrowRight  , pan X by PAN_STEP
+   *   ArrowUp / ArrowDown     , pan Y by PAN_STEP (if pan.y enabled)
+   *   Shift + Arrow           , larger step (PAN_STEP_FAST)
+   *   `+` / `=`               , zoom in at the chart centre
+   *   `-` / `_`               , zoom out at the chart centre
+   *   `0` / `Home`            , reset zoom
    *
    * All shortcuts respect interaction mode: readonly suppresses them.
    */
@@ -654,7 +654,7 @@ export class GestureManager {
 
     const PAN_STEP = 40;
     const PAN_STEP_FAST = 120;
-    const ZOOM_FACTOR = 1.2; // 20% per key press — matches wheel feel
+    const ZOOM_FACTOR = 1.2; // 20% per key press, matches wheel feel
     const layout = this.getLayout();
     const centreX = layout.plot.left + layout.plot.width / 2;
     const centreY = layout.plot.top + layout.plot.height / 2;

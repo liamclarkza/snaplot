@@ -83,17 +83,17 @@ export default function Interactions() {
           The <code>onZoom</code> callback fires whenever the viewport changes.
         </Prose>
         <Prose>
-          <b>Bounds</b> — by default, pan and zoom are clamped to the data extent so users can't navigate past the data. Override via <code>zoom.bounds</code>:
+          <b>Bounds</b>, by default, pan and zoom are clamped to the data extent so users can't navigate past the data. Override via <code>zoom.bounds</code>:
         </Prose>
         <CodeBlock code={`zoom: { bounds: true }                             // default (clamp X to data, Y unbounded)
-zoom: { bounds: false }                            // or 'unbounded' — classic infinite nav
+zoom: { bounds: false }                            // or 'unbounded', classic infinite nav
 zoom: { bounds: 'data' }                           // clamp every axis to data extent
 zoom: { bounds: { x: 'data', y: 'unbounded' } }    // per-axis
 zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         <Prose>
-          Bounds are evaluated on every viewport change. Panning into the edge stops at the edge (range preserved); zoom-out past the full extent collapses to the full extent. The <code>'data'</code> bound tracks what <code>resetZoom()</code> would produce — including <code>nice()</code> expansion and any axis pins — so the zoom-out limit matches the initial view.
+          Bounds are evaluated on every viewport change. Panning into the edge stops at the edge (range preserved); zoom-out past the full extent collapses to the full extent. The <code>'data'</code> bound tracks what <code>resetZoom()</code> would produce, including <code>nice()</code> expansion and any axis pins, so the zoom-out limit matches the initial view.
         </Prose>
-        <Demo title="Zoom controls" desc="Drag to zoom, double-click to reset. Try zooming out past the edges — bounds prevent you from escaping the data."
+        <Demo title="Zoom controls" desc="Drag to zoom, double-click to reset. Try zooming out past the edges, bounds prevent you from escaping the data."
           data={d_zoom()}
           code={`{
   axes: { x: { type: 'time' } },
@@ -127,7 +127,7 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
       <Section id="cursor" title="Cursor & Crosshair">
         <Prose>
           Configure the cursor crosshair with <code>cursor</code>. Options include <code>show</code>, <code>snap</code> (snap to nearest data point),
-          <code>xLine</code>/<code>yLine</code> (toggle each crosshair line), <code>color</code>, <code>dash</code> (dash pattern array), and <code>indicators</code> (the per-series dot+ring drawn at each hit-tested point on hover — disable when a legend table already shows the values).
+          <code>xLine</code>/<code>yLine</code> (toggle each crosshair line), <code>color</code>, <code>dash</code> (dash pattern array), and <code>indicators</code> (the per-series dot+ring drawn at each hit-tested point on hover, disable when a legend table already shows the values).
         </Prose>
         <Prose>
           <b>Cross-chart cursor sync:</b> set the same <code>cursor.syncKey</code> on multiple charts to synchronize their crosshair positions. See also{' '}
@@ -157,11 +157,11 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
       <Section id="touch" title="Touch Gestures">
         <Prose>Touch-specific interaction behaviors:</Prose>
         <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
-          <li><b>One-finger drag</b> — pan along the X axis</li>
-          <li><b>Two-finger pinch</b> — zoom (X-only in timeseries mode, XY in analytical mode). Axis locking is automatic based on the pinch direction.</li>
-          <li><b>Long-press + drag</b> — activates box zoom (same as mouse drag)</li>
-          <li><b>Tap</b> — shows tooltip at the nearest data point</li>
-          <li><b>Double-tap</b> — resets zoom to full data extent</li>
+          <li><b>One-finger drag</b>, pan along the X axis</li>
+          <li><b>Two-finger pinch</b>, zoom (X-only in timeseries mode, XY in analytical mode). Axis locking is automatic based on the pinch direction.</li>
+          <li><b>Long-press + drag</b>, activates box zoom (same as mouse drag)</li>
+          <li><b>Tap</b>, shows tooltip at the nearest data point</li>
+          <li><b>Double-tap</b>, resets zoom to full data extent</li>
         </ul>
         <Prose>
           Configure touch behavior with the <code>touch</code> config:

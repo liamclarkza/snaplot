@@ -1,14 +1,14 @@
 /**
- * Histogram utility — compute bins from raw data.
+ * Histogram utility, compute bins from raw data.
  *
  * This is a USER-FACING utility, not called internally by the chart.
  * The chart only renders pre-computed bins. The user controls
  * when and how to bin their data (P3: library never touches your data).
  *
  * Bin methods:
- * - Freedman-Diaconis (default): 2 * IQR * n^(-1/3) — robust to outliers
- * - Sturges: ceil(log2(n) + 1) — simple, good for normal distributions
- * - Scott: 3.5 * sigma / n^(1/3) — optimized for Gaussian data
+ * - Freedman-Diaconis (default): 2 * IQR * n^(-1/3), robust to outliers
+ * - Sturges: ceil(log2(n) + 1), simple, good for normal distributions
+ * - Scott: 3.5 * sigma / n^(1/3), optimized for Gaussian data
  *
  * Returns ColumnarData-compatible arrays: edges (N+1) padded to match
  * counts (N+1, last element = 0) so both columns have equal length.
@@ -118,7 +118,7 @@ function computeBinCount(
       return h > 0 ? Math.ceil(range / h) : Math.ceil(Math.log2(n) + 1);
     }
 
-    // 'freedman-diaconis' falls through to the default — both paths compute
+    // 'freedman-diaconis' falls through to the default, both paths compute
     // IQR-based bin width, so the explicit case label is redundant.
     default: {
       const q1 = sorted[Math.floor(n * 0.25)];

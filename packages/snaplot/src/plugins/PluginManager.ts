@@ -36,7 +36,7 @@ export class PluginManager {
     for (const plugin of this.plugins) {
       const fn = plugin[hook];
       if (typeof fn === 'function') {
-        // Each hook has its own signature — the dispatch is intentionally
+        // Each hook has its own signature, the dispatch is intentionally
         // variadic, so cast to a top-type callable to satisfy the compiler
         // without reaching for `any` or `Function`.
         const result = (fn as (...a: unknown[]) => unknown).apply(plugin, args);

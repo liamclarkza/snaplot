@@ -1,7 +1,7 @@
 import type { Scale, Layout, SeriesConfig } from '../types';
 
 /**
- * Line and area chart renderer. Pure function — no state.
+ * Line and area chart renderer. Pure function, no state.
  *
  * Interpolation modes:
  * - linear: moveTo/lineTo (fastest, most honest)

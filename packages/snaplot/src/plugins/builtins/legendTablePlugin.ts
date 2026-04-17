@@ -19,7 +19,7 @@ export type { LegendTableColumn } from './legendTableColumns';
  * - `first`        → show snapshot at the first X value
  * - `series-only`  → show name/swatch rows but blank value cells and hide the step header
  *
- * `series-only` is the sensible default for dashboards — the table stays
+ * `series-only` is the sensible default for dashboards, the table stays
  * in place (no layout shift) but does not show stale numbers.
  */
 export type LegendTableFallback = 'hide' | 'latest' | 'first' | 'series-only';
@@ -39,7 +39,7 @@ export interface LegendTableOptions {
   highlightOnHover?: boolean;
   /** Clicking a row toggles `series.visible`. Defaults to `false`. */
   toggleVisibilityOnClick?: boolean;
-  /** Optional max-height (CSS string) — useful for many series. */
+  /** Optional max-height (CSS string), useful for many series. */
   maxHeight?: string;
   /** Extra class added to the root container. */
   className?: string;
@@ -51,7 +51,7 @@ export interface LegendTableOptions {
  * Performance:
  * - Rows are built once per `data:update` (cached `<tr>` + `<td>` refs).
  * - `cursor:move` only swaps `textContent` on value cells and the step
- *   header — no `innerHTML` rewrites in the hot path.
+ *   header, no `innerHTML` rewrites in the hot path.
  * - The snapshot is read into a single reused buffer.
  */
 export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugin {
@@ -62,7 +62,7 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
   const toggleOnClick = options.toggleVisibilityOnClick ?? false;
   const columns = options.columns ?? [nameColumn(), valueColumn()];
 
-  // Snapshot fallback for the actual buffer fill — `series-only`
+  // Snapshot fallback for the actual buffer fill, `series-only`
   // resolves to `latest` so we still get series rows, but we'll
   // blank value cells in render.
   const bufferFallback: 'hide' | 'latest' | 'first' =
@@ -119,7 +119,7 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
 
       // Listeners are attached exactly once, inside this `if (!entry)` branch.
       // On every subsequent rebuild the cached <tr> is reused, so we do NOT
-      // re-add hover/click handlers — avoiding listener accumulation on
+      // re-add hover/click handlers, avoiding listener accumulation on
       // repeated `data:update` emissions.
       let entry = rowCache.get(si);
       if (!entry) {
@@ -197,7 +197,7 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
     }
     container.style.display = '';
 
-    // Step header — the slot is always reserved when `showStepHeader` is
+    // Step header, the slot is always reserved when `showStepHeader` is
     // true so cursor enter/leave doesn't jolt the chart layout. Only the
     // value's visibility flips, keeping the row height constant.
     if (stepLabelEl && stepEl) {
@@ -318,14 +318,14 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
 
       // Subscribe to events.
       offHandlers.push(chart.on('cursor:move', refreshCells));
-      // Data updates only change values — refresh cells, don't rebuild
+      // Data updates only change values, refresh cells, don't rebuild
       // the row list. Rebuilding wipes <tr>s under the cursor/mouse at
       // streaming tick rates, which swallows clicks and hovers.
       offHandlers.push(chart.on('data:update', refreshCells));
       offHandlers.push(chart.on('highlight:change', applyHighlightHighlightAttr));
     },
 
-    // Series added/removed/visibility flipped — rebuild row list, then
+    // Series added/removed/visibility flipped, rebuild row list, then
     // reflow values.
     onSetOptions() {
       rebuildRows();

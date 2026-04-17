@@ -14,7 +14,7 @@ function escapeHtml(raw: string): string {
 /**
  * DOM-based tooltip using position:fixed.
  * Shown only when cursor is near data points (proximity gated by HitTester).
- * No flip logic needed — tooltip can overflow chart bounds freely.
+ * No flip logic needed, tooltip can overflow chart bounds freely.
  */
 export class TooltipManager {
   private el: HTMLDivElement;
@@ -115,7 +115,7 @@ export class TooltipManager {
    * values, colours) are HTML-escaped so a series name like
    * `<img src=x onerror=alert(1)>` cannot execute.
    *
-   * Colour strings are also escaped — they land in a `style` attribute, so
+   * Colour strings are also escaped, they land in a `style` attribute, so
    * a crafted colour could otherwise break out of the attribute context.
    */
   private defaultRender(points: TooltipPoint[]): string {

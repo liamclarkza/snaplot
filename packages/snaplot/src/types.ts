@@ -186,9 +186,9 @@ export type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
 /** Configuration for an axis entry in ChartConfig.axes */
 export interface AxisConfig {
   type?: ScaleType;
-  /** Fixed lower bound. Pinned — auto-range will restore to this value on reset. */
+  /** Fixed lower bound. Pinned, auto-range will restore to this value on reset. */
   min?: number;
-  /** Fixed upper bound. Pinned — auto-range will restore to this value on reset. */
+  /** Fixed upper bound. Pinned, auto-range will restore to this value on reset. */
   max?: number;
   /**
    * Master switch for auto-range. When `false`, the scale keeps whatever
@@ -273,7 +273,7 @@ export interface ZoomConfig {
   maxRange?: number;
   /**
    * Constrains pan + zoom so the viewport cannot escape the data (or a
-   * custom range). Applied on every viewport change — pan past the edge
+   * custom range). Applied on every viewport change, pan past the edge
    * stops at the edge, zoom-out stops at the full extent.
    *
    * - `true` (default) → shorthand for `{ x: 'data', y: 'data' }`.
@@ -345,7 +345,7 @@ export interface TooltipPoint {
 // ============================================================
 
 /**
- * One row of a cursor snapshot — the value of a single visible series
+ * One row of a cursor snapshot, the value of a single visible series
  * at a given X index, plus everything the legend table needs to render it.
  */
 export interface CursorSeriesPoint<TMeta = unknown> {
@@ -382,8 +382,7 @@ export interface CursorSnapshot<TMeta = unknown> {
    * The series whose Y-value at `dataIndex` is visually closest to the
    * cursor (in pixel space). `null` when there is no cursor, when no
    * series has a valid value at this index, or when `source !== 'cursor'`.
-   * Intended for "focus the line under the cursor" interactions —
-   * pair with `setHighlight(activeSeriesIndex)` to dim everything else.
+   * Intended for "focus the line under the cursor" interactions,   * pair with `setHighlight(activeSeriesIndex)` to dim everything else.
    */
   activeSeriesIndex: number | null;
 }
@@ -414,7 +413,7 @@ export interface HighlightConfig {
   dimOpacity?: number;
   /**
    * Sync key for cross-chart highlight propagation. Mirrors
-   * `cursor.syncKey` semantics — charts sharing a key publish/receive
+   * `cursor.syncKey` semantics, charts sharing a key publish/receive
    * highlight changes from each other.
    */
   syncKey?: string;
@@ -439,7 +438,7 @@ export interface ChartConfig<TMeta = unknown> {
   axes?: Record<string, AxisConfig>;
   series: SeriesConfig<TMeta>[];
 
-  /** Interaction mode preset — sets default gesture mappings */
+  /** Interaction mode preset, sets default gesture mappings */
   interaction?: InteractionMode;
 
   cursor?: CursorConfig;
@@ -478,7 +477,7 @@ export interface ThemeConfig {
   /**
    * Plot-area frame. Kept separate from `axisLineColor` so you can tune
    * the rectangle around the plot without touching axis ticks. Typically
-   * the same hue as the grid but more opaque — see `borderOpacity`.
+   * the same hue as the grid but more opaque, see `borderOpacity`.
    */
   borderColor: string;
   /**
@@ -522,7 +521,7 @@ export interface Plugin {
   /**
    * Fires after `chart.setOptions()` merges a partial config. Use this
    * for plugins whose DOM / visual state depends on config (series,
-   * axes, theme) rather than data — legends, toolbars, stat readouts.
+   * axes, theme) rather than data, legends, toolbars, stat readouts.
    * Avoid listening on `onSetData` for those: at high streaming rates
    * it rebuilds the DOM underneath the user's cursor.
    */
@@ -572,7 +571,7 @@ export interface ChartInstance {
 
   /**
    * Snapshot of all visible series at the current cursor position
-   * (or fallback). Allocates a fresh snapshot — use
+   * (or fallback). Allocates a fresh snapshot, use
    * `getCursorSnapshotInto()` in the cursor hot path to reuse buffers.
    */
   getCursorSnapshot(opts?: CursorSnapshotOptions): CursorSnapshot;

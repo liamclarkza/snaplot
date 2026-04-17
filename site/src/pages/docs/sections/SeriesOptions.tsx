@@ -20,11 +20,11 @@ export default function SeriesOptions() {
       <Section id="interpolation" title="Interpolation">
         <Prose>Five interpolation modes for line and area series:</Prose>
         <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
-          <li><code>linear</code> — straight segments between points. Best for raw data where you want no smoothing.</li>
-          <li><code>monotone</code> — Fritsch-Carlson monotone cubic. No overshoot. Best for continuous metrics (CPU, latency, temperature).</li>
-          <li><code>step-before</code> — vertical transition before each point. The value holds until the next point.</li>
-          <li><code>step-after</code> — vertical transition after each point. Best for event/state data (deployments, status changes).</li>
-          <li><code>step-middle</code> — vertical transition at the midpoint between adjacent X values.</li>
+          <li><code>linear</code>, straight segments between points. Best for raw data where you want no smoothing.</li>
+          <li><code>monotone</code>, Fritsch-Carlson monotone cubic. No overshoot. Best for continuous metrics (CPU, latency, temperature).</li>
+          <li><code>step-before</code>, vertical transition before each point. The value holds until the next point.</li>
+          <li><code>step-after</code>, vertical transition after each point. Best for event/state data (deployments, status changes).</li>
+          <li><code>step-middle</code>, vertical transition at the midpoint between adjacent X values.</li>
         </ul>
         <Demo title="Edit the interpolation mode" desc="Change 'monotone' to 'step-after', 'linear', 'step-before', or 'step-middle'"
           data={d_interp()} height="220px"
@@ -53,7 +53,7 @@ export default function SeriesOptions() {
       <Section id="line-dash" title="Line Dash">
         <Prose>
           Use <code>lineDash</code> to render dashed or dotted lines. The value follows the
-          Canvas <code>setLineDash()</code> spec — an array of segment lengths alternating
+          Canvas <code>setLineDash()</code> spec, an array of segment lengths alternating
           between dash and gap. Applied to both line strokes and area outlines.
         </Prose>
         <Demo title="Dash patterns" desc="Solid, dashed, and dotted lines side by side"
