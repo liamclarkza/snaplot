@@ -284,9 +284,11 @@ export interface PanConfig {
 }
 
 export interface SelectionConfig {
-  enabled?: boolean;
-  mode?: 'x' | 'xy';
-  minDistance?: number;
+  /**
+   * Callback fired after a box-select gesture resolves (mouse drag /
+   * long-press + drag on touch). The `x` range is always set; `y` is
+   * only present when the selection tracked both axes.
+   */
   onSelect?: (range: { x: ScaleRange; y?: ScaleRange }) => void;
 }
 
