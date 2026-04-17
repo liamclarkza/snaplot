@@ -9,13 +9,11 @@ export function createLegendPlugin(options?: {
   position?: 'top' | 'bottom';
 }): Plugin {
   let container: HTMLDivElement | null = null;
-  let chartRef: ChartInstance | null = null;
 
   return {
     id: 'builtin:legend',
 
     install(chart: ChartInstance) {
-      chartRef = chart;
       const parent = chart.container;
       if (!parent) return;
 
@@ -59,17 +57,20 @@ export function createLegendPlugin(options?: {
     destroy() {
       container?.remove();
       container = null;
-      chartRef = null;
     },
   };
 }
 
+const FALLBACK_PALETTE = [
+  '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7',
+];
+
 function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
   const config = chart.getOptions();
-  const palette = (config.theme as any)?.palette ?? [
-    '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7',
-  ];
+  const palette = config.theme?.palette ?? FALLBACK_PALETTE;
 
+  // Wiping innerHTML detaches the old <div> items and their click handlers
+  // from the DOM; both become GC-eligible when this function returns.
   container.innerHTML = '';
 
   config.series.forEach((series, idx) => {
@@ -104,13 +105,15 @@ function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
     item.appendChild(label);
 
     item.addEventListener('click', () => {
-      const currentlyVisible = config.series[idx].visible !== false;
+      // Re-read the latest config inside the handler — the series array
+      // may have been replaced since this item was rendered.
+      const cfg = chart.getOptions();
+      const currentlyVisible = cfg.series[idx]?.visible !== false;
       chart.setOptions({
-        series: config.series.map((s, i) =>
+        series: cfg.series.map((s, i) =>
           i === idx ? { ...s, visible: !currentlyVisible } : s,
         ),
-      } as any);
-      // Re-render legend to update opacity
+      });
       renderItems(chart, container);
     });
 

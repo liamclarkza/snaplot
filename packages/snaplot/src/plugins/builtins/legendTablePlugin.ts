@@ -117,6 +117,10 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
     series.forEach((s, si) => {
       if (s.visible === false) return;
 
+      // Listeners are attached exactly once, inside this `if (!entry)` branch.
+      // On every subsequent rebuild the cached <tr> is reused, so we do NOT
+      // re-add hover/click handlers — avoiding listener accumulation on
+      // repeated `data:update` emissions.
       let entry = rowCache.get(si);
       if (!entry) {
         const tr = document.createElement('tr');
@@ -139,13 +143,15 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
         if (toggleOnClick) {
           tr.style.cursor = 'pointer';
           tr.addEventListener('click', () => {
-            const cfg = chartRef!.getOptions();
+            if (!chartRef) return;
+            const cfg = chartRef.getOptions();
             const visible = cfg.series[si].visible !== false;
-            chartRef!.setOptions({
+            chartRef.setOptions({
               series: cfg.series.map((sc, i) =>
                 i === si ? { ...sc, visible: !visible } : sc,
               ),
-            } as any);
+            });
+            // setOptions does not emit data:update, so refresh the table by hand.
             rebuildRows();
             refreshCells();
           });
