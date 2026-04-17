@@ -31,9 +31,15 @@ export class CanvasManager {
   ) {
     this._dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
 
-    // Container
+    // Container. `tabindex="0"` makes the chart keyboard-focusable —
+    // arrow-key pan / +/- zoom / 0-reset get wired up by GestureManager.
+    // We don't set `:focus-visible` styling here; consumers can target
+    // the container with their own CSS.
     this.container = document.createElement('div');
-    this.container.style.cssText = 'position:relative;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;border-radius:6px;';
+    this.container.tabIndex = 0;
+    this.container.setAttribute('role', 'application');
+    this.container.style.cssText =
+      'position:relative;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;border-radius:6px;outline:none;';
     parent.appendChild(this.container);
 
     // Create canvases

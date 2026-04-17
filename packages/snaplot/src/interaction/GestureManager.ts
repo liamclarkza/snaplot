@@ -88,6 +88,9 @@ export class GestureManager {
   private boundPointerLeave: (e: PointerEvent) => void;
   private boundWheel: (e: WheelEvent) => void;
   private boundDblClick: (e: MouseEvent) => void;
+  private boundKeyDown: (e: KeyboardEvent) => void;
+  /** Element that receives keyboard focus (chart container with tabindex=0). */
+  private keyboardTarget: HTMLElement | null = null;
 
   constructor(
     private target: HTMLElement,
@@ -106,6 +109,7 @@ export class GestureManager {
     this.boundPointerLeave = this.onPointerLeave.bind(this);
     this.boundWheel = this.onWheel.bind(this);
     this.boundDblClick = this.onDblClick.bind(this);
+    this.boundKeyDown = this.onKeyDown.bind(this);
   }
 
   attach(): void {
@@ -116,6 +120,13 @@ export class GestureManager {
     this.target.addEventListener('pointerleave', this.boundPointerLeave);
     this.target.addEventListener('wheel', this.boundWheel, { passive: false });
     this.target.addEventListener('dblclick', this.boundDblClick);
+
+    // Keyboard events bubble up from the focused element, so attach to the
+    // focusable container (the CanvasManager's tabindex=0 parent of dataCanvas).
+    // Walking the parent chain keeps GestureManager's constructor signature
+    // stable — callers don't need to pass both targets separately.
+    this.keyboardTarget = this.target.parentElement;
+    this.keyboardTarget?.addEventListener('keydown', this.boundKeyDown);
   }
 
   detach(): void {
@@ -125,6 +136,8 @@ export class GestureManager {
     this.target.removeEventListener('pointerleave', this.boundPointerLeave);
     this.target.removeEventListener('wheel', this.boundWheel);
     this.target.removeEventListener('dblclick', this.boundDblClick);
+    this.keyboardTarget?.removeEventListener('keydown', this.boundKeyDown);
+    this.keyboardTarget = null;
     this.clearLongPress();
     this.cancelMomentum();
     if (this.scrollResetTimer) clearTimeout(this.scrollResetTimer);
@@ -623,5 +636,77 @@ export class GestureManager {
     if (!this.inPlotArea(x, y)) return;
 
     this.eventBus.emit('action:reset-zoom', undefined);
+  }
+
+  // ─── Keyboard (arrow keys, +/-, 0) ─────────────────────────
+
+  /**
+   * Keyboard shortcuts for keyboard-only users. Active while the chart
+   * container has focus.
+   *
+   *   ArrowLeft / ArrowRight   — pan X by PAN_STEP
+   *   ArrowUp / ArrowDown      — pan Y by PAN_STEP (if pan.y enabled)
+   *   Shift + Arrow            — larger step (PAN_STEP_FAST)
+   *   `+` / `=`                — zoom in at the chart centre
+   *   `-` / `_`                — zoom out at the chart centre
+   *   `0` / `Home`             — reset zoom
+   *
+   * All shortcuts respect interaction mode: readonly suppresses them.
+   */
+  private onKeyDown(e: KeyboardEvent): void {
+    const mode = this.getMode();
+    if (mode === 'readonly') return;
+
+    // Ignore if the user is typing into an input/textarea that happens
+    // to be nested inside a custom chart container (tooltip templates etc.).
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+      return;
+    }
+
+    const PAN_STEP = 40;
+    const PAN_STEP_FAST = 120;
+    const ZOOM_FACTOR = 1.2; // 20% per key press — matches wheel feel
+    const layout = this.getLayout();
+    const centreX = layout.plot.left + layout.plot.width / 2;
+    const centreY = layout.plot.top + layout.plot.height / 2;
+
+    let handled = true;
+    switch (e.key) {
+      case 'ArrowLeft':
+        this.eventBus.emit('action:pan', { dx: e.shiftKey ? PAN_STEP_FAST : PAN_STEP, dy: 0 });
+        break;
+      case 'ArrowRight':
+        this.eventBus.emit('action:pan', { dx: -(e.shiftKey ? PAN_STEP_FAST : PAN_STEP), dy: 0 });
+        break;
+      case 'ArrowUp':
+        this.eventBus.emit('action:pan', { dx: 0, dy: e.shiftKey ? PAN_STEP_FAST : PAN_STEP });
+        break;
+      case 'ArrowDown':
+        this.eventBus.emit('action:pan', { dx: 0, dy: -(e.shiftKey ? PAN_STEP_FAST : PAN_STEP) });
+        break;
+      case '+':
+      case '=': {
+        const zoom = this.getZoomConfig();
+        const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
+        this.eventBus.emit('action:zoom', { factor: 1 / ZOOM_FACTOR, anchorX: centreX, anchorY: centreY, axis });
+        break;
+      }
+      case '-':
+      case '_': {
+        const zoom = this.getZoomConfig();
+        const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
+        this.eventBus.emit('action:zoom', { factor: ZOOM_FACTOR, anchorX: centreX, anchorY: centreY, axis });
+        break;
+      }
+      case '0':
+      case 'Home':
+        this.eventBus.emit('action:reset-zoom', undefined);
+        break;
+      default:
+        handled = false;
+    }
+
+    if (handled) e.preventDefault();
   }
 }
