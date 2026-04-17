@@ -7,6 +7,7 @@ import type {
   CursorSnapshotOptions,
   DeepPartial,
   Layout,
+  Plugin,
   Scale,
   ScaleRange,
   ThemeConfig,
@@ -352,7 +353,7 @@ export class ChartCore implements ChartInstance {
     }
   }
 
-  use(plugin: any): void {
+  use(plugin: Plugin): void {
     this.pluginManager.register(plugin);
     plugin.install?.(this);
   }
@@ -1032,7 +1033,7 @@ export class ChartCore implements ChartInstance {
     // default because auto-range-Y drives it in the typical timeseries setup.
     if (raw === undefined || raw === true) {
       spec = isHoriz ? 'data' : 'unbounded';
-    } else if (typeof raw === 'string' || ('min' in (raw as any) || 'max' in (raw as any))) {
+    } else if (typeof raw === 'string' || (typeof raw === 'object' && ('min' in raw || 'max' in raw))) {
       // Top-level scalar spec applies to every axis.
       spec = raw as ZoomBoundsSpec;
     } else {

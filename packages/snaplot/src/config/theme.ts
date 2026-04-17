@@ -46,7 +46,7 @@ export function resolveTheme(
     for (const [key, varName] of Object.entries(CSS_VAR_MAP)) {
       const value = styles.getPropertyValue(varName).trim();
       if (value) {
-        (cssOverrides as any)[key] = value;
+        (cssOverrides as Record<string, unknown>)[key] = value;
       }
     }
   }

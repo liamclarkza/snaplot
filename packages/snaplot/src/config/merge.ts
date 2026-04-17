@@ -31,8 +31,14 @@ export function deepMerge<T extends Record<string, unknown>>(
 
       if (sourceVal === undefined) continue;
 
+      // `result` is typed `T`, but we write arbitrary keys via the
+      // `keyof T` iterator. Cast once to a flexible record shape to keep
+      // the loop body `any`-free.
+      const out = result as Record<string, unknown>;
+      const keyStr = key as string;
+
       if (isPlainObject(targetVal) && isPlainObject(sourceVal)) {
-        (result as any)[key] = deepMerge(
+        out[keyStr] = deepMerge(
           targetVal as Record<string, unknown>,
           sourceVal as Record<string, unknown>,
         );
@@ -53,9 +59,9 @@ export function deepMerge<T extends Record<string, unknown>>(
             merged[i] = (sourceVal as unknown[])[i];
           }
         }
-        (result as any)[key] = merged;
+        out[keyStr] = merged;
       } else {
-        (result as any)[key] = sourceVal;
+        out[keyStr] = sourceVal;
       }
     }
   }
