@@ -41,7 +41,7 @@ import { TooltipManager } from '../interaction/TooltipManager';
 
 import { PluginManager } from '../plugins/PluginManager';
 
-import { nearestIndex } from '../data/binarySearch';
+import { nearestIndex, upperBound } from '../data/binarySearch';
 
 /**
  * Chart — the composition root.
@@ -1490,26 +1490,26 @@ export class ChartCore implements ChartInstance {
       const counts = this.store.y(colIdx - 1);
       const color = series.stroke ?? this.theme.palette[si % this.theme.palette.length];
 
-      // Find which bin the cursor X falls into (edges are sorted)
-      for (let b = 0; b < edges.length - 1; b++) {
-        if (dataX >= edges[b] && dataX < edges[b + 1]) {
-          const binMin = edges[b];
-          const binMax = edges[b + 1];
-          const count = counts[b];
+      // Find which bin the cursor X falls into. Edges are sorted, so
+      // `upperBound` gives the largest b with edges[b] <= dataX in O(log n).
+      // Reject dataX at or past the final edge (bin is [edges[b], edges[b+1])).
+      const b = upperBound(edges, dataX);
+      if (b < 0 || b >= edges.length - 1) continue;
 
-          points.push({
-            seriesIndex: si,
-            dataIndex: b,
-            label: series.label,
-            x: (binMin + binMax) / 2,
-            y: count,
-            color,
-            formattedX: `${binMin.toFixed(1)} \u2013 ${binMax.toFixed(1)}`,
-            formattedY: String(count),
-          });
-          break;
-        }
-      }
+      const binMin = edges[b];
+      const binMax = edges[b + 1];
+      const count = counts[b];
+
+      points.push({
+        seriesIndex: si,
+        dataIndex: b,
+        label: series.label,
+        x: (binMin + binMax) / 2,
+        y: count,
+        color,
+        formattedX: `${binMin.toFixed(1)} \u2013 ${binMax.toFixed(1)}`,
+        formattedY: String(count),
+      });
     }
 
     return points;
