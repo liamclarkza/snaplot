@@ -1,6 +1,18 @@
 import type { ColumnarData } from '../types';
 import { viewportIndices } from './binarySearch';
 
+/** Human-readable type description, used in validation error messages. */
+function describeType(v: unknown): string {
+  if (v === null) return 'null';
+  if (v === undefined) return 'undefined';
+  if (Array.isArray(v)) return `Array(${v.length})`;
+  if (typeof v === 'object' && v !== null) {
+    const ctor = (v as { constructor?: { name?: string } }).constructor?.name;
+    return ctor ?? 'object';
+  }
+  return typeof v;
+}
+
 /**
  * ColumnarStore wraps ColumnarData, validates invariants, and provides
  * efficient viewport slicing and streaming append.
@@ -16,27 +28,58 @@ export class ColumnarStore {
     this.columns = [...data];
   }
 
-  /** Validate: equal column lengths, sorted X (monotonically non-decreasing) */
+  /** Validate: equal column lengths, sorted X (monotonically non-decreasing). */
   static validate(data: ColumnarData): void {
+    if (!Array.isArray(data) && !(data && typeof (data as unknown as { length: number }).length === 'number')) {
+      throw new Error(
+        'ColumnarData must be an array of Float64Arrays — received ' +
+          describeType(data) +
+          '. Expected: [xValues, ...ySeries] where each column is a Float64Array.',
+      );
+    }
+
     if (data.length === 0) {
-      throw new Error('ColumnarData must have at least one column (X values)');
+      throw new Error(
+        'ColumnarData must have at least one column (the X values). ' +
+          'Shape: [xValues, ...ySeries] where index 0 is X and 1+ are Y series.',
+      );
+    }
+
+    // Validate each column is a Float64Array — catches the common mistake of
+    // passing a plain `number[]` or the wrong typed array (Int32, Uint8, …).
+    for (let c = 0; c < data.length; c++) {
+      if (!(data[c] instanceof Float64Array)) {
+        throw new Error(
+          `Column ${c} is a ${describeType(data[c])} — snaplot expects ` +
+            `Float64Array for every column. If you have a plain array, ` +
+            `wrap it with \`new Float64Array(arr)\`.`,
+        );
+      }
     }
 
     const len = data[0].length;
     for (let c = 1; c < data.length; c++) {
       if (data[c].length !== len) {
         throw new Error(
-          `Column ${c} length (${data[c].length}) does not match X column length (${len})`,
+          `Column length mismatch: X has ${len} values but column ${c} has ` +
+            `${data[c].length}. All columns must have the same length — each ` +
+            `Y value at index i pairs with the X value at index i.`,
         );
       }
     }
 
-    // Verify X is sorted (monotonically non-decreasing)
+    // Verify X is sorted (monotonically non-decreasing). A single out-of-order
+    // point is enough — report it with neighbouring indices so the caller can
+    // locate the source (usually a forgotten sort step).
     const x = data[0];
     for (let i = 1; i < x.length; i++) {
       if (x[i] < x[i - 1]) {
         throw new Error(
-          `X values must be sorted. Found x[${i}]=${x[i]} < x[${i - 1}]=${x[i - 1]}`,
+          `X values must be sorted in non-decreasing order, but ` +
+            `x[${i}] = ${x[i]} < x[${i - 1}] = ${x[i - 1]}. ` +
+            `Sort the X column (and move Y values in lockstep) before ` +
+            `passing the data in — snaplot uses binary search on X for ` +
+            `viewport culling and hit-testing.`,
         );
       }
     }
@@ -93,7 +136,10 @@ export class ColumnarStore {
   append(data: ColumnarData, maxLen?: number): void {
     if (data.length !== this.columns.length) {
       throw new Error(
-        `Append data has ${data.length} columns but store has ${this.columns.length}`,
+        `append() expects ${this.columns.length} columns to match the initial ` +
+          `data shape, but got ${data.length}. Pass the same number of ` +
+          `Float64Arrays you passed to setData/the constructor — one X column ` +
+          `plus one per Y series.`,
       );
     }
 
