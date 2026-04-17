@@ -21,6 +21,9 @@
     "README.md",
     "LICENSE"
   ],
+  "sideEffects": [
+    "*.css"
+  ],
   "scripts": {
     "build": "vite build",
     "typecheck": "tsc --noEmit",
