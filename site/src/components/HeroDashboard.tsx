@@ -370,25 +370,21 @@ function ThemeChip(props: { entry: ThemeEntry; active: boolean; onPick: () => vo
           'background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          display: 'inline-flex',
-          padding: '2px',
-          'border-radius': 'var(--radius-pill)',
-          background: props.entry.theme.backgroundColor,
-        }}
-      >
+      {/* Avatar-stack preview — three overlapping dots on the chip
+          itself (no mini-pill). A ring in the chip's own bg colour
+          separates them cleanly without adding a bright frame. */}
+      <span aria-hidden="true" style={{ display: 'inline-flex' }}>
         <For each={preview()}>
-          {(c) => (
+          {(c, i) => (
             <span
               style={{
                 display: 'inline-block',
-                width: '10px',
-                height: '10px',
+                width: '12px',
+                height: '12px',
                 'border-radius': '50%',
                 background: c,
-                'margin-left': '-3px',
+                'margin-left': i() === 0 ? '0' : '-4px',
+                'box-shadow': '0 0 0 1.5px var(--bg-surface)',
               }}
             />
           )}
