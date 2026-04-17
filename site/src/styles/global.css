@@ -73,6 +73,13 @@ code {
   background: rgba(79, 143, 234, 0.3);
 }
 
+/* Keyboard-only focus ring. Mouse/touch users don't see it; tab users do. */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: inherit;
+}
+
 /* Chart theme via CSS variables — resolveTheme() reads these automatically */
 :root {
   --chart-bg: #1a1b2e;

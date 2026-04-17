@@ -33,7 +33,7 @@ import { renderLine, renderArea, renderBand } from '../renderers/LineRenderer';
 import { renderScatter } from '../renderers/ScatterRenderer';
 import { renderBars } from '../renderers/BarRenderer';
 import { renderHistogram } from '../renderers/HistogramRenderer';
-import { renderCrosshair, renderSelectionBox } from '../renderers/InteractionRenderer';
+import { renderCrosshair, renderSelectionBox, renderTapRing } from '../renderers/InteractionRenderer';
 
 import { GestureManager } from '../interaction/GestureManager';
 import { HitTester } from '../interaction/HitTester';
@@ -83,8 +83,12 @@ export class ChartCore implements ChartInstance {
   /** Raw mouse position in CSS pixels (not snapped) — used for tooltip placement */
   private mouseX: number | null = null;
   private mouseY: number | null = null;
+  /** Pointer type of the most recent cursor event — drives hit-test radius. */
+  private lastPointerType: 'mouse' | 'touch' | 'pen' = 'mouse';
   /** Active selection box (shift+drag) */
   private selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  /** Transient tap-feedback ring — cleared automatically once its lifetime expires. */
+  private tapFeedback: { x: number; y: number; startTime: number } | null = null;
   /** True when the user has actively zoomed — suppresses auto-range X on data updates */
   private userHasZoomed = false;
 
@@ -701,6 +705,9 @@ export class ChartCore implements ChartInstance {
       this.cursorY = y;
       this.mouseX = x;
       this.mouseY = y;
+      if (pointerType === 'touch' || pointerType === 'pen' || pointerType === 'mouse') {
+        this.lastPointerType = pointerType;
+      }
 
       const xScale = this.scales.get('x');
       if (xScale && this.isInPlotArea(x, y)) {
@@ -951,6 +958,9 @@ export class ChartCore implements ChartInstance {
           this.cursorDataX = snappedX;
         }
         this.updateTooltipPoints();
+
+        // Leave a short-lived ring so the user can see the tap landed.
+        this.tapFeedback = { x, y, startTime: performance.now() };
       } else {
         // Tap outside plot → dismiss tooltip
         this.tooltipPoints = [];
@@ -1300,6 +1310,26 @@ export class ChartCore implements ChartInstance {
         this.layout,
       );
     }
+
+    // Tap feedback — 220ms ring animation. Schedule another overlay frame
+    // until the lifetime runs out, then clear state.
+    if (this.tapFeedback) {
+      const TAP_RING_MS = 220;
+      const elapsed = performance.now() - this.tapFeedback.startTime;
+      const progress = elapsed / TAP_RING_MS;
+      if (progress >= 1) {
+        this.tapFeedback = null;
+      } else {
+        renderTapRing(
+          ctx,
+          this.tapFeedback.x,
+          this.tapFeedback.y,
+          progress,
+          this.theme.crosshairColor,
+        );
+        this.scheduler.markDirty(DirtyFlag.OVERLAY);
+      }
+    }
   }
 
   private drawPointIndicators(ctx: CanvasRenderingContext2D): void {
@@ -1464,6 +1494,7 @@ export class ChartCore implements ChartInstance {
         this.cursorY,
         this.config.tooltip?.mode ?? 'index',
         this.theme.palette,
+        this.lastPointerType,
       );
     }
   }

@@ -132,5 +132,5 @@ export const DOUBLE_TAP_TIMEOUT = 300;
 /** Mouse hit-test radius (CSS pixels) */
 export const MOUSE_HIT_RADIUS = 32;
 
-/** Touch hit-test radius (CSS pixels) */
-export const TOUCH_HIT_RADIUS = 24;
+/** Touch hit-test radius (CSS pixels). WCAG 2.5.5 calls for ≥44px tap targets. */
+export const TOUCH_HIT_RADIUS = 44;

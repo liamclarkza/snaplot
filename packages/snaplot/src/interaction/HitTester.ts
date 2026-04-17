@@ -1,27 +1,36 @@
 import type { Scale, SeriesConfig, TooltipPoint } from '../types';
 import type { ColumnarStore } from '../data/ColumnarStore';
 import { nearestIndex, lowerBound, upperBound } from '../data/binarySearch';
+import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
 
 /**
  * Hit-testing for finding nearest data points to cursor position.
  *
  * For sorted time-series data, binary search is O(log n) — per spec §2:
  * "uPlot's exceptional cursor performance with 100K+ points relies entirely on this"
+ *
+ * Proximity is chosen per call based on pointer type: fingers get a larger
+ * radius (WCAG 2.5.5 tap-target minimum) than a mouse does.
  */
 
-/** Default max pixel distance from cursor to a data point before tooltip is shown */
-const DEFAULT_PROXIMITY = 32;
+export type PointerKind = 'mouse' | 'touch' | 'pen';
 
 export class HitTester {
-  private proximityThreshold: number;
+  /** Optional override — takes precedence over the pointer-type default. */
+  private proximityOverride: number | null;
 
   constructor(proximityThreshold?: number) {
-    this.proximityThreshold = proximityThreshold ?? DEFAULT_PROXIMITY;
+    this.proximityOverride = proximityThreshold ?? null;
   }
 
-  /** Update the proximity threshold (e.g. larger for touch) */
-  setProximity(px: number): void {
-    this.proximityThreshold = px;
+  /** Pin a fixed proximity threshold, overriding the pointer-type default. */
+  setProximity(px: number | null): void {
+    this.proximityOverride = px;
+  }
+
+  private proximityFor(pointerType: PointerKind | undefined): number {
+    if (this.proximityOverride !== null) return this.proximityOverride;
+    return pointerType === 'touch' ? TOUCH_HIT_RADIUS : MOUSE_HIT_RADIUS;
   }
 
   findNearestIndex(store: ColumnarStore, dataX: number): number {
@@ -29,8 +38,8 @@ export class HitTester {
   }
 
   /**
-   * Find tooltip points near the cursor. Returns empty array if nothing
-   * is within this.proximityThreshold pixels — tooltip should be hidden.
+   * Find tooltip points near the cursor. Returns empty array if nothing is
+   * within the active proximity radius — tooltip should be hidden.
    */
   findPoints(
     store: ColumnarStore,
@@ -40,18 +49,20 @@ export class HitTester {
     pixelY: number,
     mode: 'nearest' | 'index' | 'x',
     palette: string[],
+    pointerType?: PointerKind,
   ): TooltipPoint[] {
     const xScale = scales.get('x');
     if (!xScale || store.length === 0) return [];
 
+    const proximity = this.proximityFor(pointerType);
     const dataX = xScale.pixelToData(pixelX);
     const idx = nearestIndex(store.x, dataX);
 
     if (mode === 'index' || mode === 'x') {
-      return this.pointsAtIndex(store, scales, seriesConfigs, idx, pixelX, pixelY, palette);
+      return this.pointsAtIndex(store, scales, seriesConfigs, idx, pixelX, pixelY, palette, proximity);
     }
 
-    return this.nearestPoint(store, scales, seriesConfigs, idx, pixelX, pixelY, palette);
+    return this.nearestPoint(store, scales, seriesConfigs, idx, pixelX, pixelY, palette, proximity);
   }
 
   private pointsAtIndex(
@@ -62,6 +73,7 @@ export class HitTester {
     pixelX: number,
     pixelY: number,
     palette: string[],
+    proximity: number,
   ): TooltipPoint[] {
     const xScale = scales.get('x')!;
     const points: TooltipPoint[] = [];
@@ -101,7 +113,7 @@ export class HitTester {
     }
 
     // Only show tooltip if cursor is near a series line
-    if (closestYDist > this.proximityThreshold) return [];
+    if (closestYDist > proximity) return [];
 
     return points;
   }
@@ -114,16 +126,17 @@ export class HitTester {
     pixelX: number,
     pixelY: number,
     palette: string[],
+    proximity: number,
   ): TooltipPoint[] {
     const xScale = scales.get('x')!;
     let bestDist = Infinity;
     let bestPoint: TooltipPoint | null = null;
 
-    // Search all points within this.proximityThreshold pixels on the X axis.
-    // This ensures we find the true euclidean-nearest point, not just the
-    // nearest in X-sorted index space (which misses vertically-close points).
-    const xDataLeft = xScale.pixelToData(pixelX - this.proximityThreshold);
-    const xDataRight = xScale.pixelToData(pixelX + this.proximityThreshold);
+    // Search all points within `proximity` pixels on the X axis so we find
+    // the true euclidean-nearest point, not just the nearest in X-sorted
+    // index space (which would miss vertically-close points).
+    const xDataLeft = xScale.pixelToData(pixelX - proximity);
+    const xDataRight = xScale.pixelToData(pixelX + proximity);
     const startIdx = Math.max(0, lowerBound(store.x, xDataLeft));
     const endIdx = Math.min(store.length - 1, upperBound(store.x, xDataRight));
 
@@ -163,7 +176,7 @@ export class HitTester {
     }
 
     // Only return if within proximity threshold
-    if (bestPoint && Math.sqrt(bestDist) <= this.proximityThreshold) {
+    if (bestPoint && Math.sqrt(bestDist) <= proximity) {
       return [bestPoint];
     }
     return [];

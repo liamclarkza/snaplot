@@ -67,3 +67,11 @@
 .snaplot-legend-swatch {
   display: inline-block;
 }
+
+/* Fat-finger tap targets on touch: rows need ~44px height per WCAG 2.5.5.
+   `(pointer: coarse)` keeps dense-grid rows for mouse/trackpad users. */
+@media (pointer: coarse) {
+  .snaplot-legend-cell {
+    padding: 10px 12px 10px 0;
+  }
+}

@@ -67,6 +67,16 @@ export class GestureManager {
   private dragStartX = 0;
   private dragStartY = 0;
 
+  // Pan velocity tracking (touch-only momentum)
+  private lastMoveX = 0;
+  private lastMoveY = 0;
+  private lastMoveTime = 0;
+  // EMA velocity in px/ms, sampled during touch pan.
+  private velocityX = 0;
+  private velocityY = 0;
+  private momentumFrame: number | null = null;
+  private momentumAxis: string | undefined;
+
   // Box selection
   private boxStartX = 0;
   private boxStartY = 0;
@@ -116,6 +126,7 @@ export class GestureManager {
     this.target.removeEventListener('wheel', this.boundWheel);
     this.target.removeEventListener('dblclick', this.boundDblClick);
     this.clearLongPress();
+    this.cancelMomentum();
     if (this.scrollResetTimer) clearTimeout(this.scrollResetTimer);
   }
 
@@ -206,6 +217,9 @@ export class GestureManager {
 
     if (e.button !== 0) return; // primary button only
 
+    // Cancel any in-flight pan momentum — grabbing the chart stops the glide.
+    this.cancelMomentum();
+
     const { x, y } = this.localCoords(e);
     const area = this.getAxisArea(x, y);
     if (area.type === 'outside') return;
@@ -247,6 +261,13 @@ export class GestureManager {
     // Store drag start
     this.dragStartX = x;
     this.dragStartY = y;
+
+    // Reset pan-velocity sampler; first move will populate it.
+    this.lastMoveX = x;
+    this.lastMoveY = y;
+    this.lastMoveTime = performance.now();
+    this.velocityX = 0;
+    this.velocityY = 0;
   }
 
   private onPointerMove(e: PointerEvent): void {
@@ -337,9 +358,27 @@ export class GestureManager {
         const prevX = this.dragStartX;
         const prevY = this.dragStartY;
         const panAxis = this.dragStartArea.type === 'axis' ? this.dragStartArea.axisKey : undefined;
-        this.eventBus.emit('action:pan', { dx: x - prevX, dy: y - prevY, axis: panAxis });
+        const dxPan = x - prevX;
+        const dyPan = y - prevY;
+        this.eventBus.emit('action:pan', { dx: dxPan, dy: dyPan, axis: panAxis });
         this.dragStartX = x;
         this.dragStartY = y;
+
+        // Sample pan velocity for touch momentum (EMA).
+        if (e.pointerType === 'touch') {
+          const now = performance.now();
+          const dt = Math.max(1, now - this.lastMoveTime);
+          const instVX = dxPan / dt;
+          const instVY = dyPan / dt;
+          // α = 0.5 — fast to react, stable enough against jitter.
+          const a = 0.5;
+          this.velocityX = a * instVX + (1 - a) * this.velocityX;
+          this.velocityY = a * instVY + (1 - a) * this.velocityY;
+          this.lastMoveX = x;
+          this.lastMoveY = y;
+          this.lastMoveTime = now;
+          this.momentumAxis = panAxis;
+        }
 
         // Also update cursor during pan
         this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
@@ -415,6 +454,15 @@ export class GestureManager {
       }
     }
 
+    // ── Touch pan released: start momentum if the flick was fast enough ──
+    if (
+      ptr.pointerType === 'touch' &&
+      this.state === 'dragging' &&
+      this.pointers.size === 0
+    ) {
+      this.startMomentum();
+    }
+
     this.resetState();
   }
 
@@ -428,6 +476,53 @@ export class GestureManager {
       this.boxStartX = 0;
       this.boxStartY = 0;
     }
+  }
+
+  // ─── Pan momentum (touch only) ────────────────────────────
+
+  private startMomentum(): void {
+    // Threshold of 0.1 px/ms ≈ 100 px/s — below this it's just a static release.
+    const vMag = Math.hypot(this.velocityX, this.velocityY);
+    if (vMag < 0.1) return;
+
+    // Cap peak velocity so a jittery last sample can't launch the chart.
+    const MAX_V = 2.5; // px/ms ≈ 2500 px/s
+    if (vMag > MAX_V) {
+      const s = MAX_V / vMag;
+      this.velocityX *= s;
+      this.velocityY *= s;
+    }
+
+    let lastT = performance.now();
+    const step = (now: number) => {
+      const dt = Math.min(32, now - lastT); // clamp frame to avoid teleporting after tab blur
+      lastT = now;
+
+      const dx = this.velocityX * dt;
+      const dy = this.velocityY * dt;
+      this.eventBus.emit('action:pan', { dx, dy, axis: this.momentumAxis });
+
+      // Exponential decay — halves roughly every ~130ms.
+      const decay = Math.exp(-dt / 180);
+      this.velocityX *= decay;
+      this.velocityY *= decay;
+
+      if (Math.hypot(this.velocityX, this.velocityY) < 0.02) {
+        this.momentumFrame = null;
+        return;
+      }
+      this.momentumFrame = requestAnimationFrame(step);
+    };
+    this.momentumFrame = requestAnimationFrame(step);
+  }
+
+  private cancelMomentum(): void {
+    if (this.momentumFrame !== null) {
+      cancelAnimationFrame(this.momentumFrame);
+      this.momentumFrame = null;
+    }
+    this.velocityX = 0;
+    this.velocityY = 0;
   }
 
   // ─── Wheel (mouse scroll / trackpad pinch) ────────────────

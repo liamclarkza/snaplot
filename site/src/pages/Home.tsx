@@ -136,7 +136,9 @@ export default function Home() {
 
         {/* Hero chart */}
         <div style={{
-          height: '280px',
+          // Responsive height: portrait mobile shrinks gracefully, desktop
+          // keeps the generous reading height.
+          height: 'clamp(240px, 40vh, 320px)',
           'border-radius': 'var(--radius-lg)',
           overflow: 'hidden',
           border: '1px solid var(--border)',
