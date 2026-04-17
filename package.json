@@ -18,12 +18,14 @@
     "lint:fix": "biome lint --write",
     "format": "biome format --write",
     "check": "biome check",
-    "check:fix": "biome check --write"
+    "check:fix": "biome check --write",
+    "prepare": "lefthook install || true"
   },
   "engines": {
     "node": ">=22"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.12"
+    "@biomejs/biome": "2.4.12",
+    "lefthook": "^2.1.6"
   }
 }

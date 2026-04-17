@@ -1,0 +1,23 @@
+# Pre-commit quality gates. Bypass only with --no-verify and explain why.
+# See https://lefthook.dev for syntax.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: biome
+      glob: '*.{js,ts,tsx,jsx,json,jsonc,css}'
+      # --staged runs against the git index, matching what will be committed.
+      # --no-errors-on-unmatched silently skips commits that touch only
+      # files biome ignores (e.g. markdown-only changes).
+      run: npx biome check --staged --no-errors-on-unmatched
+
+    - name: typecheck
+      glob: 'packages/snaplot/src/**/*.{ts,tsx}'
+      # tsc runs against the whole project, so we only invoke it when a
+      # file under the library source actually changed.
+      run: npm run typecheck
+
+pre-push:
+  jobs:
+    - name: test
+      run: npm test
