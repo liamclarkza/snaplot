@@ -26,7 +26,7 @@ export default function Docs() {
         <h1 style={{ 'font-size': '28px', 'font-weight': '700', 'margin-bottom': '8px' }}>Documentation</h1>
         <Prose>
           Every example below is <b>live and editable</b> — change the config and the chart updates instantly.
-          Built-in theme variables are available in the editor: <code>darkTheme</code>, <code>lightTheme</code>, <code>oceanTheme</code>, <code>midnightTheme</code>, <code>refinedDarkTheme</code>.
+          Built-in theme variables are available in the editor: <code>lightTheme</code>, <code>darkTheme</code>, <code>oceanTheme</code>, <code>marsTheme</code>, <code>forestTheme</code>, <code>sunsetTheme</code>, <code>midnightTheme</code>, <code>refinedDarkTheme</code>.
         </Prose>
 
         <GettingStarted />

@@ -45,6 +45,9 @@ export {
   oceanTheme,
   midnightTheme,
   refinedDarkTheme,
+  marsTheme,
+  forestTheme,
+  sunsetTheme,
   resolveTheme,
 } from './config/theme';
 

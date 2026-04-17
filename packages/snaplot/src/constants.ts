@@ -112,6 +112,103 @@ export const MIDNIGHT_THEME: ThemeConfig = {
 };
 
 /**
+ * Mars — warm rust / amber / terracotta on deep burnt-umber. Designed
+ * for dashboards that want a distinctive "embers" feel without sacrificing
+ * legibility. The palette walks from bright amber through rose to brick
+ * so multi-series charts stay distinguishable.
+ */
+export const MARS_THEME: ThemeConfig = {
+  backgroundColor: '#1c100c',
+  textColor: '#f2d7c0',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#3a1f17',
+  gridOpacity: 0.55,
+  palette: [
+    '#ff8a3d', // bright amber
+    '#e2504b', // red
+    '#f4c27c', // sand
+    '#c06548', // terracotta
+    '#8e3a1e', // deep rust
+    '#e8a272', // peach
+    '#b04a2f', // brick
+    '#f2d7c0', // cream
+  ],
+  axisLineColor: '#3a1f17',
+  borderColor: '#3a1f17',
+  borderOpacity: 0.7,
+  tickColor: '#a57a66',
+  crosshairColor: '#e2a074',
+  tooltipBackground: 'rgba(28, 16, 12, 0.96)',
+  tooltipTextColor: '#f5dcc4',
+  tooltipBorderColor: 'rgba(255, 170, 120, 0.18)',
+};
+
+/**
+ * Forest — calm leaf / moss / pine on deep forest-black. Balances
+ * bright leaf greens against sage, olive and dark pine so dense
+ * multi-series charts read without pulling toward a single hue.
+ */
+export const FOREST_THEME: ThemeConfig = {
+  backgroundColor: '#0e1613',
+  textColor: '#d5e8dc',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#1e2e26',
+  gridOpacity: 0.55,
+  palette: [
+    '#58d68d', // leaf
+    '#8fbc8f', // sage
+    '#3d8b5e', // pine
+    '#b5c99a', // light olive
+    '#2d5a3d', // dark forest
+    '#a0c878', // spring
+    '#c9e4a8', // pale lime
+    '#4e8272', // teal-green
+  ],
+  axisLineColor: '#1e2e26',
+  borderColor: '#1e2e26',
+  borderOpacity: 0.7,
+  tickColor: '#7ea088',
+  crosshairColor: '#a2c6ad',
+  tooltipBackground: 'rgba(14, 22, 19, 0.96)',
+  tooltipTextColor: '#d5e8dc',
+  tooltipBorderColor: 'rgba(180, 220, 180, 0.15)',
+};
+
+/**
+ * Sunset — dusk pink / purple / gold. Brighter palette for showy
+ * dashboards; text and grid lean cool so the warm series pop. Pairs
+ * especially well with area charts that benefit from richer accents.
+ */
+export const SUNSET_THEME: ThemeConfig = {
+  backgroundColor: '#1a1220',
+  textColor: '#f0d8d4',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#2e2133',
+  gridOpacity: 0.55,
+  palette: [
+    '#ff6b9d', // pink
+    '#ffa94d', // orange
+    '#9d4edd', // purple
+    '#ffd166', // gold
+    '#e8547d', // rose
+    '#7b5abc', // lavender
+    '#ffbe76', // peach
+    '#c77dff', // lilac
+  ],
+  axisLineColor: '#2e2133',
+  borderColor: '#2e2133',
+  borderOpacity: 0.7,
+  tickColor: '#a590a8',
+  crosshairColor: '#d4a5c4',
+  tooltipBackground: 'rgba(26, 18, 32, 0.96)',
+  tooltipTextColor: '#f0d8d4',
+  tooltipBorderColor: 'rgba(255, 180, 200, 0.18)',
+};
+
+/**
  * Refined dark — the original Soft-UI template that `DARK_THEME` now
  * also follows. Kept as a named export for back-compat; the palette is
  * effectively identical to `darkTheme` since 0.4.x.

@@ -5,6 +5,9 @@ import {
   OCEAN_THEME,
   MIDNIGHT_THEME,
   REFINED_DARK_THEME,
+  MARS_THEME,
+  FOREST_THEME,
+  SUNSET_THEME,
 } from '../constants';
 import { deepMerge } from './merge';
 
@@ -14,6 +17,9 @@ export {
   OCEAN_THEME as oceanTheme,
   MIDNIGHT_THEME as midnightTheme,
   REFINED_DARK_THEME as refinedDarkTheme,
+  MARS_THEME as marsTheme,
+  FOREST_THEME as forestTheme,
+  SUNSET_THEME as sunsetTheme,
 };
 
 /**
