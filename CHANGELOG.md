@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-18
+
 ### Breaking
 - `ZoomConfig.wheelFactor` renamed to `ZoomConfig.wheelStep`, with new
   semantics: it is now the zoom fraction per max wheel / pinch tick
