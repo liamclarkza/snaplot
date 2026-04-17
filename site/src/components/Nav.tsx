@@ -38,6 +38,7 @@ export default function Nav() {
 
           {/* Light / dark toggle */}
           <button
+            type="button"
             onClick={toggle}
             title={theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             style={{

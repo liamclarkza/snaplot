@@ -93,8 +93,10 @@ export class ChartCore implements ChartInstance {
   /** True when the user has actively zoomed — suppresses auto-range X on data updates */
   private userHasZoomed = false;
 
-  // Event listeners
-  private listeners = new Map<string, Set<Function>>();
+  // Event listeners. Handlers have per-event signatures (see ChartEventMap);
+  // the storage is a contravariant-friendly callable so every event's
+  // handler shape assigns in without a cast (Function is banned by lint).
+  private listeners = new Map<string, Set<(...args: never[]) => unknown>>();
 
   // Cleanup
   private destroyed = false;
@@ -1345,7 +1347,6 @@ export class ChartCore implements ChartInstance {
     // the ring is visible but never harsh.
     const bg = this.theme.backgroundColor;
     const isDark = this.isThemeDark(bg);
-    const ringColor = '#ffffff';
     const ringAlpha = isDark ? 0.15 : 0.08;
 
     // When a series is highlighted, only draw the indicator on that series —
@@ -1775,7 +1776,10 @@ export class ChartCore implements ChartInstance {
     if (!handlers) return;
     for (const handler of handlers) {
       try {
-        (handler as Function)(...args);
+        // The per-event handler signature lives in ChartEventMap and is
+        // enforced at `.on()` registration time; the dispatch side is
+        // variadic by design.
+        (handler as (...a: unknown[]) => unknown)(...args);
       } catch (err) {
         // One bad handler must not stop the render loop or other subscribers.
         console.error(`[snaplot] '${event}' handler threw:`, err);
