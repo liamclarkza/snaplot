@@ -2,7 +2,7 @@ import { createSignal, createMemo, onCleanup, onMount } from 'solid-js';
 import { highlight } from 'sugar-high';
 import {
   Chart,
-  darkTheme, lightTheme, oceanTheme, midnightTheme,
+  darkTheme, lightTheme, oceanTheme, midnightTheme, refinedDarkTheme,
   createLegendPlugin,
   createLegendTablePlugin,
   createReferenceLinesPlugin,
@@ -13,7 +13,7 @@ import { useTheme } from '../ThemeContext';
 
 // Available to user code inside the editor via new Function args
 const evalContext = {
-  darkTheme, lightTheme, oceanTheme, midnightTheme,
+  darkTheme, lightTheme, oceanTheme, midnightTheme, refinedDarkTheme,
   createLegendPlugin,
   createLegendTablePlugin,
   createReferenceLinesPlugin,

@@ -487,7 +487,7 @@ export default function Docs() {
         <h1 style={{ 'font-size': '28px', 'font-weight': '700', 'margin-bottom': '8px' }}>Documentation</h1>
         <P>
           Every example below is <b>live and editable</b> — change the config and the chart updates instantly.
-          Built-in theme variables are available in the editor: <code>darkTheme</code>, <code>lightTheme</code>, <code>oceanTheme</code>, <code>midnightTheme</code>.
+          Built-in theme variables are available in the editor: <code>darkTheme</code>, <code>lightTheme</code>, <code>oceanTheme</code>, <code>midnightTheme</code>, <code>refinedDarkTheme</code>.
         </P>
 
         {/* ═══════════════════════════════════════════════════════
@@ -1072,8 +1072,8 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
             ═══════════════════════════════════════════════════════ */}
 
         <Section id="themes-builtin" title="Built-in Themes">
-          <P>Four built-in themes are available: <code>darkTheme</code>, <code>lightTheme</code>, <code>oceanTheme</code>, and <code>midnightTheme</code>. Pass any as the <code>theme</code> property in your config.</P>
-          <Ex title="Theme switcher" desc="Change oceanTheme to darkTheme, lightTheme, or midnightTheme"
+          <P>Five built-in themes are available: <code>darkTheme</code>, <code>lightTheme</code>, <code>oceanTheme</code>, <code>midnightTheme</code>, and <code>refinedDarkTheme</code>. Pass any as the <code>theme</code> property in your config.</P>
+          <Ex title="Theme switcher" desc="Change oceanTheme to refinedDarkTheme, darkTheme, lightTheme, or midnightTheme"
             data={d_theme()}
             code={`{
   theme: oceanTheme,

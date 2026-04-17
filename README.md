@@ -172,7 +172,7 @@ The zero-alloc `getCursorSnapshotInto(buffer)` variant reuses a caller-owned buf
 
 ### Themes
 
-Four built-in themes (`lightTheme`, `darkTheme`, `oceanTheme`, `midnightTheme`) plus full custom `ThemeConfig` objects. The legend table uses CSS custom properties (`.snaplot-legend-table-root`, `[data-highlighted]`, `[data-dimmed]`) so apps can restyle without specificity battles.
+Five built-in themes (`lightTheme`, `darkTheme`, `oceanTheme`, `midnightTheme`, `refinedDarkTheme`) plus full custom `ThemeConfig` objects. The legend table uses CSS custom properties (`.snaplot-legend-table-root`, `[data-highlighted]`, `[data-dimmed]`) so apps can restyle without specificity battles.
 
 ### Performance
 
@@ -204,7 +204,7 @@ config.plugins = [createLegendTablePlugin({ fallback: 'series-only' })];
 | **Column helpers** | `nameColumn`, `valueColumn`, `swatchColumn`, `metricColumn`, `column` |
 | **Data utilities** | `lttb`, `m4`, `histogram`, `ColumnarStore` |
 | **Scales** | `createScale`, `LinearScale`, `LogScale`, `TimeScale`, `niceTicks` |
-| **Themes** | `lightTheme`, `darkTheme`, `oceanTheme`, `midnightTheme`, `resolveTheme` |
+| **Themes** | `lightTheme`, `darkTheme`, `oceanTheme`, `midnightTheme`, `refinedDarkTheme`, `resolveTheme` |
 | **Core** | `ChartCore` (imperative, framework-free) |
 
 Full type exports and API reference in the [documentation](https://liamclarkza.github.io/snaplot/#/docs#api-types).

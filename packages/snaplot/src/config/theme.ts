@@ -1,8 +1,20 @@
 import type { ThemeConfig } from '../types';
-import { DEFAULT_THEME, DARK_THEME, OCEAN_THEME, MIDNIGHT_THEME } from '../constants';
+import {
+  DEFAULT_THEME,
+  DARK_THEME,
+  OCEAN_THEME,
+  MIDNIGHT_THEME,
+  REFINED_DARK_THEME,
+} from '../constants';
 import { deepMerge } from './merge';
 
-export { DEFAULT_THEME as lightTheme, DARK_THEME as darkTheme, OCEAN_THEME as oceanTheme, MIDNIGHT_THEME as midnightTheme };
+export {
+  DEFAULT_THEME as lightTheme,
+  DARK_THEME as darkTheme,
+  OCEAN_THEME as oceanTheme,
+  MIDNIGHT_THEME as midnightTheme,
+  REFINED_DARK_THEME as refinedDarkTheme,
+};
 
 /**
  * CSS variable name mapping for theme properties.
