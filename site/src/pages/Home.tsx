@@ -1,7 +1,8 @@
-import { createSignal, onCleanup } from 'solid-js';
-import { Chart, darkTheme } from 'snaplot';
+import { createSignal, createMemo, onCleanup } from 'solid-js';
+import { Chart, darkTheme, lightTheme } from 'snaplot';
 import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
+import { useTheme } from '../ThemeContext';
 
 function generateHeroData(points: number): ColumnarData {
   const now = Date.now();
@@ -16,24 +17,6 @@ function generateHeroData(points: number): ColumnarData {
   }
   return [x, y1, y2];
 }
-
-const heroConfig: ChartConfig = {
-  theme: {
-    ...darkTheme,
-    backgroundColor: '#0f1117',
-    gridOpacity: 0.25,
-    axisLineColor: '#2a2b3d',
-  },
-  axes: { x: { type: 'time' }, y: { type: 'linear' } },
-  series: [
-    { label: 'Throughput', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2, stroke: '#4f8fea' },
-    { label: 'Latency', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: '#e69f00' },
-  ],
-  cursor: { show: true },
-  zoom: { enabled: true, x: true },
-  tooltip: { show: true, mode: 'index' },
-  padding: { top: 20, right: 20, bottom: 36, left: 48 },
-};
 
 const quickExample = `import { Chart } from 'snaplot';
 
@@ -64,6 +47,27 @@ const features = [
 export default function Home() {
   const [heroData] = createSignal(generateHeroData(300));
   let heroChart: ChartInstance | undefined;
+  const { theme } = useTheme();
+
+  // Theme-reactive hero config. Returning a new config object when theme()
+  // flips triggers `<Chart>`'s createEffect → setOptions(), which re-resolves
+  // the theme and redraws the canvas. Without this accessor the hero stayed
+  // dark even when the page was in light mode.
+  const heroConfig = createMemo<ChartConfig>(() => ({
+    theme: {
+      ...(theme() === 'light' ? lightTheme : darkTheme),
+      gridOpacity: 0.25,
+    },
+    axes: { x: { type: 'time' }, y: { type: 'linear' } },
+    series: [
+      { label: 'Throughput', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2, stroke: '#4f8fea' },
+      { label: 'Latency', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: '#e69f00' },
+    ],
+    cursor: { show: true },
+    zoom: { enabled: true, x: true },
+    tooltip: { show: true, mode: 'index' },
+    padding: { top: 20, right: 20, bottom: 36, left: 48 },
+  }));
 
   const interval = setInterval(() => {
     if (!heroChart) return;
@@ -142,7 +146,7 @@ export default function Home() {
           border: '1px solid var(--border)',
           'margin-bottom': '48px',
         }}>
-          <Chart config={heroConfig} data={heroData()} onReady={(c) => { heroChart = c; }} />
+          <Chart config={heroConfig()} data={heroData()} onReady={(c) => { heroChart = c; }} />
         </div>
 
         {/* Install */}
