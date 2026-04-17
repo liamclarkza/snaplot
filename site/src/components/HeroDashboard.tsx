@@ -184,19 +184,28 @@ export default function HeroDashboard() {
   // overrides so Home and Docs fall back to their site light/dark tokens.
   const cssVars = createMemo(() => {
     const { theme: t, dark } = activeEntry();
-    const panelSurface = dark
-      ? `color-mix(in srgb, ${t.backgroundColor} 88%, #fff 2%)`
-      : t.backgroundColor;
+    // Panel surface matches the chart canvas exactly so the header /
+    // footer blend seamlessly into the plot — no visible seam where
+    // a lighter card meets a darker chart. The page background is the
+    // tinted surround, so panels still feel contained even without a
+    // color step (elevation does the rest via inset + shadow).
+    const pageBg = dark
+      ? `color-mix(in srgb, ${t.backgroundColor} 88%, #000 12%)`
+      : `color-mix(in srgb, ${t.backgroundColor} 92%, #000 8%)`;
+    // Dark: a dark drop-shadow under a dark card reads muddy. Skip
+    // the ambient shadow and let the tinted page bg + inset top
+    // highlight do the lifting — the soft-UI "lit from above" feel
+    // without the blob. Light: the layered shadow works as intended.
     const elevInset = dark
       ? 'inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-      : 'inset 0 1px 0 rgba(255, 255, 255, 0.80)';
+      : 'inset 0 1px 0 rgba(255, 255, 255, 0.70)';
     const elevShadow = dark
-      ? '0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(0, 0, 0, 0.28)'
-      : '0 1px 2px rgba(30, 35, 60, 0.04), 0 10px 28px rgba(30, 35, 60, 0.08)';
+      ? 'none'
+      : '0 1px 2px rgba(30, 35, 60, 0.05), 0 10px 28px rgba(30, 35, 60, 0.08)';
     return {
-      '--bg': t.backgroundColor,
-      '--bg-surface': panelSurface,
-      '--bg-surface-2': panelSurface,
+      '--bg': pageBg,
+      '--bg-surface': t.backgroundColor,
+      '--bg-surface-2': t.backgroundColor,
       '--text': t.textColor,
       '--text-secondary': t.tickColor,
       '--border': t.borderColor,
