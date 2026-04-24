@@ -175,7 +175,7 @@ export function updateDOMLabels(
   // Clear existing labels
   domLayer.innerHTML = '';
 
-  const style = `position:absolute;font-family:${theme.fontFamily};font-size:${theme.fontSize}px;color:${theme.textColor};white-space:nowrap;pointer-events:none;`;
+  const style = `position:absolute;font-family:${theme.fontFamily};font-size:${theme.fontSize}px;font-variant-numeric:tabular-nums;color:${theme.textColor};white-space:nowrap;pointer-events:none;`;
 
   for (const [key, labels] of axesResult.labels) {
     const axisInfo = layout.axes[key];

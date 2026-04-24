@@ -31,6 +31,7 @@ export class TooltipManager {
       padding: 8px 12px;
       border-radius: 4px;
       font-size: 12px;
+      font-variant-numeric: tabular-nums;
       line-height: 1.5;
       max-width: 320px;
       white-space: nowrap;

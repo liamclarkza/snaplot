@@ -109,6 +109,10 @@ body {
   color: var(--text);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  /* Tabular numerals so digits in demos, legend tables, tooltips and
+     any live-updating readout sit in fixed-width columns instead of
+     jiggling as values change. Inherited through the whole page. */
+  font-variant-numeric: tabular-nums;
   /* Soft crossfade on theme toggle, color on body cascades to most text. */
   transition: background-color 220ms cubic-bezier(0.2, 0, 0, 1),
     color 220ms cubic-bezier(0.2, 0, 0, 1);
