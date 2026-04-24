@@ -1,5 +1,5 @@
 import type { Scale, ScaleType } from '../types';
-import { niceTicks, niceRange } from './niceNumbers';
+import { niceTicks, niceRange, niceStep } from './niceNumbers';
 import { DEFAULT_TICK_COUNT } from '../constants';
 
 /**
@@ -37,21 +37,23 @@ export class LinearScale implements Scale {
   }
 
   tickFormat(value: number): string {
-    // If the value is effectively an integer, show it as one
-    if (Number.isInteger(value) || Math.abs(value - Math.round(value)) < 1e-9) {
+    // Derive precision from the nice step the ticks actually use, and apply
+    // the same decimal count to every value so ticks line up visually.
+    // Previously integer-valued ticks short-circuited to "6" while their
+    // neighbours rendered as "6.20" / "6.40", breaking the column.
+    const step = niceStep(this.min, this.max, DEFAULT_TICK_COUNT);
+    if (step === 0 || !Number.isFinite(step)) return String(value);
+
+    const absStep = Math.abs(step);
+
+    // Integer step >= 1: format every tick as an integer.
+    if (absStep >= 1 && Math.abs(absStep - Math.round(absStep)) < 1e-9) {
       return String(Math.round(value));
     }
 
-    // Determine appropriate precision from the step size
-    const step = (this.max - this.min) / DEFAULT_TICK_COUNT;
-    if (step === 0) return String(value);
-
-    const absStep = Math.abs(step);
-    if (absStep >= 1) {
-      return value.toFixed(1);
-    }
-
-    const decimals = Math.max(0, -Math.floor(Math.log10(absStep)) + 1);
+    // Fractional step: pad one extra decimal past the step's magnitude so
+    // adjacent ticks stay visually distinguishable (0.2 step -> 2 decimals).
+    const decimals = Math.max(1, -Math.floor(Math.log10(absStep)) + 1);
     return value.toFixed(Math.min(decimals, 8));
   }
 

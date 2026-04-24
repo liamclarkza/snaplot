@@ -120,4 +120,30 @@ describe('niceTicks', () => {
     expect(ticks[0]).toBeGreaterThanOrEqual(-50);
     expect(ticks[ticks.length - 1]).toBeLessThanOrEqual(50);
   });
+
+  it('subdivides zoomed domains that straddle a single integer', () => {
+    // Regression: the integer fast-path used to fire whenever exactly one
+    // integer fell in the range, collapsing deep-zoom axes to one tick.
+    const ticks = niceTicks(49.7, 50.3, 6);
+    expect(ticks.length).toBeGreaterThanOrEqual(3);
+    expect(ticks.some((t) => t < 50)).toBe(true);
+    expect(ticks.some((t) => t > 50)).toBe(true);
+  });
+
+  it('subdivides very narrow zoomed domains around an integer', () => {
+    const ticks = niceTicks(49.95, 50.05, 6);
+    expect(ticks.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('subdivides a zoomed domain entirely between two integers', () => {
+    const ticks = niceTicks(1.2, 1.8, 6);
+    expect(ticks.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('subdivides zoomed domains containing exactly two integers', () => {
+    // Regression: even with two integer ticks the axis felt bare at
+    // deep zoom; fall through to nice-step so we get finer ticks.
+    const ticks = niceTicks(42.8, 44.3, 6);
+    expect(ticks.length).toBeGreaterThanOrEqual(4);
+  });
 });

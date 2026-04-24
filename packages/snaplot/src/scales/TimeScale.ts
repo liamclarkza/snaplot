@@ -4,12 +4,17 @@ import type { Scale, ScaleType } from '../types';
  * Time scale: linear on epoch milliseconds with hierarchical interval
  * selection and multi-level formatting.
  *
- * Intervals: 1s, 5s, 15s, 30s, 1m, 5m, 15m, 30m, 1h, 3h, 6h, 12h, 1d, 1w, 1M, 1y
- * Picks the interval nearest to rawStep without exceeding ~1 label per 80-120px.
+ * Intervals: 10ms through 1y. Picks the smallest interval whose
+ * spacing is >= rawStep, targeting ~1 label per 100px.
  */
 
 // [milliseconds, label]
 const TIME_INTERVALS: [number, string][] = [
+  [10,               '10ms'],
+  [50,               '50ms'],
+  [100,              '100ms'],
+  [250,              '250ms'],
+  [500,              '500ms'],
   [1000,             '1s'],
   [5000,             '5s'],
   [15000,            '15s'],
@@ -72,12 +77,27 @@ export class TimeScale implements Scale {
     const interval = this.pickInterval(rawStep);
 
     // Generate ticks aligned to the interval
+    const ticks = this.alignTicks(interval);
+    if (ticks.length >= 2) return ticks;
+
+    // Safety net: when the chosen interval is larger than the domain we end
+    // up with 0-1 aligned ticks (tight zoom below the smallest interval, or
+    // a domain that falls between two boundaries). Fall back to an even
+    // linear subdivision so the axis always has multiple references.
+    const fallbackSteps = Math.max(2, Math.min(targetLabels, 6));
+    const fallback: number[] = new Array(fallbackSteps + 1);
+    for (let i = 0; i <= fallbackSteps; i++) {
+      fallback[i] = this.min + (domain * i) / fallbackSteps;
+    }
+    return fallback;
+  }
+
+  private alignTicks(interval: number): number[] {
     const start = Math.ceil(this.min / interval) * interval;
     const ticks: number[] = [];
     for (let t = start; t <= this.max; t += interval) {
       ticks.push(t);
     }
-
     return ticks;
   }
 
@@ -85,8 +105,16 @@ export class TimeScale implements Scale {
     const domain = this.max - this.min;
     const date = new Date(value);
 
+    if (domain < 1000) {
+      // < 1 second: show HH:MM:SS.mmm so sub-second ticks are distinguishable.
+      const base = date.toLocaleTimeString(undefined, {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+      const ms = String(Math.floor(value) % 1000).padStart(3, '0');
+      return `${base}.${ms}`;
+    }
     if (domain < 60000) {
-      // < 1 minute: show seconds.millis
+      // < 1 minute: show HH:MM:SS
       return date.toLocaleTimeString(undefined, {
         hour: '2-digit', minute: '2-digit', second: '2-digit',
       });

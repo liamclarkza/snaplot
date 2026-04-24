@@ -67,11 +67,14 @@ export function niceTicks(
 
   // For small integer ranges (e.g. bar chart categories 0-7),
   // generate a tick at every integer rather than skipping with nice steps.
+  // Require at least 3 integer ticks: when the zoomed domain contains only
+  // 1-2 integers, integer-only ticks leave the axis looking empty — fall
+  // through to the nice-step path, which subdivides at finer granularity.
   const range = max - min;
   const intMin = Math.ceil(min);
   const intMax = Math.floor(max);
   const intCount = intMax - intMin + 1;
-  if (range <= 20 && intCount > 0 && intCount <= 15) {
+  if (range <= 20 && intCount >= 3 && intCount <= 15) {
     // Check if integer ticks would cover the range well
     const allInts = Number.isInteger(intMin) && Number.isInteger(intMax);
     if (allInts) {
