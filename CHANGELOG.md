@@ -6,6 +6,34 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-24
+
+### Fixed
+- **Axis tick density at deep zoom.** `LinearScale` no longer collapses to
+  one or two ticks when the zoomed domain straddles a single integer
+  (e.g. `[49.7, 50.3]` used to render only `50`). The integer fast-path in
+  `niceTicks` now requires at least three integer ticks before firing;
+  narrower ranges subdivide via the nice-step path so the axis always
+  keeps enough reference lines to read.
+- **Time axis at sub-second zoom.** `TimeScale` gained 10ms / 50ms / 100ms /
+  250ms / 500ms intervals plus a linear-subdivision fallback, so zooming
+  past one second no longer leaves the X axis with a single tick. Tick
+  formatting also renders `HH:MM:SS.mmm` when the domain is under one
+  second so adjacent ticks are visibly distinct.
+- **Consistent decimal count on linear axes.** `LinearScale.tickFormat`
+  now derives its precision from the actual nice step and applies the
+  same decimal count to every value in the axis. Integer-valued ticks no
+  longer short-circuit to `6` while their neighbours render as `6.20` /
+  `6.40` — they render as `6.00`, keeping the column aligned.
+
+### Changed
+- **Tabular numerals by default.** Axis tick labels and the default
+  tooltip now ship with `font-variant-numeric: tabular-nums` so digits
+  stay in fixed-width columns instead of jiggling as values update
+  during zoom, pan, or live data. The docs site applies the same rule
+  at `body` level so all numeric readouts, demos, and legend tables
+  inherit it automatically.
+
 ## [0.5.0] - 2026-04-18
 
 ### Breaking
