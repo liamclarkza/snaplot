@@ -5,6 +5,7 @@ export type SiteTheme = 'dark' | 'light';
 const ThemeContext = createContext<{
   theme: Accessor<SiteTheme>;
   toggle: () => void;
+  setTheme: (t: SiteTheme) => void;
 }>();
 
 export function ThemeProvider(props: { children: any }) {
@@ -20,7 +21,7 @@ export function ThemeProvider(props: { children: any }) {
   const toggle = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
   return (
-    <ThemeContext.Provider value={{ theme, toggle }}>
+    <ThemeContext.Provider value={{ theme, toggle, setTheme }}>
       {props.children}
     </ThemeContext.Provider>
   );

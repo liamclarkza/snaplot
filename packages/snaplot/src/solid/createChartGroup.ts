@@ -100,7 +100,7 @@ export function createChartGroup(): ChartGroup {
 
     highlight(seriesIndex) {
       setHighlight(seriesIndex);
-      SyncGroup.publishHighlight(syncKey, SOURCE, seriesIndex);
+      SyncGroup.publishHighlight(syncKey, SOURCE, { type: 'index', seriesIndex });
     },
 
     cursor(dataX) {

@@ -1,5 +1,12 @@
 import type { Scale, Layout, SeriesConfig } from '../types';
 
+export interface BarRenderSegment {
+  xData: Float64Array;
+  yData: Float64Array;
+  startIdx: number;
+  endIdx: number;
+}
+
 /**
  * Bar chart renderer. Supports grouped (side-by-side) bars.
  *
@@ -27,9 +34,38 @@ export function renderBars(
   /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
 ): void {
-  if (endIdx < startIdx) return;
+  renderBarsSegments(
+    ctx,
+    [{ xData, yData, startIdx, endIdx }],
+    scaleX,
+    scaleY,
+    layout,
+    series,
+    color,
+    barSeriesIndex,
+    totalBarSeries,
+    opacityMultiplier,
+  );
+}
 
-  const count = endIdx - startIdx + 1;
+export function renderBarsSegments(
+  ctx: CanvasRenderingContext2D,
+  segments: BarRenderSegment[],
+  scaleX: Scale,
+  scaleY: Scale,
+  layout: Layout,
+  series: SeriesConfig,
+  color: string,
+  /** Index of this series among bar-type series */
+  barSeriesIndex: number,
+  /** Total number of bar-type series (for grouped width) */
+  totalBarSeries: number,
+  /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
+  opacityMultiplier: number = 1,
+): void {
+  if (segments.length === 0) return;
+
+  const count = segmentPointCount(segments);
   if (count === 0) return;
 
   // Clip to plot area
@@ -49,7 +85,10 @@ export function renderBars(
   let categoryWidth: number;
   if (count > 1) {
     // Use average spacing between adjacent X values
-    const xRange = scaleX.dataToPixel(xData[endIdx]) - scaleX.dataToPixel(xData[startIdx]);
+    const first = segments[0];
+    const last = segments[segments.length - 1];
+    const xRange = scaleX.dataToPixel(last.xData[last.endIdx]) -
+      scaleX.dataToPixel(first.xData[first.startIdx]);
     categoryWidth = xRange / (count - 1);
   } else {
     categoryWidth = layout.plot.width * 0.5;
@@ -63,21 +102,32 @@ export function renderBars(
   // Baseline Y (where value = 0)
   const baselinePixel = scaleY.dataToPixel(0);
 
-  for (let i = startIdx; i <= endIdx; i++) {
-    const yVal = yData[i];
-    if (yVal !== yVal) continue; // NaN
+  for (const segment of segments) {
+    const { xData, yData, startIdx, endIdx } = segment;
+    for (let i = startIdx; i <= endIdx; i++) {
+      const yVal = yData[i];
+      if (yVal !== yVal) continue; // NaN
 
-    const centerX = scaleX.dataToPixel(xData[i]);
-    const groupLeft = centerX - groupWidth / 2;
-    const barLeft = groupLeft + barSeriesIndex * barWidth + barGap / 2;
-    const barTop = scaleY.dataToPixel(yVal);
+      const centerX = scaleX.dataToPixel(xData[i]);
+      const groupLeft = centerX - groupWidth / 2;
+      const barLeft = groupLeft + barSeriesIndex * barWidth + barGap / 2;
+      const barTop = scaleY.dataToPixel(yVal);
 
-    // Bar goes from barTop to baseline (supports negative values)
-    const y = Math.min(barTop, baselinePixel);
-    const h = Math.abs(barTop - baselinePixel);
+      // Bar goes from barTop to baseline (supports negative values)
+      const y = Math.min(barTop, baselinePixel);
+      const h = Math.abs(barTop - baselinePixel);
 
-    ctx.fillRect(barLeft, y, effectiveBarWidth, h);
+      ctx.fillRect(barLeft, y, effectiveBarWidth, h);
+    }
   }
 
   ctx.restore();
+}
+
+function segmentPointCount(segments: BarRenderSegment[]): number {
+  let count = 0;
+  for (const segment of segments) {
+    count += segment.endIdx - segment.startIdx + 1;
+  }
+  return count;
 }

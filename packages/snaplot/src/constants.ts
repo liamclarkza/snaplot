@@ -16,6 +16,71 @@ export const PALETTE_OKABE_ITO = [
 ] as const;
 
 /**
+ * Default categorical cycles are tuned separately for light and dark surfaces:
+ * same broad hue coverage, but dark mode uses brighter/lower-glare variants.
+ */
+export const PALETTE_CATEGORICAL_LIGHT = [
+  '#0072B2',
+  '#009E73',
+  '#E69F00',
+  '#D55E00',
+  '#CC79A7',
+  '#56B4E9',
+  '#7F3C8D',
+  '#666666',
+] as const;
+
+export const PALETTE_CATEGORICAL_DARK = [
+  '#7aa2f7',
+  '#8bd17c',
+  '#f2c14e',
+  '#ff8a65',
+  '#c79cff',
+  '#5ad4e6',
+  '#f58bb8',
+  '#b8beca',
+] as const;
+
+/**
+ * Ordered ramps for continuous encodings. They avoid rainbow-style hue jumps:
+ * sequential ramps move mostly by lightness, diverging ramps reserve the centre
+ * for a neutral midpoint.
+ */
+export const PALETTE_SEQUENTIAL_LIGHT = [
+  '#f8fbff',
+  '#dceeff',
+  '#9ecae1',
+  '#4292c6',
+  '#1368aa',
+  '#08306b',
+] as const;
+
+export const PALETTE_SEQUENTIAL_DARK = [
+  '#151821',
+  '#26304c',
+  '#315f88',
+  '#2a9d8f',
+  '#7ccf72',
+  '#fde047',
+] as const;
+
+export const PALETTE_DIVERGING_LIGHT = [
+  '#2166ac',
+  '#92c5de',
+  '#f7f7f7',
+  '#f4a582',
+  '#b2182b',
+] as const;
+
+export const PALETTE_DIVERGING_DARK = [
+  '#60a5fa',
+  '#244c85',
+  '#151821',
+  '#7f1d1d',
+  '#fb7185',
+] as const;
+
+/**
  * Light theme, Soft-UI defaults. Grid and border share a single slate
  * hue and differentiate by opacity alone: the grid sits at 0.5 (quiet
  * but legible), the border at 0.9 (a clear step above). Background is
@@ -35,7 +100,11 @@ export const DEFAULT_THEME: ThemeConfig = {
   fontSize: 11,
   gridColor: '#c3c6cf',
   gridOpacity: 0.5,
-  palette: [...PALETTE_OKABE_ITO],
+  palette: [...PALETTE_CATEGORICAL_LIGHT],
+  categoricalPalette: [...PALETTE_CATEGORICAL_LIGHT],
+  sequentialPalette: [...PALETTE_SEQUENTIAL_LIGHT],
+  divergingPalette: [...PALETTE_DIVERGING_LIGHT],
+  heatmapGradient: [...PALETTE_SEQUENTIAL_LIGHT],
   axisLineColor: '#c3c6cf',
   borderColor: '#c3c6cf',
   // Same opacity as the grid, the frame is solid, the grid is dashed,
@@ -52,8 +121,8 @@ export const DEFAULT_THEME: ThemeConfig = {
  * Dark theme, Soft-UI slate. The old navy #1a1a2e gave way to a
  * cooler slate (#14161f) that matches the `refinedDarkTheme` aesthetic:
  * tinted neutrals, warm off-white text (#e2e2e5, not pure white),
- * Okabe–Ito palette. Grid and border share one hue; opacity does the
- * visual separation.
+ * and a dark-surface categorical palette. Grid and border share one hue;
+ * opacity does the visual separation.
  */
 export const DARK_THEME: ThemeConfig = {
   backgroundColor: '#14161f',
@@ -62,7 +131,11 @@ export const DARK_THEME: ThemeConfig = {
   fontSize: 11,
   gridColor: '#2a2d3a',
   gridOpacity: 0.55,
-  palette: [...PALETTE_OKABE_ITO],
+  palette: [...PALETTE_CATEGORICAL_DARK],
+  categoricalPalette: [...PALETTE_CATEGORICAL_DARK],
+  sequentialPalette: [...PALETTE_SEQUENTIAL_DARK],
+  divergingPalette: [...PALETTE_DIVERGING_DARK],
+  heatmapGradient: [...PALETTE_SEQUENTIAL_DARK],
   axisLineColor: '#2a2d3a',
   borderColor: '#2a2d3a',
   borderOpacity: 0.65,
@@ -301,6 +374,98 @@ export const MINT_THEME: ThemeConfig = {
   tooltipBackground: '#ffffff',
   tooltipTextColor: '#0f2a20',
   tooltipBorderColor: '#d3e4db',
+};
+
+/**
+ * Studio, the home-page light look. Same off-white surface as
+ * `lightTheme`, but the palette leads with the Observable / Tableau-10
+ * quartet (blue, green, orange, red): the de facto standard for business
+ * dashboards. Filled out to 8 with cohesive secondaries so it survives
+ * past four series.
+ */
+export const STUDIO_THEME: ThemeConfig = {
+  backgroundColor: '#fafbfc',
+  textColor: '#1a1d29',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#c3c6cf',
+  gridOpacity: 0.5,
+  palette: [
+    '#4e79a7', // blue
+    '#59a14f', // green
+    '#f28e2b', // orange
+    '#e15759', // red
+    '#76b7b2', // teal
+    '#edc948', // yellow
+    '#b07aa1', // purple
+    '#9c755f', // brown
+  ],
+  categoricalPalette: [
+    '#4e79a7',
+    '#59a14f',
+    '#f28e2b',
+    '#e15759',
+    '#76b7b2',
+    '#edc948',
+    '#b07aa1',
+    '#9c755f',
+  ],
+  sequentialPalette: ['#fafbfc', '#e6f0fb', '#bdd7ee', '#6baed6', '#3182bd', '#08519c'],
+  divergingPalette: ['#4e79a7', '#bdd7ee', '#fafbfc', '#f1b6b6', '#e15759'],
+  heatmapGradient: ['#fafbfc', '#e6f0fb', '#bdd7ee', '#6baed6', '#3182bd', '#08519c'],
+  axisLineColor: '#c3c6cf',
+  borderColor: '#c3c6cf',
+  borderOpacity: 0.5,
+  tickColor: '#6b7181',
+  crosshairColor: '#3b4254',
+  tooltipBackground: '#ffffff',
+  tooltipTextColor: '#1a1d29',
+  tooltipBorderColor: '#dadde3',
+};
+
+/**
+ * Tokyo, the home-page dark look. Slate background paired with the
+ * Tokyo Night editor quartet (soft blue, sage, orange, rose), softer
+ * pastels tuned for dark backgrounds so no line glares.
+ */
+export const TOKYO_THEME: ThemeConfig = {
+  backgroundColor: '#14161f',
+  textColor: '#e2e2e5',
+  fontFamily: DEFAULT_THEME.fontFamily,
+  fontSize: 11,
+  gridColor: '#2a2d3a',
+  gridOpacity: 0.55,
+  palette: [
+    '#7aa2f7', // soft blue
+    '#9ece6a', // sage
+    '#ff9e64', // orange
+    '#f7768e', // rose
+    '#7dcfff', // sky
+    '#bb9af7', // mauve
+    '#e0af68', // amber
+    '#73daca', // mint
+  ],
+  categoricalPalette: [
+    '#7aa2f7',
+    '#9ece6a',
+    '#ff9e64',
+    '#f7768e',
+    '#7dcfff',
+    '#bb9af7',
+    '#e0af68',
+    '#73daca',
+  ],
+  sequentialPalette: ['#14161f', '#20263c', '#2f557f', '#2f8f8a', '#8bd17c', '#e0af68'],
+  divergingPalette: ['#7aa2f7', '#263a5c', '#14161f', '#5c2634', '#f7768e'],
+  heatmapGradient: ['#14161f', '#20263c', '#2f557f', '#2f8f8a', '#8bd17c', '#e0af68'],
+  axisLineColor: '#2a2d3a',
+  borderColor: '#2a2d3a',
+  borderOpacity: 0.65,
+  tickColor: '#8a8e9c',
+  crosshairColor: '#a0a5b8',
+  tooltipBackground: 'rgba(20, 23, 32, 0.96)',
+  tooltipTextColor: '#e8e8eb',
+  tooltipBorderColor: 'rgba(255, 255, 255, 0.1)',
 };
 
 /**

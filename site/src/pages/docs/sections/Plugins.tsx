@@ -252,7 +252,12 @@ chart.on('cursor:move', () => {
   afterDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
 
   // Events
-  onCursorMove?(chart: ChartInstance, dataX: number | null, dataIdx: number | null): void;
+  onCursorMove?(
+    chart: ChartInstance,
+    dataX: number | null,
+    dataIdx: number | null,
+    origin: CursorEventOrigin,
+  ): void;
   onZoom?(chart: ChartInstance, scaleKey: string, range: ScaleRange): void;
   onClick?(chart: ChartInstance, dataX: number, dataIdx: number): void;
   onSetData?(chart: ChartInstance, data: ColumnarData): void;
@@ -284,7 +289,7 @@ chart.on('cursor:move', () => {
 plugins: [thresholdPlugin(75, '#e74c3c')]`} />
         <div style={{ height: '8px' }} />
         <Prose>
-          Return <code>true</code> from any <code>before*</code> hook to skip the default rendering for that layer, giving you full control over what gets drawn.
+          Return <code>false</code> from any <code>before*</code> hook to skip the default rendering for that layer, giving you full control over what gets drawn.
         </Prose>
       </Section>
     </>

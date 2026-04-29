@@ -40,6 +40,7 @@ export default function ChartTypes() {
         <Demo title="Multi-series streaming line chart" desc="Try changing interpolation to 'linear' or 'step-after'"
           data={d_line()} onReady={(c) => { lineChart = c; }}
           code={`{
+  streaming: { maxLen: 500 },
   axes: { x: { type: 'time' } },
   series: [
     { label: 'CPU %', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
@@ -100,7 +101,7 @@ export default function ChartTypes() {
 
       <Section id="heatmap" title="Density Heatmap">
         <Prose>
-          Set <code>heatmap: true</code> on a scatter series for Viridis colormap density rendering. Adjust <code>heatmapBinSize</code> for coarser or finer bins.
+          Set <code>heatmap: true</code> on a scatter series for density rendering. Heatmaps use <code>theme.heatmapGradient</code>, then <code>theme.sequentialPalette</code>, and finally the built-in Viridis-style fallback. A series-level <code>heatmapGradient</code> overrides the theme for that one chart. Adjust <code>heatmapBinSize</code> for coarser or finer bins.
           Density heatmaps auto-trigger when a scatter series exceeds 200K points, but you can opt in at any count with <code>heatmap: true</code>.
         </Prose>
         <Demo title="300K points, 4 gaussian clusters" data={d_heat()}

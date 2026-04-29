@@ -1,4 +1,4 @@
-import type { ChartInstance, ScaleRange } from '../types';
+import type { ChartInstance, HighlightSyncPayload, ScaleRange } from '../types';
 
 /**
  * Typed internal pub/sub for decoupling chart modules.
@@ -25,7 +25,7 @@ export interface EventMap {
   'action:box-update': { x: number; y: number };
   'action:box-end': { x1: number; y1: number; x2: number; y2: number };
   'action:reset-zoom': undefined;
-  'action:tap': { x: number; y: number };
+  'action:tap': { x: number; y: number; pointerType: string };
 }
 
 type Handler<T> = (payload: T) => void;
@@ -96,22 +96,23 @@ export class SyncGroup {
     if (!group) return;
     for (const peer of group) {
       if (peer !== source) {
-        peer.setCursorDataX(dataX);
+        peer.setCursorDataX(dataX, 'sync');
       }
     }
   }
 
-  /**
-   * Publish a highlight (series-index) change to all peers.
-   * Peers may map this through their own highlight resolver if the index
-   * shape differs (orbit, for example, can use `meta.runId`).
-   */
-  static publishHighlight(key: string, source: ChartInstance, seriesIndex: number | null): void {
+  /** Publish a highlight change to all peers. */
+  static publishHighlight(
+    key: string,
+    source: ChartInstance | null,
+    payload: HighlightSyncPayload,
+  ): void {
     const group = this.groups.get(key);
     if (!group) return;
     for (const peer of group) {
       if (peer !== source) {
-        peer.setHighlight(seriesIndex);
+        (peer as unknown as { receiveHighlightSync(payload: HighlightSyncPayload): void })
+          .receiveHighlightSync(payload);
       }
     }
   }

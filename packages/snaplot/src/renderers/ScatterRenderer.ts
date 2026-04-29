@@ -1,5 +1,12 @@
 import type { Scale, Layout, SeriesConfig } from '../types';
 
+export interface ScatterRenderSegment {
+  xData: Float64Array;
+  yData: Float64Array;
+  startIdx: number;
+  endIdx: number;
+}
+
 /**
  * Scatter plot renderer.
  *
@@ -18,8 +25,13 @@ let stampCache: {
   canvas: OffscreenCanvas | HTMLCanvasElement;
   radius: number;
   color: string;
+  alpha: number;
   dpr: number;
 } | null = null;
+
+function isOffscreenCanvas(canvas: OffscreenCanvas | HTMLCanvasElement): canvas is OffscreenCanvas {
+  return typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas;
+}
 
 function getStamp(
   radius: number,
@@ -32,6 +44,7 @@ function getStamp(
     stampCache &&
     stampCache.radius === radius &&
     stampCache.color === color &&
+    stampCache.alpha === alpha &&
     stampCache.dpr === dpr
   ) {
     return stampCache.canvas;
@@ -42,7 +55,7 @@ function getStamp(
     ? new OffscreenCanvas(size, size)
     : document.createElement('canvas');
 
-  if (!(canvas instanceof OffscreenCanvas)) {
+  if (!isOffscreenCanvas(canvas)) {
     canvas.width = size;
     canvas.height = size;
   }
@@ -57,7 +70,7 @@ function getStamp(
   ctx.globalAlpha = alpha;
   ctx.fill();
 
-  stampCache = { canvas, radius, color, dpr };
+  stampCache = { canvas, radius, color, alpha, dpr };
   return canvas;
 }
 
@@ -75,7 +88,30 @@ export function renderScatter(
   /** Multiplied with the per-point alpha. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
 ): void {
-  const count = endIdx - startIdx + 1;
+  renderScatterSegments(
+    ctx,
+    [{ xData, yData, startIdx, endIdx }],
+    scaleX,
+    scaleY,
+    layout,
+    series,
+    color,
+    opacityMultiplier,
+  );
+}
+
+export function renderScatterSegments(
+  ctx: CanvasRenderingContext2D,
+  segments: ScatterRenderSegment[],
+  scaleX: Scale,
+  scaleY: Scale,
+  layout: Layout,
+  series: SeriesConfig,
+  color: string,
+  /** Multiplied with the per-point alpha. Used by the highlight system to dim non-highlighted series. */
+  opacityMultiplier: number = 1,
+): void {
+  const count = segmentPointCount(segments);
   if (count <= 0) return;
 
   // Clip to plot area
@@ -87,9 +123,9 @@ export function renderScatter(
   ctx.globalAlpha = opacityMultiplier;
 
   if (series.heatmap || count > 200_000) {
-    drawHeatmap(ctx, xData, yData, startIdx, endIdx, scaleX, scaleY, layout, series.heatmapBinSize, series.heatmapGradient);
+    drawHeatmapSegments(ctx, segments, scaleX, scaleY, layout, series.heatmapBinSize, series.heatmapGradient);
   } else {
-    drawStamped(ctx, xData, yData, startIdx, endIdx, scaleX, scaleY, layout, series, color);
+    drawStampedSegments(ctx, segments, scaleX, scaleY, layout, series, color);
   }
 
   ctx.restore();
@@ -97,19 +133,16 @@ export function renderScatter(
 
 // ─── Stamp approach: single arc rasterized once, drawImage per point ────
 
-function drawStamped(
+function drawStampedSegments(
   ctx: CanvasRenderingContext2D,
-  xData: Float64Array,
-  yData: Float64Array,
-  start: number,
-  end: number,
+  segments: ScatterRenderSegment[],
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
   series: SeriesConfig,
   color: string,
 ): void {
-  const count = end - start + 1;
+  const count = segmentPointCount(segments);
   const radius = series.pointRadius ?? (count > 10_000 ? 1.5 : 3);
   const alpha = series.opacity ?? (count > 10_000 ? 0.4 : 0.8);
   const dpr = layout.dpr;
@@ -119,14 +152,17 @@ function drawStamped(
   const offset = radius + 1; // center of stamp in CSS pixels
 
   // drawImage with a canvas source is a fast GPU blit, no path overhead
-  for (let i = start; i <= end; i++) {
-    const yVal = yData[i];
-    if (yVal !== yVal) continue; // NaN
+  for (const segment of segments) {
+    const { xData, yData, startIdx, endIdx } = segment;
+    for (let i = startIdx; i <= endIdx; i++) {
+      const yVal = yData[i];
+      if (yVal !== yVal) continue; // NaN
 
-    const px = scaleX.dataToPixel(xData[i]);
-    const py = scaleY.dataToPixel(yVal);
+      const px = scaleX.dataToPixel(xData[i]);
+      const py = scaleY.dataToPixel(yVal);
 
-    ctx.drawImage(stamp, px - offset, py - offset, stampSize, stampSize);
+      ctx.drawImage(stamp, px - offset, py - offset, stampSize, stampSize);
+    }
   }
 }
 
@@ -137,8 +173,14 @@ function drawStamped(
 // invalidates the cache without us tracking the array identity.
 let heatmapCache: {
   canvas: OffscreenCanvas | HTMLCanvasElement;
+  xData: Float64Array;
+  yData: Float64Array;
+  segmentKey: string;
+  start: number;
+  end: number;
   w: number;
   h: number;
+  dpr: number;
   dataLen: number;
   xMin: number;
   xMax: number;
@@ -177,12 +219,9 @@ function sampleGradient(stops: [number, number, number][], t: number): [number, 
   ];
 }
 
-function drawHeatmap(
+function drawHeatmapSegments(
   ctx: CanvasRenderingContext2D,
-  xData: Float64Array,
-  yData: Float64Array,
-  start: number,
-  end: number,
+  segments: ScatterRenderSegment[],
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
@@ -195,15 +234,23 @@ function drawHeatmap(
   const h = Math.ceil((plot.height * dpr) / binPx);
   if (w <= 0 || h <= 0) return;
 
-  const dataLen = end - start + 1;
+  const dataLen = segmentPointCount(segments);
   const bs = binSizeCss ?? 1;
   const gradientKey = gradient?.join('|') ?? 'viridis';
+  const firstSegment = segments[0];
+  const segmentKey = segments
+    .map((segment) => `${segment.startIdx}:${segment.endIdx}`)
+    .join('|');
 
   // Check cache: reuse if data, viewport, and gradient haven't changed
   if (
     heatmapCache &&
+    heatmapCache.xData === firstSegment.xData &&
+    heatmapCache.yData === firstSegment.yData &&
+    heatmapCache.segmentKey === segmentKey &&
     heatmapCache.w === w &&
     heatmapCache.h === h &&
+    heatmapCache.dpr === dpr &&
     heatmapCache.dataLen === dataLen &&
     heatmapCache.xMin === scaleX.min &&
     heatmapCache.xMax === scaleX.max &&
@@ -225,17 +272,20 @@ function drawHeatmap(
   const bins = new Uint32Array(w * h);
   let maxCount = 0;
 
-  for (let i = start; i <= end; i++) {
-    const yVal = yData[i];
-    if (yVal !== yVal) continue;
+  for (const segment of segments) {
+    const { xData, yData, startIdx, endIdx } = segment;
+    for (let i = startIdx; i <= endIdx; i++) {
+      const yVal = yData[i];
+      if (yVal !== yVal) continue;
 
-    const px = Math.floor(((scaleX.dataToPixel(xData[i]) - plot.left) * dpr) / binPx);
-    const py = Math.floor(((scaleY.dataToPixel(yVal) - plot.top) * dpr) / binPx);
+      const px = Math.floor(((scaleX.dataToPixel(xData[i]) - plot.left) * dpr) / binPx);
+      const py = Math.floor(((scaleY.dataToPixel(yVal) - plot.top) * dpr) / binPx);
 
-    if (px >= 0 && px < w && py >= 0 && py < h) {
-      const idx = py * w + px;
-      bins[idx]++;
-      if (bins[idx] > maxCount) maxCount = bins[idx];
+      if (px >= 0 && px < w && py >= 0 && py < h) {
+        const idx = py * w + px;
+        bins[idx]++;
+        if (bins[idx] > maxCount) maxCount = bins[idx];
+      }
     }
   }
 
@@ -245,7 +295,7 @@ function drawHeatmap(
   const tmpCanvas = typeof OffscreenCanvas !== 'undefined'
     ? new OffscreenCanvas(w, h)
     : document.createElement('canvas');
-  if (!(tmpCanvas instanceof OffscreenCanvas)) {
+  if (!isOffscreenCanvas(tmpCanvas)) {
     tmpCanvas.width = w;
     tmpCanvas.height = h;
   }
@@ -268,9 +318,34 @@ function drawHeatmap(
   tmpCtx.putImageData(imageData, 0, 0);
 
   // Cache for subsequent frames (e.g. overlay-only redraws)
-  heatmapCache = { canvas: tmpCanvas, w, h, dataLen, xMin: scaleX.min, xMax: scaleX.max, yMin: scaleY.min, yMax: scaleY.max, binSize: bs, gradientKey };
+  heatmapCache = {
+    canvas: tmpCanvas,
+    xData: firstSegment.xData,
+    yData: firstSegment.yData,
+    segmentKey,
+    start: firstSegment.startIdx,
+    end: segments[segments.length - 1].endIdx,
+    w,
+    h,
+    dpr,
+    dataLen,
+    xMin: scaleX.min,
+    xMax: scaleX.max,
+    yMin: scaleY.min,
+    yMax: scaleY.max,
+    binSize: bs,
+    gradientKey,
+  };
 
   ctx.drawImage(tmpCanvas, plot.left, plot.top, plot.width, plot.height);
+}
+
+function segmentPointCount(segments: ScatterRenderSegment[]): number {
+  let count = 0;
+  for (const segment of segments) {
+    count += segment.endIdx - segment.startIdx + 1;
+  }
+  return count;
 }
 
 function viridisColor(t: number): [number, number, number] {

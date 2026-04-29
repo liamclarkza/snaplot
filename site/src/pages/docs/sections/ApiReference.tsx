@@ -27,7 +27,7 @@ export default function ApiReference() {
             <tbody>
               {[
                 ['setData(data: ColumnarData)', 'Replace all chart data'],
-                ['appendData(data: ColumnarData, maxLen?: number)', 'Append data for streaming; maxLen caps buffer'],
+                ['appendData(data: ColumnarData)', 'Append data for streaming; config.streaming.maxLen caps retained points'],
                 ['getData(): ColumnarData', 'Get current data arrays'],
                 ['setAxis(key: string, range: Partial<ScaleRange>)', 'Set axis domain (min/max)'],
                 ['getAxis(key: string): Scale | undefined', 'Get a scale instance by key'],
@@ -39,11 +39,12 @@ export default function ApiReference() {
                 ['destroy()', 'Clean up all resources and event listeners'],
                 ['use(plugin: Plugin)', 'Register a plugin at runtime'],
                 ['on(event, handler): () => void', 'Subscribe to events; returns unsubscribe fn'],
-                ['setCursorDataX(dataX: number | null)', 'Set cursor position externally (for sync)'],
+                ['setCursorDataX(dataX: number | null, origin?: CursorEventOrigin)', 'Set cursor position externally (sync/programmatic)'],
                 ['getCursorSnapshot(opts?): CursorSnapshot', 'Snapshot of every visible series at the cursor'],
                 ['getCursorSnapshotInto(target, opts?): CursorSnapshot', 'Zero-alloc variant that mutates a reused buffer'],
                 ['setHighlight(seriesIndex: number | null)', 'Focus a series; dims the others (data-layer only)'],
                 ['getHighlight(): number | null', 'Current highlighted series index, or null'],
+                ['getStats(): ChartStats', 'Read diagnostic counters for local perf debugging'],
               ].map(([method, desc]) => (
                 <tr style={{ 'border-bottom': '1px solid var(--border)' }}>
                   <td style={{ padding: '8px 12px', 'font-family': 'var(--font-mono)', 'font-size': '12px', 'white-space': 'nowrap' }}>{method}</td>
@@ -78,7 +79,7 @@ export default function ApiReference() {
             </thead>
             <tbody>
               {[
-                ['cursor:move', '(dataX: number | null, dataIdx: number | null)', 'Cursor moved over chart or left'],
+                ['cursor:move', "(dataX: number | null, dataIdx: number | null, origin: 'local' | 'sync' | 'programmatic')", 'Cursor moved over chart or left'],
                 ['highlight:change', '(seriesIndex: number | null)', 'Highlighted series changed (local or synced)'],
                 ['viewport:change', '(scaleKey: string, range: ScaleRange)', 'Scale domain changed (zoom/pan)'],
                 ['data:update', '(data: ColumnarData)', 'Data replaced or appended'],
@@ -131,12 +132,15 @@ unsub();`} />
   // Interactions
   InteractionMode,     // 'timeseries' | 'analytical' | 'readonly'
   CursorConfig,        // Crosshair config (show, snap, indicators, syncKey, ...)
+  StreamingConfig,     // { maxLen?: number } for fixed-window appends
   ZoomConfig,          // Zoom/selection config (bounds, wheelStep, ...)
   ZoomBoundsSpec,      // 'data' | 'unbounded' | { min?, max? }
   PanConfig,           // Pan configuration
   TouchConfig,         // Touch gesture configuration
   TooltipConfig,       // Tooltip configuration
   TooltipPoint,        // Point data passed to tooltip renderer
+  DebugConfig,         // { stats?: boolean }
+  ChartStats,          // Counters returned by chart.getStats()
 
   // Cursor snapshot (legend table data source)
   CursorSnapshot,      // { source, dataIndex, dataX, formattedX,

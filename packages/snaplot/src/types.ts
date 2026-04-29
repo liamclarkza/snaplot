@@ -156,8 +156,7 @@ export interface SeriesConfig<TMeta = unknown> {
   /**
    * Density-to-colour ramp for heatmap rendering. Array of 2+ hex colours
    * interpolated linearly in sRGB; `t = 0` → first stop, `t = 1` → last.
-   * Defaults to Viridis. Use 3–5 stops matching your theme palette for
-   * a cohesive dashboard feel.
+   * Overrides `theme.heatmapGradient`, then `theme.sequentialPalette`.
    */
   heatmapGradient?: string[];
 
@@ -403,7 +402,13 @@ export interface CursorSnapshotOptions {
 // HIGHLIGHT (cross-chart series highlight + dim)
 // ============================================================
 
-export interface HighlightConfig {
+export type HighlightSyncKey = string | number;
+
+export type HighlightSyncPayload =
+  | { type: 'index'; seriesIndex: number | null }
+  | { type: 'key'; key: HighlightSyncKey | null };
+
+export interface HighlightConfig<TMeta = unknown> {
   /** Master switch. Default: true. */
   enabled?: boolean;
   /**
@@ -417,6 +422,61 @@ export interface HighlightConfig {
    * highlight changes from each other.
    */
   syncKey?: string;
+  /**
+   * Optional stable identity resolver for cross-chart highlight sync.
+   *
+   * By default, sync publishes the local numeric `seriesIndex`, which is
+   * correct for simple charts with identical series ordering. Provide
+   * `getKey` when peers can have different series subsets/order; receiving
+   * charts map the published key back to their own local series index.
+   *
+   * Example: `(series) => series.meta?.runId`.
+   */
+  getKey?: (
+    series: SeriesConfig<TMeta>,
+    seriesIndex: number,
+  ) => HighlightSyncKey | null | undefined;
+}
+
+// ============================================================
+// DEBUG / DIAGNOSTICS
+// ============================================================
+
+export interface DebugConfig {
+  /**
+   * Enable lightweight timing diagnostics. Counters are always maintained,
+   * but per-layer duration measurement only runs when this is true.
+   */
+  stats?: boolean;
+}
+
+export interface ChartStats {
+  dataVersion: number;
+  setDataCount: number;
+  appendDataCount: number;
+  renderCount: {
+    grid: number;
+    data: number;
+    overlay: number;
+  };
+  lastRenderMs: {
+    grid: number;
+    data: number;
+    overlay: number;
+  };
+}
+
+// ============================================================
+// STREAMING
+// ============================================================
+
+export interface StreamingConfig {
+  /**
+   * Retain at most this many points after appendData(). When set, snaplot
+   * uses an internal ring buffer so streaming updates do not allocate a new
+   * full-window dataset on every tick.
+   */
+  maxLen?: number;
 }
 
 // ============================================================
@@ -447,7 +507,9 @@ export interface ChartConfig<TMeta = unknown> {
   selection?: SelectionConfig;
   tooltip?: TooltipConfig;
   touch?: TouchConfig;
-  highlight?: HighlightConfig;
+  highlight?: HighlightConfig<TMeta>;
+  streaming?: StreamingConfig;
+  debug?: DebugConfig;
 
   theme?: Partial<ThemeConfig>;
   plugins?: Plugin[];
@@ -472,7 +534,26 @@ export interface ThemeConfig {
   fontSize: number;
   gridColor: string;
   gridOpacity: number;
+  /**
+   * Legacy and fallback series colour cycle. Kept as the primary API for
+   * compatibility; new themes should treat it as the categorical palette.
+   */
   palette: string[];
+  /**
+   * Optional categorical series colour cycle for unordered/discrete series
+   * such as lines, grouped bars, and multiple scatter categories.
+   * Falls back to `palette`.
+   */
+  categoricalPalette?: string[];
+  /**
+   * Optional ordered magnitude ramp for density/continuous encodings.
+   * Used by heatmap scatter rendering when `heatmapGradient` is not set.
+   */
+  sequentialPalette?: string[];
+  /** Optional signed/centered-data ramp for future diverging encodings. */
+  divergingPalette?: string[];
+  /** Optional default density ramp for heatmap scatter series. */
+  heatmapGradient?: string[];
   axisLineColor: string;
   /**
    * Plot-area frame. Kept separate from `axisLineColor` so you can tune
@@ -514,9 +595,15 @@ export interface Plugin {
   beforeDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
   afterDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
 
-  onCursorMove?(chart: ChartInstance, dataX: number | null, dataIdx: number | null): void;
+  onCursorMove?(
+    chart: ChartInstance,
+    dataX: number | null,
+    dataIdx: number | null,
+    origin: CursorEventOrigin,
+  ): void;
   onZoom?(chart: ChartInstance, scaleKey: string, range: ScaleRange): void;
   onClick?(chart: ChartInstance, dataX: number, dataIdx: number): void;
+  /** Fires after chart data changes through `setData()` or `appendData()`. */
   onSetData?(chart: ChartInstance, data: ColumnarData): void;
   /**
    * Fires after `chart.setOptions()` merges a partial config. Use this
@@ -536,7 +623,7 @@ export interface ChartInstance {
   /** Replace all data */
   setData(data: ColumnarData): void;
   /** Append data for streaming */
-  appendData(data: ColumnarData, maxLen?: number): void;
+  appendData(data: ColumnarData): void;
   /** Get current data */
   getData(): ColumnarData;
 
@@ -566,8 +653,8 @@ export interface ChartInstance {
   /** Subscribe to chart events */
   on<K extends keyof ChartEventMap>(event: K, handler: ChartEventMap[K]): () => void;
 
-  /** Set cursor position from external source (sync) */
-  setCursorDataX(dataX: number | null): void;
+  /** Set cursor position from external source (sync/programmatic) */
+  setCursorDataX(dataX: number | null, origin?: CursorEventOrigin): void;
 
   /**
    * Snapshot of all visible series at the current cursor position
@@ -594,6 +681,12 @@ export interface ChartInstance {
   /** Currently highlighted series index, or `null`. */
   getHighlight(): number | null;
 
+  /**
+   * Lightweight diagnostics for benchmark demos and local debugging.
+   * Returns a copy so callers cannot mutate internal counters.
+   */
+  getStats(): ChartStats;
+
   /** The root DOM container */
   readonly container: HTMLElement;
 }
@@ -602,8 +695,14 @@ export interface ChartInstance {
 // CHART EVENTS
 // ============================================================
 
+export type CursorEventOrigin = 'local' | 'sync' | 'programmatic';
+
 export interface ChartEventMap {
-  'cursor:move': (dataX: number | null, dataIdx: number | null) => void;
+  'cursor:move': (
+    dataX: number | null,
+    dataIdx: number | null,
+    origin: CursorEventOrigin,
+  ) => void;
   'highlight:change': (seriesIndex: number | null) => void;
   'viewport:change': (scaleKey: string, range: ScaleRange) => void;
   'data:update': (data: ColumnarData) => void;

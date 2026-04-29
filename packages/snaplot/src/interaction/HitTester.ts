@@ -1,6 +1,5 @@
 import type { Scale, SeriesConfig, TooltipPoint } from '../types';
-import type { ColumnarStore } from '../data/ColumnarStore';
-import { nearestIndex, lowerBound, upperBound } from '../data/binarySearch';
+import type { DataStore } from '../data/DataStore';
 import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
 
 /**
@@ -33,8 +32,8 @@ export class HitTester {
     return pointerType === 'touch' ? TOUCH_HIT_RADIUS : MOUSE_HIT_RADIUS;
   }
 
-  findNearestIndex(store: ColumnarStore, dataX: number): number {
-    return nearestIndex(store.x, dataX);
+  findNearestIndex(store: DataStore, dataX: number): number {
+    return store.nearestXIndex(dataX);
   }
 
   /**
@@ -42,7 +41,7 @@ export class HitTester {
    * within the active proximity radius, tooltip should be hidden.
    */
   findPoints(
-    store: ColumnarStore,
+    store: DataStore,
     scales: Map<string, Scale>,
     seriesConfigs: SeriesConfig[],
     pixelX: number,
@@ -55,30 +54,23 @@ export class HitTester {
     if (!xScale || store.length === 0) return [];
 
     const proximity = this.proximityFor(pointerType);
-    const dataX = xScale.pixelToData(pixelX);
-    const idx = nearestIndex(store.x, dataX);
 
     if (mode === 'index' || mode === 'x') {
-      return this.pointsAtIndex(store, scales, seriesConfigs, idx, pixelX, pixelY, palette, proximity);
+      return this.pointsAtIndex(store, scales, seriesConfigs, pixelX, pixelY, palette, proximity);
     }
 
-    return this.nearestPoint(store, scales, seriesConfigs, idx, pixelX, pixelY, palette, proximity);
+    return this.nearestPoint(store, scales, seriesConfigs, pixelX, pixelY, palette, proximity);
   }
 
   private pointsAtIndex(
-    store: ColumnarStore,
+    store: DataStore,
     scales: Map<string, Scale>,
     seriesConfigs: SeriesConfig[],
-    idx: number,
-    // pixelX is kept for API symmetry with nearestPoint, the distance check
-    // for 'index' mode is vertical-only (Y distance to the line at the
-    // indexed column).
-    _pixelX: number,
+    pixelX: number,
     pixelY: number,
     palette: string[],
     proximity: number,
   ): TooltipPoint[] {
-    const xScale = scales.get('x')!;
     const points: TooltipPoint[] = [];
 
     // Check proximity: cursor must be close to at least one series line (Y distance)
@@ -91,7 +83,11 @@ export class HitTester {
       const colIdx = sc.dataIndex;
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
-      const yVal = store.y(colIdx - 1)[idx];
+      const xScale = scales.get(sc.xAxisKey ?? 'x');
+      if (!xScale) continue;
+
+      const idx = store.nearestXIndex(xScale.pixelToData(pixelX));
+      const yVal = store.yAt(colIdx - 1, idx);
       if (yVal !== yVal) continue; // NaN
 
       const yAxisKey = sc.yAxisKey ?? 'y';
@@ -101,7 +97,7 @@ export class HitTester {
         closestYDist = Math.min(closestYDist, Math.abs(py - pixelY));
       }
 
-      const xVal = store.x[idx];
+      const xVal = store.xAt(idx);
 
       points.push({
         seriesIndex: si,
@@ -122,29 +118,16 @@ export class HitTester {
   }
 
   private nearestPoint(
-    store: ColumnarStore,
+    store: DataStore,
     scales: Map<string, Scale>,
     seriesConfigs: SeriesConfig[],
-    // idx is the cursor's X index; kept for API symmetry with pointsAtIndex.
-    // 'nearest' mode searches a pixel-radius window around (pixelX, pixelY)
-    // directly via binary search in X so the pre-computed idx is redundant.
-    _idx: number,
     pixelX: number,
     pixelY: number,
     palette: string[],
     proximity: number,
   ): TooltipPoint[] {
-    const xScale = scales.get('x')!;
     let bestDist = Infinity;
     let bestPoint: TooltipPoint | null = null;
-
-    // Search all points within `proximity` pixels on the X axis so we find
-    // the true euclidean-nearest point, not just the nearest in X-sorted
-    // index space (which would miss vertically-close points).
-    const xDataLeft = xScale.pixelToData(pixelX - proximity);
-    const xDataRight = xScale.pixelToData(pixelX + proximity);
-    const startIdx = Math.max(0, lowerBound(store.x, xDataLeft));
-    const endIdx = Math.min(store.length - 1, upperBound(store.x, xDataRight));
 
     for (let si = 0; si < seriesConfigs.length; si++) {
       const sc = seriesConfigs[si];
@@ -153,15 +136,26 @@ export class HitTester {
       const colIdx = sc.dataIndex;
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
+      const xScale = scales.get(sc.xAxisKey ?? 'x');
+      if (!xScale) continue;
+
       const yAxisKey = sc.yAxisKey ?? 'y';
       const yScale = scales.get(yAxisKey);
       if (!yScale) continue;
 
+      // Search all points within `proximity` pixels on this series' X axis
+      // so multi-X-axis charts use the correct data-space window.
+      const xDataLeft = xScale.pixelToData(pixelX - proximity);
+      const xDataRight = xScale.pixelToData(pixelX + proximity);
+      const startIdx = Math.max(0, store.lowerBoundX(xDataLeft));
+      const endIdx = Math.min(store.length - 1, store.upperBoundX(xDataRight));
+
       for (let i = startIdx; i <= endIdx; i++) {
-        const yVal = store.y(colIdx - 1)[i];
+        const yVal = store.yAt(colIdx - 1, i);
         if (yVal !== yVal) continue;
 
-        const px = xScale.dataToPixel(store.x[i]);
+        const xVal = store.xAt(i);
+        const px = xScale.dataToPixel(xVal);
         const py = yScale.dataToPixel(yVal);
 
         const dist = (px - pixelX) ** 2 + (py - pixelY) ** 2;
@@ -171,10 +165,10 @@ export class HitTester {
             seriesIndex: si,
             dataIndex: i,
             label: sc.label,
-            x: store.x[i],
+            x: xVal,
             y: yVal,
             color: sc.stroke ?? palette[si % palette.length],
-            formattedX: xScale.tickFormat(store.x[i]),
+            formattedX: xScale.tickFormat(xVal),
             formattedY: yScale.tickFormat(yVal),
           };
         }

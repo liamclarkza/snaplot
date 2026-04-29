@@ -1,5 +1,5 @@
 import { Prose } from '../components/ui';
-import { Sidebar } from './docs/Sidebar';
+import { Sidebar, scrollTo } from './docs/Sidebar';
 import {
   GettingStarted,
   ChartTypes,
@@ -26,7 +26,17 @@ export default function Docs() {
         <h1 style={{ 'font-size': '28px', 'font-weight': '700', 'margin-bottom': '8px' }}>Documentation</h1>
         <Prose>
           Every example below is <b>live and editable</b>. Change the config and the chart updates instantly.
-          Built-in theme variables are available in the editor: <code>lightTheme</code>, <code>darkTheme</code>, <code>oceanTheme</code>, <code>forestTheme</code>, <code>sunsetTheme</code>, <code>violetTheme</code>, <code>fogTheme</code>, <code>ivoryTheme</code>, <code>mintTheme</code>.
+        </Prose>
+        <Prose>
+          <b>Driving the demos:</b> drag inside a chart to box-zoom, scroll on an axis to zoom that axis, shift+drag to pan, double-click to reset, hover for tooltips. Full reference under{' '}
+          <button
+            type="button"
+            onClick={() => scrollTo('interaction-modes')}
+            style={{
+              background: 'none', border: 'none', padding: '0',
+              color: 'var(--accent)', cursor: 'pointer', font: 'inherit',
+            }}
+          >Interactions</button>.
         </Prose>
 
         <GettingStarted />

@@ -19,6 +19,10 @@ export class PluginManager {
     this.plugins = this.plugins.filter(p => p.id !== id);
   }
 
+  hasHook(hook: keyof Plugin): boolean {
+    return this.plugins.some((plugin) => typeof plugin[hook] === 'function');
+  }
+
   installAll(chart: ChartInstance): void {
     for (const plugin of this.plugins) {
       plugin.install?.(chart);

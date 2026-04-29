@@ -2,14 +2,19 @@ import type {
   ChartInstance,
   ChartConfig,
   ChartEventMap,
+  ChartStats,
   ColumnarData,
+  CursorEventOrigin,
   CursorSnapshot,
   CursorSnapshotOptions,
   DeepPartial,
+  HighlightSyncKey,
+  HighlightSyncPayload,
   Layout,
   Plugin,
   Scale,
   ScaleRange,
+  StreamingConfig,
   ThemeConfig,
   TooltipPoint,
   ZoomBoundsSpec,
@@ -21,7 +26,10 @@ import { RenderScheduler } from './RenderScheduler';
 import { EventBus, SyncGroup } from './EventBus';
 import { computeLayout, inferPosition } from './Layout';
 
+import type { ColumnarSegment, DataStore } from '../data/DataStore';
+import { validateMaxLen } from '../data/DataStore';
 import { ColumnarStore } from '../data/ColumnarStore';
+import { RingColumnarStore } from '../data/RingColumnarStore';
 import { createScale } from '../scales/createScale';
 import { AUTO_RANGE_PADDING, DEFAULT_TICK_COUNT, MIN_DRAG_DISTANCE } from '../constants';
 
@@ -30,10 +38,10 @@ import { DEFAULT_CONFIG } from '../config/defaults';
 import { resolveTheme } from '../config/theme';
 
 import { renderAxes, updateDOMLabels } from '../renderers/AxesRenderer';
-import { renderLine, renderArea, renderBand } from '../renderers/LineRenderer';
-import { renderScatter } from '../renderers/ScatterRenderer';
-import { renderBars } from '../renderers/BarRenderer';
-import { renderHistogram } from '../renderers/HistogramRenderer';
+import { renderLineSegments, renderAreaSegments, renderBandSegments } from '../renderers/LineRenderer';
+import { renderScatterSegments } from '../renderers/ScatterRenderer';
+import { renderBarsSegments } from '../renderers/BarRenderer';
+import { renderHistogramSegments } from '../renderers/HistogramRenderer';
 import { renderCrosshair, renderSelectionBox, renderTapRing } from '../renderers/InteractionRenderer';
 
 import { GestureManager } from '../interaction/GestureManager';
@@ -42,7 +50,6 @@ import { TooltipManager } from '../interaction/TooltipManager';
 
 import { PluginManager } from '../plugins/PluginManager';
 
-import { nearestIndex, upperBound } from '../data/binarySearch';
 
 /**
  * Chart, the composition root.
@@ -60,7 +67,7 @@ export class ChartCore implements ChartInstance {
   private canvasManager: CanvasManager;
   private scheduler: RenderScheduler;
   private eventBus: EventBus;
-  private store: ColumnarStore;
+  private store: DataStore;
   private scales: Map<string, Scale> = new Map();
   private layout!: Layout;
   private theme!: ThemeConfig;
@@ -90,8 +97,12 @@ export class ChartCore implements ChartInstance {
   private selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
   /** Transient tap-feedback ring, cleared automatically once its lifetime expires. */
   private tapFeedback: { x: number; y: number; startTime: number } | null = null;
-  /** True when the user has actively zoomed, suppresses auto-range X on data updates */
-  private userHasZoomed = false;
+  /**
+   * Axis keys the user has actively zoomed. Suppresses auto-range on those
+   * axes during data updates so a zoomed Y (or X) doesn't snap back on the
+   * next setData/appendData tick. Cleared by resetZoom().
+   */
+  private userZoomedAxes = new Set<string>();
 
   // Event listeners. Handlers have per-event signatures (see ChartEventMap);
   // the storage is a contravariant-friendly callable so every event's
@@ -108,6 +119,16 @@ export class ChartCore implements ChartInstance {
 
   // Highlight state
   private highlightedSeries: number | null = null;
+
+  // Diagnostics. Counters are cheap and always maintained; render duration
+  // measurement is gated by config.debug.stats in the render path.
+  private stats: ChartStats = {
+    dataVersion: 0,
+    setDataCount: 0,
+    appendDataCount: 0,
+    renderCount: { grid: 0, data: 0, overlay: 0 },
+    lastRenderMs: { grid: 0, data: 0, overlay: 0 },
+  };
 
   /**
    * Per-axis "reset-zoom" extent, the scale's min/max after the last
@@ -140,7 +161,7 @@ export class ChartCore implements ChartInstance {
 
     // 4. Create data store
     const initialData = data ?? [new Float64Array(0)];
-    this.store = new ColumnarStore(initialData);
+    this.store = this.createDataStore(initialData);
 
     // 5. Create EventBus
     this.eventBus = new EventBus();
@@ -221,19 +242,26 @@ export class ChartCore implements ChartInstance {
   // ─── Public API (ChartInstance) ─────────────────────────────
 
   setData(data: ColumnarData): void {
-    this.store.setData(data);
+    this.setStoreData(data);
+    this.stats.dataVersion++;
+    this.stats.setDataCount++;
     this.autoRange();
     this.refreshCursor();
     this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID);
-    this.pluginManager.dispatch('onSetData', this, data);
-    this.emitEvent('data:update', data);
+    this.dispatchDataUpdate();
   }
 
-  appendData(data: ColumnarData, maxLen?: number): void {
-    this.store.append(data, maxLen);
+  appendData(data: ColumnarData): void {
+    this.ensureStoreMatchesStreaming();
+    const changed = this.store.append(data);
+    if (!changed) return;
+
+    this.stats.dataVersion++;
+    this.stats.appendDataCount++;
     this.autoRange();
     this.refreshCursor();
     this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID);
+    this.dispatchDataUpdate();
   }
 
   getData(): ColumnarData {
@@ -302,6 +330,7 @@ export class ChartCore implements ChartInstance {
       this.tooltipManager.applyTheme(this.theme);
     }
 
+    this.ensureStoreMatchesStreaming();
     this.initAxes();
     this.updateLayout();
     this.updateScalePixelRanges();
@@ -324,7 +353,7 @@ export class ChartCore implements ChartInstance {
 
   /** Reset zoom to full data extent (double-click handler) */
   resetZoom(): void {
-    this.userHasZoomed = false;
+    this.userZoomedAxes.clear();
     this.autoRangeHorizontal();
     this.autoRangeVertical();
     this.scheduler.markDirty(DirtyFlag.ALL);
@@ -373,7 +402,7 @@ export class ChartCore implements ChartInstance {
     return () => set!.delete(handler);
   }
 
-  setCursorDataX(dataX: number | null): void {
+  setCursorDataX(dataX: number | null, origin: CursorEventOrigin = 'programmatic'): void {
     this.cursorIsLocal = false; // Sync-driven cursor
 
     if (dataX === null) {
@@ -384,21 +413,30 @@ export class ChartCore implements ChartInstance {
       this.tooltipPoints = [];
       this.tooltipManager.hide();
       this.scheduler.markDirty(DirtyFlag.OVERLAY);
+      this.emitEvent('cursor:move', null, null, origin);
+      this.pluginManager.dispatch('onCursorMove', this, null, null, origin);
       return;
     }
 
     const xScale = this.scales.get('x');
     if (!xScale) return;
 
-    this.cursorDataX = dataX;
-    this.cursorDataIdx = nearestIndex(this.store.x, dataX);
-
-    // Snap to nearest actual data point's X for accurate crosshair placement
-    if (this.cursorDataIdx < this.store.length) {
-      const snappedX = this.store.x[this.cursorDataIdx];
-      this.cursorX = xScale.dataToPixel(snappedX);
+    if (this.hasOnlyVisibleHistograms()) {
+      const hit = this.resolveHistogramCursor(dataX);
+      this.cursorDataX = hit?.dataX ?? dataX;
+      this.cursorDataIdx = hit?.dataIndex ?? null;
+      this.cursorX = xScale.dataToPixel(this.cursorDataX);
     } else {
-      this.cursorX = xScale.dataToPixel(dataX);
+      this.cursorDataX = dataX;
+      this.cursorDataIdx = this.store.nearestXIndex(dataX);
+
+      // Snap to nearest actual data point's X for accurate crosshair placement
+      if (this.cursorDataIdx < this.store.length) {
+        const snappedX = this.store.xAt(this.cursorDataIdx);
+        this.cursorX = xScale.dataToPixel(snappedX);
+      } else {
+        this.cursorX = xScale.dataToPixel(dataX);
+      }
     }
 
     // Find Y position from first visible series at this index
@@ -408,7 +446,8 @@ export class ChartCore implements ChartInstance {
       for (const sc of this.config.series) {
         if (sc.visible === false) continue;
         const colIdx = sc.dataIndex;
-        const yVal = this.store.y(colIdx - 1)?.[this.cursorDataIdx];
+        if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
+        const yVal = this.store.yAt(colIdx - 1, this.cursorDataIdx);
         if (yVal !== undefined && yVal === yVal) {
           this.cursorY = yScale.dataToPixel(yVal);
           break;
@@ -426,6 +465,8 @@ export class ChartCore implements ChartInstance {
     }
 
     this.scheduler.markDirty(DirtyFlag.OVERLAY);
+    this.emitEvent('cursor:move', this.cursorDataX, this.cursorDataIdx, origin);
+    this.pluginManager.dispatch('onCursorMove', this, this.cursorDataX, this.cursorDataIdx, origin);
   }
 
   // ─── Cursor snapshot (legend table data source) ─────────────
@@ -459,20 +500,29 @@ export class ChartCore implements ChartInstance {
   // ─── Highlight (cross-chart series highlight + dim) ─────────
 
   setHighlight(seriesIndex: number | null): void {
-    // Equality guard: prevents redundant redraws and breaks sync loops.
-    if (this.highlightedSeries === seriesIndex) return;
-
-    this.highlightedSeries = seriesIndex;
-    this.scheduler.markDirty(DirtyFlag.DATA);
-    this.emitEvent('highlight:change', seriesIndex);
-
-    if (this.highlightSyncKey) {
-      SyncGroup.publishHighlight(this.highlightSyncKey, this, seriesIndex);
-    }
+    this.applyHighlight(seriesIndex, true);
   }
 
   getHighlight(): number | null {
     return this.highlightedSeries;
+  }
+
+  getStats(): ChartStats {
+    return {
+      dataVersion: this.stats.dataVersion,
+      setDataCount: this.stats.setDataCount,
+      appendDataCount: this.stats.appendDataCount,
+      renderCount: { ...this.stats.renderCount },
+      lastRenderMs: { ...this.stats.lastRenderMs },
+    };
+  }
+
+  /**
+   * Internal SyncGroup entry point. App code should call setHighlight(index);
+   * sync payloads may carry stable identity keys that need local resolution.
+   */
+  receiveHighlightSync(payload: HighlightSyncPayload): void {
+    this.applyHighlight(this.resolveHighlightSyncPayload(payload), false);
   }
 
   // ─── Private: Initialization ────────────────────────────────
@@ -496,6 +546,133 @@ export class ChartCore implements ChartInstance {
     } else if (mode === 'readonly') {
       this.config.zoom = { enabled: false };
       this.config.pan = { enabled: false };
+    }
+  }
+
+  private applyHighlight(seriesIndex: number | null, publish: boolean): void {
+    const normalized = this.normalizeHighlightIndex(seriesIndex);
+
+    // Equality guard: prevents redundant redraws and breaks sync loops.
+    if (this.highlightedSeries === normalized) return;
+
+    this.highlightedSeries = normalized;
+    this.scheduler.markDirty(DirtyFlag.DATA);
+    this.emitEvent('highlight:change', normalized);
+
+    if (publish && this.highlightSyncKey) {
+      SyncGroup.publishHighlight(
+        this.highlightSyncKey,
+        this,
+        this.createHighlightSyncPayload(normalized),
+      );
+    }
+  }
+
+  private normalizeHighlightIndex(seriesIndex: number | null): number | null {
+    if (seriesIndex === null) return null;
+    if (!Number.isInteger(seriesIndex)) return null;
+    if (seriesIndex < 0 || seriesIndex >= this.config.series.length) return null;
+    if (this.config.series[seriesIndex]?.visible === false) return null;
+    return seriesIndex;
+  }
+
+  private createHighlightSyncPayload(seriesIndex: number | null): HighlightSyncPayload {
+    const getKey = this.config.highlight?.getKey;
+    if (!getKey) return { type: 'index', seriesIndex };
+    if (seriesIndex === null) return { type: 'key', key: null };
+
+    const series = this.config.series[seriesIndex];
+    if (!series) return { type: 'key', key: null };
+    return { type: 'key', key: getKey(series, seriesIndex) ?? null };
+  }
+
+  private resolveHighlightSyncPayload(payload: HighlightSyncPayload): number | null {
+    if (payload.type === 'index') return payload.seriesIndex;
+    return this.findSeriesIndexForHighlightKey(payload.key);
+  }
+
+  private findSeriesIndexForHighlightKey(key: HighlightSyncKey | null): number | null {
+    if (key === null) return null;
+
+    const getKey = this.config.highlight?.getKey;
+    if (!getKey) return null;
+
+    for (let si = 0; si < this.config.series.length; si++) {
+      const series = this.config.series[si];
+      if (!series || series.visible === false) continue;
+      if (getKey(series, si) === key) return si;
+    }
+
+    return null;
+  }
+
+  private createDataStore(data: ColumnarData): DataStore {
+    const maxLen = this.streamingMaxLen();
+    return maxLen === undefined
+      ? new ColumnarStore(data)
+      : new RingColumnarStore(data, maxLen);
+  }
+
+  private setStoreData(data: ColumnarData): void {
+    const maxLen = this.streamingMaxLen();
+    if (maxLen !== undefined) {
+      if (this.store instanceof RingColumnarStore && this.store.maxLen === maxLen) {
+        this.store.setData(data);
+      } else {
+        this.store = new RingColumnarStore(data, maxLen);
+      }
+      return;
+    }
+
+    if (this.store instanceof ColumnarStore) {
+      this.store.setData(data);
+    } else {
+      this.store = new ColumnarStore(data);
+    }
+  }
+
+  private ensureStoreMatchesStreaming(): void {
+    const maxLen = this.streamingMaxLen();
+    if (maxLen !== undefined) {
+      if (!(this.store instanceof RingColumnarStore) || this.store.maxLen !== maxLen) {
+        this.store = new RingColumnarStore(this.store.getData(), maxLen);
+      }
+      return;
+    }
+
+    if (this.store instanceof RingColumnarStore) {
+      this.store = new ColumnarStore(this.store.getData());
+    }
+  }
+
+  private streamingMaxLen(): number | undefined {
+    const maxLen = (this.config.streaming as StreamingConfig | undefined)?.maxLen;
+    if (maxLen !== undefined) validateMaxLen(maxLen);
+    return maxLen;
+  }
+
+  private dispatchDataUpdate(): void {
+    const dataListeners = this.listeners.get('data:update');
+    const hasDataListeners = !!dataListeners && dataListeners.size > 0;
+    const hasPluginHook = this.pluginManager.hasHook('onSetData');
+    if (!hasDataListeners && !hasPluginHook) return;
+
+    // Built-in reactive helpers use zero-arg listeners as invalidation
+    // signals. Do not materialize a wrapped ring buffer unless a listener or
+    // plugin actually declares that it consumes the ColumnarData payload.
+    const listenerNeedsPayload = dataListeners
+      ? Array.from(dataListeners).some((handler) => handler.length > 0)
+      : false;
+    const data = hasPluginHook || listenerNeedsPayload
+      ? this.store.getData()
+      : undefined;
+
+    if (hasPluginHook) {
+      this.pluginManager.dispatch('onSetData', this, data);
+    }
+    if (hasDataListeners) {
+      if (data) this.emitEvent('data:update', data);
+      else this.emitEvent('data:update');
     }
   }
 
@@ -540,10 +717,9 @@ export class ChartCore implements ChartInstance {
     this.autoRangeVertical();
   }
 
-  /** Auto-range horizontal (bottom/top) axes to full data extent. Skipped if the user has actively zoomed. */
+  /** Auto-range horizontal (bottom/top) axes to full data extent. Skipped per-axis when the user has actively zoomed that axis. */
   private autoRangeHorizontal(): void {
     if (this.store.length === 0) return;
-    if (this.userHasZoomed) return;
 
     const axisConfigs = this.config.axes ?? {};
     for (const [key, ac] of Object.entries(axisConfigs)) {
@@ -553,6 +729,7 @@ export class ChartCore implements ChartInstance {
       const scale = this.scales.get(key);
       if (!scale) continue;
       if (ac.auto === false) continue;
+      if (this.userZoomedAxes.has(key)) continue;
       // Both bounds pinned → restore to those values. Skipping here would
       // leave zoomed state intact after `resetZoom()`.
       if (ac.min !== undefined && ac.max !== undefined) {
@@ -561,8 +738,8 @@ export class ChartCore implements ChartInstance {
         continue;
       }
 
-      const xMin = this.store.x[0];
-      const xMax = this.store.x[this.store.length - 1];
+      const xMin = this.store.xAt(0);
+      const xMax = this.store.xAt(this.store.length - 1);
       const hasBarSeries = this.config.series.some(
         s => s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
       );
@@ -631,6 +808,7 @@ export class ChartCore implements ChartInstance {
       const pos = inferPosition(key, ac.position);
       if (pos !== 'left' && pos !== 'right') continue;
       if (ac.auto === false) continue;
+      if (this.userZoomedAxes.has(key)) continue;
       // Both bounds pinned → restore to those values. Skipping here would
       // leave zoomed state intact after `resetZoom()`.
       if (ac.min !== undefined && ac.max !== undefined) {
@@ -639,30 +817,39 @@ export class ChartCore implements ChartInstance {
         continue;
       }
 
-      // Find data column indices bound to this axis.
-      // Band series contribute their upper/lower columns in addition to dataIndex
-      // so the auto-range encompasses the full band extent.
-      const seriesIndices: number[] = [];
+      let yMin = Infinity;
+      let yMax = -Infinity;
+      let hasValue = false;
+
+      const includeColumnRange = (columnIdx: number, startIdx: number, endIdx: number) => {
+        if (columnIdx < 0 || columnIdx >= this.store.seriesCount) return;
+        for (let i = startIdx; i <= endIdx && i < this.store.length; i++) {
+          const v = this.store.yAt(columnIdx, i);
+          if (v !== v) continue;
+          hasValue = true;
+          if (v < yMin) yMin = v;
+          if (v > yMax) yMax = v;
+        }
+      };
+
       for (const s of this.config.series) {
         if ((s.yAxisKey ?? 'y') !== key || s.visible === false) continue;
-        seriesIndices.push(s.dataIndex - 1);
+
+        const xScale = this.scales.get(s.xAxisKey ?? 'x') ?? this.scales.get('x');
+        let startIdx = 0;
+        let endIdx = this.store.length - 1;
+        if (xScale) {
+          [startIdx, endIdx] = this.store.getViewportIndices(xScale.min, xScale.max);
+        }
+
+        includeColumnRange(s.dataIndex - 1, startIdx, endIdx);
         if (s.type === 'band') {
-          if (s.upperDataIndex != null) seriesIndices.push(s.upperDataIndex - 1);
-          if (s.lowerDataIndex != null) seriesIndices.push(s.lowerDataIndex - 1);
+          if (s.upperDataIndex != null) includeColumnRange(s.upperDataIndex - 1, startIdx, endIdx);
+          if (s.lowerDataIndex != null) includeColumnRange(s.lowerDataIndex - 1, startIdx, endIdx);
         }
       }
 
-      if (seriesIndices.length === 0) continue;
-
-      // Get viewport indices for visible X range
-      const xScale = this.scales.get('x');
-      let startIdx = 0;
-      let endIdx = this.store.length - 1;
-      if (xScale) {
-        [startIdx, endIdx] = this.store.getViewportIndices(xScale.min, xScale.max);
-      }
-
-      const [yMin, yMax] = this.store.yRange(seriesIndices, startIdx, endIdx);
+      if (!hasValue) continue;
       // Vertical auto-range defaults to 5% padding so line/area charts
       // don't touch the plot edges; users can override per-axis.
       const pad = (yMax - yMin) * (ac.padding ?? AUTO_RANGE_PADDING);
@@ -733,44 +920,7 @@ export class ChartCore implements ChartInstance {
   private wireEvents(): void {
     // ── Cursor tracking ──
     this.eventBus.on('action:cursor', ({ x, y, pointerType }) => {
-      this.cursorIsLocal = true;
-      this.cursorX = x;
-      this.cursorY = y;
-      this.mouseX = x;
-      this.mouseY = y;
-      if (pointerType === 'touch' || pointerType === 'pen' || pointerType === 'mouse') {
-        this.lastPointerType = pointerType;
-      }
-
-      const xScale = this.scales.get('x');
-      if (xScale && this.isInPlotArea(x, y)) {
-        this.cursorDataX = xScale.pixelToData(x);
-        this.cursorDataIdx = nearestIndex(this.store.x, this.cursorDataX);
-
-        const hasOnlyHistograms = this.config.series.every(
-          s => s.visible === false || s.type === 'histogram',
-        );
-        if (!hasOnlyHistograms && this.config.cursor?.snap !== false && this.cursorDataIdx !== null) {
-          const snappedX = this.store.x[this.cursorDataIdx];
-          this.cursorX = xScale.dataToPixel(snappedX);
-          this.cursorDataX = snappedX;
-        }
-
-        this.updateTooltipPoints();
-
-        if (this.syncKey) {
-          SyncGroup.publishCursor(this.syncKey, this, this.cursorDataX);
-        }
-      } else {
-        this.cursorDataX = null;
-        this.cursorDataIdx = null;
-        this.tooltipPoints = [];
-        this.tooltipManager.hide();
-      }
-
-      this.scheduler.markDirty(DirtyFlag.OVERLAY);
-      this.emitEvent('cursor:move', this.cursorDataX, this.cursorDataIdx);
-      this.pluginManager.dispatch('onCursorMove', this, this.cursorDataX, this.cursorDataIdx);
+      this.updateLocalCursorFromPoint(x, y, pointerType, true);
     });
 
     // ── Cursor leave ──
@@ -788,8 +938,8 @@ export class ChartCore implements ChartInstance {
       // Notify listeners and plugins that the cursor is gone, without
       // this, a fast mouse-leave skips the "cursor outside plot area"
       // path in action:cursor and the legend table never blanks its values.
-      this.emitEvent('cursor:move', null, null);
-      this.pluginManager.dispatch('onCursorMove', this, null, null);
+      this.emitEvent('cursor:move', null, null, 'local');
+      this.pluginManager.dispatch('onCursorMove', this, null, null, 'local');
 
       if (this.syncKey) {
         SyncGroup.publishCursor(this.syncKey, this, null);
@@ -814,14 +964,18 @@ export class ChartCore implements ChartInstance {
           this.applyViewportChange(axis, scale.min + dataD, scale.max + dataD);
         }
       } else {
-        // Drag in plot area, pan all enabled axes
+        // Drag in plot area, pan all enabled axes. Axes the user has actively
+        // zoomed are also pannable even if pan.x/pan.y is off, mirroring how
+        // scroll-on-axis can zoom an axis with zoom.x/zoom.y off: once the
+        // user has engaged an axis, drag gestures on it should respond.
         for (const [key, scale] of this.scales) {
           const pos = inferPosition(key, axisConfigs[key]?.position);
           const isHoriz = pos === 'bottom' || pos === 'top';
-          if (isHoriz && pan.x !== false) {
+          const userZoomed = this.userZoomedAxes.has(key);
+          if (isHoriz && (pan.x !== false || userZoomed)) {
             const dataD = scale.pixelToData(0) - scale.pixelToData(dx);
             this.applyViewportChange(key, scale.min + dataD, scale.max + dataD);
-          } else if (!isHoriz && pan.y) {
+          } else if (!isHoriz && (pan.y || userZoomed)) {
             const dataD = scale.pixelToData(0) - scale.pixelToData(dy);
             this.applyViewportChange(key, scale.min + dataD, scale.max + dataD);
           }
@@ -881,6 +1035,7 @@ export class ChartCore implements ChartInstance {
     // ── Box selection (start/update/end) ──
     this.eventBus.on('action:box-start', ({ x, y }) => {
       this.selectionBox = { x1: x, y1: y, x2: x, y2: y };
+      this.updateLocalCursorFromPoint(x, y, this.lastPointerType, true);
       this.scheduler.markDirty(DirtyFlag.OVERLAY);
     });
 
@@ -974,33 +1129,13 @@ export class ChartCore implements ChartInstance {
     });
 
     // ── Tap (touch: show/persist tooltip) ──
-    this.eventBus.on('action:tap', ({ x, y }) => {
-      this.cursorIsLocal = true;
-      this.cursorX = x;
-      this.cursorY = y;
-      this.mouseX = x;
-      this.mouseY = y;
-
-      const xScale = this.scales.get('x');
-      if (xScale && this.isInPlotArea(x, y)) {
-        this.cursorDataX = xScale.pixelToData(x);
-        this.cursorDataIdx = nearestIndex(this.store.x, this.cursorDataX);
-        if (this.config.cursor?.snap !== false && this.cursorDataIdx !== null) {
-          const snappedX = this.store.x[this.cursorDataIdx];
-          this.cursorX = xScale.dataToPixel(snappedX);
-          this.cursorDataX = snappedX;
-        }
-        this.updateTooltipPoints();
-
+    this.eventBus.on('action:tap', ({ x, y, pointerType }) => {
+      const inPlot = this.isInPlotArea(x, y);
+      this.updateLocalCursorFromPoint(x, y, pointerType, true);
+      if (inPlot) {
         // Leave a short-lived ring so the user can see the tap landed.
         this.tapFeedback = { x, y, startTime: performance.now() };
-      } else {
-        // Tap outside plot → dismiss tooltip
-        this.tooltipPoints = [];
-        this.tooltipManager.hide();
       }
-
-      this.scheduler.markDirty(DirtyFlag.OVERLAY);
     });
 
     // ── Legacy viewport:change (still used by sync) ──
@@ -1024,7 +1159,7 @@ export class ChartCore implements ChartInstance {
     min = clamped[0];
     max = clamped[1];
 
-    if (isHoriz) this.userHasZoomed = true;
+    this.userZoomedAxes.add(scaleKey);
 
     scale.min = min;
     scale.max = max;
@@ -1103,7 +1238,7 @@ export class ChartCore implements ChartInstance {
 
     if (this.store.length === 0) return null;
     if (isHoriz) {
-      return { min: this.store.x[0], max: this.store.x[this.store.length - 1] };
+      return { min: this.store.xAt(0), max: this.store.xAt(this.store.length - 1) };
     }
     const seriesIndices = this.config.series
       .filter((s) => (s.yAxisKey ?? 'y') === scaleKey && s.visible !== false)
@@ -1162,11 +1297,16 @@ export class ChartCore implements ChartInstance {
   private render(flags: DirtyFlag): void {
     if (this.destroyed) return;
 
-    this.updateLayout();
-    this.updateScalePixelRanges();
+    // Overlay-only frames are the cursor hot path. Layout/tick measurement is
+    // only needed when grid or data layers redraw (resize/config/data/viewport).
+    if (flags & (DirtyFlag.GRID | DirtyFlag.DATA)) {
+      this.updateLayout();
+      this.updateScalePixelRanges();
+    }
 
     // Step 4a: Grid layer (axes, gridlines)
     if (flags & DirtyFlag.GRID) {
+      const start = this.statsStart();
       if (this.pluginManager.dispatch('beforeDrawGrid', this, this.canvasManager.gridCtx)) {
         this.canvasManager.clear('grid');
 
@@ -1184,32 +1324,78 @@ export class ChartCore implements ChartInstance {
         updateDOMLabels(this.canvasManager.domLayer, labels, this.theme, this.layout);
         this.pluginManager.dispatch('afterDrawGrid', this, this.canvasManager.gridCtx);
       }
+      this.statsEnd('grid', start);
     }
 
     // Step 4b: Data layer (series marks)
     if (flags & DirtyFlag.DATA) {
+      const start = this.statsStart();
       if (this.pluginManager.dispatch('beforeDrawData', this, this.canvasManager.dataCtx)) {
         this.canvasManager.clear('data');
         this.renderAllSeries();
         this.pluginManager.dispatch('afterDrawData', this, this.canvasManager.dataCtx);
         this.emitEvent('drawData', this.canvasManager.dataCtx, this.layout);
       }
+      this.statsEnd('data', start);
     }
 
     // Step 4c: Overlay layer (crosshair, tooltip)
     if (flags & DirtyFlag.OVERLAY) {
+      const start = this.statsStart();
       if (this.pluginManager.dispatch('beforeDrawOverlay', this, this.canvasManager.overlayCtx)) {
         this.canvasManager.clear('overlay');
         this.renderOverlay();
         this.pluginManager.dispatch('afterDrawOverlay', this, this.canvasManager.overlayCtx);
         this.emitEvent('drawOverlay', this.canvasManager.overlayCtx, this.layout);
       }
+      this.statsEnd('overlay', start);
     }
+  }
+
+  private statsStart(): number {
+    return this.config.debug?.stats ? performance.now() : 0;
+  }
+
+  private statsEnd(layer: keyof ChartStats['renderCount'], start: number): void {
+    this.stats.renderCount[layer]++;
+    if (this.config.debug?.stats) {
+      this.stats.lastRenderMs[layer] = performance.now() - start;
+    }
+  }
+
+  private renderSegments(
+    segments: ColumnarSegment[],
+    xData: Float64Array,
+    yData: Float64Array,
+  ) {
+    return segments.map((segment) => ({
+      xData,
+      yData,
+      startIdx: segment.physicalStart,
+      endIdx: segment.physicalEnd,
+    }));
+  }
+
+  private bandRenderSegments(
+    segments: ColumnarSegment[],
+    xData: Float64Array,
+    centerYData: Float64Array,
+    upperYData: Float64Array,
+    lowerYData: Float64Array,
+  ) {
+    return segments.map((segment) => ({
+      xData,
+      centerYData,
+      upperYData,
+      lowerYData,
+      startIdx: segment.physicalStart,
+      endIdx: segment.physicalEnd,
+    }));
   }
 
   private renderAllSeries(): void {
     const ctx = this.canvasManager.dataCtx;
-    const palette = this.theme.palette;
+    const palette = this.categoricalPalette();
 
     // Count bar-type series for grouped width calculation. This mapping is
     // position-based (which slot a bar occupies in each group), so it must
@@ -1252,37 +1438,59 @@ export class ChartCore implements ChartInstance {
       if (colIdx < 1 || colIdx > this.store.seriesCount) return;
 
       const [startIdx, endIdx] = this.store.getViewportIndices(xScale.min, xScale.max);
-      const xData = this.store.x;
-      const yData = this.store.y(colIdx - 1);
+      const segments = this.store.getSegments(startIdx, endIdx);
+      if (segments.length === 0) return;
+      const xData = this.store.getPhysicalColumn(0);
+      const yData = this.store.getPhysicalColumn(colIdx);
+      const renderSegments = this.renderSegments(segments, xData, yData);
       const type = series.type ?? 'line';
+      const renderSeries = type === 'scatter' && series.heatmap && !series.heatmapGradient
+        ? { ...series, heatmapGradient: this.heatmapGradient() }
+        : series;
 
       const opacityMul = highlightActive && si !== highlightedSi ? dimOpacity : 1;
 
       switch (type) {
         case 'line':
-          renderLine(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
+          renderLineSegments(ctx, renderSegments, xScale, yScale, this.layout, renderSeries, color, opacityMul);
           break;
         case 'area':
-          renderArea(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
+          renderAreaSegments(ctx, renderSegments, xScale, yScale, this.layout, renderSeries, color, opacityMul);
           break;
         case 'band': {
           const upperIdx = series.upperDataIndex;
           const lowerIdx = series.lowerDataIndex;
-          if (upperIdx != null && lowerIdx != null) {
-            const upperYData = this.store.y(upperIdx - 1);
-            const lowerYData = this.store.y(lowerIdx - 1);
-            renderBand(ctx, xData, yData, upperYData, lowerYData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
+          if (
+            upperIdx != null &&
+            lowerIdx != null &&
+            upperIdx >= 1 &&
+            lowerIdx >= 1 &&
+            upperIdx <= this.store.seriesCount &&
+            lowerIdx <= this.store.seriesCount
+          ) {
+            const upperYData = this.store.getPhysicalColumn(upperIdx);
+            const lowerYData = this.store.getPhysicalColumn(lowerIdx);
+            renderBandSegments(
+              ctx,
+              this.bandRenderSegments(segments, xData, yData, upperYData, lowerYData),
+              xScale,
+              yScale,
+              this.layout,
+              renderSeries,
+              color,
+              opacityMul,
+            );
           }
           break;
         }
         case 'scatter':
-          renderScatter(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
+          renderScatterSegments(ctx, renderSegments, xScale, yScale, this.layout, renderSeries, color, opacityMul);
           break;
         case 'bar':
-          renderBars(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, barIdxFor.get(si) ?? 0, barSeries.length, opacityMul);
+          renderBarsSegments(ctx, renderSegments, xScale, yScale, this.layout, renderSeries, color, barIdxFor.get(si) ?? 0, barSeries.length, opacityMul);
           break;
         case 'histogram':
-          renderHistogram(ctx, xData, yData, startIdx, endIdx, xScale, yScale, this.layout, series, color, opacityMul);
+          renderHistogramSegments(ctx, renderSegments, xScale, yScale, this.layout, renderSeries, color, opacityMul);
           break;
       }
     };
@@ -1416,14 +1624,12 @@ export class ChartCore implements ChartInstance {
 
       if (sc.type === 'histogram') {
         // Highlight hovered bin, edges from X data, counts from Y data
-        const edges = this.store.x;
         const colIdx = sc.dataIndex;
-        const counts = colIdx >= 1 && colIdx <= this.store.seriesCount ? this.store.y(colIdx - 1) : null;
         const binIdx = point.dataIndex;
-        if (counts && binIdx < edges.length - 1) {
-          const x1 = xScale.dataToPixel(edges[binIdx]);
-          const x2 = xScale.dataToPixel(edges[binIdx + 1]);
-          const yTop = yScale.dataToPixel(counts[binIdx]);
+        if (colIdx >= 1 && colIdx <= this.store.seriesCount && binIdx < this.store.length - 1) {
+          const x1 = xScale.dataToPixel(this.store.xAt(binIdx));
+          const x2 = xScale.dataToPixel(this.store.xAt(binIdx + 1));
+          const yTop = yScale.dataToPixel(this.store.yAt(colIdx - 1, binIdx));
           const yBase = yScale.dataToPixel(0);
           ctx.fillStyle = `rgba(255, 255, 255, ${ringAlpha})`;
           ctx.fillRect(x1, Math.min(yTop, yBase), x2 - x1, Math.abs(yTop - yBase));
@@ -1445,14 +1651,14 @@ export class ChartCore implements ChartInstance {
           const widthRatio = sc.barWidthRatio ?? 0.8;
           let categoryWidth: number;
           if (this.store.length > 1) {
-            const xRange = xScale.dataToPixel(this.store.x[this.store.length - 1]) - xScale.dataToPixel(this.store.x[0]);
+            const xRange = xScale.dataToPixel(this.store.xAt(this.store.length - 1)) - xScale.dataToPixel(this.store.xAt(0));
             categoryWidth = xRange / (this.store.length - 1);
           } else { categoryWidth = this.layout.plot.width * 0.5; }
           const groupWidth = categoryWidth * (1 - outerPadding) * widthRatio;
           const barWidth = groupWidth / totalBars;
           const barGap = barWidth * innerPadding;
           const effectiveBarWidth = barWidth - barGap;
-          const centerX = xScale.dataToPixel(this.store.x[idx]);
+          const centerX = xScale.dataToPixel(this.store.xAt(idx));
           const groupLeft = centerX - groupWidth / 2;
           const barLeft = groupLeft + barIdx * barWidth + barGap / 2;
           const barTop = yScale.dataToPixel(point.y);
@@ -1521,6 +1727,64 @@ export class ChartCore implements ChartInstance {
     return true; // default to dark
   }
 
+  private updateLocalCursorFromPoint(
+    x: number,
+    y: number,
+    pointerType: string,
+    publishSync: boolean,
+  ): void {
+    this.cursorIsLocal = true;
+    this.cursorX = x;
+    this.cursorY = y;
+    this.mouseX = x;
+    this.mouseY = y;
+    if (pointerType === 'touch' || pointerType === 'pen' || pointerType === 'mouse') {
+      this.lastPointerType = pointerType;
+    }
+
+    const xScale = this.scales.get('x');
+    if (xScale && this.isInPlotArea(x, y)) {
+      const pointerDataX = xScale.pixelToData(x);
+      const hasOnlyHistograms = this.hasOnlyVisibleHistograms();
+      if (hasOnlyHistograms) {
+        const hit = this.resolveHistogramCursor(pointerDataX);
+        this.cursorDataX = hit?.dataX ?? pointerDataX;
+        this.cursorDataIdx = hit?.dataIndex ?? null;
+        this.cursorX = xScale.dataToPixel(this.cursorDataX);
+      } else {
+        this.cursorDataX = pointerDataX;
+        this.cursorDataIdx = this.store.nearestXIndex(this.cursorDataX);
+      }
+
+      if (!hasOnlyHistograms && this.config.cursor?.snap !== false && this.cursorDataIdx !== null) {
+        const snappedX = this.store.xAt(this.cursorDataIdx);
+        this.cursorX = xScale.dataToPixel(snappedX);
+        this.cursorDataX = snappedX;
+      }
+
+      this.updateTooltipPoints();
+
+      if (publishSync && this.syncKey) {
+        SyncGroup.publishCursor(this.syncKey, this, this.cursorDataX);
+      }
+    } else {
+      this.cursorX = null;
+      this.cursorY = null;
+      this.cursorDataX = null;
+      this.cursorDataIdx = null;
+      this.tooltipPoints = [];
+      this.tooltipManager.hide();
+
+      if (publishSync && this.syncKey) {
+        SyncGroup.publishCursor(this.syncKey, this, null);
+      }
+    }
+
+    this.scheduler.markDirty(DirtyFlag.OVERLAY);
+    this.emitEvent('cursor:move', this.cursorDataX, this.cursorDataIdx, 'local');
+    this.pluginManager.dispatch('onCursorMove', this, this.cursorDataX, this.cursorDataIdx, 'local');
+  }
+
   private updateTooltipPoints(): void {
     if (this.store.length === 0 || this.cursorX === null || this.cursorY === null) {
       this.tooltipPoints = [];
@@ -1544,7 +1808,7 @@ export class ChartCore implements ChartInstance {
         this.cursorX,
         this.cursorY,
         this.config.tooltip?.mode ?? 'index',
-        this.theme.palette,
+        this.categoricalPalette(),
         this.lastPointerType,
       );
     }
@@ -1560,7 +1824,7 @@ export class ChartCore implements ChartInstance {
     if (!xScale || this.cursorX === null || this.store.length < 2) return points;
 
     const dataX = xScale.pixelToData(this.cursorX);
-    const edges = this.store.x; // X column = bin edges
+    const palette = this.categoricalPalette();
 
     for (let si = 0; si < this.config.series.length; si++) {
       const series = this.config.series[si];
@@ -1569,18 +1833,18 @@ export class ChartCore implements ChartInstance {
       const colIdx = series.dataIndex;
       if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
 
-      const counts = this.store.y(colIdx - 1);
-      const color = series.stroke ?? this.theme.palette[si % this.theme.palette.length];
+      const color = series.stroke ?? palette[si % palette.length];
 
       // Find which bin the cursor X falls into. Edges are sorted, so
       // `upperBound` gives the largest b with edges[b] <= dataX in O(log n).
-      // Reject dataX at or past the final edge (bin is [edges[b], edges[b+1])).
-      const b = upperBound(edges, dataX);
-      if (b < 0 || b >= edges.length - 1) continue;
+      // Bins are left-edge inclusive. The exact final edge maps to the
+      // final bin so a click on the right border still selects that bar.
+      const b = this.histogramBinIndexForDataX(dataX);
+      if (b === null) continue;
 
-      const binMin = edges[b];
-      const binMax = edges[b + 1];
-      const count = counts[b];
+      const binMin = this.store.xAt(b);
+      const binMax = this.store.xAt(b + 1);
+      const count = this.store.yAt(colIdx - 1, b);
 
       points.push({
         seriesIndex: si,
@@ -1589,7 +1853,7 @@ export class ChartCore implements ChartInstance {
         x: (binMin + binMax) / 2,
         y: count,
         color,
-        formattedX: `${binMin.toFixed(1)} \u2013 ${binMax.toFixed(1)}`,
+        formattedX: this.formatHistogramBinRange(binMin, binMax),
         formattedY: String(count),
       });
     }
@@ -1607,14 +1871,15 @@ export class ChartCore implements ChartInstance {
     if (!xScale || this.cursorX === null || this.store.length === 0) return points;
 
     const dataX = xScale.pixelToData(this.cursorX);
+    const palette = this.categoricalPalette();
 
     // Find nearest category index
-    const idx = nearestIndex(this.store.x, dataX);
-    const xVal = this.store.x[idx];
+    const idx = this.store.nearestXIndex(dataX);
+    const xVal = this.store.xAt(idx);
 
     // Check proximity: cursor must be within half a category width
     const categoryWidth = this.store.length > 1
-      ? (this.store.x[this.store.length - 1] - this.store.x[0]) / (this.store.length - 1)
+      ? (this.store.xAt(this.store.length - 1) - this.store.xAt(0)) / (this.store.length - 1)
       : 1;
     if (Math.abs(dataX - xVal) > categoryWidth * 0.6) return points;
 
@@ -1625,10 +1890,10 @@ export class ChartCore implements ChartInstance {
       const colIdx = series.dataIndex;
       if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
 
-      const yVal = this.store.y(colIdx - 1)[idx];
+      const yVal = this.store.yAt(colIdx - 1, idx);
       if (yVal !== yVal) continue; // NaN
 
-      const color = series.stroke ?? this.theme.palette[si % this.theme.palette.length];
+      const color = series.stroke ?? palette[si % palette.length];
       const yScale = this.scales.get(series.yAxisKey ?? 'y');
 
       points.push({
@@ -1662,7 +1927,7 @@ export class ChartCore implements ChartInstance {
 
     if (idx === null && length > 0) {
       if (fallback === 'latest') {
-        idx = length - 1;
+        idx = this.hasOnlyVisibleHistograms() && length > 1 ? length - 2 : length - 1;
         source = 'latest';
       } else if (fallback === 'first') {
         idx = 0;
@@ -1680,15 +1945,22 @@ export class ChartCore implements ChartInstance {
       return target;
     }
 
-    const xVal = this.store.x[idx];
+    const histogramRange = this.hasOnlyVisibleHistograms()
+      ? this.histogramBinRange(idx)
+      : null;
+    const xVal = histogramRange
+      ? (histogramRange.min + histogramRange.max) / 2
+      : this.store.xAt(idx);
     const xScale = this.scales.get('x');
 
     target.dataIndex = idx;
     target.dataX = xVal;
-    target.formattedX = xScale ? xScale.tickFormat(xVal) : String(xVal);
+    target.formattedX = histogramRange
+      ? this.formatHistogramBinRange(histogramRange.min, histogramRange.max)
+      : xScale ? xScale.tickFormat(xVal) : String(xVal);
     target.source = source;
 
-    const palette = this.theme.palette;
+    const palette = this.categoricalPalette();
     const seriesList = this.config.series;
     const points = target.points;
 
@@ -1708,8 +1980,7 @@ export class ChartCore implements ChartInstance {
       const colIdx = s.dataIndex;
       if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
 
-      const yArr = this.store.y(colIdx - 1);
-      const value = yArr ? yArr[idx] : NaN;
+      const value = this.store.yAt(colIdx - 1, idx);
       const yScale = this.scales.get(s.yAxisKey ?? 'y');
       const formattedValue = (value === value)
         ? (yScale ? yScale.tickFormat(value) : String(value))
@@ -1758,6 +2029,14 @@ export class ChartCore implements ChartInstance {
 
   // ─── Private: Helpers ───────────────────────────────────────
 
+  private categoricalPalette(): string[] {
+    return this.theme.categoricalPalette ?? this.theme.palette;
+  }
+
+  private heatmapGradient(): string[] | undefined {
+    return this.theme.heatmapGradient ?? this.theme.sequentialPalette;
+  }
+
   /** Re-run tooltip hit-test at current cursor position (called on data change) */
   private refreshCursor(): void {
     if (this.mouseX === null || this.mouseY === null || !this.cursorIsLocal) return;
@@ -1803,6 +2082,56 @@ export class ChartCore implements ChartInstance {
     }
 
     return undefined;
+  }
+
+  private hasOnlyVisibleHistograms(): boolean {
+    let hasVisibleSeries = false;
+    for (const series of this.config.series) {
+      if (series.visible === false) continue;
+      hasVisibleSeries = true;
+      if (series.type !== 'histogram') return false;
+    }
+    return hasVisibleSeries;
+  }
+
+  private resolveHistogramCursor(dataX: number): { dataIndex: number; dataX: number } | null {
+    const dataIndex = this.histogramBinIndexForDataX(dataX);
+    if (dataIndex === null) return null;
+
+    const range = this.histogramBinRange(dataIndex);
+    if (!range) return null;
+    return {
+      dataIndex,
+      dataX: (range.min + range.max) / 2,
+    };
+  }
+
+  private histogramBinIndexForDataX(dataX: number): number | null {
+    if (this.store.length < 2) return null;
+
+    const firstEdge = this.store.xAt(0);
+    const lastEdge = this.store.xAt(this.store.length - 1);
+    if (dataX < firstEdge || dataX > lastEdge) return null;
+
+    let binIdx = this.store.upperBoundX(dataX);
+    if (binIdx === this.store.length - 1 && dataX === lastEdge) {
+      binIdx = this.store.length - 2;
+    }
+
+    if (binIdx < 0 || binIdx >= this.store.length - 1) return null;
+    return binIdx;
+  }
+
+  private histogramBinRange(dataIndex: number): { min: number; max: number } | null {
+    if (dataIndex < 0 || dataIndex >= this.store.length - 1) return null;
+    return {
+      min: this.store.xAt(dataIndex),
+      max: this.store.xAt(dataIndex + 1),
+    };
+  }
+
+  private formatHistogramBinRange(min: number, max: number): string {
+    return `${min.toFixed(1)} \u2013 ${max.toFixed(1)}`;
   }
 
   private isInPlotArea(x: number, y: number): boolean {

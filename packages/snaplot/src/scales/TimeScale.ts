@@ -113,16 +113,12 @@ export class TimeScale implements Scale {
       const ms = String(Math.floor(value) % 1000).padStart(3, '0');
       return `${base}.${ms}`;
     }
-    if (domain < 60000) {
-      // < 1 minute: show HH:MM:SS
+    if (domain < 3600000) {
+      // < 1 hour: show HH:MM:SS so per-second precision is visible whenever
+      // the visible window is short enough that adjacent minute-only ticks
+      // would otherwise read identically.
       return date.toLocaleTimeString(undefined, {
         hour: '2-digit', minute: '2-digit', second: '2-digit',
-      });
-    }
-    if (domain < 3600000) {
-      // < 1 hour: show HH:MM
-      return date.toLocaleTimeString(undefined, {
-        hour: '2-digit', minute: '2-digit',
       });
     }
     if (domain < 86400000) {

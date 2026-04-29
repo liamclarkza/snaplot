@@ -9,11 +9,11 @@ import { useTheme } from '../ThemeContext';
  * Four-core CPU usage. Each core is a bounded random walk with
  * occasional workload bursts, the shape a real CPU chart would
  * trace on an idle box that occasionally compiles something. Five
- * thousand samples streaming at 10 Hz keeps the X axis sliding
+ * thousand samples streaming at 50 Hz keeps the X axis sliding
  * without the chart ever spiking off-scale.
  */
 const WINDOW_POINTS = 5000;
-const TICK_MS = 100; // 10 Hz
+const TICK_MS = 20; // 50 Hz
 
 type CoreState = number[]; // 4 values, one per core
 
@@ -128,8 +128,8 @@ export default function Home() {
     };
   });
 
-  // 10 Hz tick. Each step shifts the window forward by one sample and
-  // appends a fresh one, setData on the full column every 100 ms so the
+  // 50 Hz tick. Each step shifts the window forward by one sample and
+  // appends a fresh one, setData on the full column every 20 ms so the
   // page actually demonstrates sustained repaint throughput, not just
   // an append-to-tail optimisation.
   const interval = setInterval(() => {
@@ -250,7 +250,7 @@ export default function Home() {
                   'margin-top': '2px',
                 }}
               >
-                4 cores · 5,000 samples · 100 ms tick
+                4 cores · 5,000 samples · 20 ms tick
               </div>
             </div>
             <div
@@ -261,7 +261,7 @@ export default function Home() {
                 'text-align': 'right',
               }}
             >
-              drag to zoom · hover to inspect · double-click to reset
+              drag to zoom · scroll an axis to zoom it · shift+drag to pan · double-click to reset · hover to inspect
             </div>
           </div>
           <div style={{ height: 'clamp(280px, 44vh, 380px)', padding: '8px 0 var(--space-2)' }}>

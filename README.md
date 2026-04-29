@@ -4,7 +4,7 @@ A canvas chart library built for streaming data and interactive dashboards.
 
 [Documentation](https://liamclarkza.github.io/snaplot/#/docs) · [Live demos](https://liamclarkza.github.io/snaplot/#/demos) · [npm](https://www.npmjs.com/package/snaplot)
 
-snaplot renders line, area, scatter, bar, histogram, and band charts from columnar Float64Arrays. It handles 200,000+ points at 60 fps through a layered canvas pipeline, binary-search viewport culling, and ring-buffer streaming updates. The library never copies or mutates your data.
+snaplot renders line, area, scatter, bar, histogram, and band charts from columnar Float64Arrays. It handles 200,000+ points at 60 fps through a layered canvas pipeline, binary-search viewport culling, and ring-buffer streaming updates. The library never mutates your input arrays.
 
 Current bindings ship a SolidJS component and reactive primitives. The core (`ChartCore`) is framework-free and can be driven from any runtime.
 
@@ -40,7 +40,7 @@ const data: ColumnarData = [
 />
 ```
 
-Column 0 is always X. Columns 1+ are Y series referenced by `dataIndex`. This columnar layout is what makes binary-search viewport culling and zero-copy streaming possible.
+Column 0 is always X. Columns 1+ are Y series referenced by `dataIndex`. This columnar layout is what makes binary-search viewport culling and low-allocation streaming possible.
 
 Full API reference and runnable examples are in the [documentation](https://liamclarkza.github.io/snaplot/#/docs).
 
@@ -56,7 +56,7 @@ Drag-to-zoom, wheel and pinch zoom at the cursor, pan on shift-drag or axis gutt
 
 ### Streaming
 
-`setData` replaces the current window. `appendData` extends it with an optional `maxLen` for ring-buffer eviction. Both update at 60 fps on realistic dashboard datasets.
+`setData` replaces the current window. `appendData` extends it, and `config.streaming.maxLen` enables fixed-window ring-buffer retention. Both update at 60 fps on realistic dashboard datasets.
 
 ### Cursor-synced legend table
 
@@ -68,7 +68,7 @@ A table that shows the value of every visible series at the cursor position. Ava
 
 ### Themes
 
-Twelve built-in themes (`lightTheme`, `darkTheme`, `oceanTheme`, `forestTheme`, `violetTheme`, `fogTheme`, `ivoryTheme`, `mintTheme`, `sunsetTheme`, `midnightTheme`, `marsTheme`, `refinedDarkTheme`). CSS variable overrides and full custom `ThemeConfig` objects are supported.
+Built-in themes include `lightTheme`, `darkTheme`, `studioTheme`, `tokyoTheme`, `oceanTheme`, `forestTheme`, `violetTheme`, `fogTheme`, `ivoryTheme`, `mintTheme`, `sunsetTheme`, `midnightTheme`, `marsTheme`, and `refinedDarkTheme`. Themes support role-aware palettes: `palette` remains the fallback series cycle, `categoricalPalette` drives unordered series, and `sequentialPalette`/`heatmapGradient` drive density heatmaps. CSS variable overrides and full custom `ThemeConfig` objects are supported.
 
 ### Plugins
 
@@ -83,7 +83,7 @@ Strict types throughout, generic column helpers, no `any` in the public API.
 - 200K+ point charts render well under one frame on a modern laptop.
 - Grid, data, and overlay are separate canvases. A cursor move repaints the overlay only. A data update skips the grid layer.
 - Viewport culling is a binary search on the X column, so off-screen points cost nothing.
-- snaplot never mutates, copies, or processes input arrays. Downsampling helpers (`lttb`, `m4`) are exported as opt-in utilities.
+- snaplot never mutates input arrays. Downsampling helpers (`lttb`, `m4`) are exported as opt-in utilities.
 - Legend table updates use `textContent` swaps in the cursor hot path, not `innerHTML` rebuilds.
 
 ## Development

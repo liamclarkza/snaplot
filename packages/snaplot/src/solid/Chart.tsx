@@ -1,11 +1,11 @@
 import { onMount, onCleanup, createEffect, on } from 'solid-js';
-import type { Component } from 'solid-js';
+import type { JSX } from 'solid-js';
 import { ChartCore } from '../core/Chart';
 import type { ChartConfig, ChartInstance, ColumnarData } from '../types';
 
-export interface ChartProps {
+export interface ChartProps<TMeta = unknown> {
   /** Chart configuration */
-  config: ChartConfig;
+  config: ChartConfig<TMeta>;
   /** Columnar data (reactive, chart updates automatically when this changes) */
   data: ColumnarData;
   /** CSS class for the container div */
@@ -22,12 +22,12 @@ export interface ChartProps {
  * Fine-grained reactivity: signal changes → targeted canvas layer updates.
  * No virtual DOM diffing.
  */
-export const Chart: Component<ChartProps> = (props) => {
+export function Chart<TMeta = unknown>(props: ChartProps<TMeta>): JSX.Element {
   let containerRef!: HTMLDivElement;
   let chart: ChartCore | undefined;
 
   onMount(() => {
-    chart = new ChartCore(containerRef, props.config, props.data);
+    chart = new ChartCore(containerRef, props.config as ChartConfig, props.data);
     props.onReady?.(chart);
 
     createEffect(
@@ -41,7 +41,7 @@ export const Chart: Component<ChartProps> = (props) => {
     createEffect(
       on(
         () => props.config,
-        (config) => { chart?.setOptions(config); },
+        (config) => { chart?.setOptions(config as ChartConfig); },
         { defer: true },
       ),
     );
@@ -59,4 +59,4 @@ export const Chart: Component<ChartProps> = (props) => {
       }
     />
   );
-};
+}

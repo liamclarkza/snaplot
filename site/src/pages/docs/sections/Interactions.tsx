@@ -59,6 +59,9 @@ export default function Interactions() {
             </tbody>
           </table>
         </div>
+        <Prose>
+          <b>Touch checks</b>: iOS Safari and Android Chrome should support one-finger pan, two-finger pinch zoom, tap tooltip, double-tap reset, and long-press box zoom. Keep chart containers at least 240px tall on narrow screens so pinch and long-press gestures have enough room; regular page scroll is left alone unless the gesture starts inside the chart or on an axis.
+        </Prose>
         <Demo title="Interaction mode demo" desc="Change 'timeseries' to 'analytical' (enables Y zoom + XY pinch) or 'readonly' (tooltip only)"
           data={d_interaction()}
           code={`{
