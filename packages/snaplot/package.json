@@ -1,6 +1,6 @@
 {
   "name": "snaplot",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "description": "High-performance charts that actually look good",
   "main": "./dist/index.js",

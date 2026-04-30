@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-30
+
 ### Added
 - Scatter series can now use arbitrary `xDataIndex` / `yDataIndex`
   coordinate columns, categorical or continuous `colorBy` encodings,
