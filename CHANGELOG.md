@@ -6,6 +6,40 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Scatter series can now use arbitrary `xDataIndex` / `yDataIndex`
+  coordinate columns, categorical or continuous `colorBy` encodings,
+  `sizeBy` radius encodings, custom point shapes, explicit density
+  rendering, and extra `tooltipFields` in nearest-point tooltips.
+- Box selections on scatter plots can return selected point metadata via
+  `SelectionResult.points`, making lasso-like dashboard workflows possible
+  without reimplementing hit testing outside snaplot.
+- Streaming charts can opt into fixed-window retention with
+  `config.streaming.maxLen`, backed by a ring-buffer store for low-allocation
+  append workloads.
+- Chart diagnostics now expose lightweight render and data-update counters
+  through `ChartStats`, with optional per-layer timing behind `debug.stats`.
+- Added role-aware theme palettes plus `studioTheme`, `tokyoTheme`, and a
+  docs-site theme editor for previewing chart tokens.
+
+### Changed
+- Scatter hit testing now supports arbitrary X columns and dense point clouds
+  through a cached screen-space lookup grid.
+- Cross-chart highlight sync can use stable series keys via
+  `highlight.getKey`, so charts with different series order or subsets can
+  share hover state correctly.
+- Auto-range no longer applies axis nicening by default; set
+  `axis.nice: true` when rounded presentation bounds are preferred.
+- Line, bar, histogram, scatter, Solid, and plugin code paths now have broader
+  unit coverage around append, missing values, rendering, sync, and lifecycle
+  behavior.
+
+### Fixed
+- Data updates now preserve explicit user zoom until reset, avoiding
+  unexpected auto-range snaps during streaming or replacement updates.
+- Theme changes now propagate through chart internals more consistently,
+  including tooltip rendering and palette-driven density heatmaps.
+
 ## [0.6.0] - 2026-04-24
 
 ### Fixed
