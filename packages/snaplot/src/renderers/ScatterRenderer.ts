@@ -1,8 +1,17 @@
 import type { Scale, Layout, SeriesConfig } from '../types';
+import {
+  createScatterStyleResolver,
+  type IndexRange,
+  parseHex,
+  seriesYDataIndex,
+  type ScatterPalettes,
+} from './scatterEncoding';
 
 export interface ScatterRenderSegment {
   xData: Float64Array;
   yData: Float64Array;
+  colorData?: Float64Array;
+  sizeData?: Float64Array;
   startIdx: number;
   endIdx: number;
 }
@@ -26,8 +35,18 @@ let stampCache: {
   radius: number;
   color: string;
   alpha: number;
+  shape: string;
   dpr: number;
 } | null = null;
+
+const stampCacheMap = new Map<string, OffscreenCanvas | HTMLCanvasElement>();
+const STAMP_CACHE_MAX = 512;
+export const SCATTER_DENSITY_THRESHOLD = 200_000;
+
+export function isDensityScatterSeries(series: SeriesConfig, pointCount: number): boolean {
+  const renderMode = series.renderMode ?? (series.heatmap ? 'density' : 'auto');
+  return renderMode === 'density' || (renderMode === 'auto' && pointCount > SCATTER_DENSITY_THRESHOLD);
+}
 
 function isOffscreenCanvas(canvas: OffscreenCanvas | HTMLCanvasElement): canvas is OffscreenCanvas {
   return typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas;
@@ -37,20 +56,27 @@ function getStamp(
   radius: number,
   color: string,
   alpha: number,
+  shape: string,
   dpr: number,
 ): OffscreenCanvas | HTMLCanvasElement {
+  const roundedRadius = Math.round(radius * 10) / 10;
+  const key = `${shape}|${roundedRadius}|${color}|${alpha}|${dpr}`;
+  const cached = stampCacheMap.get(key);
+  if (cached) return cached;
+
   // Reuse cached stamp if params match
   if (
     stampCache &&
-    stampCache.radius === radius &&
+    stampCache.radius === roundedRadius &&
     stampCache.color === color &&
     stampCache.alpha === alpha &&
+    stampCache.shape === shape &&
     stampCache.dpr === dpr
   ) {
     return stampCache.canvas;
   }
 
-  const size = Math.ceil((radius * 2 + 2) * dpr);
+  const size = Math.ceil((roundedRadius * 2 + 2) * dpr);
   const canvas = typeof OffscreenCanvas !== 'undefined'
     ? new OffscreenCanvas(size, size)
     : document.createElement('canvas');
@@ -63,14 +89,29 @@ function getStamp(
   const ctx = canvas.getContext('2d')! as CanvasRenderingContext2D;
   ctx.scale(dpr, dpr);
 
-  const center = radius + 1;
+  const center = roundedRadius + 1;
   ctx.beginPath();
-  ctx.arc(center, center, radius, 0, Math.PI * 2);
+  if (shape === 'square') {
+    ctx.rect(1, 1, roundedRadius * 2, roundedRadius * 2);
+  } else if (shape === 'diamond') {
+    ctx.moveTo(center, 1);
+    ctx.lineTo(center + roundedRadius, center);
+    ctx.lineTo(center, center + roundedRadius);
+    ctx.lineTo(1, center);
+    ctx.closePath();
+  } else {
+    ctx.arc(center, center, roundedRadius, 0, Math.PI * 2);
+  }
   ctx.fillStyle = color;
   ctx.globalAlpha = alpha;
   ctx.fill();
 
-  stampCache = { canvas, radius, color, alpha, dpr };
+  stampCache = { canvas, radius: roundedRadius, color, alpha, shape, dpr };
+  stampCacheMap.set(key, canvas);
+  if (stampCacheMap.size > STAMP_CACHE_MAX) {
+    const oldest = stampCacheMap.keys().next().value;
+    if (oldest) stampCacheMap.delete(oldest);
+  }
   return canvas;
 }
 
@@ -87,6 +128,7 @@ export function renderScatter(
   color: string,
   /** Multiplied with the per-point alpha. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
+  palettes: ScatterPalettes = { categorical: [] },
 ): void {
   renderScatterSegments(
     ctx,
@@ -97,6 +139,7 @@ export function renderScatter(
     series,
     color,
     opacityMultiplier,
+    palettes,
   );
 }
 
@@ -110,6 +153,7 @@ export function renderScatterSegments(
   color: string,
   /** Multiplied with the per-point alpha. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
+  palettes: ScatterPalettes = { categorical: [] },
 ): void {
   const count = segmentPointCount(segments);
   if (count <= 0) return;
@@ -122,10 +166,10 @@ export function renderScatterSegments(
   // Multiplies cumulatively with the stamp's baked-in alpha during drawImage.
   ctx.globalAlpha = opacityMultiplier;
 
-  if (series.heatmap || count > 200_000) {
+  if (isDensityScatterSeries(series, count)) {
     drawHeatmapSegments(ctx, segments, scaleX, scaleY, layout, series.heatmapBinSize, series.heatmapGradient);
   } else {
-    drawStampedSegments(ctx, segments, scaleX, scaleY, layout, series, color);
+    drawStampedSegments(ctx, segments, scaleX, scaleY, layout, series, color, palettes);
   }
 
   ctx.restore();
@@ -141,15 +185,46 @@ function drawStampedSegments(
   layout: Layout,
   series: SeriesConfig,
   color: string,
+  palettes: ScatterPalettes,
 ): void {
   const count = segmentPointCount(segments);
   const radius = series.pointRadius ?? (count > 10_000 ? 1.5 : 3);
   const alpha = series.opacity ?? (count > 10_000 ? 0.4 : 0.8);
   const dpr = layout.dpr;
+  const shape = series.pointShape ?? 'circle';
+  const ranges: IndexRange[] = segments.map((segment) => ({
+    startIdx: segment.startIdx,
+    endIdx: segment.endIdx,
+  }));
+  const colorData = segments[0]?.colorData;
+  const sizeData = segments[0]?.sizeData;
+  const resolver = createScatterStyleResolver({
+    series,
+    fallbackColor: color,
+    fallbackRadius: radius,
+    palettes,
+    columnCount: 1 +
+      (colorData ? Math.max(series.colorBy && typeof series.colorBy !== 'number' ? series.colorBy.dataIndex : typeof series.colorBy === 'number' ? series.colorBy : 0, 0) : 0) +
+      (sizeData ? Math.max(series.sizeBy && typeof series.sizeBy !== 'number' ? series.sizeBy.dataIndex : typeof series.sizeBy === 'number' ? series.sizeBy : 0, 0) : 0),
+    ranges,
+    valueAt(columnIdx, index) {
+      if (columnIdx === series.xDataIndex) return segments[0]?.xData[index] ?? Number.NaN;
+      if (columnIdx === seriesYDataIndex(series)) return segments[0]?.yData[index] ?? Number.NaN;
+      const colorBy = series.colorBy;
+      const colorIdx = typeof colorBy === 'number' ? colorBy : colorBy?.dataIndex;
+      if (columnIdx === colorIdx) return colorData?.[index] ?? Number.NaN;
+      const sizeBy = series.sizeBy;
+      const sizeIdx = typeof sizeBy === 'number' ? sizeBy : sizeBy?.dataIndex;
+      if (columnIdx === sizeIdx) return sizeData?.[index] ?? Number.NaN;
+      return Number.NaN;
+    },
+  });
 
-  const stamp = getStamp(radius, color, alpha, dpr);
-  const stampSize = (radius * 2 + 2);
-  const offset = radius + 1; // center of stamp in CSS pixels
+  const constantStamp = !resolver.variableColor && !resolver.variableRadius
+    ? getStamp(radius, color, alpha, shape, dpr)
+    : null;
+  const constantStampSize = radius * 2 + 2;
+  const constantOffset = radius + 1;
 
   // drawImage with a canvas source is a fast GPU blit, no path overhead
   for (const segment of segments) {
@@ -161,6 +236,22 @@ function drawStampedSegments(
       const px = scaleX.dataToPixel(xData[i]);
       const py = scaleY.dataToPixel(yVal);
 
+      if (constantStamp) {
+        ctx.drawImage(
+          constantStamp,
+          px - constantOffset,
+          py - constantOffset,
+          constantStampSize,
+          constantStampSize,
+        );
+        continue;
+      }
+
+      const pointRadius = resolver.radiusAt(i);
+      const pointColor = resolver.colorAt(i);
+      const stamp = getStamp(pointRadius, pointColor, alpha, shape, dpr);
+      const stampSize = pointRadius * 2 + 2;
+      const offset = pointRadius + 1;
       ctx.drawImage(stamp, px - offset, py - offset, stampSize, stampSize);
     }
   }
@@ -189,17 +280,6 @@ let heatmapCache: {
   binSize: number;
   gradientKey: string;
 } | null = null;
-
-/** Parse a #rrggbb or #rgb hex string into [r, g, b] 0–255. */
-function parseHex(hex: string): [number, number, number] {
-  const h = hex.replace('#', '');
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
-  return [
-    parseInt(full.slice(0, 2), 16) || 0,
-    parseInt(full.slice(2, 4), 16) || 0,
-    parseInt(full.slice(4, 6), 16) || 0,
-  ];
-}
 
 /**
  * Sample a multi-stop gradient at t ∈ [0, 1]. Stops are spaced evenly;

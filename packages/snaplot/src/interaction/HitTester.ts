@@ -1,6 +1,13 @@
 import type { Scale, SeriesConfig, TooltipPoint } from '../types';
 import type { DataStore } from '../data/DataStore';
 import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
+import {
+  createScatterStyleResolver,
+  seriesYDataIndex,
+  scatterTooltipFields,
+  scatterXDataIndex,
+  type ScatterPalettes,
+} from '../renderers/scatterEncoding';
 
 /**
  * Hit-testing for finding nearest data points to cursor position.
@@ -17,6 +24,7 @@ export type PointerKind = 'mouse' | 'touch' | 'pen';
 export class HitTester {
   /** Optional override, takes precedence over the pointer-type default. */
   private proximityOverride: number | null;
+  private scatterGridCache: ScatterGridCache | null = null;
 
   constructor(proximityThreshold?: number) {
     this.proximityOverride = proximityThreshold ?? null;
@@ -49,6 +57,8 @@ export class HitTester {
     mode: 'nearest' | 'index' | 'x',
     palette: string[],
     pointerType?: PointerKind,
+    scatterPalettes?: ScatterPalettes,
+    dataVersion = 0,
   ): TooltipPoint[] {
     const xScale = scales.get('x');
     if (!xScale || store.length === 0) return [];
@@ -59,7 +69,17 @@ export class HitTester {
       return this.pointsAtIndex(store, scales, seriesConfigs, pixelX, pixelY, palette, proximity);
     }
 
-    return this.nearestPoint(store, scales, seriesConfigs, pixelX, pixelY, palette, proximity);
+    return this.nearestPoint(
+      store,
+      scales,
+      seriesConfigs,
+      pixelX,
+      pixelY,
+      palette,
+      proximity,
+      scatterPalettes ?? { categorical: palette },
+      dataVersion,
+    );
   }
 
   private pointsAtIndex(
@@ -80,7 +100,7 @@ export class HitTester {
       const sc = seriesConfigs[si];
       if (sc.visible === false) continue;
 
-      const colIdx = sc.dataIndex;
+      const colIdx = seriesYDataIndex(sc);
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
       const xScale = scales.get(sc.xAxisKey ?? 'x');
@@ -125,6 +145,8 @@ export class HitTester {
     pixelY: number,
     palette: string[],
     proximity: number,
+    scatterPalettes: ScatterPalettes,
+    dataVersion: number,
   ): TooltipPoint[] {
     let bestDist = Infinity;
     let bestPoint: TooltipPoint | null = null;
@@ -133,7 +155,30 @@ export class HitTester {
       const sc = seriesConfigs[si];
       if (sc.visible === false) continue;
 
-      const colIdx = sc.dataIndex;
+      if (sc.type === 'scatter') {
+        const scatterPoint = this.nearestScatterPoint(
+          store,
+          scales,
+          sc,
+          si,
+          pixelX,
+          pixelY,
+          palette[si % palette.length],
+          proximity,
+          scatterPalettes,
+          dataVersion,
+        );
+        if (scatterPoint) {
+          const dist = (scatterPoint.pixelX - pixelX) ** 2 + (scatterPoint.pixelY - pixelY) ** 2;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestPoint = scatterPoint.point;
+          }
+        }
+        continue;
+      }
+
+      const colIdx = seriesYDataIndex(sc);
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
       const xScale = scales.get(sc.xAxisKey ?? 'x');
@@ -181,4 +226,160 @@ export class HitTester {
     }
     return [];
   }
+
+  private nearestScatterPoint(
+    store: DataStore,
+    scales: Map<string, Scale>,
+    sc: SeriesConfig,
+    seriesIndex: number,
+    pixelX: number,
+    pixelY: number,
+    fallbackColor: string,
+    proximity: number,
+    palettes: ScatterPalettes,
+    dataVersion: number,
+  ): { point: TooltipPoint; pixelX: number; pixelY: number } | null {
+    const xScale = scales.get(sc.xAxisKey ?? 'x');
+    const yScale = scales.get(sc.yAxisKey ?? 'y');
+    if (!xScale || !yScale) return null;
+
+    const yCol = seriesYDataIndex(sc);
+    const xCol = scatterXDataIndex(sc);
+    if (xCol < 0 || xCol > store.seriesCount || yCol < 1 || yCol > store.seriesCount) return null;
+
+    const grid = this.getScatterGrid(
+      store,
+      sc,
+      seriesIndex,
+      xScale,
+      yScale,
+      proximity,
+      dataVersion,
+    );
+    const cx = Math.floor(pixelX / proximity);
+    const cy = Math.floor(pixelY / proximity);
+    let bestIdx: number | null = null;
+    let bestDist = Infinity;
+
+    for (let gx = cx - 1; gx <= cx + 1; gx++) {
+      for (let gy = cy - 1; gy <= cy + 1; gy++) {
+        const indices = grid.cells.get(`${gx}:${gy}`);
+        if (!indices) continue;
+        for (const idx of indices) {
+          const px = grid.pixelX[idx];
+          const py = grid.pixelY[idx];
+          const dist = (px - pixelX) ** 2 + (py - pixelY) ** 2;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestIdx = idx;
+          }
+        }
+      }
+    }
+
+    if (bestIdx === null || Math.sqrt(bestDist) > proximity) return null;
+
+    const xVal = store.valueAt(xCol, bestIdx);
+    const yVal = store.valueAt(yCol, bestIdx);
+    const style = createScatterStyleResolver({
+      series: sc,
+      fallbackColor,
+      fallbackRadius: sc.pointRadius ?? (store.length > 10_000 ? 1.5 : 3),
+      palettes,
+      columnCount: store.seriesCount + 1,
+      ranges: [{ startIdx: 0, endIdx: store.length - 1 }],
+      valueAt: (columnIdx, index) => store.valueAt(columnIdx, index),
+    });
+
+    return {
+      pixelX: grid.pixelX[bestIdx],
+      pixelY: grid.pixelY[bestIdx],
+      point: {
+        seriesIndex,
+        dataIndex: bestIdx,
+        label: sc.label,
+        x: xVal,
+        y: yVal,
+        color: style.colorAt(bestIdx),
+        radius: style.radiusAt(bestIdx),
+        formattedX: xScale.tickFormat(xVal),
+        formattedY: yScale.tickFormat(yVal),
+        fields: scatterTooltipFields(
+          sc,
+          bestIdx,
+          store.seriesCount + 1,
+          (columnIdx, index) => store.valueAt(columnIdx, index),
+        ),
+      },
+    };
+  }
+
+  private getScatterGrid(
+    store: DataStore,
+    sc: SeriesConfig,
+    seriesIndex: number,
+    xScale: Scale,
+    yScale: Scale,
+    cellSize: number,
+    dataVersion: number,
+  ): ScatterGridCache {
+    const xCol = scatterXDataIndex(sc);
+    const yCol = seriesYDataIndex(sc);
+    const key = [
+      dataVersion,
+      seriesIndex,
+      xCol,
+      yCol,
+      store.length,
+      xScale.min,
+      xScale.max,
+      xScale.dataToPixel(xScale.min),
+      xScale.dataToPixel(xScale.max),
+      yScale.min,
+      yScale.max,
+      yScale.dataToPixel(yScale.min),
+      yScale.dataToPixel(yScale.max),
+      cellSize,
+    ].join('|');
+
+    if (this.scatterGridCache?.store === store && this.scatterGridCache.key === key) {
+      return this.scatterGridCache;
+    }
+
+    const cells = new Map<string, number[]>();
+    const pixelX = new Float64Array(store.length);
+    const pixelY = new Float64Array(store.length);
+
+    for (let i = 0; i < store.length; i++) {
+      const x = store.valueAt(xCol, i);
+      const y = store.valueAt(yCol, i);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        pixelX[i] = Number.NaN;
+        pixelY[i] = Number.NaN;
+        continue;
+      }
+      const px = xScale.dataToPixel(x);
+      const py = yScale.dataToPixel(y);
+      pixelX[i] = px;
+      pixelY[i] = py;
+      const cellKey = `${Math.floor(px / cellSize)}:${Math.floor(py / cellSize)}`;
+      let bucket = cells.get(cellKey);
+      if (!bucket) {
+        bucket = [];
+        cells.set(cellKey, bucket);
+      }
+      bucket.push(i);
+    }
+
+    this.scatterGridCache = { store, key, cells, pixelX, pixelY };
+    return this.scatterGridCache;
+  }
+}
+
+interface ScatterGridCache {
+  store: DataStore;
+  key: string;
+  cells: Map<string, number[]>;
+  pixelX: Float64Array;
+  pixelY: Float64Array;
 }

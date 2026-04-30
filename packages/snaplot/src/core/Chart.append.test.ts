@@ -449,6 +449,223 @@ describe('ChartCore histogram cursor', () => {
   });
 });
 
+describe('ChartCore scatter selection', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', new MockDocument());
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns selected scatter points using xDataIndex and y ranges', () => {
+    const selections: Array<{ points?: Array<{ dataIndex: number; x: number; y: number }> }> = [];
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
+        zoom: { enabled: false, x: true, y: true },
+        selection: { onSelect: (selection) => selections.push(selection) },
+        series: [{
+          label: 'runs',
+          type: 'scatter',
+          xDataIndex: 1,
+          yDataIndex: 2,
+          colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
+        }],
+      },
+      [
+        f([0, 1, 2, 3]),
+        f([0.1, 0.4, 0.7, 0.9]),
+        f([0.2, 0.5, 0.8, 0.3]),
+        f([0, 1, 1, 0]),
+      ],
+    );
+    const xScale = chart.getAxis('x')!;
+    const yScale = chart.getAxis('y')!;
+
+    chartEventBus(chart).emit('action:box-end', {
+      x1: xScale.dataToPixel(0.3),
+      y1: yScale.dataToPixel(0.9),
+      x2: xScale.dataToPixel(0.8),
+      y2: yScale.dataToPixel(0.4),
+    });
+
+    expect(selections).toHaveLength(1);
+    expect(selections[0].points?.map((point) => [point.dataIndex, point.x, point.y])).toEqual([
+      [1, 0.4, 0.5],
+      [2, 0.7, 0.8],
+    ]);
+
+    chart.destroy();
+  });
+
+  it('hit-tests scatter with xDataIndex at the pointer instead of snapped column 0', () => {
+    const moves: Array<[number | null, number | null]> = [];
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', padding: 0 }, y: { type: 'linear', padding: 0 } },
+        cursor: { show: true, snap: true },
+        tooltip: { show: true, mode: 'nearest' },
+        series: [{
+          label: 'cohorts',
+          type: 'scatter',
+          xDataIndex: 1,
+          yDataIndex: 2,
+          colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
+        }],
+      },
+      [
+        f([0, 1, 2, 3]),
+        f([-20, 2, 25, -15]),
+        f([10, 17, -5, 12]),
+        f([0, 1, 0, 0]),
+      ],
+    );
+    chart.on('cursor:move', (dataX, dataIdx) => {
+      moves.push([dataX, dataIdx]);
+    });
+    const xScale = chart.getAxis('x')!;
+    const yScale = chart.getAxis('y')!;
+
+    chartEventBus(chart).emit('action:cursor', {
+      x: xScale.dataToPixel(-16),
+      y: yScale.dataToPixel(12),
+      pointerType: 'mouse',
+    });
+
+    expect(moves.at(-1)).toEqual([-15, 3]);
+
+    chart.destroy();
+  });
+});
+
+describe('ChartCore log interactions', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', new MockDocument());
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps linear auto-range exact unless nice is explicitly enabled', () => {
+    const exactChart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+      },
+      [
+        f([3, 50, 97]),
+        f([0.2, 0.3, 0.4]),
+      ],
+    );
+
+    expect(exactChart.getAxis('x')?.min).toBe(3);
+    expect(exactChart.getAxis('x')?.max).toBe(97);
+    exactChart.destroy();
+
+    const niceChart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', nice: true }, y: { type: 'linear' } },
+        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+      },
+      [
+        f([3, 50, 97]),
+        f([0.2, 0.3, 0.4]),
+      ],
+    );
+
+    expect(niceChart.getAxis('x')?.min).toBe(0);
+    expect(niceChart.getAxis('x')?.max).toBe(100);
+    niceChart.destroy();
+  });
+
+  it('pads horizontal log axes symmetrically in log space by default', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'log', padding: 0.1 }, y: { type: 'linear' } },
+        series: [{ label: 'loss', type: 'line', dataIndex: 1 }],
+      },
+      [
+        f([1e-4, 1e-3, 1e-2]),
+        f([0.2, 0.3, 0.4]),
+      ],
+    );
+    const xScale = chart.getAxis('x')!;
+    const leftPad = Math.log10(1e-4) - Math.log10(xScale.min);
+    const rightPad = Math.log10(xScale.max) - Math.log10(1e-2);
+
+    expect(leftPad).toBeCloseTo(0.2, 10);
+    expect(rightPad).toBeCloseTo(leftPad, 10);
+
+    chart.destroy();
+  });
+
+  it('pads vertical log axes symmetrically and ignores non-positive values', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'log', padding: 0.1 } },
+        series: [{ label: 'loss', type: 'line', dataIndex: 1 }],
+      },
+      [
+        f([0, 1, 2, 3]),
+        f([0, 1e-2, 1, 1e2]),
+      ],
+    );
+    const yScale = chart.getAxis('y')!;
+    const bottomPad = Math.log10(1e-2) - Math.log10(yScale.min);
+    const topPad = Math.log10(yScale.max) - Math.log10(1e2);
+
+    expect(bottomPad).toBeCloseTo(0.4, 10);
+    expect(topPad).toBeCloseTo(bottomPad, 10);
+
+    chart.destroy();
+  });
+
+  it('zooms log axes in log space around the pointer anchor', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'log', min: 1e-5, max: 1e-1 }, y: { type: 'linear' } },
+        zoom: { enabled: true, x: true, bounds: 'unbounded' },
+        series: [{ label: 'points', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
+      },
+      [
+        f([0, 1, 2]),
+        f([1e-5, 1e-3, 1e-1]),
+        f([0.2, 0.3, 0.4]),
+      ],
+    );
+    const xScale = chart.getAxis('x')!;
+
+    chartEventBus(chart).emit('action:zoom', {
+      factor: 0.5,
+      anchorX: xScale.dataToPixel(1e-3),
+      anchorY: 0,
+      axis: 'x',
+    });
+
+    expect(xScale.min).toBeCloseTo(1e-4, 10);
+    expect(xScale.max).toBeCloseTo(1e-2, 10);
+
+    chart.destroy();
+  });
+});
+
 describe('ChartCore highlight sync', () => {
   beforeEach(() => {
     vi.stubGlobal('document', new MockDocument());

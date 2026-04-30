@@ -85,6 +85,7 @@ export default function ApiReference() {
                 ['data:update', '(data: ColumnarData)', 'Data replaced or appended'],
                 ['resize', '(width: number, height: number)', 'Chart container resized'],
                 ['click', '(dataX: number, dataIdx: number)', 'Click on the plot area'],
+                ['select', '(selection: SelectionResult)', 'Box selection resolved; scatter selections include selected points'],
                 ['drawData', '(ctx: CanvasRenderingContext2D, layout: Layout)', 'After data layer draw (custom overlay)'],
                 ['drawOverlay', '(ctx: CanvasRenderingContext2D, layout: Layout)', 'After overlay layer draw'],
               ].map(([event, payload, desc]) => (
@@ -106,13 +107,93 @@ const unsub = chart.on('viewport:change', (key, range) => {
 unsub();`} />
       </Section>
 
+      <Section id="api-scatter-options" title="Scatter Series Options">
+        <Prose>
+          Scatter series support additional encodings for tabular data. All scatter column references are absolute <code>ColumnarData</code> indexes: <code>0</code> is the default X column, and <code>1</code> onward are value columns.
+        </Prose>
+        <CodeBlock code={`type ScatterRenderMode = 'points' | 'density' | 'auto';
+type ScatterPointShape = 'circle' | 'square' | 'diamond';
+
+interface SeriesConfig {
+  type: 'scatter';
+  xDataIndex?: number;    // X column, defaults to 0
+  yDataIndex: number;     // Y column
+  renderMode?: ScatterRenderMode;
+  pointShape?: ScatterPointShape;
+  colorBy?: number | ScatterColorEncoding;
+  sizeBy?: number | ScatterSizeEncoding;
+  tooltipFields?: Array<number | ScatterTooltipField>;
+}`} />
+        <div style={{
+          'overflow-x': 'auto',
+          'margin-bottom': '20px',
+          border: '1px solid var(--border)',
+          'border-radius': 'var(--radius-lg)',
+        }}>
+          <table style={{
+            width: '100%',
+            'border-collapse': 'collapse',
+            'font-size': '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            <thead>
+              <tr style={{ 'border-bottom': '1px solid var(--border)' }}>
+                <th style={{ padding: '10px 12px', 'text-align': 'left', 'font-weight': '600', color: 'var(--text)' }}>Option</th>
+                <th style={{ padding: '10px 12px', 'text-align': 'left', 'font-weight': '600', color: 'var(--text)' }}>Type</th>
+                <th style={{ padding: '10px 12px', 'text-align': 'left', 'font-weight': '600', color: 'var(--text)' }}>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ['xDataIndex', 'number', 'Absolute column index for X values. Defaults to 0.'],
+                ['yDataIndex', 'number', 'Absolute column index for Y values. Preferred for scatter series.'],
+                ['renderMode', "'points' | 'density' | 'auto'", 'Controls whether scatter renders individual stamped points, aggregate density bins, or switches automatically for very large clouds.'],
+                ['pointShape', "'circle' | 'square' | 'diamond'", 'Shape used by point rendering. Density rendering ignores this.'],
+                ['colorBy', 'number | ScatterColorEncoding', 'Maps another column to point colour. Object form adds type, palette, domain, nullColor, label, and format.'],
+                ['sizeBy', 'number | ScatterSizeEncoding', 'Maps another column to point radius. Object form adds domain, range, sqrt/linear scale, label, and format.'],
+                ['tooltipFields', 'Array<number | ScatterTooltipField>', 'Additional columns rendered by the built-in nearest-point tooltip.'],
+                ['heatmap', 'boolean', "Legacy alias for renderMode: 'density'. Prefer renderMode for new code."],
+                ['heatmapBinSize', 'number', 'Density bin size in CSS pixels. Larger values are coarser and cheaper to render.'],
+                ['heatmapGradient', 'string[]', 'Per-series density colour ramp. Overrides theme heatmap/sequential palettes for that series.'],
+              ].map(([option, type, desc]) => (
+                <tr style={{ 'border-bottom': '1px solid var(--border)' }}>
+                  <td style={{ padding: '8px 12px', 'font-family': 'var(--font-mono)', 'font-size': '12px', 'white-space': 'nowrap' }}>{option}</td>
+                  <td style={{ padding: '8px 12px', 'font-family': 'var(--font-mono)', 'font-size': '11.5px', 'white-space': 'nowrap' }}>{type}</td>
+                  <td style={{ padding: '8px 12px' }}>{desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <CodeBlock code={`colorBy: {
+  dataIndex: 3,
+  type: 'category',       // 'auto' | 'category' | 'continuous' | 'diverging'
+  palette: ['#4f8fea', '#58b884', '#e6a23c'],
+  label: 'Model family',
+  format: (value) => MODEL_FAMILIES[Math.round(value)] ?? 'Other',
+}
+
+sizeBy: {
+  dataIndex: 4,
+  domain: [0, 600],
+  range: [2, 8],          // radius in CSS pixels
+  scale: 'sqrt',
+  label: 'Runtime',
+  format: (value) => \`\${(value / 60).toFixed(1)} min\`,
+}
+
+tooltipFields: [
+  { dataIndex: 5, label: 'Accuracy', format: (v) => \`\${(v * 100).toFixed(1)}%\` },
+]`} />
+      </Section>
+
       <Section id="api-types" title="Types">
         <Prose>Key type exports from <code>snaplot</code>:</Prose>
         <CodeBlock code={`import type {
   // Core
   ChartInstance,       // Public chart API (methods table above)
   ChartConfig,         // Top-level configuration object (generic in TMeta)
-  ChartType,           // 'line' | 'area' | 'scatter' | 'bar' | 'histogram'
+  ChartType,           // 'line' | 'area' | 'band' | 'scatter' | 'bar' | 'histogram'
   ColumnarData,        // [xValues: Float64Array, ...yValues: Float64Array[]]
   DeepPartial,         // Recursive partial utility type
 
@@ -123,6 +204,10 @@ unsub();`} />
 
   // Series
   SeriesConfig,        // Per-series configuration (generic in TMeta)
+  ScatterRenderMode,   // 'points' | 'density' | 'auto'
+  ScatterColorEncoding,// colorBy object form
+  ScatterSizeEncoding, // sizeBy object form
+  ScatterTooltipField, // tooltipFields object form
   InterpolationMode,   // 'linear' | 'monotone' | 'step-before' | 'step-after' | 'step-middle'
 
   // Axes
@@ -139,6 +224,8 @@ unsub();`} />
   TouchConfig,         // Touch gesture configuration
   TooltipConfig,       // Tooltip configuration
   TooltipPoint,        // Point data passed to tooltip renderer
+  SelectionResult,     // Box-selection range plus selected scatter points
+  SelectedPoint,       // One selected scatter point
   DebugConfig,         // { stats?: boolean }
   ChartStats,          // Counters returned by chart.getStats()
 

@@ -38,7 +38,7 @@ function multiAxisData(): ColumnarData {
 }
 
 const areaBandConfig: ChartConfig = {
-  axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
+  axes: { x: { type: 'linear' }, y: { type: 'linear' } },
   series: [
     { label: 'area gaps', dataIndex: 1, type: 'area', lineWidth: 2 },
     {
@@ -55,14 +55,14 @@ const areaBandConfig: ChartConfig = {
 };
 
 const heatmapConfig: ChartConfig = {
-  axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
-  series: [{ label: 'density', dataIndex: 1, type: 'scatter', heatmap: true, heatmapBinSize: 2 }],
+  axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+  series: [{ label: 'density', yDataIndex: 1, type: 'scatter', heatmap: true, heatmapBinSize: 2 }],
   tooltip: { show: false },
 };
 
 const multiAxisConfig: ChartConfig = {
   axes: {
-    x: { type: 'linear', nice: false },
+    x: { type: 'linear' },
     y: { type: 'linear', position: 'left' },
     y2: { type: 'linear', position: 'right' },
   },

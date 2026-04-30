@@ -4,7 +4,7 @@ import CodeBlock from '../../../components/CodeBlock';
 import { Section, Prose, Demo } from '../../../components/ui';
 import {
   timeSeries,
-  scatterData,
+  encodedScatterData,
   barData,
   histData,
   bandData,
@@ -15,7 +15,7 @@ export default function ChartTypes() {
   const [d_line] = createSignal(timeSeries(500, 3));
   const [d_area] = createSignal(timeSeries(300, 2));
   const [d_band] = createSignal(bandData());
-  const [d_scatter] = createSignal(scatterData(2000));
+  const [d_scatter] = createSignal(encodedScatterData(1200));
   const [d_heat] = createSignal(heatmapData(300_000));
   const [d_bar] = createSignal(barData());
   const [d_hist] = createSignal(histData());
@@ -89,25 +89,141 @@ export default function ChartTypes() {
       <Section id="scatter" title="Scatter">
         <Prose>
           Scatter plots use stamp-based rendering, a single point shape is pre-rendered to an offscreen canvas, then stamped at each data position. This makes scatter rendering scale to tens of thousands of points with minimal overhead.
-          Tooltip mode <code>'nearest'</code> uses euclidean (pixel-space) distance to find the closest point.
+          Tooltip mode <code>'nearest'</code> uses euclidean (pixel-space) distance to find the closest point, with a cached screen-space grid for dense clouds.
+          For tabular datasets, set <code>xDataIndex</code> to use a column other than column 0 for X, then use <code>colorBy</code>, <code>sizeBy</code>, and <code>tooltipFields</code> for additional encodings.
         </Prose>
-        <Demo title="Clustered scatter (2K points)" data={d_scatter()}
+        <Demo title="Encoded cohort scatter (1.2K points)" desc="X/Y from tabular columns, colour by cohort, size by volume, score in the tooltip"
+          data={d_scatter()}
           code={`{
-  series: [{ label: 'Latency vs Load', dataIndex: 1, type: 'scatter', pointRadius: 3 }],
+  axes: { x: { padding: 0.08 }, y: { padding: 0.08 } },
+  interaction: 'analytical',
+  series: [{
+    label: 'Users',
+    type: 'scatter',
+    xDataIndex: 1, // embedding X
+    yDataIndex: 2, // embedding Y
+    renderMode: 'points',
+    pointShape: 'circle',
+    opacity: 0.68,
+    colorBy: {
+      dataIndex: 3,
+      type: 'category',
+      label: 'Cohort',
+      format: (value) => ['Core', 'Growth', 'Enterprise', 'Trial'][Math.round(value)] ?? 'Other',
+    },
+    sizeBy: {
+      dataIndex: 4,
+      range: [2, 6.5],
+      scale: 'sqrt',
+      label: 'Volume',
+      format: (value) => \`\${Math.round(value)} events\`,
+    },
+    tooltipFields: [
+      { dataIndex: 5, label: 'Score', format: (value) => value.toFixed(2) },
+    ],
+  }],
   zoom: { enabled: true, x: true, y: true },
   tooltip: { show: true, mode: 'nearest' },
 }`} />
+        <Prose>
+          Scatter series can read from arbitrary data columns. Column indexes are absolute indexes into <code>ColumnarData</code>: column <code>0</code> is the default X column, while <code>xDataIndex</code>, <code>yDataIndex</code>, <code>colorBy.dataIndex</code>, <code>sizeBy.dataIndex</code>, and <code>tooltipFields[].dataIndex</code> all point at columns in the same array.
+        </Prose>
+        <CodeBlock code={`const data = [
+  rowId,          // column 0: stable row identity / default X
+  embeddingX,     // column 1: scatter X
+  embeddingY,     // column 2: scatter Y
+  cohort,         // column 3: category id
+  volume,         // column 4: numeric size encoding
+  score,          // column 5: extra tooltip field
+];
+
+const config = {
+  axes: { x: { padding: 0.08 }, y: { padding: 0.08 } },
+  interaction: 'analytical',
+  series: [{
+    label: 'Users',
+    type: 'scatter',
+    xDataIndex: 1,
+    yDataIndex: 2,
+    renderMode: 'points',
+    pointShape: 'circle', // 'circle' | 'square' | 'diamond'
+    opacity: 0.68,
+
+    colorBy: {
+      dataIndex: 3,
+      type: 'category',   // 'auto' | 'category' | 'continuous' | 'diverging'
+      label: 'Cohort',
+      format: (value) => ['Core', 'Growth', 'Enterprise', 'Trial'][Math.round(value)] ?? 'Other',
+    },
+
+    sizeBy: {
+      dataIndex: 4,
+      range: [2, 6.5],    // radius range in CSS pixels
+      scale: 'sqrt',      // 'linear' | 'sqrt'
+      label: 'Volume',
+      format: (value) => \`\${Math.round(value)} events\`,
+    },
+
+    tooltipFields: [
+      { dataIndex: 5, label: 'Score', format: (value) => value.toFixed(2) },
+    ],
+  }],
+  tooltip: { show: true, mode: 'nearest' },
+  zoom: { enabled: true, x: true, y: true },
+};`} />
+        <div style={{
+          'overflow-x': 'auto',
+          'margin-bottom': '20px',
+          border: '1px solid var(--border)',
+          'border-radius': 'var(--radius-lg)',
+        }}>
+          <table style={{
+            width: '100%',
+            'border-collapse': 'collapse',
+            'font-size': '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            <thead>
+              <tr style={{ 'border-bottom': '1px solid var(--border)' }}>
+                <th style={{ padding: '10px 12px', 'text-align': 'left', 'font-weight': '600', color: 'var(--text)' }}>Option</th>
+                <th style={{ padding: '10px 12px', 'text-align': 'left', 'font-weight': '600', color: 'var(--text)' }}>Use</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ['xDataIndex', 'Use a non-zero column for scatter X values. This is useful for tabular experiment data where column 0 is just row identity.'],
+                ['yDataIndex', 'Use an explicit Y column for scatter values. Prefer this over dataIndex for scatter configs.'],
+                ['renderMode', "'points' forces stamped points, 'density' forces aggregate heatmap rendering, and 'auto' switches to density above the large-point threshold."],
+                ['pointShape', "Point shape for stamped scatter: 'circle', 'square', or 'diamond'."],
+                ['colorBy', 'Colour points from another column. Low-cardinality integer columns work well as categories; numeric columns can use continuous or diverging ramps.'],
+                ['sizeBy', 'Map a numeric column to point radius. Use sqrt scaling when the encoded value represents count, duration, or magnitude.'],
+                ['tooltipFields', 'Add extra columns to the default nearest-point tooltip without writing a custom tooltip renderer.'],
+                ['selection.onSelect', 'Box selections return ranges and selected scatter points when the drag spans both X and Y axes.'],
+              ].map(([option, use]) => (
+                <tr style={{ 'border-bottom': '1px solid var(--border)' }}>
+                  <td style={{ padding: '8px 12px', 'font-family': 'var(--font-mono)', 'font-size': '12px', 'white-space': 'nowrap' }}>{option}</td>
+                  <td style={{ padding: '8px 12px' }}>{use}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Prose>
+          Use <code>renderMode: 'density'</code> when the question is about distribution rather than individual runs. Density rendering aggregates points into bins, so cursor dots and nearest-point tooltips are usually less meaningful than they are for stamped point scatter.
+        </Prose>
       </Section>
 
       <Section id="heatmap" title="Density Heatmap">
         <Prose>
-          Set <code>heatmap: true</code> on a scatter series for density rendering. Heatmaps use <code>theme.heatmapGradient</code>, then <code>theme.sequentialPalette</code>, and finally the built-in Viridis-style fallback. A series-level <code>heatmapGradient</code> overrides the theme for that one chart. Adjust <code>heatmapBinSize</code> for coarser or finer bins.
-          Density heatmaps auto-trigger when a scatter series exceeds 200K points, but you can opt in at any count with <code>heatmap: true</code>.
+          Set <code>renderMode: 'density'</code> on a scatter series for density rendering. Heatmaps use <code>theme.heatmapGradient</code>, then <code>theme.sequentialPalette</code>, and finally the built-in Viridis-style fallback. A series-level <code>heatmapGradient</code> overrides the theme for that one chart. Adjust <code>heatmapBinSize</code> for coarser or finer bins.
+          Density heatmaps auto-trigger when a scatter series exceeds 200K points in <code>renderMode: 'auto'</code>. The legacy <code>heatmap: true</code> flag remains supported.
+          Since density rendering represents aggregate bins rather than individual points, this demo disables cursor and tooltip overlays.
         </Prose>
         <Demo title="300K points, 4 gaussian clusters" data={d_heat()}
           code={`{
-  series: [{ label: 'Density', dataIndex: 1, type: 'scatter', heatmap: true, heatmapBinSize: 1 }],
+  series: [{ label: 'Density', yDataIndex: 1, type: 'scatter', renderMode: 'density', heatmapBinSize: 1 }],
   zoom: { enabled: true, x: true, y: true },
+  cursor: { show: false },
   tooltip: { show: false },
 }`} />
       </Section>

@@ -40,7 +40,7 @@ const data: ColumnarData = [
 />
 ```
 
-Column 0 is always X. Columns 1+ are Y series referenced by `dataIndex`. This columnar layout is what makes binary-search viewport culling and low-allocation streaming possible.
+Column 0 is the default sorted X column. Columns 1+ are value columns referenced by `dataIndex`; scatter series can use explicit `xDataIndex` and `yDataIndex` columns. This columnar layout is what makes binary-search viewport culling and low-allocation streaming possible.
 
 Full API reference and runnable examples are in the [documentation](https://liamclarkza.github.io/snaplot/#/docs).
 
@@ -48,7 +48,9 @@ Full API reference and runnable examples are in the [documentation](https://liam
 
 ### Chart types
 
-Line (linear, monotone, stepped interpolation), area with gradient fill, scatter that switches to a density heatmap past 200K points, grouped bar, histogram via the included `histogram()` utility (Freedman-Diaconis, Sturges, Scott), and band (fill between upper and lower series).
+Line (linear, monotone, stepped interpolation), area with gradient fill, scatter with arbitrary X columns, colour/size encodings, box selection, and density rendering, grouped bar, histogram via the included `histogram()` utility (Freedman-Diaconis, Sturges, Scott), and band (fill between upper and lower series).
+
+Scatter series can use `xDataIndex`/`yDataIndex` for tabular coordinates, `colorBy` for categorical/continuous/diverging colour encodings, `sizeBy` for radius encodings, `tooltipFields` for extra nearest-point tooltip rows, and `renderMode: 'density'` for aggregate heatmaps.
 
 ### Interactions
 
@@ -82,7 +84,7 @@ Strict types throughout, generic column helpers, no `any` in the public API.
 
 - 200K+ point charts render well under one frame on a modern laptop.
 - Grid, data, and overlay are separate canvases. A cursor move repaints the overlay only. A data update skips the grid layer.
-- Viewport culling is a binary search on the X column, so off-screen points cost nothing.
+- Viewport culling is a binary search on the X column for sorted series; scatter nearest-hit testing uses a cached screen-space grid for dense clouds and arbitrary X columns.
 - snaplot never mutates input arrays. Downsampling helpers (`lttb`, `m4`) are exported as opt-in utilities.
 - Legend table updates use `textContent` swaps in the cursor hot path, not `innerHTML` rebuilds.
 

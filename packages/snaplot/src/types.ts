@@ -76,6 +76,52 @@ export interface Layout {
 
 export type ChartType = 'line' | 'area' | 'band' | 'scatter' | 'bar' | 'histogram';
 
+export type ScatterRenderMode = 'points' | 'density' | 'auto';
+export type ScatterPointShape = 'circle' | 'square' | 'diamond';
+export type ScatterColorEncodingType = 'auto' | 'category' | 'continuous' | 'diverging';
+
+export interface ScatterColorEncoding {
+  /** Absolute data column index. Column 0 is the default X column. */
+  dataIndex: number;
+  /**
+   * `auto` treats low-cardinality integer columns as categories and
+   * otherwise uses a continuous ramp. Default: `auto`.
+   */
+  type?: ScatterColorEncodingType;
+  /** Palette/ramp override for this encoding. */
+  palette?: string[];
+  /** Numeric domain for continuous/diverging encodings. */
+  domain?: [number, number];
+  /** Colour for NaN/missing values. Default: the series colour. */
+  nullColor?: string;
+  /** Tooltip label for this encoded field. */
+  label?: string;
+  /** Tooltip formatter for this encoded field. */
+  format?: (value: number) => string;
+}
+
+export interface ScatterSizeEncoding {
+  /** Absolute data column index. Column 0 is the default X column. */
+  dataIndex: number;
+  /** Numeric input domain. Defaults to the visible data extent. */
+  domain?: [number, number];
+  /** Radius range in CSS pixels. Default: [2, 7]. */
+  range?: [number, number];
+  /** `sqrt` is useful when the encoded value represents area/count. */
+  scale?: 'linear' | 'sqrt';
+  /** Tooltip label for this encoded field. */
+  label?: string;
+  /** Tooltip formatter for this encoded field. */
+  format?: (value: number) => string;
+}
+
+export interface ScatterTooltipField {
+  /** Absolute data column index. */
+  dataIndex: number;
+  label?: string;
+  format?: (value: number) => string;
+}
+
 export type InterpolationMode =
   | 'linear'
   | 'monotone'
@@ -88,8 +134,12 @@ export interface SeriesConfig<TMeta = unknown> {
   type?: ChartType;
   /** Display label */
   label: string;
-  /** Column index in ColumnarData (1-based; 0 is X) */
-  dataIndex: number;
+  /**
+   * Primary value column in `ColumnarData`.
+   * Required for line, area, band, bar, and histogram series. Scatter series
+   * should prefer `yDataIndex`, with `dataIndex` kept as a fallback alias.
+   */
+  dataIndex?: number;
 
   // Visual
   stroke?: string;
@@ -149,6 +199,24 @@ export interface SeriesConfig<TMeta = unknown> {
   barWidthRatio?: number;
 
   // Scatter
+  /**
+   * Absolute column index for scatter X values. Defaults to column 0.
+   * Useful for tabular datasets where several scatter views share the same
+   * row identity but use different X/Y metric columns.
+   */
+  xDataIndex?: number;
+  /** Absolute column index for scatter Y values. Preferred over `dataIndex`. */
+  yDataIndex?: number;
+  /** Preferred scatter render path. `auto` uses points until the density threshold. */
+  renderMode?: ScatterRenderMode;
+  /** Point shape for non-density scatter rendering. Default: 'circle'. */
+  pointShape?: ScatterPointShape;
+  /** Colour points by a categorical or numeric column. */
+  colorBy?: number | ScatterColorEncoding;
+  /** Size points by a numeric column. */
+  sizeBy?: number | ScatterSizeEncoding;
+  /** Extra columns to show in the default nearest-point tooltip. */
+  tooltipFields?: Array<number | ScatterTooltipField>;
   /** Force heatmap (density) rendering for scatter plots regardless of point count */
   heatmap?: boolean;
   /** Heatmap bin size in CSS pixels (default: 1 = one bin per physical pixel) */
@@ -204,8 +272,9 @@ export interface AxisConfig {
   /**
    * Whether to call `scale.nice(DEFAULT_TICK_COUNT)` after auto-ranging,
    * which rounds the bounds outward to produce clean tick boundaries.
-   * Default: `true`. Always skipped for `time` scales and bar/histogram
-   * X axes where exact-boundary rendering is required.
+   * Default: `false`, so padded data bounds stay exact and predictable.
+   * Set `nice: true` to opt into rounded presentation bounds. Always skipped
+   * for bar/histogram X axes where exact-boundary rendering is required.
    */
   nice?: boolean;
   position?: AxisPosition;
@@ -306,7 +375,24 @@ export interface SelectionConfig {
    * long-press + drag on touch). The `x` range is always set; `y` is
    * only present when the selection tracked both axes.
    */
-  onSelect?: (range: { x: ScaleRange; y?: ScaleRange }) => void;
+  onSelect?: (selection: SelectionResult) => void;
+}
+
+export interface SelectedPoint<TMeta = unknown> {
+  seriesIndex: number;
+  dataIndex: number;
+  label: string;
+  x: number;
+  y: number;
+  color: string;
+  meta?: TMeta;
+}
+
+export interface SelectionResult<TMeta = unknown> {
+  x: ScaleRange;
+  y?: ScaleRange;
+  /** Populated for visible scatter series when the selection spans both axes. */
+  points?: SelectedPoint<TMeta>[];
 }
 
 export interface TooltipConfig {
@@ -337,6 +423,14 @@ export interface TooltipPoint {
   color: string;
   formattedX: string;
   formattedY: string;
+  radius?: number;
+  fields?: TooltipFieldValue[];
+}
+
+export interface TooltipFieldValue {
+  label: string;
+  value: number;
+  formatted: string;
 }
 
 // ============================================================
@@ -708,6 +802,7 @@ export interface ChartEventMap {
   'data:update': (data: ColumnarData) => void;
   'resize': (width: number, height: number) => void;
   'click': (dataX: number, dataIdx: number) => void;
+  'select': (selection: SelectionResult) => void;
   'drawData': (ctx: CanvasRenderingContext2D, layout: Layout) => void;
   'drawOverlay': (ctx: CanvasRenderingContext2D, layout: Layout) => void;
 }

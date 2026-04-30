@@ -51,6 +51,8 @@ const RUN_NAMES = [
   'efficient-v2',
 ];
 
+const MODEL_FAMILIES = ['ResNet', 'ConvNext', 'ViT', 'Mixer'];
+
 const STREAM_HZ = 60;
 const STREAM_FRAME_MS = 1000 / STREAM_HZ;
 const STREAM_WINDOW_SECONDS = 20;
@@ -252,6 +254,36 @@ function heatmapData(points: number): ColumnarData {
   ];
 }
 
+function sweepScatterData(points: number): ColumnarData {
+  const rand = rng(514);
+  const row = new Float64Array(points);
+  const learningRate = new Float64Array(points);
+  const validationLoss = new Float64Array(points);
+  const family = new Float64Array(points);
+  const runtime = new Float64Array(points);
+  const accuracy = new Float64Array(points);
+
+  for (let i = 0; i < points; i++) {
+    const fam = Math.floor(rand() * MODEL_FAMILIES.length);
+    const logLr = -5 + rand() * 4.1;
+    const lr = 10 ** logLr;
+    const optimum = -3.35 + fam * 0.23;
+    const distance = logLr - optimum;
+    const baseLoss = 0.18 + fam * 0.025 + distance * distance * (0.08 + fam * 0.012);
+    const params = 18 + fam * 16 + rand() * 18;
+    const acc = clamp(0.91 - baseLoss * 0.75 + normal(rand) * 0.018, 0.55, 0.94);
+
+    row[i] = i;
+    learningRate[i] = lr;
+    validationLoss[i] = Math.max(0.06, baseLoss + normal(rand) * 0.025);
+    family[i] = fam;
+    runtime[i] = params;
+    accuracy[i] = acc;
+  }
+
+  return [row, learningRate, validationLoss, family, runtime, accuracy];
+}
+
 function endpointData(): ColumnarData {
   const x = Float64Array.from([0, 1, 2, 3, 4, 5]);
   const ok = Float64Array.from([1180, 870, 690, 520, 430, 210]);
@@ -314,6 +346,7 @@ export default function HeroDashboard() {
   const initialChoice = themeChoiceForMode(siteTheme());
   const [themeKey, setThemeKey] = createSignal(initialChoice.key);
   const [streamStats, setStreamStats] = createSignal<ChartStats | null>(null);
+  const [selectedSweepPoints, setSelectedSweepPoints] = createSignal(0);
 
   const activeChoice = createMemo(() =>
     THEME_CHOICES.find((choice) => choice.key === themeKey()) ?? THEME_CHOICES[0],
@@ -329,6 +362,7 @@ export default function HeroDashboard() {
 
   const streamData = streamSeed(STREAM_WINDOW_POINTS);
   const runsData = experimentData(RUN_NAMES.length, 220);
+  const sweepData = sweepScatterData(2600);
   const heatData = heatmapData(110_000);
   const endpoints = endpointData();
   const responseTimes = responseHistogramData();
@@ -366,7 +400,7 @@ export default function HeroDashboard() {
     return group.apply({
       theme: activeTheme(),
       axes: {
-        x: { type: 'linear', nice: false, padding: 0 },
+        x: { type: 'linear', padding: 0 },
         y: { type: 'linear', padding: 0.04 },
       },
       series: RUN_NAMES.map((label, i) => ({
@@ -419,10 +453,10 @@ export default function HeroDashboard() {
 
   const heatConfig = createMemo<ChartConfig>(() => ({
     theme: activeTheme(),
-    axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
+    axes: { x: { type: 'linear' }, y: { type: 'linear' } },
     series: [{
       label: 'Density',
-      dataIndex: 1,
+      yDataIndex: 1,
       type: 'scatter',
       heatmap: true,
       heatmapBinSize: 1,
@@ -431,6 +465,51 @@ export default function HeroDashboard() {
     zoom: { enabled: true, x: true, y: true, bounds: 'data' },
     tooltip: { show: true, mode: 'nearest' },
     padding: { top: 18, right: 20, bottom: 34, left: 44 },
+  }));
+
+  const sweepConfig = createMemo<ChartConfig>(() => ({
+    theme: activeTheme(),
+    interaction: 'analytical',
+    axes: {
+      x: {
+        type: 'log',
+        padding: 0.05,
+        tickFormat: (value) => value >= 0.001 ? value.toFixed(3) : value.toExponential(0),
+      },
+      y: { type: 'linear', padding: 0.08 },
+    },
+    series: [{
+      label: 'Sweep runs',
+      type: 'scatter',
+      xDataIndex: 1,
+      yDataIndex: 2,
+      colorBy: {
+        dataIndex: 3,
+        type: 'category',
+        label: 'Family',
+        format: (value) => MODEL_FAMILIES[Math.round(value)] ?? 'Other',
+      },
+      sizeBy: {
+        dataIndex: 4,
+        range: [2.2, 7.5],
+        scale: 'sqrt',
+        label: 'Runtime',
+        format: (value) => `${value.toFixed(1)} min`,
+      },
+      tooltipFields: [
+        { dataIndex: 5, label: 'Accuracy', format: (value) => `${(value * 100).toFixed(2)}%` },
+      ],
+      pointShape: 'circle',
+      opacity: 0.72,
+      renderMode: 'points',
+    }],
+    cursor: { show: true, indicators: true },
+    zoom: { enabled: false, x: true, y: true },
+    selection: {
+      onSelect: (selection) => setSelectedSweepPoints(selection.points?.length ?? 0),
+    },
+    tooltip: { show: true, mode: 'nearest' },
+    padding: { top: 18, right: 20, bottom: 38, left: 48 },
   }));
 
   const endpointConfig = createMemo<ChartConfig>(() => ({
@@ -462,7 +541,7 @@ export default function HeroDashboard() {
 
   const bandConfig = createMemo<ChartConfig>(() => ({
     theme: activeTheme(),
-    axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
+    axes: { x: { type: 'linear' }, y: { type: 'linear' } },
     series: [{
       label: 'Latency band',
       dataIndex: 1,
@@ -660,6 +739,17 @@ export default function HeroDashboard() {
               </div>
             </Panel>
           </div>
+
+          <Panel
+            title="Experiment Sweep Scatter"
+            meta={selectedSweepPoints() > 0
+              ? `${selectedSweepPoints()} selected - colour by model family, size by runtime`
+              : '2.6K runs - colour by model family, size by runtime'}
+          >
+            <div style={{ height: '320px' }}>
+              <Chart config={sweepConfig()} data={sweepData} />
+            </div>
+          </Panel>
 
           <Panel title="Experiment Comparison" meta="cursor, zoom, highlight, legend table">
             <div

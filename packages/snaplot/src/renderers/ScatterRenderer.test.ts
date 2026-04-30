@@ -91,7 +91,7 @@ describe('renderScatter cache keys', () => {
     const layout = createLayout();
     const series: SeriesConfig = {
       label: 'heat',
-      dataIndex: 1,
+      yDataIndex: 1,
       type: 'scatter',
       heatmap: true,
     };
@@ -114,7 +114,7 @@ describe('renderScatter cache keys', () => {
     const layout = createLayout();
     const baseSeries: SeriesConfig = {
       label: 'points',
-      dataIndex: 1,
+      yDataIndex: 1,
       type: 'scatter',
       pointRadius: 3,
     };

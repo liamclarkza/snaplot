@@ -12,7 +12,7 @@ export default function Scales() {
     <>
       <Section id="linear-scale" title="Linear Scale">
         <Prose>
-          The default scale type. Uses Heckbert's nice numbers algorithm (with D3's integer-arithmetic trick) to produce clean tick boundaries, 0, 20, 40, 60 instead of 17.3, 34.6, 51.9.
+          The default scale type. Auto-range preserves the padded data extent by default, while tick generation still chooses readable intervals for labels.
           Y axis auto-ranges to fit the visible data in the current X viewport.
         </Prose>
         <Prose>
@@ -21,14 +21,15 @@ export default function Scales() {
         <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
           <li><code>min</code> / <code>max</code>, pin the bounds. <code>resetZoom()</code> now restores to these values (previously a no-op).</li>
           <li><code>padding</code>, fraction of the data range to pad each side. Default: <code>0</code> for horizontal axes, <code>0.05</code> for vertical.</li>
-          <li><code>nice</code>, whether to round bounds outward to clean tick boundaries. Default: <code>true</code>. Set to <code>false</code> for exact-extent rendering (no trailing gap on the right).</li>
+          <li><code>nice</code>, whether to round bounds outward to clean tick boundaries. Default: <code>false</code>. Set to <code>true</code> when presentation-friendly bounds matter more than exact framing.</li>
         </ul>
         <CodeBlock code={`axes: {
-  x: { nice: false, padding: 0 },      // exact data extent
-  y: { nice: true,  padding: 0.1 },    // 10% pad + nice tick boundaries
+  x: { padding: 0 },                   // exact data extent
+  y: { padding: 0.1 },                 // 10% pad, exact padded bounds
+  // y: { padding: 0.1, nice: true },   // opt into rounded bounds
 }`} />
         <div style={{ height: '12px' }} />
-        <Demo title="Linear scale with nice ticks" data={d_linear()} height="240px"
+        <Demo title="Linear scale with readable ticks" data={d_linear()} height="240px"
           code={`{
   series: [{ label: 'Value', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   tooltip: { show: true },

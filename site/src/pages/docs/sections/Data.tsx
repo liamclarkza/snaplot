@@ -140,7 +140,7 @@ function StreamingDiagnosticsDemo() {
             config={{
               debug: { stats: true },
               streaming: { maxLen: 500 },
-              axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
+              axes: { x: { type: 'linear' }, y: { type: 'linear' } },
               series: [{ label: 'stream', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
               tooltip: { show: true, mode: 'index' },
             }}

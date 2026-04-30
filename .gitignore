@@ -17,6 +17,7 @@ Thumbs.db
 # Project-internal
 specification.md
 .claude/
+.codex/
 
 # Build artifacts
 .vinxi/

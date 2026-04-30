@@ -89,4 +89,54 @@ describe('HitTester', () => {
     expect(points[0].label).toBe('secondary');
     expect(points[0].dataIndex).toBe(2);
   });
+
+  it('uses scatter xDataIndex, encoded colour, radius, and tooltip fields', () => {
+    const store = new ColumnarStore([
+      f([0, 1, 2]),
+      f([10, 1, 5]),
+      f([10, 20, 30]),
+      f([0, 1, 0]),
+      f([4, 9, 16]),
+    ]);
+    const scales = new Map<string, Scale>([
+      ['x', scale('x', 0, 10)],
+      ['y', scale('y', 0, 40)],
+    ]);
+    const series: SeriesConfig[] = [{
+      label: 'runs',
+      type: 'scatter',
+      xDataIndex: 1,
+      yDataIndex: 2,
+      colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'], label: 'family' },
+      sizeBy: { dataIndex: 4, domain: [4, 16], range: [2, 8], label: 'runtime' },
+      tooltipFields: [{ dataIndex: 1, label: 'lr' }],
+    }];
+
+    const points = new HitTester(12).findPoints(
+      store,
+      scales,
+      series,
+      10,
+      50,
+      'nearest',
+      ['#abc'],
+      'mouse',
+      { categorical: ['#111111', '#eeeeee'] },
+      1,
+    );
+
+    expect(points).toHaveLength(1);
+    expect(points[0]).toMatchObject({
+      dataIndex: 1,
+      x: 1,
+      y: 20,
+      color: '#eeeeee',
+      radius: 4.5,
+    });
+    expect(points[0].fields?.map((field) => [field.label, field.value])).toEqual([
+      ['family', 1],
+      ['runtime', 9],
+      ['lr', 1],
+    ]);
+  });
 });

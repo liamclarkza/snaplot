@@ -128,8 +128,7 @@ const config: ChartConfig<RunMeta> = {
           desc="Renders Step + values in a table below the chart on hover; series-only fallback keeps the layout stable when the cursor leaves."
           data={d_legend()}
           code={`{
-  // nice: false keeps the X axis tight to the data extent.
-  axes: { x: { nice: false }, y: { padding: 0.05 } },
+  axes: { x: { padding: 0 }, y: { padding: 0.05 } },
   series: [
     { label: 'live-training', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'failed-experiment', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
