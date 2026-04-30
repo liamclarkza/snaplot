@@ -35,6 +35,42 @@ export function scatterData(n: number): ColumnarData {
   return [Float64Array.from(idx.map(i => x[i])), Float64Array.from(idx.map(i => y[i]))];
 }
 
+export function encodedScatterData(n: number): ColumnarData {
+  const rowId = new Float64Array(n);
+  const embeddingX = new Float64Array(n);
+  const embeddingY = new Float64Array(n);
+  const cohort = new Float64Array(n);
+  const volume = new Float64Array(n);
+  const score = new Float64Array(n);
+
+  const centers = [
+    [-18, 12, 7, 4],
+    [8, 20, 6, 5],
+    [24, -4, 8, 6],
+    [-7, -18, 5, 7],
+  ];
+
+  for (let i = 0; i < n; i++) {
+    const c = Math.floor(Math.random() * centers.length);
+    const [cx, cy, sx, sy] = centers[c];
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.sqrt(Math.random());
+    const localX = Math.cos(angle) * radius * sx + (Math.random() - 0.5) * sx * 0.55;
+    const localY = Math.sin(angle) * radius * sy + (Math.random() - 0.5) * sy * 0.55;
+    const eventVolume = 80 + Math.random() * 900 + c * 120;
+    const distance = Math.hypot(localX / sx, localY / sy);
+
+    rowId[i] = i;
+    embeddingX[i] = cx + localX;
+    embeddingY[i] = cy + localY;
+    cohort[i] = c;
+    volume[i] = eventVolume;
+    score[i] = Math.max(0, Math.min(1, 0.78 - distance * 0.14 + c * 0.025 + (Math.random() - 0.5) * 0.08));
+  }
+
+  return [rowId, embeddingX, embeddingY, cohort, volume, score];
+}
+
 export function barData(): ColumnarData {
   const n = 8, x = new Float64Array(n), y1 = new Float64Array(n), y2 = new Float64Array(n);
   for (let i = 0; i < n; i++) { x[i] = i; y1[i] = 20 + Math.random() * 60; y2[i] = 15 + Math.random() * 45; }

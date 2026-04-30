@@ -1,237 +1,523 @@
-import { createSignal, createMemo, createEffect, onCleanup, For } from 'solid-js';
+import {
+  For,
+  batch,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  untrack,
+  type JSX,
+} from 'solid-js';
 import {
   Chart,
-  createLegendPlugin,
+  LegendTable,
+  column,
+  createChartGroup,
   histogram,
-  lightTheme,
-  darkTheme,
-  oceanTheme,
-  forestTheme,
-  violetTheme,
-  fogTheme,
+  metricColumn,
+  nameColumn,
+  studioTheme,
+  tokyoTheme,
+  valueColumn,
 } from 'snaplot';
-import type { ColumnarData, ChartConfig, ChartInstance, ThemeConfig } from 'snaplot';
+import type {
+  ChartConfig,
+  ChartInstance,
+  ChartStats,
+  ColumnarData,
+  ThemeConfig,
+} from 'snaplot';
 import { useTheme } from '../ThemeContext';
+import type { SiteTheme } from '../ThemeContext';
 
-/**
- * Showcase dashboard on the /demos route. Six hand-tuned themes
- * drive every surface on the page, not just the charts, the chip
- * row rewrites the local CSS-var namespace so panels, chips and
- * text pick up the selection too. Panels lean on layered elevation
- * (inset highlight + soft ambient shadow) instead of hard borders.
- */
-
-type ThemeKey = 'dark' | 'light' | 'fog' | 'ocean' | 'forest' | 'violet';
-
-type ThemeEntry = {
-  key: ThemeKey;
+interface ThemeChoice {
+  key: string;
   label: string;
   theme: ThemeConfig;
-  /** true = dark background; drives elevation + contrast picks */
-  dark: boolean;
-  /**
-   * Density ramp for the heatmap panel. 3–4 stops that walk from the
-   * page bg through the theme's primary into a hotter tertiary, gives
-   * every theme a distinct "hot spot" colour instead of always Viridis.
-   */
-  heatmapGradient: string[];
-};
+  pageMode: SiteTheme;
+}
 
-const THEMES: ThemeEntry[] = [
-  // Paper, warm cream through orange into red (Okabe-Ito warm arc)
-  { key: 'light',  label: 'Paper',  theme: lightTheme,  dark: false,
-    heatmapGradient: ['#fafbfc', '#e69f00', '#d55e00'] },
-  // Fog, cool blue family, picks up the productivity feel
-  { key: 'fog',    label: 'Fog',    theme: fogTheme,    dark: false,
-    heatmapGradient: ['#f5f7fb', '#60a5fa', '#2563eb', '#1e3a8a'] },
-  // Slate, classic cool-to-warm "viridis-lite" tuned to the slate bg
-  { key: 'dark',   label: 'Slate',  theme: darkTheme,   dark: true,
-    heatmapGradient: ['#14161f', '#1e3a8a', '#0891b2', '#22d3ee', '#fde68a'] },
-  // Ocean, deep water to surface sparkle
-  { key: 'ocean',  label: 'Ocean',  theme: oceanTheme,  dark: true,
-    heatmapGradient: ['#0b1a2b', '#1d4ed8', '#22d3ee', '#fef3c7'] },
-  // Forest, pine to leaf to sunlit canopy
-  { key: 'forest', label: 'Forest', theme: forestTheme, dark: true,
-    heatmapGradient: ['#0c1613', '#064e3b', '#10b981', '#fde68a'] },
-  // Violet, aubergine through lavender to hot magenta
-  { key: 'violet', label: 'Violet', theme: violetTheme, dark: true,
-    heatmapGradient: ['#100d1f', '#4c1d95', '#a78bfa', '#f0abfc'] },
+interface RunMeta {
+  runId: string;
+  metricKey: string;
+  status: 'running' | 'finished' | 'failed';
+}
+
+const RUN_NAMES = [
+  'baseline-resnet50',
+  'large-batch-sweep',
+  'augmented-inputs',
+  'failed-sweep-17',
+  'efficient-v2',
 ];
 
-function genStream(points: number): ColumnarData {
+const MODEL_FAMILIES = ['ResNet', 'ConvNext', 'ViT', 'Mixer'];
+
+const STREAM_HZ = 60;
+const STREAM_FRAME_MS = 1000 / STREAM_HZ;
+const STREAM_WINDOW_SECONDS = 20;
+const STREAM_WINDOW_POINTS = STREAM_HZ * STREAM_WINDOW_SECONDS;
+const STREAM_STATS_MS = 250;
+const STREAM_PAUSE_RESET_MS = 250;
+const DEMO_THEME_STORAGE_KEY: Record<SiteTheme, string> = {
+  light: 'snaplot-demo-theme-light',
+  dark: 'snaplot-demo-theme-dark',
+};
+const DEFAULT_DEMO_THEME: Record<SiteTheme, string> = {
+  light: 'studio',
+  dark: 'tokyo',
+};
+
+const paperTheme: ThemeConfig = {
+  ...studioTheme,
+  backgroundColor: '#f8fafc',
+  textColor: '#172033',
+  gridColor: '#cbd5e1',
+  gridOpacity: 0.58,
+  axisLineColor: '#cbd5e1',
+  borderColor: '#cbd5e1',
+  borderOpacity: 0.75,
+  tickColor: '#64748b',
+  crosshairColor: '#64748b',
+  tooltipBackground: '#ffffff',
+  tooltipTextColor: '#172033',
+  tooltipBorderColor: '#cbd5e1',
+  palette: ['#2563eb', '#16a34a', '#f59e0b', '#e11d48', '#0891b2', '#7c3aed'],
+  categoricalPalette: ['#2563eb', '#16a34a', '#f59e0b', '#e11d48', '#0891b2', '#7c3aed'],
+  sequentialPalette: ['#f8fafc', '#dbeafe', '#93c5fd', '#38bdf8', '#2563eb', '#1e3a8a'],
+  divergingPalette: ['#2563eb', '#bfdbfe', '#f8fafc', '#fecaca', '#dc2626'],
+  heatmapGradient: ['#f8fafc', '#dbeafe', '#93c5fd', '#38bdf8', '#2563eb', '#1e3a8a'],
+};
+
+const carbonTheme: ThemeConfig = {
+  ...tokyoTheme,
+  backgroundColor: '#111318',
+  textColor: '#e5e7eb',
+  gridColor: '#2b303a',
+  gridOpacity: 0.62,
+  axisLineColor: '#343a46',
+  borderColor: '#343a46',
+  borderOpacity: 0.72,
+  tickColor: '#9ca3af',
+  crosshairColor: '#a3aab8',
+  tooltipBackground: '#171a22',
+  tooltipTextColor: '#f3f4f6',
+  tooltipBorderColor: '#3a404d',
+  palette: ['#7aa2f7', '#9ece6a', '#e0af68', '#f7768e', '#2ac3de', '#bb9af7'],
+  categoricalPalette: ['#7aa2f7', '#9ece6a', '#e0af68', '#f7768e', '#2ac3de', '#bb9af7'],
+  sequentialPalette: ['#111318', '#202842', '#315f88', '#2a9d8f', '#8bd17c', '#f2c14e'],
+  divergingPalette: ['#7aa2f7', '#263a5c', '#111318', '#5c2634', '#f7768e'],
+  heatmapGradient: ['#111318', '#202842', '#315f88', '#2a9d8f', '#8bd17c', '#f2c14e'],
+};
+
+const harborTheme: ThemeConfig = {
+  ...tokyoTheme,
+  backgroundColor: '#0f1720',
+  textColor: '#e6edf3',
+  gridColor: '#263544',
+  gridOpacity: 0.58,
+  axisLineColor: '#304153',
+  borderColor: '#304153',
+  borderOpacity: 0.76,
+  tickColor: '#91a4b7',
+  crosshairColor: '#a8b7c7',
+  tooltipBackground: '#111d28',
+  tooltipTextColor: '#f0f7ff',
+  tooltipBorderColor: '#385064',
+  palette: ['#5dade2', '#54d2a0', '#f2c879', '#ee7b84', '#8bd3ff', '#b79cff'],
+  categoricalPalette: ['#5dade2', '#54d2a0', '#f2c879', '#ee7b84', '#8bd3ff', '#b79cff'],
+  sequentialPalette: ['#0f1720', '#17334a', '#1c6788', '#2aa89a', '#88d68d', '#f2c879'],
+  divergingPalette: ['#5dade2', '#214259', '#0f1720', '#5f2f36', '#ee7b84'],
+  heatmapGradient: ['#0f1720', '#17334a', '#1c6788', '#2aa89a', '#88d68d', '#f2c879'],
+};
+
+const THEME_CHOICES: ThemeChoice[] = [
+  { key: 'studio', label: 'Studio', theme: studioTheme, pageMode: 'light' },
+  { key: 'paper', label: 'Paper', theme: paperTheme, pageMode: 'light' },
+  { key: 'tokyo', label: 'Tokyo', theme: tokyoTheme, pageMode: 'dark' },
+  { key: 'carbon', label: 'Carbon', theme: carbonTheme, pageMode: 'dark' },
+  { key: 'harbor', label: 'Harbor', theme: harborTheme, pageMode: 'dark' },
+];
+
+function themeChoiceByKey(key: string | null | undefined): ThemeChoice | undefined {
+  return THEME_CHOICES.find((choice) => choice.key === key);
+}
+
+function storedThemeKey(mode: SiteTheme): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(DEMO_THEME_STORAGE_KEY[mode]);
+}
+
+function rememberThemeChoice(choice: ThemeChoice): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(DEMO_THEME_STORAGE_KEY[choice.pageMode], choice.key);
+}
+
+function themeChoiceForMode(mode: SiteTheme): ThemeChoice {
+  const storedChoice = themeChoiceByKey(storedThemeKey(mode));
+  if (storedChoice?.pageMode === mode) return storedChoice;
+
+  const defaultChoice = themeChoiceByKey(DEFAULT_DEMO_THEME[mode]);
+  if (defaultChoice?.pageMode === mode) return defaultChoice;
+
+  return THEME_CHOICES.find((choice) => choice.pageMode === mode) ?? THEME_CHOICES[0];
+}
+
+function rng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
+function normal(rand: () => number): number {
+  const u1 = Math.max(rand(), 1e-9);
+  const u2 = rand();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+function streamValues(sampleIndex: number): [number, number, number] {
+  const t = sampleIndex / STREAM_HZ;
+  return [
+    64 + Math.sin(t * 0.9) * 18 + Math.sin(t * 2.4) * 4 + Math.sin(t * 5.2) * 1.1,
+    48 + Math.cos(t * 0.7 + 0.8) * 12 + Math.sin(t * 1.8) * 3 + Math.cos(t * 4.4) * 0.9,
+    17 + Math.sin(t * 0.5 + 2) * 7 + Math.cos(t * 1.9) * 2 + Math.sin(t * 3.3) * 0.7,
+  ];
+}
+
+function streamSeed(points: number): ColumnarData {
   const now = Date.now();
   const x = new Float64Array(points);
-  const y1 = new Float64Array(points);
-  const y2 = new Float64Array(points);
-  const y3 = new Float64Array(points);
+  const requests = new Float64Array(points);
+  const p95 = new Float64Array(points);
+  const errors = new Float64Array(points);
+  const firstStep = -points + 1;
+
   for (let i = 0; i < points; i++) {
-    x[i] = now - (points - i) * 60_000;
-    const t = i / points;
-    y1[i] = 62 + 22 * Math.sin(t * Math.PI * 4) + 6 * Math.sin(t * Math.PI * 13) + (Math.random() - 0.5) * 4;
-    y2[i] = 42 + 18 * Math.cos(t * Math.PI * 3 + 1) + 5 * Math.sin(t * Math.PI * 9) + (Math.random() - 0.5) * 4;
-    y3[i] = 28 + 14 * Math.sin(t * Math.PI * 2.3 + 2) + 4 * Math.cos(t * Math.PI * 7) + (Math.random() - 0.5) * 3;
+    const step = firstStep + i;
+    const [requestValue, p95Value, errorValue] = streamValues(step);
+    x[i] = now + step * STREAM_FRAME_MS;
+    requests[i] = requestValue;
+    p95[i] = p95Value;
+    errors[i] = errorValue;
   }
-  return [x, y1, y2, y3];
+
+  return [x, requests, p95, errors];
 }
 
-function genScatter(n: number): ColumnarData {
-  const x = new Float64Array(n);
-  const y = new Float64Array(n);
-  // Three gaussian clusters so the scatter reads as genuine data.
-  const centers: [number, number][] = [
-    [30, 70],
-    [60, 40],
-    [80, 75],
-  ];
-  for (let i = 0; i < n; i++) {
-    const c = centers[i % 3];
-    const u1 = Math.random();
-    const u2 = Math.random();
-    const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-    const z1 = Math.sqrt(-2 * Math.log(u1)) * Math.sin(2 * Math.PI * u2);
-    x[i] = c[0] + z0 * 10;
-    y[i] = c[1] + z1 * 10;
-  }
-  const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => x[a] - x[b]);
-  return [Float64Array.from(idx.map((i) => x[i])), Float64Array.from(idx.map((i) => y[i]))];
-}
+function experimentData(runs: number, points: number): ColumnarData {
+  const rand = rng(82);
+  const x = new Float64Array(points);
+  const cols: Float64Array[] = [];
 
-function genHeatmap(n: number): ColumnarData {
-  const x = new Float64Array(n);
-  const y = new Float64Array(n);
-  const centers: [number, number, number][] = [
-    [25, 30, 10],
-    [75, 70, 8],
-    [30, 75, 12],
-    [70, 25, 9],
-  ];
-  for (let i = 0; i < n; i++) {
-    const c = centers[Math.floor(Math.random() * centers.length)];
-    const u1 = Math.random();
-    const u2 = Math.random();
-    const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-    const z1 = Math.sqrt(-2 * Math.log(u1)) * Math.sin(2 * Math.PI * u2);
-    x[i] = c[0] + z0 * c[2];
-    y[i] = c[1] + z1 * c[2];
-  }
-  const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => x[a] - x[b]);
-  return [Float64Array.from(idx.map((i) => x[i])), Float64Array.from(idx.map((i) => y[i]))];
-}
+  for (let r = 0; r < runs; r++) {
+    const y = new Float64Array(points);
+    let v = 0.05 + rand() * 0.04;
+    const target = 0.58 + rand() * 0.28 - (r === 3 ? 0.18 : 0);
+    const noise = 0.026 + rand() * 0.018;
 
-/**
- * Top-N endpoints by request count, grouped bar with a 2xx
- * and 5xx column per endpoint so the chart actually says something
- * (not just random bars). Errors scale with traffic + a random
- * failure rate to keep the shape realistic.
- */
-function genBars(): ColumnarData {
-  const n = 6;
-  const x = new Float64Array(n);
-  const success = new Float64Array(n);
-  const errors = new Float64Array(n);
-  const baselines = [1200, 820, 640, 510, 390, 220];
-  // Per-endpoint error rate, a mix of healthy and unhealthy endpoints
-  // so the grouped bars actually tell a story instead of reading flat.
-  const errorRates = [0.04, 0.18, 0.08, 0.12, 0.02, 0.22];
-  for (let i = 0; i < n; i++) {
-    x[i] = i;
-    const traffic = baselines[i] * (0.9 + Math.random() * 0.2);
-    errors[i] = Math.round(traffic * errorRates[i] * (0.85 + Math.random() * 0.3));
-    success[i] = Math.round(traffic - errors[i]);
-  }
-  return [x, success, errors];
-}
-
-/**
- * Response-time histogram, bimodal "fast cache hit / slow DB path"
- * distribution typical of API latency. 8K samples, freedman-diaconis
- * bins give a smooth shape without over-binning.
- */
-function genHistogram(): ColumnarData {
-  const n = 8000;
-  const raw = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    if (Math.random() < 0.7) {
-      // fast path, tight around 30 ms
-      raw[i] = 30 + (Math.random() + Math.random() - 1) * 12;
-    } else {
-      // slow path, spread around 120 ms
-      raw[i] = 120 + (Math.random() + Math.random() + Math.random() - 1.5) * 35;
+    for (let i = 0; i < points; i++) {
+      x[i] = i;
+      const progress = i / (points - 1);
+      const penalty = r === 3 && progress > 0.55 ? (progress - 0.55) * 0.22 : 0;
+      v += (target - v) * 0.035 + normal(rand) * noise * (1 - progress * 0.7);
+      y[i] = clamp(v - penalty, 0.02, 0.98);
     }
+    cols.push(y);
+  }
+
+  return [x, ...cols] as ColumnarData;
+}
+
+function heatmapData(points: number): ColumnarData {
+  const rand = rng(123);
+  const centers: Array<[number, number, number, number]> = [
+    [24, 30, 13, 8],
+    [76, 70, 9, 7],
+    [34, 76, 14, 9],
+    [68, 24, 10, 8],
+  ];
+  const x = new Float64Array(points);
+  const y = new Float64Array(points);
+
+  for (let i = 0; i < points; i++) {
+    const c = centers[Math.floor(rand() * centers.length)];
+    x[i] = c[0] + normal(rand) * c[2];
+    y[i] = c[1] + normal(rand) * c[3];
+  }
+
+  const idx = Array.from({ length: points }, (_, i) => i).sort((a, b) => x[a] - x[b]);
+  return [
+    Float64Array.from(idx.map((i) => x[i])),
+    Float64Array.from(idx.map((i) => y[i])),
+  ];
+}
+
+function sweepScatterData(points: number): ColumnarData {
+  const rand = rng(514);
+  const row = new Float64Array(points);
+  const learningRate = new Float64Array(points);
+  const validationLoss = new Float64Array(points);
+  const family = new Float64Array(points);
+  const runtime = new Float64Array(points);
+  const accuracy = new Float64Array(points);
+
+  for (let i = 0; i < points; i++) {
+    const fam = Math.floor(rand() * MODEL_FAMILIES.length);
+    const logLr = -5 + rand() * 4.1;
+    const lr = 10 ** logLr;
+    const optimum = -3.35 + fam * 0.23;
+    const distance = logLr - optimum;
+    const baseLoss = 0.18 + fam * 0.025 + distance * distance * (0.08 + fam * 0.012);
+    const params = 18 + fam * 16 + rand() * 18;
+    const acc = clamp(0.91 - baseLoss * 0.75 + normal(rand) * 0.018, 0.55, 0.94);
+
+    row[i] = i;
+    learningRate[i] = lr;
+    validationLoss[i] = Math.max(0.06, baseLoss + normal(rand) * 0.025);
+    family[i] = fam;
+    runtime[i] = params;
+    accuracy[i] = acc;
+  }
+
+  return [row, learningRate, validationLoss, family, runtime, accuracy];
+}
+
+function endpointData(): ColumnarData {
+  const x = Float64Array.from([0, 1, 2, 3, 4, 5]);
+  const ok = Float64Array.from([1180, 870, 690, 520, 430, 210]);
+  const err = Float64Array.from([36, 146, 58, 74, 16, 52]);
+  return [x, ok, err];
+}
+
+function responseHistogramData(): ColumnarData {
+  const rand = rng(204);
+  const raw = new Float64Array(9000);
+  for (let i = 0; i < raw.length; i++) {
+    raw[i] = rand() < 0.72
+      ? 31 + normal(rand) * 6
+      : 118 + normal(rand) * 20;
   }
   const bins = histogram(raw);
   return [bins.edges, bins.counts];
 }
 
+function latencyBandData(): ColumnarData {
+  const rand = rng(301);
+  const points = 180;
+  const x = new Float64Array(points);
+  const median = new Float64Array(points);
+  const upper = new Float64Array(points);
+  const lower = new Float64Array(points);
+
+  for (let i = 0; i < points; i++) {
+    const t = i / points;
+    x[i] = i;
+    const base = 62 + Math.sin(t * Math.PI * 4) * 18 + Math.cos(t * Math.PI * 9) * 5;
+    const spread = 10 + Math.sin(t * Math.PI * 3 + 1) * 4;
+    median[i] = base + normal(rand) * 1.2;
+    upper[i] = median[i] + spread;
+    lower[i] = median[i] - spread * 0.75;
+  }
+
+  return [x, median, upper, lower];
+}
+
+function cloneTheme(theme: ThemeConfig): ThemeConfig {
+  return {
+    ...theme,
+    palette: [...theme.palette],
+    categoricalPalette: theme.categoricalPalette ? [...theme.categoricalPalette] : undefined,
+    sequentialPalette: theme.sequentialPalette ? [...theme.sequentialPalette] : undefined,
+    divergingPalette: theme.divergingPalette ? [...theme.divergingPalette] : undefined,
+    heatmapGradient: theme.heatmapGradient ? [...theme.heatmapGradient] : undefined,
+  };
+}
+
+function formatStats(stats: ChartStats | null): string {
+  const label = `${STREAM_HZ} Hz appends - ${STREAM_WINDOW_SECONDS}s window`;
+  if (!stats) return `${label} - waiting for stream`;
+  return `${label} - appends ${stats.appendDataCount} - draws ${stats.renderCount.data}`;
+}
+
 export default function HeroDashboard() {
-  const { theme: siteTheme } = useTheme();
-  const [selected, setSelected] = createSignal<ThemeKey>(
-    siteTheme() === 'light' ? 'light' : 'dark',
+  const { theme: siteTheme, setTheme: setPageTheme } = useTheme();
+  const initialChoice = themeChoiceForMode(siteTheme());
+  const [themeKey, setThemeKey] = createSignal(initialChoice.key);
+  const [streamStats, setStreamStats] = createSignal<ChartStats | null>(null);
+  const [selectedSweepPoints, setSelectedSweepPoints] = createSignal(0);
+
+  const activeChoice = createMemo(() =>
+    THEME_CHOICES.find((choice) => choice.key === themeKey()) ?? THEME_CHOICES[0],
   );
+  const activeTheme = createMemo(() => cloneTheme(activeChoice().theme));
 
-  const activeEntry = createMemo(
-    () => THEMES.find((t) => t.key === selected()) ?? THEMES[2],
-  );
-  const activeTheme = createMemo(() => activeEntry().theme);
+  createEffect(() => {
+    const mode = siteTheme();
+    const currentChoice = themeChoiceByKey(untrack(themeKey));
+    if (currentChoice?.pageMode === mode) return;
+    setThemeKey(themeChoiceForMode(mode).key);
+  });
 
-  // ─── Data ────────────────────────────────────────────────────
-  const [streamData, setStreamData] = createSignal(genStream(240));
-  const [scatter] = createSignal(genScatter(600));
-  const [heat] = createSignal(genHeatmap(80_000));
-  const [bars] = createSignal(genBars());
-  const [hist] = createSignal(genHistogram());
+  const streamData = streamSeed(STREAM_WINDOW_POINTS);
+  const runsData = experimentData(RUN_NAMES.length, 220);
+  const sweepData = sweepScatterData(2600);
+  const heatData = heatmapData(110_000);
+  const endpoints = endpointData();
+  const responseTimes = responseHistogramData();
+  const latencyBand = latencyBandData();
 
-  // ─── Chart configs (theme-reactive) ──────────────────────────
   let streamChart: ChartInstance | undefined;
+  let lastX = streamData[0][streamData[0].length - 1];
+  let streamStep = 1;
 
   const streamConfig = createMemo<ChartConfig>(() => ({
     theme: activeTheme(),
+    debug: { stats: true },
+    streaming: { maxLen: STREAM_WINDOW_POINTS },
     axes: { x: { type: 'time' }, y: { type: 'linear' } },
     series: [
-      { label: 'Requests',  dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 1.75 },
-      { label: 'p95 (ms)',  dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
-      { label: 'Errors %',  dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+      { label: 'Requests', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 1.8 },
+      { label: 'p95 latency', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.6 },
+      { label: 'Errors', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 1.6 },
     ],
-    cursor: { show: true },
-    zoom: { enabled: true, x: true },
+    cursor: { show: true, indicators: true },
+    zoom: { enabled: true, x: true, bounds: 'data' },
     tooltip: { show: true, mode: 'index' },
-    padding: { top: 20, right: 20, bottom: 36, left: 48 },
-    plugins: [createLegendPlugin({ position: 'bottom' })],
+    padding: { top: 20, right: 22, bottom: 36, left: 48 },
   }));
 
-  const scatterConfig = createMemo<ChartConfig>(() => ({
-    theme: activeTheme(),
-    axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-    series: [{ label: 'Events', dataIndex: 1, type: 'scatter', pointRadius: 2.5 }],
-    cursor: { show: true },
-    zoom: { enabled: true, x: true, y: true },
-    tooltip: { show: true, mode: 'nearest' },
-    padding: { top: 20, right: 20, bottom: 36, left: 44 },
-  }));
+  const group = createChartGroup();
+  const [runChartA, setRunChartA] = createSignal<ChartInstance | undefined>();
+  const [runChartB, setRunChartB] = createSignal<ChartInstance | undefined>();
+  const [activeRunChartKey, setActiveRunChartKey] = createSignal<'a' | 'b'>('a');
+  const activeRunChart = createMemo(() =>
+    activeRunChartKey() === 'b' ? runChartB() : runChartA(),
+  );
+
+  function runConfig(metric: string): ChartConfig<RunMeta> {
+    return group.apply({
+      theme: activeTheme(),
+      axes: {
+        x: { type: 'linear', padding: 0 },
+        y: { type: 'linear', padding: 0.04 },
+      },
+      series: RUN_NAMES.map((label, i) => ({
+        label,
+        dataIndex: i + 1,
+        type: 'line' as const,
+        interpolation: 'monotone' as const,
+        lineWidth: 2,
+        meta: {
+          runId: `run-${i}`,
+          metricKey: metric,
+          status: i === 3 ? 'failed' : i === 0 ? 'running' : 'finished',
+        },
+      })),
+      highlight: {
+        getKey: (series) => series.meta?.runId,
+      },
+      cursor: { show: true, snap: true },
+      tooltip: { show: false },
+      zoom: { enabled: true, x: true, bounds: 'data' },
+      padding: { top: 18, right: 20, bottom: 34, left: 44 },
+    });
+  }
+
+  const runConfigA = createMemo(() => runConfig('eval/accuracy'));
+  const runConfigB = createMemo(() => runConfig('train/loss'));
+
+  createEffect(() => {
+    const chart = runChartA();
+    if (!chart) return;
+
+    const off = chart.on('cursor:move', (_dataX, _dataIdx, origin) => {
+      if (origin !== 'local') return;
+      setActiveRunChartKey('a');
+      chart.setHighlight(chart.getCursorSnapshot({ fallback: 'hide' }).activeSeriesIndex);
+    });
+    onCleanup(off);
+  });
+  createEffect(() => {
+    const chart = runChartB();
+    if (!chart) return;
+
+    const off = chart.on('cursor:move', (_dataX, _dataIdx, origin) => {
+      if (origin !== 'local') return;
+      setActiveRunChartKey('b');
+      chart.setHighlight(chart.getCursorSnapshot({ fallback: 'hide' }).activeSeriesIndex);
+    });
+    onCleanup(off);
+  });
 
   const heatConfig = createMemo<ChartConfig>(() => ({
     theme: activeTheme(),
     axes: { x: { type: 'linear' }, y: { type: 'linear' } },
     series: [{
       label: 'Density',
-      dataIndex: 1,
+      yDataIndex: 1,
       type: 'scatter',
       heatmap: true,
       heatmapBinSize: 1,
-      heatmapGradient: activeEntry().heatmapGradient,
     }],
     cursor: { show: true },
-    zoom: { enabled: true, x: true, y: true },
+    zoom: { enabled: true, x: true, y: true, bounds: 'data' },
     tooltip: { show: true, mode: 'nearest' },
-    padding: { top: 20, right: 20, bottom: 36, left: 44 },
+    padding: { top: 18, right: 20, bottom: 34, left: 44 },
   }));
 
-  const barConfig = createMemo<ChartConfig>(() => ({
+  const sweepConfig = createMemo<ChartConfig>(() => ({
+    theme: activeTheme(),
+    interaction: 'analytical',
+    axes: {
+      x: {
+        type: 'log',
+        padding: 0.05,
+        tickFormat: (value) => value >= 0.001 ? value.toFixed(3) : value.toExponential(0),
+      },
+      y: { type: 'linear', padding: 0.08 },
+    },
+    series: [{
+      label: 'Sweep runs',
+      type: 'scatter',
+      xDataIndex: 1,
+      yDataIndex: 2,
+      colorBy: {
+        dataIndex: 3,
+        type: 'category',
+        label: 'Family',
+        format: (value) => MODEL_FAMILIES[Math.round(value)] ?? 'Other',
+      },
+      sizeBy: {
+        dataIndex: 4,
+        range: [2.2, 7.5],
+        scale: 'sqrt',
+        label: 'Runtime',
+        format: (value) => `${value.toFixed(1)} min`,
+      },
+      tooltipFields: [
+        { dataIndex: 5, label: 'Accuracy', format: (value) => `${(value * 100).toFixed(2)}%` },
+      ],
+      pointShape: 'circle',
+      opacity: 0.72,
+      renderMode: 'points',
+    }],
+    cursor: { show: true, indicators: true },
+    zoom: { enabled: false, x: true, y: true },
+    selection: {
+      onSelect: (selection) => setSelectedSweepPoints(selection.points?.length ?? 0),
+    },
+    tooltip: { show: true, mode: 'nearest' },
+    padding: { top: 18, right: 20, bottom: 38, left: 48 },
+  }));
+
+  const endpointConfig = createMemo<ChartConfig>(() => ({
     theme: activeTheme(),
     axes: {
       x: {
         type: 'linear',
-        tickFormat: (v: number) => ['/api', '/auth', '/users', '/search', '/upload', '/admin'][Math.round(v)] ?? '',
+        tickFormat: (v) => ['/api', '/auth', '/users', '/search', '/upload', '/admin'][Math.round(v)] ?? '',
       },
       y: { type: 'linear' },
     },
@@ -241,211 +527,279 @@ export default function HeroDashboard() {
     ],
     cursor: { show: true },
     tooltip: { show: true, mode: 'index' },
-    padding: { top: 20, right: 20, bottom: 36, left: 48 },
-    plugins: [createLegendPlugin({ position: 'bottom' })],
+    padding: { top: 18, right: 18, bottom: 34, left: 50 },
   }));
 
-  const histConfig = createMemo<ChartConfig>(() => ({
+  const histogramConfig = createMemo<ChartConfig>(() => ({
     theme: activeTheme(),
     axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-    series: [{ label: 'Response time (ms)', dataIndex: 1, type: 'histogram' }],
+    series: [{ label: 'Response time', dataIndex: 1, type: 'histogram' }],
     cursor: { show: true },
-    tooltip: { show: true },
-    padding: { top: 20, right: 20, bottom: 36, left: 48 },
+    tooltip: { show: true, mode: 'x' },
+    padding: { top: 18, right: 18, bottom: 34, left: 50 },
   }));
 
-  // ─── Stream loop, appends one point every 1.5s ──────────────
-  const interval = setInterval(() => {
-    // Keep a rolling window: push a new point, drop the oldest so the
-    // X-range slides instead of stretching unbounded.
-    setStreamData((prev) => {
-      const [x, y1, y2, y3] = prev;
-      const next = x[x.length - 1] + 60_000;
-      const nx = new Float64Array(x.length);
-      const ny1 = new Float64Array(x.length);
-      const ny2 = new Float64Array(x.length);
-      const ny3 = new Float64Array(x.length);
-      nx.set(x.subarray(1));
-      ny1.set(y1.subarray(1));
-      ny2.set(y2.subarray(1));
-      ny3.set(y3.subarray(1));
-      nx[x.length - 1] = next;
-      ny1[x.length - 1] = clamp(y1[x.length - 1] + (Math.random() - 0.5) * 6, 20, 100);
-      ny2[x.length - 1] = clamp(y2[x.length - 1] + (Math.random() - 0.5) * 5, 10, 90);
-      ny3[x.length - 1] = clamp(y3[x.length - 1] + (Math.random() - 0.5) * 4, 5, 60);
-      return [nx, ny1, ny2, ny3] as ColumnarData;
-    });
-    if (streamChart) streamChart.setData(streamData());
-  }, 1500);
-  onCleanup(() => clearInterval(interval));
+  const bandConfig = createMemo<ChartConfig>(() => ({
+    theme: activeTheme(),
+    axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+    series: [{
+      label: 'Latency band',
+      dataIndex: 1,
+      upperDataIndex: 2,
+      lowerDataIndex: 3,
+      type: 'band',
+      opacity: 0.16,
+      interpolation: 'monotone',
+      lineWidth: 1.8,
+    }],
+    cursor: { show: true },
+    tooltip: { show: true, mode: 'index' },
+    padding: { top: 18, right: 18, bottom: 34, left: 48 },
+  }));
 
-  // Page-scope CSS variables. Painted onto `document.documentElement`
-  // (not just the dashboard subtree) so the nav, footer and scrollbar
-  // gutter all track the active theme. On cleanup we remove the
-  // overrides so Home and Docs fall back to their site light/dark tokens.
-  const cssVars = createMemo(() => {
-    const { theme: t, dark } = activeEntry();
-    // Panel surface matches the chart canvas exactly so the header /
-    // footer blend seamlessly into the plot. Page bg strategy differs
-    // by mode: dark themes darken the surround (shadows are muted on
-    // dark, so we need a colour step); light themes share the panel
-    // bg and let the ambient shadow do all the elevation work (a black
-    // mix-in on warm off-whites looked muddy, "cement" not "paper").
-    const pageBg = dark
-      ? `color-mix(in srgb, ${t.backgroundColor} 88%, #000 12%)`
-      : t.backgroundColor;
-    // Dark: a dark drop-shadow under a dark card reads muddy. Skip
-    // the ambient shadow and let the tinted page bg + inset top
-    // highlight do the lifting, the soft-UI "lit from above" feel
-    // without the blob. Light: the layered shadow works as intended.
-    const elevInset = dark
-      ? 'inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-      : 'inset 0 1px 0 rgba(255, 255, 255, 0.70)';
-    const elevShadow = dark
-      ? 'none'
-      : '0 1px 2px rgba(30, 35, 60, 0.05), 0 10px 28px rgba(30, 35, 60, 0.08)';
-    return {
-      '--bg': pageBg,
-      '--bg-surface': t.backgroundColor,
-      '--bg-surface-2': t.backgroundColor,
-      '--text': t.textColor,
-      '--text-secondary': t.tickColor,
-      '--border': t.borderColor,
-      '--border-light': t.gridColor,
-      '--accent': t.palette[0],
-      '--accent-hover': t.palette[0],
-      '--elev-1-inset': elevInset,
-      '--elev-1-shadow': elevShadow,
-      '--code-bg': dark
-        ? `color-mix(in srgb, ${t.backgroundColor} 80%, #fff 4%)`
-        : `color-mix(in srgb, ${t.backgroundColor} 85%, #000 3%)`,
-    } as Record<string, string>;
+  function appendStreamSample() {
+    if (!streamChart) return;
+
+    lastX += STREAM_FRAME_MS;
+    const [requestValue, p95Value, errorValue] = streamValues(streamStep);
+    streamStep++;
+
+    streamChart.appendData([
+      new Float64Array([lastX]),
+      new Float64Array([requestValue]),
+      new Float64Array([p95Value]),
+      new Float64Array([errorValue]),
+    ]);
+  }
+
+  let streamFrame = 0;
+  let lastStreamFrameAt = performance.now();
+  let lastStatsAt = 0;
+
+  function resetStreamClock(now = performance.now()) {
+    lastStreamFrameAt = now;
+    lastStatsAt = now;
+  }
+
+  function runStream(now: number) {
+    if (!streamChart) {
+      resetStreamClock(now);
+      streamFrame = window.requestAnimationFrame(runStream);
+      return;
+    }
+
+    const elapsed = now - lastStreamFrameAt;
+    if (elapsed > STREAM_PAUSE_RESET_MS) {
+      resetStreamClock(now);
+    } else if (elapsed >= STREAM_FRAME_MS) {
+      const appendCount = Math.min(4, Math.floor(elapsed / STREAM_FRAME_MS));
+      for (let i = 0; i < appendCount; i++) appendStreamSample();
+      lastStreamFrameAt += appendCount * STREAM_FRAME_MS;
+    }
+
+    if (now - lastStatsAt >= STREAM_STATS_MS) {
+      setStreamStats(streamChart.getStats());
+      lastStatsAt = now;
+    }
+
+    streamFrame = window.requestAnimationFrame(runStream);
+  }
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'visible') resetStreamClock();
+  }
+
+  function handleWindowFocus() {
+    resetStreamClock();
+  }
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('focus', handleWindowFocus);
+  streamFrame = window.requestAnimationFrame(runStream);
+  onCleanup(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('focus', handleWindowFocus);
+    window.cancelAnimationFrame(streamFrame);
   });
 
-  // Paint (and repaint) onto <html> so nav + body reflect the theme.
   createEffect(() => {
-    const vars = cssVars();
-    const root = document.documentElement;
-    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+    document.documentElement.style.setProperty('--chart-panel-bg', activeTheme().backgroundColor);
   });
   onCleanup(() => {
-    const root = document.documentElement;
-    for (const k of Object.keys(cssVars())) root.style.removeProperty(k);
+    document.documentElement.style.removeProperty('--chart-panel-bg');
   });
+
+  function chooseTheme(choice: ThemeChoice) {
+    rememberThemeChoice(choice);
+    batch(() => {
+      setThemeKey(choice.key);
+      setPageTheme(choice.pageMode);
+    });
+  }
 
   return (
     <section
-      class="demos-themed"
+      class="demos-showcase"
       style={{
         background: 'var(--bg)',
         color: 'var(--text)',
         'min-height': 'calc(100vh - 56px)',
-        transition:
-          'background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out)',
       }}
     >
       <div
         style={{
-          'max-width': 'var(--max-width)',
           margin: '0 auto',
-          padding: 'var(--space-7) var(--space-5) var(--space-8)',
+          padding: '28px clamp(16px, 3vw, 40px) 44px',
+          'max-width': '1680px',
         }}
       >
-        <header style={{ 'text-align': 'center', 'margin-bottom': 'var(--space-6)' }}>
-          <h1
-            style={{
-              'font-size': 'clamp(28px, 4vw, 40px)',
-              'font-weight': 700,
-              'letter-spacing': '-0.02em',
-              'line-height': 1.15,
-              'margin-bottom': 'var(--space-2)',
-            }}
-          >
-            Themes & live dashboard
-          </h1>
-          <p
-            style={{
-              'font-size': 'var(--fs-md)',
-              color: 'var(--text-secondary)',
-              'max-width': '560px',
-              margin: '0 auto',
-              'line-height': 1.55,
-            }}
-          >
-            Pick a theme and every surface on the page follows. Streaming area, scatter
-            cloud, and 80K-point density heatmap all re-render against the palette.
-          </p>
-        </header>
-
-        {/* Theme chip row */}
-        <div
-          role="tablist"
-          aria-label="Chart themes"
-          style={{
-            display: 'flex',
-            'flex-wrap': 'wrap',
-            gap: 'var(--space-2)',
-            'justify-content': 'center',
-            'margin-bottom': 'var(--space-5)',
-          }}
-        >
-          <For each={THEMES}>
-            {(t) => <ThemeChip entry={t} active={selected() === t.key} onPick={() => setSelected(t.key)} />}
-          </For>
-        </div>
-
-        {/* Dashboard grid */}
-        <div
+        <header
           style={{
             display: 'grid',
-            'grid-template-columns': '1fr',
-            'grid-template-rows': 'auto auto',
-            gap: 'var(--space-4)',
+            'grid-template-columns': 'minmax(260px, 1fr) auto',
+            gap: '18px',
+            'align-items': 'end',
+            'margin-bottom': '18px',
           }}
         >
-          {/* Row 1, streaming (full width) */}
-          <Panel title="Throughput & latency" subtitle="Streaming, 1.5s tick">
-            <div style={{ height: 'clamp(240px, 36vh, 320px)' }}>
-              <Chart config={streamConfig()} data={streamData()} onReady={(c) => { streamChart = c; }} />
+          <div>
+            <div style={{ color: 'var(--text-secondary)', 'font-size': '12px', 'font-weight': 700, 'letter-spacing': '0.08em', 'text-transform': 'uppercase' }}>
+              Snaplot Demos
+            </div>
+            <h1 style={{ 'font-size': 'clamp(24px, 3vw, 38px)', 'line-height': 1.05, margin: '6px 0 8px' }}>
+              Fast charts for dense, live dashboards
+            </h1>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', 'max-width': '780px', 'font-size': '14px' }}>
+              Fixed-window streaming, million-scale rendering patterns, cross-chart sync, and dashboard chart types in one focused workspace.
+            </p>
+          </div>
+
+          <div
+            class="demo-theme-row"
+            role="group"
+            aria-label="Demo theme"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              'flex-wrap': 'wrap',
+              'justify-content': 'flex-end',
+            }}
+          >
+            <For each={THEME_CHOICES}>
+              {(choice) => (
+                <ThemeButton
+                  choice={choice}
+                  active={themeKey() === choice.key}
+                  onClick={() => chooseTheme(choice)}
+                />
+              )}
+            </For>
+          </div>
+        </header>
+
+        <div style={{ display: 'grid', gap: '14px' }}>
+          <Panel
+            title="Streaming Throughput"
+            meta={
+              <span style={{ display: 'inline-flex', gap: '8px', 'align-items': 'center' }}>
+                <span class="live-dot" />
+                {formatStats(streamStats())}
+              </span>
+            }
+          >
+            <div style={{ height: '320px' }}>
+              <Chart
+                config={streamConfig()}
+                data={streamData}
+                onReady={(chart) => {
+                  streamChart = chart;
+                  setStreamStats(chart.getStats());
+                }}
+              />
             </div>
           </Panel>
 
-          {/* Row 2, scatter + heatmap */}
           <div
             style={{
               display: 'grid',
-              'grid-template-columns': 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: 'var(--space-4)',
+              'grid-template-columns': '1fr 1fr',
+              gap: '14px',
             }}
+            class="demos-two-col-grid"
           >
-            <Panel title="Event cloud" subtitle="600 points, 3 clusters">
-              <div style={{ height: 'clamp(220px, 32vh, 280px)' }}>
-                <Chart config={scatterConfig()} data={scatter()} />
+            <Panel title="Dense Event Cloud" meta="110K points - heatmap renderer">
+              <div style={{ height: '260px' }}>
+                <Chart config={heatConfig()} data={heatData} />
               </div>
             </Panel>
-            <Panel title="Density heatmap" subtitle="80K points · themed gradient">
-              <div style={{ height: 'clamp(220px, 32vh, 280px)' }}>
-                <Chart config={heatConfig()} data={heat()} />
+
+            <Panel title="Latency Envelope" meta="band series">
+              <div style={{ height: '260px' }}>
+                <Chart config={bandConfig()} data={latencyBand} />
               </div>
             </Panel>
           </div>
 
-          {/* Row 3, bar + histogram */}
+          <Panel
+            title="Experiment Sweep Scatter"
+            meta={selectedSweepPoints() > 0
+              ? `${selectedSweepPoints()} selected - colour by model family, size by runtime`
+              : '2.6K runs - colour by model family, size by runtime'}
+          >
+            <div style={{ height: '320px' }}>
+              <Chart config={sweepConfig()} data={sweepData} />
+            </div>
+          </Panel>
+
+          <Panel title="Experiment Comparison" meta="cursor, zoom, highlight, legend table">
+            <div
+              style={{
+                display: 'grid',
+                'grid-template-columns': '1fr 1fr',
+                gap: '1px',
+                background: 'color-mix(in srgb, var(--border) 70%, transparent)',
+              }}
+              class="demos-sync-grid"
+            >
+              <div style={{ height: '260px', background: 'var(--chart-panel-bg, var(--bg-surface))' }}>
+                <Chart config={runConfigA()} data={runsData} onReady={setRunChartA} />
+              </div>
+              <div style={{ height: '260px', background: 'var(--chart-panel-bg, var(--bg-surface))' }}>
+                <Chart config={runConfigB()} data={runsData} onReady={setRunChartB} />
+              </div>
+            </div>
+            <LegendTable<RunMeta>
+              chart={activeRunChart}
+              columns={[
+                nameColumn(),
+                metricColumn<RunMeta>((point) => point.meta!.metricKey),
+                column<RunMeta>({
+                  key: 'status',
+                  header: 'Status',
+                  cell: (point) => point.meta!.status,
+                }),
+                valueColumn({ format: (value) => value.toFixed(4) }),
+              ]}
+            />
+          </Panel>
+
           <div
             style={{
               display: 'grid',
-              'grid-template-columns': 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: 'var(--space-4)',
+              'grid-template-columns': '1fr 1fr',
+              gap: '14px',
             }}
+            class="demos-two-col-grid"
           >
-            <Panel title="Top endpoints" subtitle="Requests · 2xx vs 5xx">
-              <div style={{ height: 'clamp(240px, 34vh, 300px)' }}>
-                <Chart config={barConfig()} data={bars()} />
+            <Panel title="Top Endpoints" meta="grouped bar chart">
+              <div style={{ height: '260px' }}>
+                <Chart config={endpointConfig()} data={endpoints} />
               </div>
             </Panel>
-            <Panel title="Response time" subtitle="Bimodal · 8K samples">
-              <div style={{ height: 'clamp(240px, 34vh, 300px)' }}>
-                <Chart config={histConfig()} data={hist()} />
+
+            <Panel title="Response Time" meta="histogram - 9K samples">
+              <div style={{ height: '260px' }}>
+                <Chart config={histogramConfig()} data={responseTimes} />
               </div>
             </Panel>
           </div>
@@ -455,97 +809,91 @@ export default function HeroDashboard() {
   );
 }
 
-function clamp(v: number, lo: number, hi: number) {
-  return v < lo ? lo : v > hi ? hi : v;
-}
-
-/** Single-theme picker button, a swatch row previewing the palette. */
-function ThemeChip(props: { entry: ThemeEntry; active: boolean; onPick: () => void }) {
-  const preview = () => {
-    const p = props.entry.theme.palette;
-    return [p[0], p[1], p[2]];
-  };
+function ThemeButton(props: {
+  choice: ThemeChoice;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected={props.active}
-      onClick={props.onPick}
+      aria-pressed={props.active}
+      onClick={props.onClick}
       style={{
         display: 'inline-flex',
         'align-items': 'center',
         gap: '8px',
-        padding: '6px 14px 6px 8px',
-        'border-radius': 'var(--radius-pill)',
-        border: 'none',
-        background: props.active
-          ? 'color-mix(in srgb, var(--accent) 14%, var(--bg-surface))'
-          : 'var(--bg-surface)',
-        color: 'inherit',
-        'font-size': 'var(--fs-sm)',
-        'font-weight': props.active ? 600 : 500,
+        height: '34px',
+        padding: '0 11px',
+        'border-radius': '999px',
+        border: props.active ? '1px solid var(--accent)' : '1px solid var(--border)',
+        background: props.active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--bg-surface)',
+        color: props.active ? 'var(--text)' : 'var(--text-secondary)',
         cursor: 'pointer',
-        'box-shadow': props.active
-          ? `var(--elev-1-inset), 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent)`
-          : 'var(--elev-1-inset), var(--elev-1-shadow)',
-        transition:
-          'background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
+        'font-size': '12px',
+        'font-weight': 650,
       }}
     >
-      {/* Avatar-stack preview, three overlapping dots on the chip
-          itself (no mini-pill). A ring in the chip's own bg colour
-          separates them cleanly without adding a bright frame. */}
-      <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-        <For each={preview()}>
-          {(c, i) => (
-            <span
-              style={{
-                display: 'inline-block',
-                width: '12px',
-                height: '12px',
-                'border-radius': '50%',
-                background: c,
-                'margin-left': i() === 0 ? '0' : '-4px',
-                'box-shadow': '0 0 0 1.5px var(--bg-surface)',
-              }}
-            />
-          )}
-        </For>
+      <span
+        aria-hidden="true"
+        style={{
+          display: 'inline-flex',
+          width: '30px',
+          height: '14px',
+          overflow: 'hidden',
+          'border-radius': '999px',
+          border: '1px solid color-mix(in srgb, var(--border) 75%, transparent)',
+        }}
+      >
+        <span style={{ flex: 1, background: props.choice.theme.backgroundColor }} />
+        <span style={{ flex: 1, background: props.choice.theme.palette[0] }} />
+        <span style={{ flex: 1, background: props.choice.theme.palette[1] ?? props.choice.theme.textColor }} />
       </span>
-      {props.entry.label}
+      {props.choice.label}
     </button>
   );
 }
 
-/** Panel with header + chart slot. Soft-UI elevation, no hard border. */
-function Panel(props: { title: string; subtitle?: string; children: any }) {
+function Panel(props: {
+  title: string;
+  meta?: JSX.Element | string;
+  children: JSX.Element;
+}) {
   return (
-    <div
+    <section
       style={{
-        background: 'var(--bg-surface)',
-        'border-radius': 'var(--radius-lg)',
+        background: 'var(--chart-panel-bg, var(--bg-surface))',
+        'border-radius': '16px',
         'box-shadow': 'var(--elev-1-inset), var(--elev-1-shadow)',
         overflow: 'hidden',
         display: 'flex',
         'flex-direction': 'column',
+        'min-width': '0',
       }}
     >
       <div
         style={{
-          padding: '12px 16px',
+          padding: '12px 16px 8px',
           display: 'flex',
           'align-items': 'baseline',
           'justify-content': 'space-between',
+          gap: '12px',
         }}
       >
-        <div style={{ 'font-size': 'var(--fs-sm)', 'font-weight': 600 }}>{props.title}</div>
-        {props.subtitle && (
-          <div style={{ 'font-size': 'var(--fs-xs)', color: 'var(--text-secondary)' }}>
-            {props.subtitle}
+        <h2 style={{ 'font-size': '14px', 'font-weight': 700, margin: 0 }}>
+          {props.title}
+        </h2>
+        {props.meta && (
+          <div style={{ color: 'var(--text-secondary)', 'font-size': '12px', 'white-space': 'nowrap' }}>
+            {props.meta}
           </div>
         )}
       </div>
       {props.children}
-    </div>
+    </section>
   );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return value < min ? min : value > max ? max : value;
 }

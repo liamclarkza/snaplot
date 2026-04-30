@@ -38,13 +38,13 @@ export default function SeriesOptions() {
           Control appearance per-series with <code>stroke</code>, <code>fill</code>, <code>opacity</code>, <code>lineWidth</code>, and <code>pointRadius</code>.
           For area charts, use <code>fillGradient</code> to specify custom top/bottom gradient colors.
         </Prose>
-        <Demo title="Custom series styling" desc="Edit colors, opacity, and line widths"
+        <Demo title="Custom series styling" desc="Edit colors, opacity, dashes, and line widths"
           data={d_styling()}
           code={`{
   series: [
     { label: 'Thick', dataIndex: 1, type: 'line', stroke: '#e74c3c', lineWidth: 3, interpolation: 'monotone' },
-    { label: 'Dashed area', dataIndex: 2, type: 'area', stroke: '#2ecc71', opacity: 0.6, fillGradient: { top: 'rgba(46,204,113,0.3)', bottom: 'rgba(46,204,113,0.02)' }, interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Points', dataIndex: 3, type: 'scatter', stroke: '#9b59b6', pointRadius: 4 },
+    { label: 'Dashed area', dataIndex: 2, type: 'area', stroke: '#2ecc71', opacity: 0.6, fillGradient: { top: 'rgba(46,204,113,0.3)', bottom: 'rgba(46,204,113,0.02)' }, interpolation: 'monotone', lineWidth: 2, lineDash: [8, 4] },
+    { label: 'Points', yDataIndex: 3, type: 'scatter', stroke: '#9b59b6', pointRadius: 4 },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />

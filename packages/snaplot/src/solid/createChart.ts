@@ -1,4 +1,4 @@
-import { createSignal, createEffect, on, onCleanup, type Accessor } from 'solid-js';
+import { createSignal, createEffect, on, onCleanup, untrack, type Accessor } from 'solid-js';
 import { ChartCore } from '../core/Chart';
 import type { ChartConfig, ChartInstance, ColumnarData } from '../types';
 
@@ -14,9 +14,9 @@ import type { ChartConfig, ChartInstance, ColumnarData } from '../types';
  *   let ref!: HTMLDivElement;
  *   const chart = createChart(() => ref, config, data);
  */
-export function createChart(
+export function createChart<TMeta = unknown>(
   containerRef: Accessor<HTMLElement | undefined>,
-  config: Accessor<ChartConfig>,
+  config: Accessor<ChartConfig<TMeta>>,
   data: Accessor<ColumnarData>,
 ): Accessor<ChartInstance | undefined> {
   const [chart, setChart] = createSignal<ChartInstance | undefined>();
@@ -25,7 +25,10 @@ export function createChart(
     const el = containerRef();
     if (!el) return;
 
-    const instance = new ChartCore(el, config(), data());
+    // Chart construction should be keyed only by the container element.
+    // Initial config/data are read untracked; later signal changes flow
+    // through the dedicated setOptions/setData effects below.
+    const instance = new ChartCore(el, untrack(config) as ChartConfig, untrack(data));
     setChart(instance as ChartInstance);
 
     onCleanup(() => {
@@ -50,7 +53,7 @@ export function createChart(
     on(
       config,
       (c) => {
-        chart()?.setOptions(c);
+        chart()?.setOptions(c as ChartConfig);
       },
       { defer: true },
     ),

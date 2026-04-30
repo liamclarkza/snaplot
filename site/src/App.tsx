@@ -34,7 +34,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <Nav />
+      <Nav page={page()} />
       <Show when={page() === 'home'}><Home /></Show>
       <Show when={page() === 'docs'}><Docs /></Show>
       <Show when={page() === 'demos'}><Demos /></Show>

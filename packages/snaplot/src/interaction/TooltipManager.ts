@@ -126,7 +126,13 @@ export class TooltipManager {
     // Single point (nearest mode, e.g. scatter): show x, y as coordinate pair
     if (points.length === 1) {
       const p = points[0];
-      return `<div style="display:flex;align-items:center;gap:8px">${dot(p.color)}<span style="font-variant-numeric:tabular-nums"><b>x</b> ${escapeHtml(p.formattedX)}&nbsp;&nbsp;<b>y</b> ${escapeHtml(p.formattedY)}</span></div>`;
+      const fields = p.fields && p.fields.length > 0
+        ? `<div style="display:grid;grid-template-columns:auto auto;gap:2px 12px;margin-top:6px;font-variant-numeric:tabular-nums">${p.fields.map((field) => `
+          <span style="opacity:0.7">${escapeHtml(field.label)}</span>
+          <span style="font-weight:600;text-align:right">${escapeHtml(field.formatted)}</span>
+        `).join('')}</div>`
+        : '';
+      return `<div style="display:flex;align-items:center;gap:8px">${dot(p.color)}<span style="font-variant-numeric:tabular-nums"><b>x</b> ${escapeHtml(p.formattedX)}&nbsp;&nbsp;<b>y</b> ${escapeHtml(p.formattedY)}</span></div>${fields}`;
     }
 
     // Multiple points (index mode, e.g. time series): header + rows

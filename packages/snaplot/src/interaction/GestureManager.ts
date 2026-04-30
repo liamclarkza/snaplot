@@ -290,8 +290,11 @@ export class GestureManager {
       ptr.y = y;
     }
 
-    // Always emit cursor for crosshair/tooltip (even in readonly)
-    if (this.state === 'idle' || mode === 'readonly') {
+    // Emit hover cursor only when no drag pointer is active. During the first
+    // few pixels of a box selection, state is still idle until we cross the
+    // drag threshold; publishing those interim moves makes synced peers drift
+    // away from the selection anchor.
+    if (this.pointers.size === 0 || mode === 'readonly') {
       this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
     }
 
@@ -443,7 +446,7 @@ export class GestureManager {
         this.lastTapTime = 0;
       } else {
         // Single tap
-        this.eventBus.emit('action:tap', { x, y });
+        this.eventBus.emit('action:tap', { x, y, pointerType: ptr.pointerType });
         this.lastTapTime = now;
         this.lastTapX = x;
         this.lastTapY = y;

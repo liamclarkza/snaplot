@@ -55,6 +55,36 @@ describe('append', () => {
       .toThrow(/append\(\) expects 2 columns/);
   });
 
+  it('rejects non-Float64Array append columns', () => {
+    const store = new ColumnarStore([f([1, 2]), f([10, 20])]);
+    expect(() => store.append([[3], [30]] as unknown as ColumnarData))
+      .toThrow(/Float64Array/);
+  });
+
+  it('rejects append column length mismatches', () => {
+    const store = new ColumnarStore([f([1, 2]), f([10, 20])]);
+    expect(() => store.append([f([3, 4]), f([30])]))
+      .toThrow(/column 1 has 1/i);
+  });
+
+  it('rejects unsorted appended X values', () => {
+    const store = new ColumnarStore([f([1, 2]), f([10, 20])]);
+    expect(() => store.append([f([3, 2.5]), f([30, 25])]))
+      .toThrow(/X values must be sorted/);
+  });
+
+  it('rejects appends that would break global X ordering', () => {
+    const store = new ColumnarStore([f([10, 11]), f([100, 110])]);
+    expect(() => store.append([f([9]), f([90])]))
+      .toThrow(/current last X = 11/);
+  });
+
+  it('accepts an appended X value equal to the current last X', () => {
+    const store = new ColumnarStore([f([1, 2]), f([10, 20])]);
+    store.append([f([2, 3]), f([200, 30])]);
+    expect(Array.from(store.x)).toEqual([1, 2, 2, 3]);
+  });
+
   it('concatenates data correctly and preserves length', () => {
     const store = new ColumnarStore([f([1, 2]), f([10, 20])]);
     store.append([f([3, 4]), f([30, 40])]);
@@ -71,9 +101,25 @@ describe('append', () => {
     expect(Array.from(store.y(0))).toEqual([20, 30, 40]);
   });
 
+  it('keeps only the appended tail when appended chunk exceeds maxLen', () => {
+    const store = new ColumnarStore([f([1, 2]), f([10, 20])]);
+    store.append([f([3, 4, 5, 6]), f([30, 40, 50, 60])], 3);
+    expect(store.length).toBe(3);
+    expect(Array.from(store.x)).toEqual([4, 5, 6]);
+    expect(Array.from(store.y(0))).toEqual([40, 50, 60]);
+  });
+
+  it('rejects invalid maxLen values', () => {
+    const store = new ColumnarStore([f([1, 2]), f([10, 20])]);
+    expect(() => store.append([f([3]), f([30])], -1))
+      .toThrow(/maxLen must be a non-negative integer/);
+    expect(() => store.append([f([3]), f([30])], 1.5))
+      .toThrow(/maxLen must be a non-negative integer/);
+  });
+
   it('handles a zero-length append as a no-op', () => {
     const store = new ColumnarStore([f([1, 2]), f([10, 20])]);
-    store.append([f([]), f([])]);
+    expect(store.append([f([]), f([])])).toBe(false);
     expect(store.length).toBe(2);
   });
 });

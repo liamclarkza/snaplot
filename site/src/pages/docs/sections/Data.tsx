@@ -1,6 +1,6 @@
-import { createSignal } from 'solid-js';
-import { lttb, m4 } from 'snaplot';
-import type { ColumnarData } from 'snaplot';
+import { createEffect, createSignal, onCleanup } from 'solid-js';
+import { Chart, lttb, m4 } from 'snaplot';
+import type { ChartInstance, ColumnarData } from 'snaplot';
 import CodeBlock from '../../../components/CodeBlock';
 import { Section, Prose, Demo } from '../../../components/ui';
 import { largeTimeSeries } from '../fixtures';
@@ -25,20 +25,21 @@ export default function Data() {
           The user's zoom state is preserved, new data appears but the viewport stays where the user left it until they double-click to reset.
         </Prose>
         <Prose>
-          Pass <code>maxLen</code> as the second argument to cap the buffer size. When the buffer overflows, the oldest points are dropped.
+          Set <code>streaming.maxLen</code> on the chart config to cap the retained window. When the buffer overflows, the oldest points are dropped through an internal ring buffer.
         </Prose>
-        <CodeBlock code={`// appendData signature
-chart.appendData(newData: ColumnarData, maxLen?: number);
+        <CodeBlock code={`const chart = new ChartCore(container, {
+  streaming: { maxLen: 1000 }, // keep max 1000 points
+  series: [{ label: 'value', dataIndex: 1, type: 'line' }],
+}, initialData);
 
 // Example: append one point per second
-const chart = /* ChartInstance from onReady */;
 setInterval(() => {
   const now = Date.now();
   const value = Math.random() * 100;
   chart.appendData([
     new Float64Array([now]),
     new Float64Array([value]),
-  ], 1000); // keep max 1000 points
+  ]);
 }, 1000);`} />
         <div style={{ height: '12px' }} />
         <Prose>
@@ -53,6 +54,7 @@ setInterval(() => {
           >Line</button>{' '}
           section above demonstrates this pattern live.
         </Prose>
+        <StreamingDiagnosticsDemo />
       </Section>
 
       <Section id="downsampling" title="Downsampling">
@@ -85,5 +87,75 @@ const [downX, downY] = m4(xData, yData, pixelWidth, xMin, xMax);`} />
 }`} />
       </Section>
     </>
+  );
+}
+
+function streamingSeed(points: number): ColumnarData {
+  const x = new Float64Array(points);
+  const y = new Float64Array(points);
+  for (let i = 0; i < points; i++) {
+    x[i] = i;
+    y[i] = 50 + Math.sin(i / 12) * 18 + Math.cos(i / 5) * 4;
+  }
+  return [x, y];
+}
+
+function StreamingDiagnosticsDemo() {
+  const [chart, setChart] = createSignal<ChartInstance>();
+  const [label, setLabel] = createSignal('waiting for chart');
+  const data = streamingSeed(240);
+
+  createEffect(() => {
+    const c = chart();
+    if (!c) return;
+
+    let i = data[0][data[0].length - 1] + 1;
+    const timer = window.setInterval(() => {
+      const nextY = 50 + Math.sin(i / 12) * 18 + Math.cos(i / 5) * 4;
+      c.appendData([new Float64Array([i]), new Float64Array([nextY])]);
+      const stats = c.getStats();
+      setLabel(
+        `append ${stats.appendDataCount} · version ${stats.dataVersion} · ` +
+          `draws g/d/o ${stats.renderCount.grid}/${stats.renderCount.data}/${stats.renderCount.overlay}`,
+      );
+      i++;
+    }, 250);
+
+    onCleanup(() => window.clearInterval(timer));
+  });
+
+  return (
+    <div style={{ 'margin-top': '16px', 'margin-bottom': '20px' }}>
+      <h3 style={{ 'font-size': 'var(--fs-sm)', 'font-weight': '600', 'margin-bottom': 'var(--space-1)' }}>
+        Streaming diagnostics
+      </h3>
+      <p style={{ 'font-size': 'var(--fs-sm)', color: 'var(--text-secondary)', 'margin-bottom': '10px' }}>
+        Fixed-window append benchmark using <code>getStats()</code>. The buffer caps at 500 points.
+      </p>
+      <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
+        <div style={{ height: '240px' }}>
+          <Chart
+            data={data}
+            onReady={setChart}
+            config={{
+              debug: { stats: true },
+              streaming: { maxLen: 500 },
+              axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+              series: [{ label: 'stream', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
+              tooltip: { show: true, mode: 'index' },
+            }}
+          />
+        </div>
+        <div style={{
+          padding: '8px 12px',
+          'border-top': '1px solid var(--border)',
+          'font-size': '12px',
+          color: 'var(--text-secondary)',
+          'font-variant-numeric': 'tabular-nums',
+        }}>
+          {label()}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -59,6 +59,9 @@ export default function Interactions() {
             </tbody>
           </table>
         </div>
+        <Prose>
+          <b>Touch checks</b>: iOS Safari and Android Chrome should support one-finger pan, two-finger pinch zoom, tap tooltip, double-tap reset, and long-press box zoom. Keep chart containers at least 240px tall on narrow screens so pinch and long-press gestures have enough room; regular page scroll is left alone unless the gesture starts inside the chart or on an axis.
+        </Prose>
         <Demo title="Interaction mode demo" desc="Change 'timeseries' to 'analytical' (enables Y zoom + XY pinch) or 'readonly' (tooltip only)"
           data={d_interaction()}
           code={`{
@@ -91,7 +94,7 @@ zoom: { bounds: 'data' }                           // clamp every axis to data e
 zoom: { bounds: { x: 'data', y: 'unbounded' } }    // per-axis
 zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         <Prose>
-          Bounds are evaluated on every viewport change. Panning into the edge stops at the edge (range preserved); zoom-out past the full extent collapses to the full extent. The <code>'data'</code> bound tracks what <code>resetZoom()</code> would produce, including <code>nice()</code> expansion and any axis pins, so the zoom-out limit matches the initial view.
+          Bounds are evaluated on every viewport change. Panning into the edge stops at the edge (range preserved); zoom-out past the full extent collapses to the full extent. The <code>'data'</code> bound tracks what <code>resetZoom()</code> would produce, including padding, any explicit <code>nice: true</code> expansion, and axis pins, so the zoom-out limit matches the initial view.
         </Prose>
         <Demo title="Zoom controls" desc="Drag to zoom, double-click to reset. Try zooming out past the edges, bounds prevent you from escaping the data."
           data={d_zoom()}

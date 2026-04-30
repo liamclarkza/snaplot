@@ -69,15 +69,15 @@ function runNames(n: number): string[] {
  * @param numRuns number of series
  * @param metric  per-series `meta.metricKey`
  *
- * X uses `nice: false` so the plot stretches exactly from the first to
- * the last X value (no trailing gap). Y keeps `nice: true` with a small
- * padding so the top-most line doesn't touch the plot edge.
+ * X uses zero padding so the plot stretches exactly from the first to the
+ * last X value. Y adds a small padding so the top-most line doesn't touch
+ * the plot edge.
  */
 function runConfig(numRuns: number, metric: string): ChartConfig<RunMeta> {
   const names = runNames(numRuns);
   return {
     axes: {
-      x: { type: 'linear', nice: false, padding: 0 },
+      x: { type: 'linear', padding: 0 },
       y: { type: 'linear', padding: 0.05 },
     },
     series: names.map((label, i) => ({

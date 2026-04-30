@@ -71,7 +71,7 @@ export default function Tooltips() {
         <Demo title="Proximity and snap" desc="Move the cursor around, tooltip only shows near points. Toggle snap to see the difference."
           data={d_tooltip_snap()}
           code={`{
-  series: [{ label: 'Points', dataIndex: 1, type: 'scatter', pointRadius: 3 }],
+  series: [{ label: 'Points', yDataIndex: 1, type: 'scatter', pointRadius: 3 }],
   cursor: { show: true, snap: true, xLine: true, yLine: true },
   tooltip: { show: true, mode: 'nearest' },
 }`} />

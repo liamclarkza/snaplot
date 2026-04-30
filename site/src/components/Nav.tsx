@@ -1,6 +1,9 @@
 import { useTheme } from '../ThemeContext';
 
-export default function Nav() {
+/**
+ * `page` is consumed by `NavLink` to show the active-route underline.
+ */
+export default function Nav(props: { page: string }) {
   const { theme, toggle } = useTheme();
 
   return (
@@ -34,14 +37,10 @@ export default function Nav() {
         </a>
 
         <div style={{ display: 'flex', gap: '20px', 'align-items': 'center' }}>
-          <a href="#/docs" style={{ color: 'var(--text-secondary)', 'font-size': '14px', 'font-weight': '500' }}>
-            Docs
-          </a>
-          <a href="#/demos" style={{ color: 'var(--text-secondary)', 'font-size': '14px', 'font-weight': '500' }}>
-            Demos
-          </a>
+          <NavLink href="#/docs"  label="Docs"  active={props.page === 'docs'} />
+          <NavLink href="#/demos" label="Demos" active={props.page === 'demos'} />
 
-          {/* Light / dark toggle */}
+          {/* On /demos this also switches to the last-used preset for the target mode. */}
           <button
             type="button"
             onClick={toggle}
@@ -94,5 +93,25 @@ export default function Nav() {
         </div>
       </div>
     </nav>
+  );
+}
+
+function NavLink(props: { href: string; label: string; active: boolean }) {
+  return (
+    <a
+      href={props.href}
+      aria-current={props.active ? 'page' : undefined}
+      style={{
+        color: props.active ? 'var(--text)' : 'var(--text-secondary)',
+        'font-size': '14px',
+        'font-weight': props.active ? 600 : 500,
+        position: 'relative',
+        'padding-bottom': '2px',
+        'border-bottom': props.active ? '2px solid var(--accent)' : '2px solid transparent',
+        transition: 'color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+      }}
+    >
+      {props.label}
+    </a>
   );
 }

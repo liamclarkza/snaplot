@@ -69,7 +69,7 @@ const FALLBACK_PALETTE = [
 
 function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
   const config = chart.getOptions();
-  const palette = config.theme?.palette ?? FALLBACK_PALETTE;
+  const palette = config.theme?.categoricalPalette ?? config.theme?.palette ?? FALLBACK_PALETTE;
 
   // Wiping innerHTML detaches the old <button> items and their click
   // handlers from the DOM; both become GC-eligible when this function

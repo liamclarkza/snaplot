@@ -1,5 +1,6 @@
 import type { ColumnarData } from '../types';
-import { viewportIndices } from './binarySearch';
+import type { ColumnarSegment, DataStore } from './DataStore';
+import { lowerBound, nearestIndex, upperBound, viewportIndices } from './binarySearch';
 
 /** Human-readable type description, used in validation error messages. */
 function describeType(v: unknown): string {
@@ -20,7 +21,7 @@ function describeType(v: unknown): string {
  * Per P3: the store never mutates user data. setData() swaps references.
  * append() creates new arrays internally.
  */
-export class ColumnarStore {
+export class ColumnarStore implements DataStore {
   private columns: Float64Array[];
 
   constructor(data: ColumnarData) {
@@ -100,6 +101,11 @@ export class ColumnarStore {
     return this.columns[index];
   }
 
+  /** Get raw physical column storage. Same as getColumn() for contiguous stores. */
+  getPhysicalColumn(index: number): Float64Array {
+    return this.columns[index];
+  }
+
   /** Number of data points */
   get length(): number {
     return this.columns[0].length;
@@ -123,6 +129,43 @@ export class ColumnarStore {
     return viewportIndices(this.columns[0], xMin, xMax);
   }
 
+  xAt(index: number): number {
+    return this.columns[0][index];
+  }
+
+  yAt(seriesIdx: number, index: number): number {
+    return this.columns[seriesIdx + 1][index];
+  }
+
+  valueAt(columnIdx: number, index: number): number {
+    return this.columns[columnIdx][index];
+  }
+
+  lowerBoundX(value: number): number {
+    return lowerBound(this.columns[0], value);
+  }
+
+  upperBoundX(value: number): number {
+    return upperBound(this.columns[0], value);
+  }
+
+  nearestXIndex(value: number): number {
+    return nearestIndex(this.columns[0], value);
+  }
+
+  getSegments(startIdx: number, endIdx: number): ColumnarSegment[] {
+    if (this.length === 0 || endIdx < startIdx) return [];
+    const logicalStart = Math.max(0, startIdx);
+    const logicalEnd = Math.min(this.length - 1, endIdx);
+    if (logicalEnd < logicalStart) return [];
+    return [{
+      logicalStart,
+      logicalEnd,
+      physicalStart: logicalStart,
+      physicalEnd: logicalEnd,
+    }];
+  }
+
   /** Replace all data */
   setData(data: ColumnarData): void {
     ColumnarStore.validate(data);
@@ -133,7 +176,9 @@ export class ColumnarStore {
    * Append new data points for streaming.
    * If maxLen is specified, evicts oldest points to stay within budget.
    */
-  append(data: ColumnarData, maxLen?: number): void {
+  append(data: ColumnarData, maxLen?: number): boolean {
+    ColumnarStore.validate(data);
+
     if (data.length !== this.columns.length) {
       throw new Error(
         `append() expects ${this.columns.length} columns to match the initial ` +
@@ -143,23 +188,42 @@ export class ColumnarStore {
       );
     }
 
+    if (maxLen !== undefined && (!Number.isInteger(maxLen) || maxLen < 0)) {
+      throw new Error(`append() maxLen must be a non-negative integer, received ${maxLen}.`);
+    }
+
     const addLen = data[0].length;
-    if (addLen === 0) return;
+    if (addLen === 0) return false;
 
     const curLen = this.length;
     const newLen = curLen + addLen;
 
+    if (curLen > 0 && data[0][0] < this.columns[0][curLen - 1]) {
+      throw new Error(
+        `append() X values must continue in non-decreasing order, but ` +
+          `new x[0] = ${data[0][0]} < current last X = ${this.columns[0][curLen - 1]}. ` +
+          `Append only newer points, or call setData() with a fully sorted dataset.`,
+      );
+    }
+
     if (maxLen !== undefined && newLen > maxLen) {
-      // Evict oldest points: keep the most recent (maxLen - addLen) from existing + all new
-      const keepFromExisting = Math.max(0, maxLen - addLen);
+      // Evict oldest points: keep the newest values across existing + appended
+      // data. If the appended chunk itself is larger than maxLen, keep only
+      // the tail of that chunk so the cap is always respected.
+      const targetLen = Math.min(maxLen, newLen);
+      const keepFromNew = Math.min(addLen, targetLen);
+      const keepFromExisting = targetLen - keepFromNew;
       const skipFromExisting = curLen - keepFromExisting;
+      const skipFromNew = addLen - keepFromNew;
 
       this.columns = this.columns.map((col, c) => {
-        const out = new Float64Array(keepFromExisting + addLen);
+        const out = new Float64Array(targetLen);
         if (keepFromExisting > 0) {
           out.set(col.subarray(skipFromExisting));
         }
-        out.set(data[c], keepFromExisting);
+        if (keepFromNew > 0) {
+          out.set(data[c].subarray(skipFromNew), keepFromExisting);
+        }
         return out;
       });
     } else {
@@ -171,6 +235,8 @@ export class ColumnarStore {
         return out;
       });
     }
+
+    return true;
   }
 
   /**

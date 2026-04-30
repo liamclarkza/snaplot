@@ -128,8 +128,7 @@ const config: ChartConfig<RunMeta> = {
           desc="Renders Step + values in a table below the chart on hover; series-only fallback keeps the layout stable when the cursor leaves."
           data={d_legend()}
           code={`{
-  // nice: false keeps the X axis tight to the data extent.
-  axes: { x: { nice: false }, y: { padding: 0.05 } },
+  axes: { x: { padding: 0 }, y: { padding: 0.05 } },
   series: [
     { label: 'live-training', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
     { label: 'failed-experiment', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
@@ -252,7 +251,12 @@ chart.on('cursor:move', () => {
   afterDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
 
   // Events
-  onCursorMove?(chart: ChartInstance, dataX: number | null, dataIdx: number | null): void;
+  onCursorMove?(
+    chart: ChartInstance,
+    dataX: number | null,
+    dataIdx: number | null,
+    origin: CursorEventOrigin,
+  ): void;
   onZoom?(chart: ChartInstance, scaleKey: string, range: ScaleRange): void;
   onClick?(chart: ChartInstance, dataX: number, dataIdx: number): void;
   onSetData?(chart: ChartInstance, data: ColumnarData): void;
@@ -284,7 +288,7 @@ chart.on('cursor:move', () => {
 plugins: [thresholdPlugin(75, '#e74c3c')]`} />
         <div style={{ height: '8px' }} />
         <Prose>
-          Return <code>true</code> from any <code>before*</code> hook to skip the default rendering for that layer, giving you full control over what gets drawn.
+          Return <code>false</code> from any <code>before*</code> hook to skip the default rendering for that layer, giving you full control over what gets drawn.
         </Prose>
       </Section>
     </>

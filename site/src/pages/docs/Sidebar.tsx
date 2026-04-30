@@ -70,6 +70,7 @@ export const NAV: NavItem[] = [
   { type: 'divider', label: 'API Reference' },
   { type: 'link', id: 'api-methods', label: 'ChartInstance Methods' },
   { type: 'link', id: 'api-events', label: 'Events' },
+  { type: 'link', id: 'api-scatter-options', label: 'Scatter Options' },
   { type: 'link', id: 'api-types', label: 'Types' },
 ];
 
