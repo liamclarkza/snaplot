@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-01
+
 ### Breaking
 - The root `snaplot` export is now framework-free. SolidJS components and
   primitives should be imported from `snaplot/solid`; core APIs remain
