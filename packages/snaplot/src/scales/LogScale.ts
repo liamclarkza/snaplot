@@ -11,6 +11,13 @@ export class LogScale implements Scale {
   max: number;
   private pxMin = 0;
   private pxMax = 0;
+  private cacheMin = Number.NaN;
+  private cacheMax = Number.NaN;
+  private cachePxMin = Number.NaN;
+  private cachePxMax = Number.NaN;
+  private logMin = 0;
+  private dataToPxScale = 0;
+  private pxToLogScale = 0;
 
   /** Minimum positive value to clamp to (avoid log(0)) */
   private static readonly EPSILON = 1e-10;
@@ -26,19 +33,14 @@ export class LogScale implements Scale {
   }
 
   dataToPixel(value: number): number {
-    const logMin = this.log(this.min);
-    const logMax = this.log(this.max);
-    const logDomain = logMax - logMin;
-    if (logDomain === 0) return this.pxMin;
-    return this.pxMin + ((this.log(value) - logMin) / logDomain) * (this.pxMax - this.pxMin);
+    if (!Number.isFinite(value) || value <= 0) return Number.NaN;
+    if (!this.updateTransformCache()) return this.pxMin;
+    return this.pxMin + (this.log(value) - this.logMin) * this.dataToPxScale;
   }
 
   pixelToData(pixel: number): number {
-    const logMin = this.log(this.min);
-    const logMax = this.log(this.max);
-    const pxRange = this.pxMax - this.pxMin;
-    if (pxRange === 0) return this.min;
-    const logValue = logMin + ((pixel - this.pxMin) / pxRange) * (logMax - logMin);
+    if (!this.updateTransformCache()) return this.min;
+    const logValue = this.logMin + (pixel - this.pxMin) * this.pxToLogScale;
     return Math.pow(10, logValue);
   }
 
@@ -76,5 +78,31 @@ export class LogScale implements Scale {
   setPixelRange(pxMin: number, pxMax: number): void {
     this.pxMin = pxMin;
     this.pxMax = pxMax;
+  }
+
+  private updateTransformCache(): boolean {
+    const logMin = this.log(this.min);
+    const logMax = this.log(this.max);
+    const logDomain = logMax - logMin;
+    const pxRange = this.pxMax - this.pxMin;
+    if (logDomain === 0 || pxRange === 0) return false;
+
+    if (
+      this.cacheMin === this.min &&
+      this.cacheMax === this.max &&
+      this.cachePxMin === this.pxMin &&
+      this.cachePxMax === this.pxMax
+    ) {
+      return true;
+    }
+
+    this.cacheMin = this.min;
+    this.cacheMax = this.max;
+    this.cachePxMin = this.pxMin;
+    this.cachePxMax = this.pxMax;
+    this.logMin = logMin;
+    this.dataToPxScale = pxRange / logDomain;
+    this.pxToLogScale = logDomain / pxRange;
+    return true;
   }
 }

@@ -179,7 +179,7 @@ export function renderAreaSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (yVal !== yVal) {
+      if (!Number.isFinite(yVal)) {
         if (hasSegment) {
           closeAndFillSegment();
           hasSegment = false;
@@ -189,6 +189,13 @@ export function renderAreaSegments(
 
       const px = scaleX.dataToPixel(xData[i]);
       const py = scaleY.dataToPixel(yVal);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) {
+        if (hasSegment) {
+          closeAndFillSegment();
+          hasSegment = false;
+        }
+        continue;
+      }
 
       if (!hasSegment) {
         ctx.beginPath();
@@ -213,9 +220,10 @@ export function renderAreaSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (yVal !== yVal) { hasPath = false; continue; }
+      if (!Number.isFinite(yVal)) { hasPath = false; continue; }
       const px = scaleX.dataToPixel(xData[i]);
       const py = scaleY.dataToPixel(yVal);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) { hasPath = false; continue; }
       if (!hasPath) { ctx.moveTo(px, py); hasPath = true; }
       else { ctx.lineTo(px, py); }
     }
@@ -326,7 +334,13 @@ export function renderBandSegments(
     const { xData, centerYData, upperYData, lowerYData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const u = upperYData[i], l = lowerYData[i];
-      const valid = u === u && l === l;
+      const valid =
+        Number.isFinite(xData[i]) &&
+        Number.isFinite(u) &&
+        Number.isFinite(l) &&
+        Number.isFinite(scaleX.dataToPixel(xData[i])) &&
+        Number.isFinite(scaleY.dataToPixel(u)) &&
+        Number.isFinite(scaleY.dataToPixel(l));
       if (valid && runStart < 0) {
         runStart = i;
       } else if (!valid) {
@@ -358,9 +372,10 @@ export function renderBandSegments(
       const { xData, centerYData, startIdx, endIdx } = segment;
       for (let i = startIdx; i <= endIdx; i++) {
         const yVal = centerYData[i];
-        if (yVal !== yVal) { moved = false; continue; }
+        if (!Number.isFinite(yVal)) { moved = false; continue; }
         const px = scaleX.dataToPixel(xData[i]);
         const py = scaleY.dataToPixel(yVal);
+        if (!Number.isFinite(px) || !Number.isFinite(py)) { moved = false; continue; }
         if (!moved) { ctx.moveTo(px, py); moved = true; }
         else { ctx.lineTo(px, py); }
       }
@@ -393,10 +408,11 @@ function drawLinearSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (yVal !== yVal) { moved = false; continue; } // NaN gap
+      if (!Number.isFinite(yVal)) { moved = false; continue; }
 
       const px = scaleX.dataToPixel(xData[i]);
       const py = scaleY.dataToPixel(yVal);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) { moved = false; continue; }
 
       if (!moved) { ctx.moveTo(px, py); moved = true; }
       else { ctx.lineTo(px, py); }
@@ -421,10 +437,11 @@ function drawSteppedSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (yVal !== yVal) { moved = false; continue; }
+      if (!Number.isFinite(yVal)) { moved = false; continue; }
 
       const px = scaleX.dataToPixel(xData[i]);
       const py = scaleY.dataToPixel(yVal);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) { moved = false; continue; }
 
       if (!moved) {
         ctx.moveTo(px, py);
@@ -465,25 +482,48 @@ function drawMonotoneCubicSegments(
   scaleX: Scale,
   scaleY: Scale,
 ): void {
-  // Collect valid (non-NaN) points
-  const px: number[] = [];
-  const py: number[] = [];
+  ctx.beginPath();
+  let px: number[] = [];
+  let py: number[] = [];
+
+  const flushRun = () => {
+    drawMonotoneRun(ctx, px, py);
+    px = [];
+    py = [];
+  };
 
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (yVal !== yVal) continue;
-      px.push(scaleX.dataToPixel(xData[i]));
-      py.push(scaleY.dataToPixel(yVal));
+      if (!Number.isFinite(yVal)) {
+        flushRun();
+        continue;
+      }
+      const x = scaleX.dataToPixel(xData[i]);
+      const y = scaleY.dataToPixel(yVal);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        flushRun();
+        continue;
+      }
+      px.push(x);
+      py.push(y);
     }
+    flushRun();
   }
 
+  flushRun();
+}
+
+function drawMonotoneRun(
+  ctx: CanvasRenderingContext2D,
+  px: number[],
+  py: number[],
+): void {
   const n = px.length;
   if (n === 0) return;
-  if (n === 1) { ctx.beginPath(); ctx.moveTo(px[0], py[0]); return; }
+  if (n === 1) { ctx.moveTo(px[0], py[0]); return; }
   if (n === 2) {
-    ctx.beginPath();
     ctx.moveTo(px[0], py[0]);
     ctx.lineTo(px[1], py[1]);
     return;
@@ -536,7 +576,6 @@ function drawMonotoneCubicSegments(
   }
 
   // Draw using bezierCurveTo
-  ctx.beginPath();
   ctx.moveTo(px[0], py[0]);
 
   for (let i = 0; i < n - 1; i++) {

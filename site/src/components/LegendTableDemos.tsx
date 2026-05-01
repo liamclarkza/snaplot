@@ -1,9 +1,5 @@
 import { createSignal, createMemo, createEffect, onCleanup, For } from 'solid-js';
 import {
-  Chart,
-  LegendTable,
-  createChartGroup,
-  createCursorSnapshot,
   nameColumn,
   valueColumn,
   metricColumn,
@@ -12,6 +8,12 @@ import {
   lightTheme,
   darkTheme,
 } from 'snaplot';
+import {
+  Chart,
+  LegendTable,
+  createChartGroup,
+  createCursorSnapshot,
+} from 'snaplot/solid';
 import { useTheme } from '../ThemeContext';
 import type {
   ChartConfig,

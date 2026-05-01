@@ -1,22 +1,22 @@
 # snaplot Wishlist
 
-## Identity-Based Highlight Sync
+## Completed
+
+### Identity-Based Highlight Sync
 
 Orbit found a cross-chart highlight mismatch when multiple charts share a
 highlight sync group but do not have identical series sets or ordering.
-`snaplot` currently publishes numeric `seriesIndex` values through
-`highlight.syncKey`; receiving charts interpret that index against their own
-local series array, which can highlight the wrong run.
+`snaplot` now supports stable-key highlight sync through `highlight.getKey`,
+`chart.setHighlightKey()`, `chart.getHighlightKey()`, and
+`group.highlightKey()`. Numeric index sync remains the default for simple
+charts with identical series ordering.
 
-Wanted behavior:
+Shipped behavior:
 
-- Allow highlight sync to use stable series identity instead of only local
-  numeric index.
-- Support identity from `SeriesConfig.meta`, for example `meta.runId`.
-- Publish the identity through the sync group and let each receiving chart map
-  it back to its own local series index.
-- Keep numeric index sync as the default for simple charts with identical
-  series ordering.
+- Highlight sync can use stable series identity instead of only local numeric index.
+- Identity can come from `SeriesConfig.meta`, for example `meta.runId`.
+- The sync group publishes identity payloads and receivers map them to local series indexes.
+- Numeric index sync is still the default for identical series ordering.
 
 Possible API shape:
 
@@ -24,15 +24,6 @@ Possible API shape:
 highlight: {
   syncKey: "project-charts",
   getKey: (series) => series.meta?.runId,
-}
-```
-
-or:
-
-```ts
-highlight: {
-  syncKey: "project-charts",
-  identity: "meta.runId",
 }
 ```
 

@@ -108,12 +108,13 @@ export class HitTester {
 
       const idx = store.nearestXIndex(xScale.pixelToData(pixelX));
       const yVal = store.yAt(colIdx - 1, idx);
-      if (yVal !== yVal) continue; // NaN
+      if (!Number.isFinite(yVal)) continue;
 
       const yAxisKey = sc.yAxisKey ?? 'y';
       const yScale = scales.get(yAxisKey);
       if (yScale) {
         const py = yScale.dataToPixel(yVal);
+        if (!Number.isFinite(py)) continue;
         closestYDist = Math.min(closestYDist, Math.abs(py - pixelY));
       }
 
@@ -197,11 +198,12 @@ export class HitTester {
 
       for (let i = startIdx; i <= endIdx; i++) {
         const yVal = store.yAt(colIdx - 1, i);
-        if (yVal !== yVal) continue;
+        if (!Number.isFinite(yVal)) continue;
 
         const xVal = store.xAt(i);
         const px = xScale.dataToPixel(xVal);
         const py = yScale.dataToPixel(yVal);
+        if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
 
         const dist = (px - pixelX) ** 2 + (py - pixelY) ** 2;
         if (dist < bestDist) {

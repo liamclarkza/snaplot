@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderArea, renderBand } from './LineRenderer';
+import { renderArea, renderBand, renderLine } from './LineRenderer';
 import type { Layout, Scale, SeriesConfig } from '../types';
 
 const f = (xs: number[]) => Float64Array.from(xs);
@@ -38,6 +38,7 @@ function createContext(): CanvasRenderingContext2D {
     clip: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
+    bezierCurveTo: vi.fn(),
     closePath: vi.fn(),
     fill: vi.fn(),
     stroke: vi.fn(),
@@ -99,5 +100,58 @@ describe('filled line renderers', () => {
 
     expect(ctx.fill).toHaveBeenCalledTimes(2);
     expect(ctx.stroke).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('line gap rendering', () => {
+  it('renders monotone interpolation as separate finite runs around NaN gaps', () => {
+    const ctx = createContext();
+    const scale = createScale();
+    const layout = createLayout();
+    const series: SeriesConfig = { label: 'line', dataIndex: 1, type: 'line', interpolation: 'monotone' };
+
+    renderLine(
+      ctx,
+      f([0, 1, 2, 3, 4, 5, 6]),
+      f([1, 2, 3, NaN, 4, 5, 6]),
+      0,
+      6,
+      scale,
+      scale,
+      layout,
+      series,
+      '#4e79a7',
+    );
+
+    expect(ctx.moveTo).toHaveBeenCalledTimes(2);
+    expect(ctx.bezierCurveTo).toHaveBeenCalledTimes(4);
+  });
+
+  it('treats non-positive log-scale Y values as gaps', () => {
+    const ctx = createContext();
+    const xScale = createScale();
+    const yScale = {
+      ...createScale(),
+      type: 'log' as const,
+      dataToPixel: (value: number) => value > 0 ? value : Number.NaN,
+    };
+    const layout = createLayout();
+    const series: SeriesConfig = { label: 'loss', dataIndex: 1, type: 'line' };
+
+    renderLine(
+      ctx,
+      f([0, 1, 2]),
+      f([1, 0, 2]),
+      0,
+      2,
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+    );
+
+    expect(ctx.moveTo).toHaveBeenCalledTimes(2);
+    expect(ctx.lineTo).not.toHaveBeenCalled();
   });
 });

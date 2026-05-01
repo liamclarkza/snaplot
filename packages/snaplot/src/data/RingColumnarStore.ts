@@ -199,7 +199,7 @@ export class RingColumnarStore implements DataStore {
       if (!col) continue;
       for (let i = start; i <= end; i++) {
         const v = col[this.physicalIndex(i)];
-        if (v !== v) continue;
+        if (!Number.isFinite(v)) continue;
         if (v < min) min = v;
         if (v > max) max = v;
       }

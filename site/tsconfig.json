@@ -8,7 +8,13 @@
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "snaplot": ["../packages/snaplot/src/index.ts"],
+      "snaplot/core": ["../packages/snaplot/src/core.ts"],
+      "snaplot/solid": ["../packages/snaplot/src/solid.ts"]
+    }
   },
   "include": ["src/**/*"]
 }

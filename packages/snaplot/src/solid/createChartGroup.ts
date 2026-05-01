@@ -1,6 +1,6 @@
 import { createSignal, type Accessor } from 'solid-js';
 import { SyncGroup } from '../core/EventBus';
-import type { ChartConfig } from '../types';
+import type { ChartConfig, HighlightSyncKey } from '../types';
 
 let groupCounter = 0;
 
@@ -54,11 +54,17 @@ export interface ChartGroup {
   /** Push a highlight to all charts in the group (or `null` to clear). */
   highlight(seriesIndex: number | null): void;
 
+  /** Push a stable-key highlight to all charts in the group. */
+  highlightKey(key: HighlightSyncKey | null): void;
+
   /** Push a cursor X (data-space) to all charts in the group (or `null`). */
   cursor(dataX: number | null): void;
 
   /** Reactively track the most recent highlight broadcast from this handle. */
   highlightedSeries: Accessor<number | null>;
+
+  /** Reactively track the most recent stable-key highlight broadcast. */
+  highlightedKey: Accessor<HighlightSyncKey | null>;
 
   /** Reactively track the most recent cursor broadcast from this handle. */
   cursorDataX: Accessor<number | null>;
@@ -73,6 +79,7 @@ export interface ChartGroup {
 export function createChartGroup(): ChartGroup {
   const syncKey = `__snaplot_group_${++groupCounter}`;
   const [highlightedSeries, setHighlight] = createSignal<number | null>(null);
+  const [highlightedKey, setHighlightKey] = createSignal<HighlightSyncKey | null>(null);
   const [cursorDataX, setCursor] = createSignal<number | null>(null);
 
   // SyncGroup.publishHighlight/publishCursor compare peers by reference.
@@ -100,7 +107,14 @@ export function createChartGroup(): ChartGroup {
 
     highlight(seriesIndex) {
       setHighlight(seriesIndex);
+      setHighlightKey(null);
       SyncGroup.publishHighlight(syncKey, SOURCE, { type: 'index', seriesIndex });
+    },
+
+    highlightKey(key) {
+      setHighlight(null);
+      setHighlightKey(key);
+      SyncGroup.publishHighlight(syncKey, SOURCE, { type: 'key', key });
     },
 
     cursor(dataX) {
@@ -109,6 +123,7 @@ export function createChartGroup(): ChartGroup {
     },
 
     highlightedSeries,
+    highlightedKey,
     cursorDataX,
 
     syncKey,

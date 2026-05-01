@@ -1,5 +1,6 @@
 import { createSignal, createMemo, onCleanup } from 'solid-js';
-import { Chart, createLegendPlugin, darkTheme, lightTheme } from 'snaplot';
+import { createLegendPlugin, darkTheme, lightTheme } from 'snaplot';
+import { Chart } from 'snaplot/solid';
 import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
 import { Button } from '../components/ui';
@@ -59,7 +60,8 @@ function generateCores(): { data: ColumnarData; tail: CoreState } {
   return { data: [x, c0, c1, c2, c3], tail: s };
 }
 
-const heroCode = `import { Chart, createLegendPlugin } from 'snaplot';
+const heroCode = `import { createLegendPlugin } from 'snaplot';
+import { Chart } from 'snaplot/solid';
 
 <Chart
   config={{

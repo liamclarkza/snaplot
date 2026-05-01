@@ -40,6 +40,14 @@ export class TimeScale implements Scale {
   max: number;
   private pxMin = 0;
   private pxMax = 0;
+  private cacheMin = Number.NaN;
+  private cacheMax = Number.NaN;
+  private cachePxMin = Number.NaN;
+  private cachePxMax = Number.NaN;
+  private dataToPxScale = 0;
+  private dataToPxOffset = 0;
+  private pxToDataScale = 0;
+  private pxToDataOffset = 0;
 
   constructor(key: string, min = 0, max = Date.now()) {
     this.key = key;
@@ -48,15 +56,13 @@ export class TimeScale implements Scale {
   }
 
   dataToPixel(value: number): number {
-    const domain = this.max - this.min;
-    if (domain === 0) return this.pxMin;
-    return this.pxMin + ((value - this.min) / domain) * (this.pxMax - this.pxMin);
+    if (!this.updateTransformCache()) return this.pxMin;
+    return value * this.dataToPxScale + this.dataToPxOffset;
   }
 
   pixelToData(pixel: number): number {
-    const pxRange = this.pxMax - this.pxMin;
-    if (pxRange === 0) return this.min;
-    return this.min + ((pixel - this.pxMin) / pxRange) * (this.max - this.min);
+    if (!this.updateTransformCache()) return this.min;
+    return pixel * this.pxToDataScale + this.pxToDataOffset;
   }
 
   // `count` matches the Scale interface but TimeScale sizes its ticks from
@@ -165,5 +171,30 @@ export class TimeScale implements Scale {
     }
     // Beyond 1 year: use multiples of years
     return Math.ceil(rawStep / 31536000000) * 31536000000;
+  }
+
+  private updateTransformCache(): boolean {
+    const domain = this.max - this.min;
+    const pxRange = this.pxMax - this.pxMin;
+    if (domain === 0 || pxRange === 0) return false;
+
+    if (
+      this.cacheMin === this.min &&
+      this.cacheMax === this.max &&
+      this.cachePxMin === this.pxMin &&
+      this.cachePxMax === this.pxMax
+    ) {
+      return true;
+    }
+
+    this.cacheMin = this.min;
+    this.cacheMax = this.max;
+    this.cachePxMin = this.pxMin;
+    this.cachePxMax = this.pxMax;
+    this.dataToPxScale = pxRange / domain;
+    this.dataToPxOffset = this.pxMin - this.min * this.dataToPxScale;
+    this.pxToDataScale = domain / pxRange;
+    this.pxToDataOffset = this.min - this.pxMin * this.pxToDataScale;
+    return true;
   }
 }

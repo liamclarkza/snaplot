@@ -53,7 +53,7 @@ export function createChart<TMeta = unknown>(
     on(
       config,
       (c) => {
-        chart()?.setOptions(c as ChartConfig);
+        chart()?.replaceOptions(c as ChartConfig);
       },
       { defer: true },
     ),

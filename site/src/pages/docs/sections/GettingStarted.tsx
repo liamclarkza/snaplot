@@ -11,18 +11,18 @@ export default function GettingStarted() {
       <Section id="install" title="Installation">
         <CodeBlock code="npm install snaplot" />
         <div style={{ height: '12px' }} />
-        <Prose>Zero runtime dependencies. Requires <code>solid-js ^1.9.0</code> as a peer dependency.</Prose>
-        <CodeBlock code={`import { Chart } from 'snaplot';
+        <Prose>The core entry is framework-free. Solid components and primitives are imported from <code>snaplot/solid</code> and require <code>solid-js ^1.9.0</code>.</Prose>
+        <CodeBlock code={`import { Chart } from 'snaplot/solid';
 import type { ColumnarData, ChartConfig } from 'snaplot';`} />
       </Section>
 
       <Section id="quick-start" title="Quick Start">
         <Prose>A minimal working chart: create columnar data, define a config, and render with <code>&lt;Chart&gt;</code>.</Prose>
-        <CodeBlock code={`import { Chart } from 'snaplot';
+        <CodeBlock code={`import { Chart } from 'snaplot/solid';
 import type { ColumnarData, ChartConfig } from 'snaplot';
 
 const data: ColumnarData = [
-  new Float64Array(timestamps),  // X values (sorted)
+  new Float64Array(timestamps),  // finite X values (sorted ascending)
   new Float64Array(values),      // Y series 1
 ];
 
@@ -47,8 +47,8 @@ const config: ChartConfig = {
 
       <Section id="data-model" title="Data Model">
         <Prose>
-          snaplot uses a <b>columnar data format</b> built on <code>Float64Array</code>s. Index 0 is always the X axis (must be sorted ascending).
-          Indices 1+ are Y series. All arrays must be the same length. <code>NaN</code> in any Y array creates a gap in that series.
+          snaplot uses a <b>columnar data format</b> built on <code>Float64Array</code>s. Index 0 is always the X axis and must contain finite values sorted ascending.
+          Indices 1+ are Y/value columns. All arrays must be the same length. <code>NaN</code> in any Y array creates a gap in that series, and infinities are ignored by range calculations.
         </Prose>
         <CodeBlock code={`// Columnar format: [x, y1, y2, ...]
 const data: ColumnarData = [

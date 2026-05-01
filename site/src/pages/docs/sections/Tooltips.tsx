@@ -33,9 +33,9 @@ export default function Tooltips() {
       <Section id="tooltip-custom" title="Custom Tooltip Renderer">
         <Prose>
           Pass a <code>tooltip.render</code> function for full control over tooltip content.
-          It receives an array of <code>TooltipPoint</code> objects and should return an HTML string or an <code>HTMLElement</code>.
+          It receives an array of <code>TooltipPoint</code> objects and can return an <code>HTMLElement</code>. Prefer DOM nodes with <code>textContent</code> when values may contain user-controlled text.
         </Prose>
-        <Demo title="Custom tooltip HTML" desc="Edit the render function to change tooltip formatting"
+        <Demo title="Custom tooltip renderer" desc="Edit the render function to change tooltip formatting"
           data={d_tooltip_custom()}
           code={`{
   axes: { x: { type: 'time' } },
@@ -46,16 +46,31 @@ export default function Tooltips() {
   tooltip: {
     show: true,
     mode: 'index',
-    render: (points) =>
-      '<div style="font-size:12px">' +
-      points.map(p =>
-        '<div style="display:flex;gap:8px;align-items:center">' +
-        '<span style="width:8px;height:8px;border-radius:50%;background:' + p.color + '"></span>' +
-        '<span>' + p.label + '</span>' +
-        '<b style="margin-left:auto">$' + Number(p.formattedY).toFixed(1) + '</b>' +
-        '</div>'
-      ).join('') +
-      '</div>',
+    render: (points) => {
+      const root = document.createElement('div');
+      root.style.fontSize = '12px';
+      for (const p of points) {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '8px';
+        row.style.alignItems = 'center';
+
+        const swatch = document.createElement('span');
+        swatch.style.cssText = 'width:8px;height:8px;border-radius:50%';
+        swatch.style.background = p.color;
+
+        const label = document.createElement('span');
+        label.textContent = p.label;
+
+        const value = document.createElement('b');
+        value.style.marginLeft = 'auto';
+        value.textContent = '$' + Number(p.formattedY).toFixed(1);
+
+        row.append(swatch, label, value);
+        root.append(row);
+      }
+      return root;
+    },
   },
 }`} />
         <Prose>Each <code>TooltipPoint</code> contains: <code>seriesIndex</code>, <code>dataIndex</code>, <code>label</code>, <code>x</code>, <code>y</code>, <code>color</code>, <code>formattedX</code>, <code>formattedY</code>.</Prose>

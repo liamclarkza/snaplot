@@ -3,11 +3,21 @@ import { highlight } from 'sugar-high';
 
 export default function CodeBlock(props: { code: string; lang?: string }) {
   const [copied, setCopied] = createSignal(false);
+  const [status, setStatus] = createSignal('');
 
-  const copy = () => {
-    navigator.clipboard.writeText(props.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(props.code);
+      setCopied(true);
+      setStatus('Code copied.');
+      setTimeout(() => {
+        setCopied(false);
+        setStatus('');
+      }, 2000);
+    } catch {
+      setCopied(false);
+      setStatus('Copy failed.');
+    }
   };
 
   const highlighted = () => highlight(props.code);
@@ -43,7 +53,10 @@ export default function CodeBlock(props: { code: string; lang?: string }) {
       >
         {copied() ? 'Copied!' : 'Copy'}
       </button>
-      <pre style={{ padding: '16px 20px', margin: 0, 'white-space': 'pre', 'overflow-x': 'auto' }}><code innerHTML={highlighted()} /></pre>
+      <div role="status" aria-live="polite" style={{ position: 'absolute', left: '16px', bottom: '8px', color: 'var(--text-secondary)', 'font-size': '11px', 'pointer-events': 'none' }}>
+        {status()}
+      </div>
+      <pre style={{ padding: '44px 20px 28px', margin: 0, 'white-space': 'pre', 'overflow-x': 'auto' }}><code innerHTML={highlighted()} /></pre>
     </div>
   );
 }

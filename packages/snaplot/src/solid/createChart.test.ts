@@ -14,6 +14,7 @@ const mockState = vi.hoisted(() => ({
     data: ColumnarData;
     setData: ReturnType<typeof vi.fn>;
     setOptions: ReturnType<typeof vi.fn>;
+    replaceOptions: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
   }>,
 }));
@@ -25,6 +26,7 @@ vi.mock('../core/Chart', () => ({
     data: ColumnarData;
     setData = vi.fn();
     setOptions = vi.fn();
+    replaceOptions = vi.fn();
     destroy = vi.fn();
 
     constructor(el: HTMLElement, config: ChartConfig, data: ColumnarData) {
@@ -75,7 +77,7 @@ describe('createChart', () => {
       await tick();
 
       expect(mockState.instances).toHaveLength(1);
-      expect(first.setOptions).toHaveBeenCalledWith(nextConfig);
+      expect(first.replaceOptions).toHaveBeenCalledWith(nextConfig);
 
       dispose();
       expect(first.destroy).toHaveBeenCalledTimes(1);

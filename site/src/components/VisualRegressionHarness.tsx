@@ -1,4 +1,4 @@
-import { Chart } from 'snaplot';
+import { Chart } from 'snaplot/solid';
 import type { ChartConfig, ColumnarData } from 'snaplot';
 import type { JSX } from 'solid-js';
 

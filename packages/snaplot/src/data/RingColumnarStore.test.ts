@@ -41,7 +41,7 @@ describe('RingColumnarStore', () => {
   });
 
   it('searches and ranges in logical order across wrap', () => {
-    const store = new RingColumnarStore([f([1, 2, 3, 4, 5]), f([10, 20, 30, NaN, 50])], 5);
+    const store = new RingColumnarStore([f([1, 2, 3, 4, 5]), f([10, 20, 30, NaN, Infinity])], 5);
     store.append([f([6, 7]), f([60, 70])]);
 
     expect(store.nearestXIndex(5.6)).toBe(3);

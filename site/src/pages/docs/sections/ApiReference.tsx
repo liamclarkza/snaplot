@@ -237,7 +237,8 @@ tooltipFields: [
   CursorSnapshotOptions, // { fallback?: 'hide' | 'latest' | 'first' }
 
   // Highlight (cross-chart series focus)
-  HighlightConfig,     // { enabled, dimOpacity, syncKey }
+  HighlightConfig,     // { enabled, dimOpacity, syncKey, getKey }
+  HighlightSyncKey,    // string | number stable series identity
 
   // Theme & Layout
   ThemeConfig,         // Full theme object
@@ -253,6 +254,9 @@ tooltipFields: [
   LegendTableColumn,   // Column spec shared by plugin and <LegendTable>
   LegendCellContent,   // string | Node returned by cell()
 
+} from 'snaplot';
+
+import type {
   // SolidJS component
   LegendTableProps,        // <LegendTable> props
   LegendTableSolidColumn,  // JSX-flavored column (cell returns JSX.Element)
@@ -261,7 +265,7 @@ tooltipFields: [
   // Chart groups (multi-chart sync helpers)
   ChartGroup,          // createChartGroup() handle
   ChartGroupBindings,  // What bind() returns
-} from 'snaplot';`} />
+} from 'snaplot/solid';`} />
       </Section>
     </>
   );

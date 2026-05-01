@@ -312,7 +312,7 @@ export interface CursorConfig {
   indicators?: boolean;
   color?: string;
   dash?: number[];
-  syncKey?: string;
+  syncKey?: string | null;
   syncTooltip?: boolean;
 }
 
@@ -360,7 +360,7 @@ export interface ZoomConfig {
    * Uses the same SyncGroup registry as cursor/highlight sync. An
    * equality guard prevents infinite broadcast loops.
    */
-  syncKey?: string;
+  syncKey?: string | null;
 }
 
 export interface PanConfig {
@@ -515,7 +515,7 @@ export interface HighlightConfig<TMeta = unknown> {
    * `cursor.syncKey` semantics, charts sharing a key publish/receive
    * highlight changes from each other.
    */
-  syncKey?: string;
+  syncKey?: string | null;
   /**
    * Optional stable identity resolver for cross-chart highlight sync.
    *
@@ -726,8 +726,14 @@ export interface ChartInstance {
   /** Get a scale by axis key */
   getAxis(key: string): Scale | undefined;
 
-  /** Merge config updates (ECharts setOption style) */
+  /** Merge config updates. Arrays such as `series` replace by value. */
   setOptions(config: DeepPartial<ChartConfig>): void;
+  /**
+   * Replace the chart config declaratively, resolving defaults again and
+   * dropping keys omitted from the new config. Solid wrappers use this for
+   * full `config` signal updates.
+   */
+  replaceOptions(config: ChartConfig): void;
   /** Get resolved config */
   getOptions(): ChartConfig;
 
@@ -741,8 +747,8 @@ export interface ChartInstance {
   /** Destroy and clean up all resources */
   destroy(): void;
 
-  /** Register a plugin */
-  use(plugin: Plugin): void;
+  /** Register a plugin. Returns false when a plugin with the same id is already registered. */
+  use(plugin: Plugin): boolean;
 
   /** Subscribe to chart events */
   on<K extends keyof ChartEventMap>(event: K, handler: ChartEventMap[K]): () => void;
@@ -776,6 +782,15 @@ export interface ChartInstance {
   getHighlight(): number | null;
 
   /**
+   * Highlight by stable identity. Requires `highlight.getKey`; when no
+   * visible series resolves to the key the highlight is cleared.
+   */
+  setHighlightKey(key: HighlightSyncKey | null): void;
+
+  /** Currently highlighted stable identity key, or `null`. */
+  getHighlightKey(): HighlightSyncKey | null;
+
+  /**
    * Lightweight diagnostics for benchmark demos and local debugging.
    * Returns a copy so callers cannot mutate internal counters.
    */
@@ -800,6 +815,7 @@ export interface ChartEventMap {
   'highlight:change': (seriesIndex: number | null) => void;
   'viewport:change': (scaleKey: string, range: ScaleRange) => void;
   'data:update': (data: ColumnarData) => void;
+  'options:update': (config: ChartConfig) => void;
   'resize': (width: number, height: number) => void;
   'click': (dataX: number, dataIdx: number) => void;
   'select': (selection: SelectionResult) => void;

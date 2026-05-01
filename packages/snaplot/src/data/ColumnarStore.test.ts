@@ -43,6 +43,13 @@ describe('ColumnarStore construction + validate', () => {
       .toThrow(/binary search/);
   });
 
+  it('rejects non-finite X values before binary search can observe them', () => {
+    expect(() => new ColumnarStore([f([1, NaN, 3]), f([10, 20, 30])]))
+      .toThrow(/X values must be finite/);
+    expect(() => new ColumnarStore([f([1, Infinity, 3]), f([10, 20, 30])]))
+      .toThrow(/x\[1\] = Infinity/);
+  });
+
   it('accepts equal (non-decreasing) X values', () => {
     expect(() => new ColumnarStore([f([1, 2, 2, 3]), f([1, 2, 3, 4])])).not.toThrow();
   });
@@ -125,9 +132,9 @@ describe('append', () => {
 });
 
 describe('yRange', () => {
-  it('returns [min, max] across selected series, skipping NaN', () => {
-    const store = new ColumnarStore([f([1, 2, 3, 4]), f([10, NaN, 5, 20])]);
-    expect(store.yRange([0], 0, 3)).toEqual([5, 20]);
+  it('returns [min, max] across selected series, skipping non-finite values', () => {
+    const store = new ColumnarStore([f([1, 2, 3, 4, 5]), f([10, NaN, Infinity, 5, 20])]);
+    expect(store.yRange([0], 0, 4)).toEqual([5, 20]);
   });
 
   it('returns [0, 1] fallback when all values are NaN', () => {

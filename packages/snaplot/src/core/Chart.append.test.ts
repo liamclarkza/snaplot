@@ -260,6 +260,125 @@ describe('ChartCore appendData', () => {
   });
 });
 
+describe('ChartCore runtime options', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', new MockDocument());
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('replaces series arrays instead of retaining stale entries', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        series: [
+          { label: 'loss', dataIndex: 1 },
+          { label: 'accuracy', dataIndex: 2 },
+        ],
+      },
+      [f([1, 2]), f([10, 20]), f([0.5, 0.6])],
+    );
+
+    chart.setOptions({ series: [{ label: 'loss only', dataIndex: 1 }] });
+
+    expect(chart.getOptions().series).toEqual([{ label: 'loss only', dataIndex: 1 }]);
+    chart.destroy();
+  });
+
+  it('replaceOptions drops config keys omitted from the next declarative config', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { y2: { position: 'right', type: 'linear' } },
+        cursor: { syncKey: 'old-group' },
+        series: [{ label: 'loss', dataIndex: 1, yAxisKey: 'y2' }],
+      },
+      [f([1, 2]), f([10, 20])],
+    );
+
+    chart.replaceOptions({ series: [{ label: 'loss', dataIndex: 1 }] });
+
+    expect(chart.getOptions().axes?.y2).toBeUndefined();
+    expect(chart.getAxis('y2')).toBeUndefined();
+    expect(chart.getOptions().cursor?.syncKey).toBeUndefined();
+    chart.destroy();
+  });
+
+  it('emits options:update after runtime config changes', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { series: [{ label: 'value', dataIndex: 1 }] },
+      [f([1, 2]), f([10, 20])],
+    );
+    const seen: number[] = [];
+    chart.on('options:update', (config) => seen.push(config.series.length));
+
+    chart.setOptions({ series: [{ label: 'a', dataIndex: 1 }, { label: 'b', dataIndex: 1 }] });
+    chart.replaceOptions({ series: [{ label: 'a', dataIndex: 1 }] });
+
+    expect(seen).toEqual([2, 1]);
+    chart.destroy();
+  });
+
+  it('returns false when registering a duplicate plugin id at runtime', () => {
+    const plugin: Plugin = { id: 'runtime-plugin', install: vi.fn() };
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { series: [{ label: 'value', dataIndex: 1 }] },
+      [f([1, 2]), f([10, 20])],
+    );
+
+    expect(chart.use(plugin)).toBe(true);
+    expect(chart.use({ id: 'runtime-plugin', install: vi.fn() })).toBe(false);
+    expect(plugin.install).toHaveBeenCalledTimes(1);
+
+    chart.destroy();
+  });
+
+  it('rebinds cursor sync groups when sync keys are added, changed, or cleared', () => {
+    const data: ColumnarData = [f([0, 50, 100]), f([0, 1, 0])];
+    const chartA = new ChartCore(
+      document.createElement('div'),
+      { series: [{ label: 'value', dataIndex: 1 }] },
+      data,
+    );
+    const chartB = new ChartCore(
+      document.createElement('div'),
+      { cursor: { syncKey: 'group-a' }, series: [{ label: 'value', dataIndex: 1 }] },
+      data,
+    );
+    const chartC = new ChartCore(
+      document.createElement('div'),
+      { cursor: { syncKey: 'group-b' }, series: [{ label: 'value', dataIndex: 1 }] },
+      data,
+    );
+
+    chartA.setOptions({ cursor: { syncKey: 'group-a' } });
+    chartEventBus(chartA).emit('action:cursor', { ...plotPoint(chartA, 0.5), pointerType: 'mouse' });
+    expect(chartB.getCursorSnapshot({ fallback: 'hide' }).source).toBe('cursor');
+    expect(chartC.getCursorSnapshot({ fallback: 'hide' }).source).toBe('none');
+
+    chartA.setOptions({ cursor: { syncKey: 'group-b' } });
+    chartEventBus(chartA).emit('action:cursor', { ...plotPoint(chartA, 0.8), pointerType: 'mouse' });
+    expect(chartB.getCursorSnapshot({ fallback: 'hide' }).dataX).toBe(50);
+    expect(chartC.getCursorSnapshot({ fallback: 'hide' }).dataX).toBe(100);
+
+    chartA.setOptions({ cursor: { syncKey: null } });
+    chartEventBus(chartA).emit('action:cursor', { ...plotPoint(chartA, 0.2), pointerType: 'mouse' });
+    expect(chartC.getCursorSnapshot({ fallback: 'hide' }).dataX).toBe(100);
+
+    chartA.destroy();
+    chartB.destroy();
+    chartC.destroy();
+  });
+});
+
 describe('ChartCore cursor sync', () => {
   beforeEach(() => {
     vi.stubGlobal('document', new MockDocument());
@@ -444,6 +563,25 @@ describe('ChartCore histogram cursor', () => {
       dataX: 2.5,
       formattedX: '2.0 \u2013 3.0',
     });
+
+    chart.destroy();
+  });
+
+  it('keeps baseline padding when x zoom shows only positive histogram bins', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
+        series: [{ label: 'count', dataIndex: 1, type: 'histogram' }],
+      },
+      [f([0, 1, 2, 3, 4]), f([0, 100, 120, 80, 0])],
+    );
+
+    chart.setAxis('x', { min: 1.2, max: 2.8 });
+
+    const yScale = chart.getAxis('y')!;
+    expect(yScale.min).toBeLessThan(0);
+    expect(yScale.max).toBeGreaterThan(120);
 
     chart.destroy();
   });
@@ -762,5 +900,48 @@ describe('ChartCore highlight sync', () => {
     chartA.destroy();
     chartB.destroy();
     chartC.destroy();
+  });
+
+  it('exposes stable-key highlight setters for mismatched series order', () => {
+    type RunMeta = { runId: string };
+    const syncKey = 'identity-highlight-api-test';
+    const getRunId = (series: SeriesConfig) => (series.meta as RunMeta | undefined)?.runId;
+    const data: ColumnarData = [f([1, 2]), f([10, 20]), f([100, 200])];
+    const chartA = new ChartCore(
+      document.createElement('div'),
+      {
+        highlight: { syncKey, getKey: getRunId },
+        series: [
+          { label: 'run-a', dataIndex: 1, meta: { runId: 'a' } },
+          { label: 'run-b', dataIndex: 2, meta: { runId: 'b' } },
+        ],
+      },
+      data,
+    );
+    const chartB = new ChartCore(
+      document.createElement('div'),
+      {
+        highlight: { syncKey, getKey: getRunId },
+        series: [
+          { label: 'run-b', dataIndex: 1, meta: { runId: 'b' } },
+          { label: 'run-a', dataIndex: 2, meta: { runId: 'a' } },
+        ],
+      },
+      data,
+    );
+
+    chartA.setHighlightKey('b');
+
+    expect(chartA.getHighlight()).toBe(1);
+    expect(chartA.getHighlightKey()).toBe('b');
+    expect(chartB.getHighlight()).toBe(0);
+    expect(chartB.getHighlightKey()).toBe('b');
+
+    chartA.setHighlightKey('missing');
+    expect(chartA.getHighlight()).toBe(null);
+    expect(chartB.getHighlight()).toBe(null);
+
+    chartA.destroy();
+    chartB.destroy();
   });
 });

@@ -15,6 +15,7 @@ function getPage() {
 
 export default function App() {
   const [page, setPage] = createSignal(getPage());
+  let mainRef!: HTMLElement;
 
   const onHash = () => {
     const prev = page();
@@ -27,6 +28,7 @@ export default function App() {
     // (prev === next).
     if (prev !== next) {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      requestAnimationFrame(() => mainRef?.focus({ preventScroll: true }));
     }
   };
   window.addEventListener('hashchange', onHash);
@@ -35,9 +37,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <Nav page={page()} />
-      <Show when={page() === 'home'}><Home /></Show>
-      <Show when={page() === 'docs'}><Docs /></Show>
-      <Show when={page() === 'demos'}><Demos /></Show>
+      <main ref={mainRef!} tabIndex={-1} style={{ outline: 'none' }}>
+        <Show when={page() === 'home'}><Home /></Show>
+        <Show when={page() === 'docs'}><Docs /></Show>
+        <Show when={page() === 'demos'}><Demos /></Show>
+      </main>
       <Footer />
     </ThemeProvider>
   );

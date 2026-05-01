@@ -101,6 +101,9 @@ export function SidebarUI(props: {
   setSidebarOpen: (v: boolean) => void;
 }) {
   let navTarget: string | null = null;
+  let triggerRef!: HTMLButtonElement;
+  let drawerRef!: HTMLElement;
+  let wasOpen = false;
 
   // Lock the page behind the drawer while it's open. Previously we
   // used the position:fixed + saved-scroll-offset dance, but rapid
@@ -114,17 +117,32 @@ export function SidebarUI(props: {
     const html = document.documentElement;
     if (open) {
       html.style.overflow = 'hidden';
+      requestAnimationFrame(() => {
+        const first = drawerRef?.querySelector<HTMLButtonElement>('button');
+        first?.focus();
+      });
     } else {
       html.style.overflow = '';
+      if (wasOpen) triggerRef?.focus();
       if (navTarget) {
         const target = navTarget;
         navTarget = null;
         requestAnimationFrame(() => scrollTo(target));
       }
     }
+    wasOpen = open;
   });
   onCleanup(() => {
     document.documentElement.style.overflow = '';
+  });
+
+  createEffect(() => {
+    if (!props.sidebarOpen()) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') props.setSidebarOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    onCleanup(() => document.removeEventListener('keydown', onKeyDown));
   });
 
   function navClick(id: string) {
@@ -140,9 +158,12 @@ export function SidebarUI(props: {
     <>
       {/* Mobile hamburger, visible below 768px via .docs-menu-btn media query. */}
       <button
+        ref={triggerRef!}
         type="button"
         class="docs-menu-btn"
         aria-label={props.sidebarOpen() ? 'Close navigation' : 'Open navigation'}
+        aria-expanded={props.sidebarOpen()}
+        aria-controls="docs-sidebar"
         onClick={() => props.setSidebarOpen(!props.sidebarOpen())}
         style={{
           position: 'fixed',
@@ -194,6 +215,10 @@ export function SidebarUI(props: {
       </Show>
 
       <aside
+        ref={drawerRef!}
+        id="docs-sidebar"
+        role="navigation"
+        aria-label="Documentation sections"
         class="docs-sidebar"
         classList={{ 'docs-sidebar-open': props.sidebarOpen() }}
         style={{

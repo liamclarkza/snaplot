@@ -3,6 +3,19 @@ import { PluginManager } from './PluginManager';
 import type { ChartInstance, Plugin } from '../types';
 
 describe('PluginManager', () => {
+  it('returns false for duplicate plugin ids and keeps the original', () => {
+    const manager = new PluginManager();
+    const first = { id: 'duplicate', install: vi.fn() };
+    const second = { id: 'duplicate', install: vi.fn() };
+
+    expect(manager.register(first)).toBe(true);
+    expect(manager.register(second)).toBe(false);
+    manager.installAll({} as ChartInstance);
+
+    expect(first.install).toHaveBeenCalledTimes(1);
+    expect(second.install).not.toHaveBeenCalled();
+  });
+
   it('cancels before* hooks when a plugin returns false', () => {
     const manager = new PluginManager();
     const after = vi.fn();

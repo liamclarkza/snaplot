@@ -69,10 +69,19 @@ export class ColumnarStore implements DataStore {
       }
     }
 
-    // Verify X is sorted (monotonically non-decreasing). A single out-of-order
-    // point is enough, report it with neighbouring indices so the caller can
-    // locate the source (usually a forgotten sort step).
+    // Verify X is finite and sorted (monotonically non-decreasing). Binary
+    // search assumes a total order; NaN/Infinity would poison culling and
+    // hit-testing even if adjacent comparisons happened to pass.
     const x = data[0];
+    for (let i = 0; i < x.length; i++) {
+      if (!Number.isFinite(x[i])) {
+        throw new Error(
+          `X values must be finite numbers, but x[${i}] = ${x[i]}. ` +
+            `NaN and Infinity are allowed only in Y columns where renderers ` +
+            `can treat them as missing values.`,
+        );
+      }
+    }
     for (let i = 1; i < x.length; i++) {
       if (x[i] < x[i - 1]) {
         throw new Error(
@@ -252,7 +261,7 @@ export class ColumnarStore implements DataStore {
       if (!col) continue;
       for (let i = startIdx; i <= endIdx && i < col.length; i++) {
         const v = col[i];
-        if (v !== v) continue; // NaN
+        if (!Number.isFinite(v)) continue;
         if (v < min) min = v;
         if (v > max) max = v;
       }

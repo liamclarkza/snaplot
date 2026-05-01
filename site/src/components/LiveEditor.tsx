@@ -1,16 +1,17 @@
 import { createSignal, createMemo, onCleanup, onMount } from 'solid-js';
 import { highlight } from 'sugar-high';
 import * as snaplot from 'snaplot';
-import { Chart, darkTheme, lightTheme } from 'snaplot';
+import { darkTheme, lightTheme } from 'snaplot';
+import { Chart } from 'snaplot/solid';
 import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
 import { useTheme } from '../ThemeContext';
 
 // Everything snaplot exports is available as a bare identifier inside the
 // editor. This means new theme/plugin/column exports (e.g. refinedDarkTheme)
 // light up automatically, no hand-maintained allowlist to keep in sync.
-// `Chart` is excluded: it's a Solid component, not data, and can't be used
-// usefully from an expression-mode eval.
-const { Chart: _, ...evalContext } = snaplot;
+// Solid components are intentionally imported from `snaplot/solid`, so the
+// framework-free root exports can be passed directly into expression eval.
+const evalContext = snaplot;
 const evalArgNames = Object.keys(evalContext);
 const evalArgValues = Object.values(evalContext);
 
@@ -29,6 +30,7 @@ export default function LiveEditor(props: {
 }) {
   const { theme: siteTheme } = useTheme();
   const [error, setError] = createSignal(false);
+  const [status, setStatus] = createSignal('');
   const [userConfig, setUserConfig] = createSignal<ChartConfig>(evalConfig(props.defaultCode));
   const [copied, setCopied] = createSignal(false);
 
@@ -101,8 +103,10 @@ export default function LiveEditor(props: {
         const result = new Function(...evalArgNames, 'return (' + text + ')')(...evalArgValues);
         setUserConfig(result as ChartConfig);
         setError(false);
-      } catch {
+        setStatus('');
+      } catch (err) {
         setError(true);
+        setStatus(err instanceof Error ? err.message : 'Unable to parse chart config.');
       }
     }, 300);
   }
@@ -131,17 +135,28 @@ export default function LiveEditor(props: {
       e.preventDefault();
       insertAtCaret('\n');
       rehighlight();
-    } else if (e.key === 'Tab') {
+    } else if (e.key === 'Escape') {
+      editorRef.blur();
+    } else if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
       insertAtCaret('  ');
       rehighlight();
     }
   }
 
-  function copy() {
-    navigator.clipboard.writeText(currentCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(currentCode);
+      setCopied(true);
+      setStatus('Code copied.');
+      setTimeout(() => {
+        setCopied(false);
+        setStatus('');
+      }, 2000);
+    } catch {
+      setCopied(false);
+      setStatus('Copy failed.');
+    }
   }
 
   onMount(() => {
@@ -208,7 +223,7 @@ export default function LiveEditor(props: {
             'white-space': 'pre-wrap',
             'word-wrap': 'break-word',
             'tab-size': '2',
-            padding: '16px 20px',
+            padding: '44px 20px 28px',
             outline: 'none',
             'min-height': '80px',
             'max-height': '500px',
@@ -217,6 +232,20 @@ export default function LiveEditor(props: {
             'caret-color': 'var(--accent)',
           }}
         />
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'absolute',
+            left: '16px',
+            bottom: '8px',
+            color: error() ? '#ef6b6b' : 'var(--text-secondary)',
+            'font-size': '11px',
+            'pointer-events': 'none',
+          }}
+        >
+          {status()}
+        </div>
       </div>
     </div>
   );

@@ -50,6 +50,7 @@ import {
   type ScatterPalettes,
 } from '../renderers/scatterEncoding';
 import { renderBarsSegments } from '../renderers/BarRenderer';
+import { barRectForCategory, categoryWidthFromData } from '../renderers/barGeometry';
 import { renderHistogramSegments } from '../renderers/HistogramRenderer';
 import { renderCrosshair, renderSelectionBox, renderTapRing } from '../renderers/InteractionRenderer';
 
@@ -79,7 +80,10 @@ export class ChartCore implements ChartInstance {
   private store: DataStore;
   private scales: Map<string, Scale> = new Map();
   private layout!: Layout;
+  private layoutCacheKey = '';
   private theme!: ThemeConfig;
+  private rangeCacheDataVersion = -1;
+  private yRangeCache = new Map<string, [number, number]>();
 
   private gestureManager: GestureManager;
   private hitTester: HitTester;
@@ -123,6 +127,7 @@ export class ChartCore implements ChartInstance {
   private syncKey: string | null = null;
   private highlightSyncKey: string | null = null;
   private zoomSyncKey: string | null = null;
+  private lastPublishedCursorDataX: number | null | undefined = undefined;
   /** Guard to suppress zoom sync publishing when applying a peer's broadcast */
   private suppressZoomSync = false;
 
@@ -210,23 +215,7 @@ export class ChartCore implements ChartInstance {
     this.gestureManager.attach();
 
     // 12. Join sync group(s) if configured
-    if (this.config.cursor?.syncKey) {
-      this.syncKey = this.config.cursor.syncKey;
-      SyncGroup.join(this.syncKey, this);
-    }
-    if (this.config.highlight?.syncKey) {
-      this.highlightSyncKey = this.config.highlight.syncKey;
-      // Cursor and highlight may share the same key, only join once.
-      if (this.highlightSyncKey !== this.syncKey) {
-        SyncGroup.join(this.highlightSyncKey, this);
-      }
-    }
-    if (this.config.zoom?.syncKey) {
-      this.zoomSyncKey = this.config.zoom.syncKey;
-      if (this.zoomSyncKey !== this.syncKey && this.zoomSyncKey !== this.highlightSyncKey) {
-        SyncGroup.join(this.zoomSyncKey, this);
-      }
-    }
+    this.reconcileSyncGroups();
 
     // 13. Create render scheduler and schedule initial draw
     this.scheduler = new RenderScheduler((flags) => this.render(flags));
@@ -328,22 +317,48 @@ export class ChartCore implements ChartInstance {
       ) as unknown as ChartConfig;
     }
 
-    if (partial.interaction) {
+    this.applyConfigSideEffects(partial, false);
+  }
+
+  replaceOptions(config: ChartConfig): void {
+    const previousPlugins = this.config.plugins ?? [];
+    this.config = deepMerge(
+      DEFAULT_CONFIG as unknown as Record<string, unknown>,
+      config as unknown as Record<string, unknown>,
+    ) as unknown as ChartConfig;
+
+    const nextPlugins = this.config.plugins ?? [];
+    if (nextPlugins !== previousPlugins) {
+      this.pluginManager.destroyAll(this);
+      this.pluginManager = new PluginManager();
+      for (const plugin of nextPlugins) {
+        this.pluginManager.register(plugin);
+      }
+      this.pluginManager.installAll(this);
+    }
+
+    this.applyConfigSideEffects(config, true);
+  }
+
+  private applyConfigSideEffects(partial: DeepPartial<ChartConfig>, fullReplace: boolean): void {
+    if (fullReplace || partial.interaction) {
       this.applyModePresets();
       this.gestureManager.updateTouchAction();
     }
 
-    if (partial.theme) {
+    if (fullReplace || partial.theme) {
       this.theme = resolveTheme(this.container, this.config.theme);
       this.tooltipManager.applyTheme(this.theme);
     }
 
     this.ensureStoreMatchesStreaming();
+    this.reconcileSyncGroups();
     this.initAxes();
     this.updateLayout();
     this.updateScalePixelRanges();
     this.autoRange();
     this.scheduler.markDirty(DirtyFlag.ALL);
+    this.emitEvent('options:update', this.config);
     this.pluginManager.dispatch('onSetOptions', this);
   }
 
@@ -365,6 +380,12 @@ export class ChartCore implements ChartInstance {
     this.autoRangeHorizontal();
     this.autoRangeVertical();
     this.scheduler.markDirty(DirtyFlag.ALL);
+
+    if (this.zoomSyncKey && !this.suppressZoomSync) {
+      for (const [scaleKey, scale] of this.scales) {
+        SyncGroup.publishScale(this.zoomSyncKey, this, scaleKey, { min: scale.min, max: scale.max });
+      }
+    }
   }
 
   resize(width: number, height: number): void {
@@ -384,20 +405,14 @@ export class ChartCore implements ChartInstance {
     this.canvasManager.destroy();
     this.listeners.clear();
 
-    if (this.syncKey) {
-      SyncGroup.leave(this.syncKey, this);
-    }
-    if (this.highlightSyncKey && this.highlightSyncKey !== this.syncKey) {
-      SyncGroup.leave(this.highlightSyncKey, this);
-    }
-    if (this.zoomSyncKey && this.zoomSyncKey !== this.syncKey && this.zoomSyncKey !== this.highlightSyncKey) {
-      SyncGroup.leave(this.zoomSyncKey, this);
-    }
+    this.leaveSyncGroups();
   }
 
-  use(plugin: Plugin): void {
-    this.pluginManager.register(plugin);
+  use(plugin: Plugin): boolean {
+    const registered = this.pluginManager.register(plugin);
+    if (!registered) return false;
     plugin.install?.(this);
+    return true;
   }
 
   on<K extends keyof ChartEventMap>(event: K, handler: ChartEventMap[K]): () => void {
@@ -515,6 +530,19 @@ export class ChartCore implements ChartInstance {
     return this.highlightedSeries;
   }
 
+  setHighlightKey(key: HighlightSyncKey | null): void {
+    this.applyHighlight(this.findSeriesIndexForHighlightKey(key), true);
+  }
+
+  getHighlightKey(): HighlightSyncKey | null {
+    if (this.highlightedSeries === null) return null;
+    const getKey = this.config.highlight?.getKey;
+    if (!getKey) return null;
+    const series = this.config.series[this.highlightedSeries];
+    if (!series) return null;
+    return getKey(series, this.highlightedSeries) ?? null;
+  }
+
   getStats(): ChartStats {
     return {
       dataVersion: this.stats.dataVersion,
@@ -614,6 +642,55 @@ export class ChartCore implements ChartInstance {
     return null;
   }
 
+  private reconcileSyncGroups(): void {
+    const previous = this.activeSyncKeys();
+    const nextCursorKey = this.config.cursor?.syncKey ?? null;
+    const nextHighlightKey = this.config.highlight?.syncKey ?? null;
+    const nextZoomKey = this.config.zoom?.syncKey ?? null;
+    const next = this.syncKeySet(nextCursorKey, nextHighlightKey, nextZoomKey);
+
+    for (const key of previous) {
+      if (!next.has(key)) SyncGroup.leave(key, this);
+    }
+    for (const key of next) {
+      if (!previous.has(key)) SyncGroup.join(key, this);
+    }
+
+    this.syncKey = nextCursorKey;
+    this.highlightSyncKey = nextHighlightKey;
+    this.zoomSyncKey = nextZoomKey;
+    this.lastPublishedCursorDataX = undefined;
+  }
+
+  private leaveSyncGroups(): void {
+    for (const key of this.activeSyncKeys()) {
+      SyncGroup.leave(key, this);
+    }
+    this.syncKey = null;
+    this.highlightSyncKey = null;
+    this.zoomSyncKey = null;
+    this.lastPublishedCursorDataX = undefined;
+  }
+
+  private activeSyncKeys(): Set<string> {
+    return this.syncKeySet(this.syncKey, this.highlightSyncKey, this.zoomSyncKey);
+  }
+
+  private syncKeySet(...keys: Array<string | null>): Set<string> {
+    const set = new Set<string>();
+    for (const key of keys) {
+      if (key) set.add(key);
+    }
+    return set;
+  }
+
+  private publishCursorSync(dataX: number | null): void {
+    if (!this.syncKey) return;
+    if (this.lastPublishedCursorDataX === dataX) return;
+    this.lastPublishedCursorDataX = dataX;
+    SyncGroup.publishCursor(this.syncKey, this, dataX);
+  }
+
   private createDataStore(data: ColumnarData): DataStore {
     const maxLen = this.streamingMaxLen();
     return maxLen === undefined
@@ -629,6 +706,7 @@ export class ChartCore implements ChartInstance {
       } else {
         this.store = new RingColumnarStore(data, maxLen);
       }
+      this.invalidateRangeCache();
       return;
     }
 
@@ -637,6 +715,7 @@ export class ChartCore implements ChartInstance {
     } else {
       this.store = new ColumnarStore(data);
     }
+    this.invalidateRangeCache();
   }
 
   private ensureStoreMatchesStreaming(): void {
@@ -644,12 +723,14 @@ export class ChartCore implements ChartInstance {
     if (maxLen !== undefined) {
       if (!(this.store instanceof RingColumnarStore) || this.store.maxLen !== maxLen) {
         this.store = new RingColumnarStore(this.store.getData(), maxLen);
+        this.invalidateRangeCache();
       }
       return;
     }
 
     if (this.store instanceof RingColumnarStore) {
       this.store = new ColumnarStore(this.store.getData());
+      this.invalidateRangeCache();
     }
   }
 
@@ -696,6 +777,14 @@ export class ChartCore implements ChartInstance {
     }
     // Write back so Layout and AxesRenderer can see all axes
     this.config.axes = axisConfigs;
+
+    for (const key of Array.from(this.scales.keys())) {
+      if (!axisConfigs[key]) {
+        this.scales.delete(key);
+        this.naturalExtent.delete(key);
+        this.userZoomedAxes.delete(key);
+      }
+    }
 
     for (const [key, ac] of Object.entries(axisConfigs)) {
       if (!this.scales.has(key)) {
@@ -754,7 +843,7 @@ export class ChartCore implements ChartInstance {
         if (!this.isValidColumn(columnIdx)) return;
         for (let i = 0; i < this.store.length; i++) {
           const value = this.store.valueAt(columnIdx, i);
-          if (value !== value) continue;
+          if (!Number.isFinite(value)) continue;
           hasXValue = true;
           if (value < xMin) xMin = value;
           if (value > xMax) xMax = value;
@@ -774,7 +863,9 @@ export class ChartCore implements ChartInstance {
         xMin = xPositiveMin;
       }
       const hasBarSeries = this.config.series.some(
-        s => s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
+        s => s.visible !== false &&
+          (s.xAxisKey ?? 'x') === key &&
+          (s.type === 'bar' || s.type === 'histogram'),
       );
       // Scatter/heatmap clouds default to a 5% pad so the data fills the plot
       // with just enough breathing room. Users can still opt into rounded
@@ -794,10 +885,14 @@ export class ChartCore implements ChartInstance {
         scale.min = xMin - 1;
         scale.max = xMax + 1;
       } else if (hasBarSeries && this.store.length > 1) {
-        // Bar/histogram: pad by half a category width so edge bars aren't clipped
-        const categoryPad = (xMax - xMin) / (this.store.length - 1) * 0.5;
-        scale.min = xMin - categoryPad;
-        scale.max = xMax + categoryPad;
+        const firstPad = categoryWidthFromData((idx) => this.store.valueAt(0, idx), 0, this.store.length) * 0.5;
+        const lastPad = categoryWidthFromData(
+          (idx) => this.store.valueAt(0, idx),
+          this.store.length - 1,
+          this.store.length,
+        ) * 0.5;
+        scale.min = xMin - firstPad;
+        scale.max = xMax + lastPad;
       } else if (isScatterOnly) {
         const pad = (xMax - xMin) * (ac.padding ?? AUTO_RANGE_PADDING);
         scale.min = xMin - pad;
@@ -829,6 +924,7 @@ export class ChartCore implements ChartInstance {
    */
   private autoRangeVertical(): void {
     if (this.store.length === 0) return;
+    this.ensureRangeCacheFresh();
 
     const axisConfigs = this.config.axes ?? {};
     for (const [key, scale] of this.scales) {
@@ -850,31 +946,22 @@ export class ChartCore implements ChartInstance {
       let yMax = -Infinity;
       let hasValue = false;
 
+      const includeRange = (range: [number, number] | null) => {
+        if (!range) return;
+        hasValue = true;
+        if (range[0] < yMin) yMin = range[0];
+        if (range[1] > yMax) yMax = range[1];
+      };
+
       const includeColumnRange = (columnIdx: number, startIdx: number, endIdx: number) => {
-        if (columnIdx < 0 || columnIdx >= this.store.seriesCount) return;
-        for (let i = startIdx; i <= endIdx && i < this.store.length; i++) {
-          const v = this.store.yAt(columnIdx, i);
-          if (v !== v || (scale.type === 'log' && v <= 0)) continue;
-          hasValue = true;
-          if (v < yMin) yMin = v;
-          if (v > yMax) yMax = v;
-        }
+        includeRange(this.cachedColumnRange(columnIdx, startIdx, endIdx, scale.type));
       };
       const includeColumnForScatterViewport = (
         yColumnIdx: number,
         xColumnIdx: number,
         xScale: Scale | undefined,
       ) => {
-        if (yColumnIdx < 0 || yColumnIdx >= this.store.seriesCount) return;
-        for (let i = 0; i < this.store.length; i++) {
-          const x = this.store.valueAt(xColumnIdx, i);
-          if (xScale && (x < xScale.min || x > xScale.max)) continue;
-          const v = this.store.yAt(yColumnIdx, i);
-          if (v !== v || (scale.type === 'log' && v <= 0)) continue;
-          hasValue = true;
-          if (v < yMin) yMin = v;
-          if (v > yMax) yMax = v;
-        }
+        includeRange(this.cachedScatterViewportColumnRange(yColumnIdx, xColumnIdx, xScale, scale.type));
       };
 
       for (const s of this.config.series) {
@@ -900,12 +987,17 @@ export class ChartCore implements ChartInstance {
         }
       }
 
-      if (!hasValue) continue;
-
       // For bar/histogram series, always include 0 as the baseline
       const hasBarOrHist = this.config.series.some(
         s => (s.yAxisKey ?? 'y') === key && s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
       );
+      if (!hasValue) continue;
+
+      if (hasBarOrHist && scale.type !== 'log') {
+        if (yMin > 0) yMin = 0;
+        if (yMax < 0) yMax = 0;
+      }
+
       if (scale.type === 'log') {
         const [min, max] = this.paddedLogRange(yMin, yMax, ac.padding ?? AUTO_RANGE_PADDING);
         if (ac.min === undefined) scale.min = min;
@@ -934,9 +1026,83 @@ export class ChartCore implements ChartInstance {
     }
   }
 
+  private ensureRangeCacheFresh(): void {
+    if (this.rangeCacheDataVersion === this.stats.dataVersion) return;
+    this.rangeCacheDataVersion = this.stats.dataVersion;
+    this.yRangeCache.clear();
+  }
+
+  private invalidateRangeCache(): void {
+    this.rangeCacheDataVersion = -1;
+    this.yRangeCache.clear();
+  }
+
+  private cachedColumnRange(
+    columnIdx: number,
+    startIdx: number,
+    endIdx: number,
+    scaleType: Scale['type'],
+  ): [number, number] | null {
+    if (columnIdx < 0 || columnIdx >= this.store.seriesCount) return null;
+    const start = Math.max(0, startIdx);
+    const end = Math.min(this.store.length - 1, endIdx);
+    if (end < start) return null;
+
+    const key = ['column', columnIdx, start, end, scaleType].join(':');
+    const cached = this.yRangeCache.get(key);
+    if (cached) return cached;
+
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = start; i <= end; i++) {
+      const v = this.store.yAt(columnIdx, i);
+      if (!Number.isFinite(v) || (scaleType === 'log' && v <= 0)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    if (min === Infinity) return null;
+    const range: [number, number] = [min, max];
+    this.yRangeCache.set(key, range);
+    return range;
+  }
+
+  private cachedScatterViewportColumnRange(
+    yColumnIdx: number,
+    xColumnIdx: number,
+    xScale: Scale | undefined,
+    scaleType: Scale['type'],
+  ): [number, number] | null {
+    if (yColumnIdx < 0 || yColumnIdx >= this.store.seriesCount) return null;
+    if (!this.isValidColumn(xColumnIdx)) return null;
+
+    const xMin = xScale?.min ?? -Infinity;
+    const xMax = xScale?.max ?? Infinity;
+    const key = ['scatter', yColumnIdx, xColumnIdx, xMin, xMax, scaleType].join(':');
+    const cached = this.yRangeCache.get(key);
+    if (cached) return cached;
+
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < this.store.length; i++) {
+      const x = this.store.valueAt(xColumnIdx, i);
+      if (!Number.isFinite(x)) continue;
+      if (x < xMin || x > xMax) continue;
+      const v = this.store.yAt(yColumnIdx, i);
+      if (!Number.isFinite(v) || (scaleType === 'log' && v <= 0)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    if (min === Infinity) return null;
+    const range: [number, number] = [min, max];
+    this.yRangeCache.set(key, range);
+    return range;
+  }
+
   private updateLayout(): void {
     const w = this.canvasManager.cssWidth || 600;
     const h = this.canvasManager.cssHeight || 400;
+    const cacheKey = this.createLayoutCacheKey(w, h);
+    if (this.layout && cacheKey === this.layoutCacheKey) return;
 
     this.layout = computeLayout(
       w, h,
@@ -946,6 +1112,34 @@ export class ChartCore implements ChartInstance {
       this.theme.fontFamily,
       this.theme.fontSize,
     );
+    this.layoutCacheKey = cacheKey;
+  }
+
+  private createLayoutCacheKey(width: number, height: number): string {
+    const axes = Array.from(this.scales, ([key, scale]) => {
+      const ac = this.config.axes?.[key];
+      return [
+        key,
+        inferPosition(key, ac?.position),
+        scale.type,
+        scale.min,
+        scale.max,
+        ac?.tickFormat?.toString() ?? '',
+      ].join(':');
+    }).join('|');
+    const padding = this.config.padding ?? {};
+    return [
+      width,
+      height,
+      this.canvasManager.dpr,
+      this.theme.fontFamily,
+      this.theme.fontSize,
+      padding.top,
+      padding.right,
+      padding.bottom,
+      padding.left,
+      axes,
+    ].join('|');
   }
 
   private updateScalePixelRanges(): void {
@@ -990,9 +1184,7 @@ export class ChartCore implements ChartInstance {
       this.emitEvent('cursor:move', null, null, 'local');
       this.pluginManager.dispatch('onCursorMove', this, null, null, 'local');
 
-      if (this.syncKey) {
-        SyncGroup.publishCursor(this.syncKey, this, null);
-      }
+      this.publishCursorSync(null);
     });
 
     // ── Pan (incremental pixel delta) ──
@@ -1166,13 +1358,6 @@ export class ChartCore implements ChartInstance {
     // ── Reset zoom ──
     this.eventBus.on('action:reset-zoom', () => {
       this.resetZoom();
-      // Broadcast the reset X range to zoom sync peers
-      if (this.zoomSyncKey) {
-        const xScale = this.scales.get('x');
-        if (xScale) {
-          SyncGroup.publishScale(this.zoomSyncKey, this, 'x', { min: xScale.min, max: xScale.max });
-        }
-      }
     });
 
     // ── Tap (touch: show/persist tooltip) ──
@@ -1758,30 +1943,30 @@ export class ChartCore implements ChartInstance {
         const barIdx = barSeries.indexOf(sc);
         const totalBars = barSeries.length;
         if (barIdx >= 0 && idx < this.store.length) {
-          const outerPadding = 0.2;
-          const innerPadding = 0.1;
-          const widthRatio = sc.barWidthRatio ?? 0.8;
-          let categoryWidth: number;
-          if (this.store.length > 1) {
-            const xRange = xScale.dataToPixel(this.store.xAt(this.store.length - 1)) - xScale.dataToPixel(this.store.xAt(0));
-            categoryWidth = xRange / (this.store.length - 1);
-          } else { categoryWidth = this.layout.plot.width * 0.5; }
-          const groupWidth = categoryWidth * (1 - outerPadding) * widthRatio;
-          const barWidth = groupWidth / totalBars;
-          const barGap = barWidth * innerPadding;
-          const effectiveBarWidth = barWidth - barGap;
           const centerX = xScale.dataToPixel(this.store.xAt(idx));
-          const groupLeft = centerX - groupWidth / 2;
-          const barLeft = groupLeft + barIdx * barWidth + barGap / 2;
+          const categoryWidth = categoryWidthFromData(
+            (dataIndex) => xScale.dataToPixel(this.store.xAt(dataIndex)),
+            idx,
+            this.store.length,
+            this.layout.plot.width * 0.5,
+          );
+          const rect = barRectForCategory({
+            centerX,
+            categoryWidth,
+            series: sc,
+            barSeriesIndex: barIdx,
+            totalBarSeries: totalBars,
+          });
           const barTop = yScale.dataToPixel(point.y);
           const baselineY = yScale.dataToPixel(0);
+          if (!Number.isFinite(centerX) || !Number.isFinite(barTop) || !Number.isFinite(baselineY)) continue;
           const rectY = Math.min(barTop, baselineY);
           const rectH = Math.abs(barTop - baselineY);
           ctx.fillStyle = `rgba(255, 255, 255, ${ringAlpha})`;
-          ctx.fillRect(barLeft, rectY, effectiveBarWidth, rectH);
+          ctx.fillRect(rect.left, rectY, rect.width, rectH);
           ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha * 2})`;
           ctx.lineWidth = 1;
-          ctx.strokeRect(barLeft, rectY, effectiveBarWidth, rectH);
+          ctx.strokeRect(rect.left, rectY, rect.width, rectH);
         }
         continue;
       }
@@ -1884,9 +2069,7 @@ export class ChartCore implements ChartInstance {
       this.updateTooltipPoints();
       this.applyNearestScatterCursor();
 
-      if (publishSync && this.syncKey) {
-        SyncGroup.publishCursor(this.syncKey, this, this.cursorDataX);
-      }
+      if (publishSync) this.publishCursorSync(this.cursorDataX);
     } else {
       this.cursorX = null;
       this.cursorY = null;
@@ -1895,9 +2078,7 @@ export class ChartCore implements ChartInstance {
       this.tooltipPoints = [];
       this.tooltipManager.hide();
 
-      if (publishSync && this.syncKey) {
-        SyncGroup.publishCursor(this.syncKey, this, null);
-      }
+      if (publishSync) this.publishCursorSync(null);
     }
 
     this.scheduler.markDirty(DirtyFlag.OVERLAY);
@@ -1945,15 +2126,16 @@ export class ChartCore implements ChartInstance {
    */
   private findHistogramTooltipPoints(): TooltipPoint[] {
     const points: TooltipPoint[] = [];
-    const xScale = this.scales.get('x');
-    if (!xScale || this.cursorX === null || this.store.length < 2) return points;
-
-    const dataX = xScale.pixelToData(this.cursorX);
+    if (this.cursorX === null || this.store.length < 2) return points;
     const palette = this.categoricalPalette();
 
     for (let si = 0; si < this.config.series.length; si++) {
       const series = this.config.series[si];
       if (series.visible === false || series.type !== 'histogram') continue;
+
+      const xScale = this.scales.get(series.xAxisKey ?? 'x');
+      if (!xScale) continue;
+      const dataX = xScale.pixelToData(this.cursorX);
 
       const colIdx = seriesYDataIndex(series);
       if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
@@ -1992,31 +2174,31 @@ export class ChartCore implements ChartInstance {
    */
   private findBarTooltipPoints(): TooltipPoint[] {
     const points: TooltipPoint[] = [];
-    const xScale = this.scales.get('x');
-    if (!xScale || this.cursorX === null || this.store.length === 0) return points;
-
-    const dataX = xScale.pixelToData(this.cursorX);
+    if (this.cursorX === null || this.store.length === 0) return points;
     const palette = this.categoricalPalette();
-
-    // Find nearest category index
-    const idx = this.store.nearestXIndex(dataX);
-    const xVal = this.store.xAt(idx);
-
-    // Check proximity: cursor must be within half a category width
-    const categoryWidth = this.store.length > 1
-      ? (this.store.xAt(this.store.length - 1) - this.store.xAt(0)) / (this.store.length - 1)
-      : 1;
-    if (Math.abs(dataX - xVal) > categoryWidth * 0.6) return points;
 
     for (let si = 0; si < this.config.series.length; si++) {
       const series = this.config.series[si];
       if (series.visible === false || series.type !== 'bar') continue;
 
+      const xScale = this.scales.get(series.xAxisKey ?? 'x');
+      if (!xScale) continue;
+
+      const dataX = xScale.pixelToData(this.cursorX);
+      const idx = this.store.nearestXIndex(dataX);
+      const xVal = this.store.xAt(idx);
+      const categoryWidth = categoryWidthFromData(
+        (dataIndex) => this.store.xAt(dataIndex),
+        idx,
+        this.store.length,
+      );
+      if (Math.abs(dataX - xVal) > categoryWidth * 0.6) continue;
+
       const colIdx = seriesYDataIndex(series);
       if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
 
       const yVal = this.store.yAt(colIdx - 1, idx);
-      if (yVal !== yVal) continue; // NaN
+      if (!Number.isFinite(yVal)) continue;
 
       const color = series.stroke ?? palette[si % palette.length];
       const yScale = this.scales.get(series.yAxisKey ?? 'y');
@@ -2107,7 +2289,7 @@ export class ChartCore implements ChartInstance {
 
       const value = this.store.yAt(colIdx - 1, idx);
       const yScale = this.scales.get(s.yAxisKey ?? 'y');
-      const formattedValue = (value === value)
+      const formattedValue = Number.isFinite(value)
         ? (yScale ? yScale.tickFormat(value) : String(value))
         : '';
       const color = s.stroke ?? palette[si % palette.length];

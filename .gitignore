@@ -18,6 +18,7 @@ Thumbs.db
 specification.md
 .claude/
 .codex/
+codex-reviews/
 
 # Build artifacts
 .vinxi/

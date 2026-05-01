@@ -80,7 +80,7 @@ export function renderHistogramSegments(
 
     for (let i = segment.startIdx; i <= renderEnd; i++) {
       const count = segment.yData[i];
-      if (count === 0) continue;
+      if (!Number.isFinite(count) || count <= 0) continue;
 
       const nextX = i === segment.endIdx && nextSegment
         ? nextSegment.xData[nextSegment.startIdx]
@@ -88,6 +88,9 @@ export function renderHistogramSegments(
       const x1 = scaleX.dataToPixel(segment.xData[i]);
       const x2 = scaleX.dataToPixel(nextX);
       const yTop = scaleY.dataToPixel(count);
+      if (!Number.isFinite(x1) || !Number.isFinite(x2) || !Number.isFinite(yTop) || !Number.isFinite(baselineY)) {
+        continue;
+      }
 
       const barX = x1 + 0.5;
       const barW = Math.max(1, x2 - x1 - 1);

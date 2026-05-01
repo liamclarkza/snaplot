@@ -32,23 +32,20 @@ describe('deepMerge', () => {
     expect(result).toEqual({ a: 1, b: 2 });
   });
 
-  it('replaces arrays by reference for non-series keys', () => {
+  it('replaces arrays by reference', () => {
     const result = deepMerge(obj({ tags: [1, 2] }), obj({ tags: [3, 4] }));
     expect(result.tags).toEqual([3, 4]);
   });
 
-  it('merges series arrays by index, overwriting primitives within each entry', () => {
+  it('replaces series arrays instead of retaining stale entries', () => {
     const result = deepMerge(
       obj({ series: [{ label: 'a', visible: true }, { label: 'b', visible: true }] }),
       obj({ series: [{ visible: false }] }),
     );
-    expect(result.series).toEqual([
-      { label: 'a', visible: false },
-      { label: 'b', visible: true },
-    ]);
+    expect(result.series).toEqual([{ visible: false }]);
   });
 
-  it('series merging extends if the source has more entries', () => {
+  it('does not merge individual series objects by index', () => {
     const result = deepMerge(
       obj({ series: [{ label: 'a' }] }),
       obj({ series: [{ label: 'a', stroke: '#fff' }, { label: 'b' }] }),

@@ -21,7 +21,10 @@ const BASE_STYLE: Record<string, string> = {
 
 function variantStyle(v: Variant): Record<string, string> {
   if (v === 'primary') {
-    return { background: 'var(--accent)', color: '#fff' };
+    return {
+      background: 'var(--button-primary-bg, var(--accent))',
+      color: 'var(--button-primary-text, #fff)',
+    };
   }
   return {
     background: 'var(--bg-surface-hover)',

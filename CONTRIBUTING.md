@@ -19,13 +19,12 @@ Requires Node ≥ 22. Uses npm workspaces (`packages/snaplot` + `site`).
 | `npm run dev:lib` | Library watch build only |
 | `npm run build` | Library production build (→ `packages/snaplot/dist`) |
 | `npm run build:site` | Site production build |
-| `npm run typecheck` | `tsc --noEmit` over the library |
+| `npm run typecheck` | `tsc --noEmit` over the library and site |
 | `npm test` | Vitest unit tests |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run lint` | Biome lint |
 | `npm run lint:fix` | Apply safe lint fixes |
-| `npm run check` | Biome lint + format check |
-| `npm run format` | Apply Biome formatting |
+| `npm run check` | Biome lint/config checks |
 
 ## Quality gates
 
@@ -76,10 +75,10 @@ Flow is "edit CHANGELOG as you go, cut a release with one script":
     scripts/release.sh patch      # or: minor | major | 1.2.3
     ```
 
-   That bumps `packages/snaplot/package.json`, promotes the `[Unreleased]`
-   section under a dated `## [X.Y.Z]` header (reseeding an empty
-   `[Unreleased]` on top), commits `chore: release vX.Y.Z`, and tags
-   `vX.Y.Z`. It stops short of pushing.
+   That bumps `packages/snaplot/package.json`, updates/stages
+   `package-lock.json`, promotes the `[Unreleased]` section under a dated
+   `## [X.Y.Z]` header (reseeding an empty `[Unreleased]` on top), commits
+   `chore: release vX.Y.Z`, and tags `vX.Y.Z`. It stops short of pushing.
 3. Push:
 
     ```bash

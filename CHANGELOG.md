@@ -6,6 +6,46 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Breaking
+- The root `snaplot` export is now framework-free. SolidJS components and
+  primitives should be imported from `snaplot/solid`; core APIs remain
+  available from `snaplot` and `snaplot/core`.
+
+### Added
+- Added explicit `snaplot/core` and `snaplot/solid` package subpath exports,
+  with Solid marked as an optional peer dependency for core-only consumers.
+- Added `ChartCore.replaceOptions()` for declarative integrations that need
+  omitted config keys removed instead of deep-merged.
+- Added `options:update` events so plugins and Solid helpers can react to
+  runtime option changes.
+- Added stable-key highlight APIs for cross-chart workflows with mismatched
+  series order or subsets.
+- Added focused regression coverage for downsampling, histogram utilities,
+  log scales, bar geometry, runtime option replacement, plugin registration,
+  and sync behavior.
+
+### Changed
+- Solid bindings now update existing chart instances with full replacement
+  semantics instead of recreating charts or retaining stale config.
+- Bar rendering and hit testing now share geometry helpers, improving
+  irregularly spaced categories and grouped bars.
+- Vertical auto-range and layout work now reuse internal caches to reduce
+  repeated scans and layout computation during interaction-heavy dashboards.
+- Documentation and demos now use the split core/Solid imports, clearer live
+  editor behavior, and improved navigation/accessibility polish.
+
+### Fixed
+- Histogram and bar y-axis auto-range now includes the zero baseline before
+  padding is calculated, preserving top/bottom breathing room after x zoom.
+- Runtime sync keys now rebind correctly when cursor, highlight, or zoom sync
+  options are changed or cleared.
+- Duplicate runtime plugin registration is ignored instead of installing the
+  same plugin id more than once.
+- Removed stale axes and zoom state when declarative config replacement drops
+  an axis.
+- Tightened finite-value handling across data stores, downsampling, line
+  rendering, scatter rendering, scales, and histogram generation.
+
 ## [0.7.0] - 2026-04-30
 
 ### Added

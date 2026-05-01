@@ -6,7 +6,7 @@ A canvas chart library built for streaming data and interactive dashboards.
 
 snaplot renders line, area, scatter, bar, histogram, and band charts from columnar Float64Arrays. It handles 200,000+ points at 60 fps through a layered canvas pipeline, binary-search viewport culling, and ring-buffer streaming updates. The library never mutates your input arrays.
 
-Current bindings ship a SolidJS component and reactive primitives. The core (`ChartCore`) is framework-free and can be driven from any runtime.
+The root package entry is framework-free. SolidJS components and reactive primitives ship from `snaplot/solid`.
 
 ## Install
 
@@ -14,16 +14,16 @@ Current bindings ship a SolidJS component and reactive primitives. The core (`Ch
 npm install snaplot
 ```
 
-Requires `solid-js ^1.9.0`.
+Solid users also install `solid-js ^1.9.0`; framework-free `ChartCore` users do not need it at runtime.
 
 ## Quick start
 
 ```tsx
-import { Chart } from 'snaplot';
+import { Chart } from 'snaplot/solid';
 import type { ColumnarData } from 'snaplot';
 
 const data: ColumnarData = [
-  new Float64Array(timestamps), // X values, sorted
+  new Float64Array(timestamps), // finite X values, sorted ascending
   new Float64Array(cpu),        // Y series 1
   new Float64Array(memory),     // Y series 2
 ];
@@ -40,7 +40,7 @@ const data: ColumnarData = [
 />
 ```
 
-Column 0 is the default sorted X column. Columns 1+ are value columns referenced by `dataIndex`; scatter series can use explicit `xDataIndex` and `yDataIndex` columns. This columnar layout is what makes binary-search viewport culling and low-allocation streaming possible.
+Column 0 is the default sorted X column. X values must be finite and non-decreasing, and every column must have equal length. Columns 1+ are value columns referenced by `dataIndex`; `NaN` in Y columns creates gaps and non-finite Y values are ignored by range calculations. Scatter series can use explicit `xDataIndex` and `yDataIndex` columns for visual position, but shared cursor/viewport operations still depend on the sorted default X column unless you opt into nearest-point scatter behavior.
 
 Full API reference and runnable examples are in the [documentation](https://liamclarkza.github.io/snaplot/#/docs).
 
@@ -66,7 +66,7 @@ A table that shows the value of every visible series at the cursor position. Ava
 
 ### Cross-chart sync
 
-`createChartGroup()` keeps cursor and highlight state in sync across any number of charts. External controls can drive the highlight too, for UIs like sidebars or experiment lists.
+`createChartGroup()` keeps cursor and highlight state in sync across any number of charts. External controls can drive the highlight too, for UIs like sidebars or experiment lists. Index-based highlight sync is safe only when peer charts share identical series order; for experiment dashboards with subsets or reordered runs, configure `highlight.getKey` and drive focus with `chart.setHighlightKey()` or `group.highlightKey()`.
 
 ### Themes
 
@@ -96,8 +96,8 @@ npm run dev          # docs site dev server with live HMR against the library
 npm run build        # library production build
 npm run build:site   # docs site production build
 npm test             # vitest
-npm run check        # biome lint + format check
-npm run typecheck    # tsc --noEmit
+npm run check        # biome lint/config checks
+npm run typecheck    # library + site tsc --noEmit
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, conventions, and release process.

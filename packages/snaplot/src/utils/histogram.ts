@@ -44,11 +44,11 @@ export function histogram(
   const method = options?.method ?? 'freedman-diaconis';
   const explicitBinCount = options?.binCount;
 
-  // Filter NaN
+  // Filter values that cannot participate in finite bin math.
   const valid: number[] = [];
   for (let i = 0; i < values.length; i++) {
     const v = values[i];
-    if (v === v) valid.push(v);
+    if (Number.isFinite(v)) valid.push(v);
   }
 
   if (valid.length === 0) {
@@ -70,6 +70,9 @@ export function histogram(
   // Determine bin count
   let nBins: number;
   if (explicitBinCount !== undefined) {
+    if (!Number.isFinite(explicitBinCount) || explicitBinCount <= 0) {
+      throw new Error(`histogram() binCount must be a positive finite number, received ${explicitBinCount}.`);
+    }
     nBins = Math.max(1, Math.round(explicitBinCount));
   } else {
     nBins = computeBinCount(valid, n, min, max, method);

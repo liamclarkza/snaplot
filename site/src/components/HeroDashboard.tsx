@@ -9,17 +9,19 @@ import {
   type JSX,
 } from 'solid-js';
 import {
-  Chart,
-  LegendTable,
-  column,
-  createChartGroup,
   histogram,
+  column,
   metricColumn,
   nameColumn,
   studioTheme,
   tokyoTheme,
   valueColumn,
 } from 'snaplot';
+import {
+  Chart,
+  LegendTable,
+  createChartGroup,
+} from 'snaplot/solid';
 import type {
   ChartConfig,
   ChartInstance,
@@ -517,7 +519,11 @@ export default function HeroDashboard() {
     axes: {
       x: {
         type: 'linear',
-        tickFormat: (v) => ['/api', '/auth', '/users', '/search', '/upload', '/admin'][Math.round(v)] ?? '',
+        tickFormat: (v) => {
+          const idx = Math.round(v);
+          if (Math.abs(v - idx) > 1e-6) return '';
+          return ['/api', '/auth', '/users', '/search', '/upload', '/admin'][idx] ?? '';
+        },
       },
       y: { type: 'linear' },
     },

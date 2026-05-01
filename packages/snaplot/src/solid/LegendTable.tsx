@@ -1,7 +1,10 @@
 import {
   For,
   Show,
+  createEffect,
   createMemo,
+  createSignal,
+  onCleanup,
   type Accessor,
   type JSX,
 } from 'solid-js';
@@ -31,6 +34,7 @@ export type LegendTableFallback = 'hide' | 'latest' | 'first' | 'series-only';
  * the plugin works fine and is forwarded through `columns`.
  */
 export interface LegendTableSolidColumn<TMeta = unknown> {
+  kind?: 'solid';
   key: string;
   header: string;
   align?: 'left' | 'right' | 'center';
@@ -85,9 +89,7 @@ export interface LegendTableProps<TMeta = unknown> {
 }
 
 function isSolidColumn<T>(c: any): c is LegendTableSolidColumn<T> {
-  // Solid columns return JSX (could be string, number, Element, array, function).
-  // The DOM-plugin column type returns string | Node. Distinguish by checking
-  // whether `cell.length` (declared arity) is 3, only Solid columns take api.
+  if (c.kind !== undefined) return c.kind === 'solid';
   return typeof c.cell === 'function' && c.cell.length === 3;
 }
 
@@ -139,9 +141,18 @@ export function LegendTable<TMeta = unknown>(
 
   const snapshot = createCursorSnapshot<TMeta>(
     props.chart,
-    { fallback: bufferFallback() },
+    () => ({ fallback: bufferFallback() }),
   );
   const [highlight, setHighlight] = createHighlight(props.chart);
+  const [optionsVersion, setOptionsVersion] = createSignal(0);
+
+  createEffect(() => {
+    const c = props.chart();
+    if (!c) return;
+    setOptionsVersion((v) => v + 1);
+    const off = c.on('options:update', () => setOptionsVersion((v) => v + 1));
+    onCleanup(off);
+  });
 
   // If a render-prop child is provided, hand off and skip our table.
   if (typeof props.children === 'function') {
@@ -156,7 +167,10 @@ export function LegendTable<TMeta = unknown>(
   const showStepHeader = () => props.showStepHeader ?? true;
   const highlightOnHover = () => props.highlightOnHover ?? true;
 
-  const seriesList = createMemo(() => props.chart()?.getOptions().series ?? []);
+  const seriesList = createMemo(() => {
+    optionsVersion();
+    return props.chart()?.getOptions().series ?? [];
+  });
 
   const isCursorActive = () => snapshot()?.source === 'cursor';
   const isSeriesOnly = () =>

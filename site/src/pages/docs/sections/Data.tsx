@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onCleanup } from 'solid-js';
-import { Chart, lttb, m4 } from 'snaplot';
+import { lttb, m4 } from 'snaplot';
+import { Chart } from 'snaplot/solid';
 import type { ChartInstance, ColumnarData } from 'snaplot';
 import CodeBlock from '../../../components/CodeBlock';
 import { Section, Prose, Demo } from '../../../components/ui';
@@ -26,6 +27,9 @@ export default function Data() {
         </Prose>
         <Prose>
           Set <code>streaming.maxLen</code> on the chart config to cap the retained window. When the buffer overflows, the oldest points are dropped through an internal ring buffer.
+        </Prose>
+        <Prose>
+          Appended chunks must use the same column count and equal column lengths as the current dataset. New X values must be finite and continue in non-decreasing order from the existing tail.
         </Prose>
         <CodeBlock code={`const chart = new ChartCore(container, {
   streaming: { maxLen: 1000 }, // keep max 1000 points

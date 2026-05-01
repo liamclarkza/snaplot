@@ -11,6 +11,14 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./core": {
+      "import": "./dist/core.js",
+      "types": "./dist/core.d.ts"
+    },
+    "./solid": {
+      "import": "./dist/solid.js",
+      "types": "./dist/solid.d.ts"
+    },
     "./legend-table.css": {
       "import": "./dist/legend-table.css",
       "default": "./dist/legend-table.css"
@@ -22,7 +30,8 @@
     "LICENSE"
   ],
   "sideEffects": [
-    "*.css"
+    "*.css",
+    "dist/*.css"
   ],
   "scripts": {
     "build": "vite build",
@@ -33,6 +42,11 @@
   },
   "peerDependencies": {
     "solid-js": "^1.9.0"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "solid-js": "^1.9.5",

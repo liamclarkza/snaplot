@@ -41,7 +41,7 @@ export function Chart<TMeta = unknown>(props: ChartProps<TMeta>): JSX.Element {
     createEffect(
       on(
         () => props.config,
-        (config) => { chart?.setOptions(config as ChartConfig); },
+        (config) => { chart?.replaceOptions(config as ChartConfig); },
         { defer: true },
       ),
     );

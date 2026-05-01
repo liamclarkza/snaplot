@@ -101,6 +101,11 @@ node -e "
   fs.writeFileSync('$pkg', JSON.stringify(p,null,2)+'\n');
 "
 
+# Keep the workspace lockfile in sync with the package version committed
+# for the release. `--ignore-scripts` avoids local hook side effects.
+npm install --package-lock-only --ignore-scripts
+npm ci --ignore-scripts --dry-run
+
 # Roll CHANGELOG — insert a new dated header *after* the Unreleased
 # header so previous Unreleased content sits under the new version
 # and Unreleased becomes empty for the next cycle.
@@ -114,7 +119,7 @@ node -e "
   fs.writeFileSync('CHANGELOG.md', s);
 "
 
-git add "$pkg" CHANGELOG.md
+git add "$pkg" package-lock.json CHANGELOG.md
 git commit -m "chore: release v$new"
 git tag -a "v$new" -m "v$new"
 

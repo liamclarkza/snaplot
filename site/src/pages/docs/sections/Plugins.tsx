@@ -83,7 +83,7 @@ const config = {
         <Prose>
           Both share the same column helpers and the same CSS class names. Zero configuration produces a sensible default:
         </Prose>
-        <CodeBlock code={`import { LegendTable } from 'snaplot';
+        <CodeBlock code={`import { LegendTable } from 'snaplot/solid';
 import 'snaplot/legend-table.css';
 
 <LegendTable chart={chart} />`} />
@@ -171,10 +171,16 @@ const config: ChartConfig<RunMeta> = {
 <Chart config={group.apply(myConfigA)} data={a} />
 <Chart config={group.apply(myConfigB)} data={b} />
 
-// External controls (e.g. a sidepanel):
+// External controls with identical series order:
 <button onMouseEnter={() => group.highlight(2)}
         onMouseLeave={() => group.highlight(null)}>
   Run #2
+</button>
+
+// External controls with stable run IDs across mismatched charts:
+<button onMouseEnter={() => group.highlightKey('run-42')}
+        onMouseLeave={() => group.highlightKey(null)}>
+  Run #42
 </button>`} />
         <div style={{ height: '12px' }} />
         <CrossChartSyncDemo />
@@ -196,7 +202,7 @@ const config: ChartConfig<RunMeta> = {
         <Prose>
           Both <code>&lt;LegendTable&gt;</code> and the plugin are built on the same primitive: <code>chart.getCursorSnapshot()</code>. Use it directly if you need cursor-synchronised data anywhere else in your UI.
         </Prose>
-        <CodeBlock code={`import { createCursorSnapshot } from 'snaplot';
+        <CodeBlock code={`import { createCursorSnapshot } from 'snaplot/solid';
 
 const snapshot = createCursorSnapshot(chart);
 // Accessor<CursorSnapshot | null>:

@@ -231,10 +231,11 @@ function drawStampedSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (yVal !== yVal) continue; // NaN
+      if (!Number.isFinite(yVal)) continue;
 
       const px = scaleX.dataToPixel(xData[i]);
       const py = scaleY.dataToPixel(yVal);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
 
       if (constantStamp) {
         ctx.drawImage(
@@ -319,7 +320,18 @@ function drawHeatmapSegments(
   const gradientKey = gradient?.join('|') ?? 'viridis';
   const firstSegment = segments[0];
   const segmentKey = segments
-    .map((segment) => `${segment.startIdx}:${segment.endIdx}`)
+    .map((segment) => {
+      const first = segment.startIdx;
+      const last = segment.endIdx;
+      return [
+        first,
+        last,
+        segment.xData[first],
+        segment.xData[last],
+        segment.yData[first],
+        segment.yData[last],
+      ].join(':');
+    })
     .join('|');
 
   // Check cache: reuse if data, viewport, and gradient haven't changed
@@ -356,10 +368,11 @@ function drawHeatmapSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (yVal !== yVal) continue;
+      if (!Number.isFinite(yVal)) continue;
 
       const px = Math.floor(((scaleX.dataToPixel(xData[i]) - plot.left) * dpr) / binPx);
       const py = Math.floor(((scaleY.dataToPixel(yVal) - plot.top) * dpr) / binPx);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
 
       if (px >= 0 && px < w && py >= 0 && py < h) {
         const idx = py * w + px;

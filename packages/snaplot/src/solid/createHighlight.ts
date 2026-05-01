@@ -4,7 +4,7 @@ import {
   onCleanup,
   type Accessor,
 } from 'solid-js';
-import type { ChartInstance } from '../types';
+import type { ChartInstance, HighlightSyncKey } from '../types';
 
 /**
  * Two-way reactive binding to a chart's highlighted series.
@@ -39,4 +39,32 @@ export function createHighlight(
   };
 
   return [highlight, set];
+}
+
+/**
+ * Key-aware highlight binding for charts configured with
+ * `highlight.getKey`. Use this when peer charts can have different
+ * series subsets or order.
+ */
+export function createHighlightKey(
+  chart: Accessor<ChartInstance | undefined>,
+): [Accessor<HighlightSyncKey | null>, (key: HighlightSyncKey | null) => void] {
+  const [highlightKey, setHighlightKeySignal] = createSignal<HighlightSyncKey | null>(null);
+
+  createEffect(() => {
+    const c = chart();
+    if (!c) {
+      setHighlightKeySignal(null);
+      return;
+    }
+    setHighlightKeySignal(c.getHighlightKey());
+    const off = c.on('highlight:change', () => setHighlightKeySignal(c.getHighlightKey()));
+    onCleanup(off);
+  });
+
+  const set = (key: HighlightSyncKey | null) => {
+    chart()?.setHighlightKey(key);
+  };
+
+  return [highlightKey, set];
 }

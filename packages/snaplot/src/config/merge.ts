@@ -3,7 +3,8 @@
  *
  * Merge cascade: global defaults → theme → chart-level → series-level.
  * Objects merge recursively. Primitives overwrite.
- * Arrays: series arrays merge by index, other arrays replace entirely.
+ * Arrays replace entirely. This keeps declarative config updates from
+ * retaining stale entries such as removed series or plugin options.
  */
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -42,24 +43,6 @@ export function deepMerge<T extends Record<string, unknown>>(
           targetVal as Record<string, unknown>,
           sourceVal as Record<string, unknown>,
         );
-      } else if (
-        key === 'series' &&
-        Array.isArray(targetVal) &&
-        Array.isArray(sourceVal)
-      ) {
-        // Series arrays merge by index
-        const merged = [...(targetVal as unknown[])];
-        for (let i = 0; i < (sourceVal as unknown[]).length; i++) {
-          if (i < merged.length && isPlainObject(merged[i]) && isPlainObject((sourceVal as unknown[])[i])) {
-            merged[i] = deepMerge(
-              merged[i] as Record<string, unknown>,
-              (sourceVal as unknown[])[i] as Record<string, unknown>,
-            );
-          } else {
-            merged[i] = (sourceVal as unknown[])[i];
-          }
-        }
-        out[keyStr] = merged;
       } else {
         out[keyStr] = sourceVal;
       }

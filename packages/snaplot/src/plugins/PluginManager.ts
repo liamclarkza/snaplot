@@ -9,10 +9,11 @@ import type { Plugin, ChartInstance } from '../types';
 export class PluginManager {
   private plugins: Plugin[] = [];
 
-  register(plugin: Plugin): void {
+  register(plugin: Plugin): boolean {
     // Prevent duplicate registration
-    if (this.plugins.some(p => p.id === plugin.id)) return;
+    if (this.plugins.some(p => p.id === plugin.id)) return false;
     this.plugins.push(plugin);
+    return true;
   }
 
   unregister(id: string): void {

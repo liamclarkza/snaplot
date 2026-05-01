@@ -1,4 +1,5 @@
 import type { Scale, Layout, SeriesConfig } from '../types';
+import { barRectForCategory, categoryWidthFromCenters } from './barGeometry';
 
 export interface BarRenderSegment {
   xData: Float64Array;
@@ -77,47 +78,42 @@ export function renderBarsSegments(
   ctx.fillStyle = color;
   ctx.globalAlpha = (series.opacity ?? 0.85) * opacityMultiplier;
 
-  const outerPadding = 0.2;
-  const innerPadding = 0.1;
-  const widthRatio = series.barWidthRatio ?? 0.8;
-
-  // Compute bar width based on data point spacing
-  let categoryWidth: number;
-  if (count > 1) {
-    // Use average spacing between adjacent X values
-    const first = segments[0];
-    const last = segments[segments.length - 1];
-    const xRange = scaleX.dataToPixel(last.xData[last.endIdx]) -
-      scaleX.dataToPixel(first.xData[first.startIdx]);
-    categoryWidth = xRange / (count - 1);
-  } else {
-    categoryWidth = layout.plot.width * 0.5;
+  const centers: number[] = [];
+  for (const segment of segments) {
+    const { xData, startIdx, endIdx } = segment;
+    for (let i = startIdx; i <= endIdx; i++) {
+      centers.push(scaleX.dataToPixel(xData[i]));
+    }
   }
-
-  const groupWidth = categoryWidth * (1 - outerPadding) * widthRatio;
-  const barWidth = groupWidth / totalBarSeries;
-  const barGap = barWidth * innerPadding;
-  const effectiveBarWidth = barWidth - barGap;
 
   // Baseline Y (where value = 0)
   const baselinePixel = scaleY.dataToPixel(0);
 
+  let ordinal = 0;
   for (const segment of segments) {
-    const { xData, yData, startIdx, endIdx } = segment;
+    const { yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (yVal !== yVal) continue; // NaN
+      const centerX = centers[ordinal++];
+      if (!Number.isFinite(yVal)) continue;
 
-      const centerX = scaleX.dataToPixel(xData[i]);
-      const groupLeft = centerX - groupWidth / 2;
-      const barLeft = groupLeft + barSeriesIndex * barWidth + barGap / 2;
+      if (!Number.isFinite(centerX)) continue;
+      const categoryWidth = categoryWidthFromCenters(centers, ordinal - 1, layout.plot.width * 0.5);
+      const rect = barRectForCategory({
+        centerX,
+        categoryWidth,
+        series,
+        barSeriesIndex,
+        totalBarSeries,
+      });
       const barTop = scaleY.dataToPixel(yVal);
+      if (!Number.isFinite(barTop) || !Number.isFinite(baselinePixel)) continue;
 
       // Bar goes from barTop to baseline (supports negative values)
       const y = Math.min(barTop, baselinePixel);
       const h = Math.abs(barTop - baselinePixel);
 
-      ctx.fillRect(barLeft, y, effectiveBarWidth, h);
+      ctx.fillRect(rect.left, y, rect.width, h);
     }
   }
 

@@ -24,7 +24,7 @@ import type {
  */
 export function createCursorSnapshot<TMeta = unknown>(
   chart: Accessor<ChartInstance | undefined>,
-  opts?: CursorSnapshotOptions,
+  opts?: CursorSnapshotOptions | Accessor<CursorSnapshotOptions>,
 ): Accessor<CursorSnapshot<TMeta> | null> {
   const [snapshot, setSnapshot] = createSignal<CursorSnapshot<TMeta> | null>(
     null,
@@ -53,7 +53,7 @@ export function createCursorSnapshot<TMeta = unknown>(
       // The cast is safe, meta typing is purely an external assertion.
       c.getCursorSnapshotInto(
         buffer as unknown as CursorSnapshot,
-        opts,
+        typeof opts === 'function' ? opts() : opts,
       );
       setSnapshot(buffer);
     };
@@ -63,10 +63,12 @@ export function createCursorSnapshot<TMeta = unknown>(
 
     const offCursor = c.on('cursor:move', refresh);
     const offData = c.on('data:update', refresh);
+    const offOptions = c.on('options:update', refresh);
 
     onCleanup(() => {
       offCursor();
       offData();
+      offOptions();
     });
   });
 
