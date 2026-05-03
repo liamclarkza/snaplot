@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-03
+
 ### Added
 - Added touch interaction knobs for one-finger drag behavior and touch
   selection gestures.
