@@ -571,7 +571,7 @@ export const DEFAULT_WHEEL_STEP = 0.1;
 /** Auto-range Y padding as fraction of range */
 export const AUTO_RANGE_PADDING = 0.05;
 
-/** Default long-press duration (ms) before box-zoom on touch */
+/** Default long-press duration (ms) before opt-in touch selection */
 export const DEFAULT_LONG_PRESS_MS = 400;
 
 /** Default tap timeout (ms), max time for a press to count as a tap */

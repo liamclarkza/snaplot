@@ -6,6 +6,36 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Added touch interaction knobs for one-finger drag behavior and touch
+  selection gestures.
+- Added opt-in axis-gutter pan and zoom controls via `pan.axis` and
+  `zoom.axis`.
+- Added `zoom.pinchMode` so touch pinch can either preserve a uniform 2D
+  zoom or opt into direction-based axis locking.
+
+### Changed
+- Touch interactions now default to cursor-first behavior: one-finger drag
+  moves the cursor/tooltip, while double-tap-drag handles touch selection.
+- Charts that opt into one-finger touch panning now disable touch selection
+  by default to avoid accidental box-zoom during ordinary pan gestures.
+- Touch pinch now applies a uniform 2D zoom by default when X and Y zoom are
+  enabled, matching map/image-style mobile zoom behavior.
+- Touch cursor updates are coalesced to animation frames to reduce mobile
+  scatter tooltip and overlay work during drag.
+- Interaction mode presets now respect explicit `zoom` and `pan` fields
+  instead of overwriting them.
+
+### Fixed
+- Axis gutters no longer capture drag, scroll, or touch input by default.
+- Touch pan, cursor, pinch, and selection gestures now use explicit gesture
+  states so ordinary panning cannot leak into box selection.
+- The scatter demo accepts plot-area touchpad pinch and cmd-scroll zoom again.
+- Plot-area double-tap suppresses native page zoom and resets chart zoom.
+- Streaming demos can be configured as cursor-only so touch exploration does
+  not freeze the live scrolling window.
+- Touch tooltips now position higher above the finger instead of underneath it.
+
 ## [0.8.0] - 2026-05-01
 
 ### Breaking

@@ -54,7 +54,7 @@ Scatter series can use `xDataIndex`/`yDataIndex` for tabular coordinates, `color
 
 ### Interactions
 
-Drag-to-zoom, wheel and pinch zoom at the cursor, pan on shift-drag or axis gutters, double-click reset, proximity tooltips in three modes (`index`, `nearest`, `x`), keyboard pan and zoom, and full touch gesture support.
+Drag-to-zoom, wheel and pinch zoom at the cursor, pan on shift-drag, opt-in axis-gutter controls, double-click reset, proximity tooltips in three modes (`index`, `nearest`, `x`), keyboard pan and zoom, and touch gestures tuned for cursor-first mobile use.
 
 ### Streaming
 

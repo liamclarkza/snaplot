@@ -1,4 +1,4 @@
-import type { InteractionMode, Layout, ZoomConfig } from '../types';
+import type { InteractionMode, Layout, PanConfig, TouchConfig, ZoomConfig } from '../types';
 import type { EventBus } from '../core/EventBus';
 import {
   MIN_DRAG_DISTANCE,
@@ -17,8 +17,9 @@ import {
  * - Touch: one-finger drag, two-finger pinch, tap, double-tap, long-press
  *
  * Gesture→action mapping is determined by the interaction mode:
- * - timeseries: drag=pan, shift+drag=box-zoom
- * - analytical: drag=box-zoom, shift+drag=pan
+ * - mouse: drag=box-zoom, shift+drag=pan
+ * - touch: drag=cursor by default, or pan when `touch.drag` is `'pan'`
+ * - touch selection: double-tap+drag by default, long-press only by opt-in
  * - readonly: tooltip only
  */
 
@@ -37,47 +38,83 @@ interface AreaResult {
   axisKey?: string;
 }
 
+type GestureState =
+  | { kind: 'idle' }
+  | ActivePressState
+  | ActiveCursorState
+  | ActivePanState
+  | ActiveBoxState
+  | ActivePinchState;
+
+interface ActivePressState {
+  kind: 'press' | 'selection-pending' | 'long-press-ready';
+  pointerId: number;
+  pointerType: string;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  startTime: number;
+  lastMoveTime: number;
+  area: AreaResult;
+}
+
+interface ActiveCursorState {
+  kind: 'cursor';
+  pointerId: number;
+  pointerType: string;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+}
+
+interface ActivePanState {
+  kind: 'pan';
+  pointerId: number;
+  pointerType: string;
+  lastX: number;
+  lastY: number;
+  axis?: string;
+  lastMoveTime: number;
+  velocityX: number;
+  velocityY: number;
+}
+
+interface ActiveBoxState {
+  kind: 'box';
+  pointerId: number;
+  pointerType: string;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  mode: 'zoom' | 'selection';
+}
+
+interface ActivePinchState {
+  kind: 'pinch';
+  lastDist: number;
+}
+
 export class GestureManager {
   private pointers = new Map<number, PointerState>();
-  private state: 'idle' | 'dragging' | 'pinching' | 'long-pressing' | 'selecting' = 'idle';
+  private state: GestureState = { kind: 'idle' };
 
   // Long-press
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
-  private longPressMs: number;
-
   // Scroll origin tracking: only zoom on axis if scroll STARTED on that axis.
   // Scrolls that start elsewhere (plot, page) always pass through.
   private scrollStartArea: AreaResult | null = null;
   private scrollResetTimer: ReturnType<typeof setTimeout> | null = null;
-
-  // Track which area the drag started in (for axis-specific pan)
-  private dragStartArea: AreaResult = { type: 'plot' };
 
   // Tap detection
   private lastTapTime = 0;
   private lastTapX = 0;
   private lastTapY = 0;
 
-  // Pinch state, just the distance; the centre point is recomputed each
-  // move because it depends on both pointer positions.
-  private lastPinchDist = 0;
-
-  // Pan drag start
-  private dragStartX = 0;
-  private dragStartY = 0;
-
-  // Pan velocity tracking (touch-only momentum).
-  // EMA velocity in px/ms, sampled during touch pan. `lastMoveTime` anchors
-  // the sample interval; the pointer positions live on the PointerState map.
-  private lastMoveTime = 0;
-  private velocityX = 0;
-  private velocityY = 0;
+  // Touch pan momentum, started only from a completed pan gesture.
   private momentumFrame: number | null = null;
-  private momentumAxis: string | undefined;
-
-  // Box selection
-  private boxStartX = 0;
-  private boxStartY = 0;
 
   // Bound handlers
   private boundPointerDown: (e: PointerEvent) => void;
@@ -87,6 +124,7 @@ export class GestureManager {
   private boundWheel: (e: WheelEvent) => void;
   private boundDblClick: (e: MouseEvent) => void;
   private boundKeyDown: (e: KeyboardEvent) => void;
+  private boundTouchPreventDefault: (e: TouchEvent) => void;
   /** Element that receives keyboard focus (chart container with tabindex=0). */
   private keyboardTarget: HTMLElement | null = null;
 
@@ -96,10 +134,10 @@ export class GestureManager {
     private getMode: () => InteractionMode,
     private getLayout: () => Layout,
     private getZoomConfig: () => ZoomConfig,
-    longPressMs?: number,
+    private getPanConfig: () => PanConfig,
+    private getTouchConfig: () => TouchConfig,
+    private coordinateTarget: HTMLElement = target,
   ) {
-    this.longPressMs = longPressMs ?? DEFAULT_LONG_PRESS_MS;
-
     this.boundPointerDown = this.onPointerDown.bind(this);
     this.boundPointerMove = this.onPointerMove.bind(this);
     this.boundPointerUp = this.onPointerUp.bind(this);
@@ -107,6 +145,7 @@ export class GestureManager {
     this.boundWheel = this.onWheel.bind(this);
     this.boundDblClick = this.onDblClick.bind(this);
     this.boundKeyDown = this.onKeyDown.bind(this);
+    this.boundTouchPreventDefault = this.onTouchPreventDefault.bind(this);
   }
 
   attach(): void {
@@ -117,6 +156,10 @@ export class GestureManager {
     this.target.addEventListener('pointerleave', this.boundPointerLeave);
     this.target.addEventListener('wheel', this.boundWheel, { passive: false });
     this.target.addEventListener('dblclick', this.boundDblClick);
+    this.target.addEventListener('touchstart', this.boundTouchPreventDefault, { passive: false });
+    this.target.addEventListener('touchmove', this.boundTouchPreventDefault, { passive: false });
+    this.target.addEventListener('touchend', this.boundTouchPreventDefault, { passive: false });
+    this.target.addEventListener('touchcancel', this.boundTouchPreventDefault, { passive: false });
 
     // Keyboard events bubble up from the focused element, so attach to the
     // focusable container (the CanvasManager's tabindex=0 parent of dataCanvas).
@@ -133,6 +176,10 @@ export class GestureManager {
     this.target.removeEventListener('pointerleave', this.boundPointerLeave);
     this.target.removeEventListener('wheel', this.boundWheel);
     this.target.removeEventListener('dblclick', this.boundDblClick);
+    this.target.removeEventListener('touchstart', this.boundTouchPreventDefault);
+    this.target.removeEventListener('touchmove', this.boundTouchPreventDefault);
+    this.target.removeEventListener('touchend', this.boundTouchPreventDefault);
+    this.target.removeEventListener('touchcancel', this.boundTouchPreventDefault);
     this.keyboardTarget?.removeEventListener('keydown', this.boundKeyDown);
     this.keyboardTarget = null;
     this.clearLongPress();
@@ -146,16 +193,21 @@ export class GestureManager {
     this.target.style.touchAction = mode === 'readonly' ? 'auto' : 'none';
   }
 
+  private onTouchPreventDefault(e: TouchEvent): void {
+    if (this.getMode() === 'readonly') return;
+    e.preventDefault();
+  }
+
   // ─── Helpers ──────────────────────────────────────────────
 
   private localCoords(e: PointerEvent | WheelEvent | MouseEvent): { x: number; y: number } {
-    const rect = this.target.getBoundingClientRect();
+    const rect = this.coordinateTarget.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
   private inPlotArea(x: number, y: number): boolean {
     const { plot } = this.getLayout();
-    return x >= plot.left && x <= plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height;
+    return x > plot.left && x < plot.left + plot.width && y > plot.top && y < plot.top + plot.height;
   }
 
   /**
@@ -164,9 +216,8 @@ export class GestureManager {
    */
   private getAxisArea(x: number, y: number): AreaResult {
     const layout = this.getLayout();
-    const { plot } = layout;
 
-    if (x >= plot.left && x <= plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height) {
+    if (this.inPlotArea(x, y)) {
       return { type: 'plot' };
     }
 
@@ -188,6 +239,30 @@ export class GestureManager {
     }
   }
 
+  private touchDragMode(): 'cursor' | 'pan' {
+    return this.getTouchConfig().drag ?? 'cursor';
+  }
+
+  private touchSelectionGesture(): 'double-tap-drag' | 'long-press' | 'none' {
+    const touch = this.getTouchConfig();
+    if (touch.selectionGesture) return touch.selectionGesture;
+    return touch.drag === 'pan' ? 'none' : 'double-tap-drag';
+  }
+
+  private isTouchLike(e: PointerEvent): boolean {
+    return e.pointerType === 'touch' || e.pointerType === 'pen';
+  }
+
+  private distance(x1: number, y1: number, x2: number, y2: number): number {
+    return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+  }
+
+  private isDoubleTapCandidate(x: number, y: number, now: number): boolean {
+    if (this.lastTapTime === 0) return false;
+    return now - this.lastTapTime < DOUBLE_TAP_TIMEOUT
+      && this.distance(x, y, this.lastTapX, this.lastTapY) < 30;
+  }
+
   private pinchDistance(): number {
     if (this.pointers.size < 2) return 0;
     const pts = Array.from(this.pointers.values());
@@ -203,85 +278,125 @@ export class GestureManager {
   }
 
   /** Whether the primary drag action is pan (vs box-zoom) based on mode + modifiers + area */
-  private dragIsPan(e: PointerEvent): boolean {
+  private dragIsPan(area: AreaResult, pointerType: string, shiftKey: boolean): boolean {
     const mode = this.getMode();
     if (mode === 'readonly') return false;
 
-    // Drag on axis area always pans that axis
-    if (this.dragStartArea.type === 'axis') return true;
+    if (area.type === 'axis') return this.getPanConfig().axis === true;
 
-    // Touch one-finger drag always pans (box-zoom via long-press)
-    if (e.pointerType === 'touch') return true;
+    if (pointerType === 'touch') return this.touchDragMode() === 'pan';
 
-    // Mouse/trackpad in plot area:
-    // timeseries: drag=box-zoom (Grafana-style), shift+drag=pan
-    // analytical: drag=box-zoom, shift+drag=pan
-    return e.shiftKey;
+    return shiftKey;
+  }
+
+  private panAxisForArea(area: AreaResult): string | undefined {
+    return area.type === 'axis' ? area.axisKey : undefined;
+  }
+
+  private makePressState(
+    kind: ActivePressState['kind'],
+    pointer: PointerState,
+    area: AreaResult,
+  ): ActivePressState {
+    return {
+      kind,
+      pointerId: pointer.id,
+      pointerType: pointer.pointerType,
+      startX: pointer.startX,
+      startY: pointer.startY,
+      lastX: pointer.x,
+      lastY: pointer.y,
+      startTime: pointer.startTime,
+      lastMoveTime: performance.now(),
+      area,
+    };
+  }
+
+  private armLongPress(pointerId: number): void {
+    const longPressMs = this.getTouchConfig().longPressMs ?? DEFAULT_LONG_PRESS_MS;
+    this.longPressTimer = setTimeout(() => {
+      this.longPressTimer = null;
+      const state = this.state;
+      if (state.kind !== 'press' || state.pointerId !== pointerId || state.pointerType !== 'touch') return;
+      this.state = { ...state, kind: 'long-press-ready' };
+    }, longPressMs);
+  }
+
+  private resetTapMemory(): void {
+    this.lastTapTime = 0;
+    this.lastTapX = 0;
+    this.lastTapY = 0;
   }
 
   // ─── Pointer events ───────────────────────────────────────
 
   private onPointerDown(e: PointerEvent): void {
     const mode = this.getMode();
-    if (mode === 'readonly') return; // readonly: no interaction except cursor
-
     if (e.button !== 0) return; // primary button only
-
-    // Cancel any in-flight pan momentum, grabbing the chart stops the glide.
-    this.cancelMomentum();
 
     const { x, y } = this.localCoords(e);
     const area = this.getAxisArea(x, y);
     if (area.type === 'outside') return;
 
-    this.dragStartArea = area;
-    // setPointerCapture can throw when the UA has already retargeted the
-    // pointer (e.g. fast multi-touch under iOS, or synthetic events). Keep
-    // going either way, capture is an optimisation, not a correctness
-    // requirement for our state machine.
+    if (this.isTouchLike(e) && area.type === 'plot') {
+      if (mode !== 'readonly') e.preventDefault();
+      this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
+    }
+
+    if (mode === 'readonly') return;
+
+    if (area.type !== 'plot' && !(area.type === 'axis' && this.getPanConfig().axis === true)) {
+      return;
+    }
+
+    this.cancelMomentum();
+
+    // Capture is helpful for uninterrupted drags, but browsers can reject it
+    // during fast synthetic or multi-touch transitions.
     try { this.target.setPointerCapture(e.pointerId); } catch {}
 
-    this.pointers.set(e.pointerId, {
+    const pointer: PointerState = {
       id: e.pointerId,
       x, y,
       startX: x, startY: y,
       startTime: Date.now(),
       pointerType: e.pointerType,
-    });
+    };
+    this.pointers.set(e.pointerId, pointer);
 
     if (this.pointers.size === 2) {
-      // Two pointers → pinch mode
       this.clearLongPress();
-      this.state = 'pinching';
-      this.lastPinchDist = this.pinchDistance();
+      this.resetTapMemory();
+      this.state = { kind: 'pinch', lastDist: this.pinchDistance() };
       return;
     }
 
-    if (this.pointers.size === 1 && e.pointerType === 'touch') {
-      // Touch: start long-press timer
+    if (this.pointers.size !== 1) return;
+
+    if (e.pointerType === 'touch') {
+      const now = Date.now();
+      if (
+        this.touchSelectionGesture() === 'double-tap-drag' &&
+        this.isDoubleTapCandidate(x, y, now)
+      ) {
+        this.state = this.makePressState('selection-pending', pointer, area);
+        return;
+      }
+
       this.clearLongPress();
-      this.longPressTimer = setTimeout(() => {
-        this.longPressTimer = null;
-        this.state = 'long-pressing';
-        // Long-press → ready for box-zoom on next move
-        this.boxStartX = x;
-        this.boxStartY = y;
-      }, this.longPressMs);
+      this.state = this.makePressState('press', pointer, area);
+      if (this.touchSelectionGesture() === 'long-press') this.armLongPress(e.pointerId);
+      return;
     }
 
-    // Store drag start
-    this.dragStartX = x;
-    this.dragStartY = y;
-
-    // Reset pan-velocity sampler; first move will populate it.
-    this.lastMoveTime = performance.now();
-    this.velocityX = 0;
-    this.velocityY = 0;
+    this.clearLongPress();
+    this.state = this.makePressState('press', pointer, area);
   }
 
   private onPointerMove(e: PointerEvent): void {
     const { x, y } = this.localCoords(e);
     const mode = this.getMode();
+    const area = this.getAxisArea(x, y);
 
     // Update pointer position
     const ptr = this.pointers.get(e.pointerId);
@@ -290,25 +405,35 @@ export class GestureManager {
       ptr.y = y;
     }
 
+    if (ptr && this.isTouchLike(e)) {
+      e.preventDefault();
+    }
+
     // Emit hover cursor only when no drag pointer is active. During the first
     // few pixels of a box selection, state is still idle until we cross the
     // drag threshold; publishing those interim moves makes synced peers drift
     // away from the selection anchor.
     if (this.pointers.size === 0 || mode === 'readonly') {
+      if (area.type !== 'plot') {
+        this.eventBus.emit('action:cursor-leave', undefined);
+        return;
+      }
       this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
     }
 
     if (mode === 'readonly') return;
 
     // ── Pinch (two-finger touch) ──
-    if (this.state === 'pinching' && this.pointers.size >= 2) {
+    if (this.state.kind === 'pinch' && this.pointers.size >= 2) {
       const newDist = this.pinchDistance();
       const center = this.pinchCenter();
 
-      if (this.lastPinchDist > 0 && newDist > 0) {
-        const factor = newDist / this.lastPinchDist;
+      if (this.state.lastDist > 0 && newDist > 0) {
+        const factor = newDist / this.state.lastDist;
 
-        // Axis locking: measure horizontal vs vertical spread change
+        // Default touch pinch mirrors desktop wheel/pinch: if both axes are
+        // enabled, zoom both together. `pinchMode: 'axis-lock'` opts back into
+        // direction-based locking for apps that need it.
         const pts = Array.from(this.pointers.values());
         const dx = Math.abs(pts[1].x - pts[0].x);
         const dy = Math.abs(pts[1].y - pts[0].y);
@@ -316,8 +441,10 @@ export class GestureManager {
         let axis: string = 'xy';
         if (zoom.x && !zoom.y) axis = 'x';
         else if (!zoom.x && zoom.y) axis = 'y';
-        else if (dx > 2 * dy) axis = 'x';
-        else if (dy > 2 * dx) axis = 'y';
+        else if (zoom.pinchMode === 'axis-lock') {
+          if (dx > 2 * dy) axis = 'x';
+          else if (dy > 2 * dx) axis = 'y';
+        }
 
         this.eventBus.emit('action:zoom', {
           factor: 1 / factor, // invert: spread fingers = zoom in = smaller range
@@ -327,84 +454,161 @@ export class GestureManager {
         });
       }
 
-      this.lastPinchDist = newDist;
+      this.state = { kind: 'pinch', lastDist: newDist };
       return;
     }
 
     // ── Single pointer gestures ──
     if (!ptr || this.pointers.size !== 1) return;
 
-    const dx = x - ptr.startX;
-    const dy = y - ptr.startY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    const state = this.state;
+    const dist = this.distance(x, y, ptr.startX, ptr.startY);
 
-    // Not enough movement yet
-    if (dist < MIN_DRAG_DISTANCE && this.state === 'idle') return;
-
-    // Cancel long-press on movement
-    if (this.state === 'idle') {
-      this.clearLongPress();
-      this.state = 'dragging';
+    if (state.kind === 'selection-pending' && state.pointerId === e.pointerId) {
+      if (dist >= MIN_DRAG_DISTANCE) {
+        this.clearLongPress();
+        this.state = {
+          kind: 'box',
+          pointerId: e.pointerId,
+          pointerType: state.pointerType,
+          startX: state.startX,
+          startY: state.startY,
+          lastX: x,
+          lastY: y,
+          mode: 'selection',
+        };
+        this.eventBus.emit('action:box-start', { x: state.startX, y: state.startY });
+        this.eventBus.emit('action:box-update', { x, y });
+      } else {
+        this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
+      }
+      return;
     }
 
-    // Long-press + drag → box selection
-    if (this.state === 'long-pressing') {
-      this.state = 'selecting';
-      this.boxStartX = ptr.startX;
-      this.boxStartY = ptr.startY;
-      this.eventBus.emit('action:box-start', { x: this.boxStartX, y: this.boxStartY });
-    }
-
-    if (this.state === 'selecting') {
+    if (state.kind === 'box' && state.pointerId === e.pointerId) {
+      this.state = { ...state, lastX: x, lastY: y };
       this.eventBus.emit('action:box-update', { x, y });
       return;
     }
 
-    // Dragging, pan or box-zoom based on mode
-    if (this.state === 'dragging') {
-      if (this.dragIsPan(e)) {
-        // Pan: emit incremental delta with axis key from drag start area
-        const prevX = this.dragStartX;
-        const prevY = this.dragStartY;
-        const panAxis = this.dragStartArea.type === 'axis' ? this.dragStartArea.axisKey : undefined;
-        const dxPan = x - prevX;
-        const dyPan = y - prevY;
-        this.eventBus.emit('action:pan', { dx: dxPan, dy: dyPan, axis: panAxis });
-        this.dragStartX = x;
-        this.dragStartY = y;
-
-        // Sample pan velocity for touch momentum (EMA).
-        if (e.pointerType === 'touch') {
-          const now = performance.now();
-          const dt = Math.max(1, now - this.lastMoveTime);
-          const instVX = dxPan / dt;
-          const instVY = dyPan / dt;
-          // α = 0.5, fast to react, stable enough against jitter.
-          const a = 0.5;
-          this.velocityX = a * instVX + (1 - a) * this.velocityX;
-          this.velocityY = a * instVY + (1 - a) * this.velocityY;
-          this.lastMoveTime = now;
-          this.momentumAxis = panAxis;
-        }
-
-        // Also update cursor during pan
-        this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
-      } else {
-        // Box zoom: first move starts the box
-        if (!this.boxStartX && !this.boxStartY) {
-          this.boxStartX = ptr.startX;
-          this.boxStartY = ptr.startY;
-          this.eventBus.emit('action:box-start', { x: this.boxStartX, y: this.boxStartY });
-        }
-        this.eventBus.emit('action:box-update', { x, y });
-      }
+    if (state.kind === 'cursor' && state.pointerId === e.pointerId) {
+      this.state = { ...state, lastX: x, lastY: y };
+      this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
+      return;
     }
+
+    if (state.kind === 'pan' && state.pointerId === e.pointerId) {
+      const dxPan = x - state.lastX;
+      const dyPan = y - state.lastY;
+      let velocityX = state.velocityX;
+      let velocityY = state.velocityY;
+      let lastMoveTime = state.lastMoveTime;
+
+      this.eventBus.emit('action:pan', { dx: dxPan, dy: dyPan, axis: state.axis });
+
+      if (state.pointerType === 'touch') {
+        const now = performance.now();
+        const dt = Math.max(1, now - state.lastMoveTime);
+        const a = 0.5;
+        velocityX = a * (dxPan / dt) + (1 - a) * state.velocityX;
+        velocityY = a * (dyPan / dt) + (1 - a) * state.velocityY;
+        lastMoveTime = now;
+      }
+
+      this.state = {
+        ...state,
+        lastX: x,
+        lastY: y,
+        lastMoveTime,
+        velocityX,
+        velocityY,
+      };
+      this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
+      return;
+    }
+
+    if (state.kind === 'long-press-ready' && state.pointerId === e.pointerId) {
+      if (dist < MIN_DRAG_DISTANCE) {
+        this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
+        return;
+      }
+      this.state = {
+        kind: 'box',
+        pointerId: e.pointerId,
+        pointerType: state.pointerType,
+        startX: state.startX,
+        startY: state.startY,
+        lastX: x,
+        lastY: y,
+        mode: 'selection',
+      };
+      this.eventBus.emit('action:box-start', { x: state.startX, y: state.startY });
+      this.eventBus.emit('action:box-update', { x, y });
+      return;
+    }
+
+    if (state.kind !== 'press' || state.pointerId !== e.pointerId) return;
+
+    if (e.pointerType === 'touch' && this.touchDragMode() === 'cursor') {
+      if (dist >= MIN_DRAG_DISTANCE) this.clearLongPress();
+      this.state = {
+        kind: 'cursor',
+        pointerId: e.pointerId,
+        pointerType: e.pointerType,
+        startX: state.startX,
+        startY: state.startY,
+        lastX: x,
+        lastY: y,
+      };
+      this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
+      return;
+    }
+
+    if (dist < MIN_DRAG_DISTANCE) return;
+
+    this.clearLongPress();
+    if (this.dragIsPan(state.area, e.pointerType, e.shiftKey)) {
+      const panAxis = this.panAxisForArea(state.area);
+      const now = performance.now();
+      const dxPan = x - state.startX;
+      const dyPan = y - state.startY;
+      this.eventBus.emit('action:pan', { dx: dxPan, dy: dyPan, axis: panAxis });
+      this.state = {
+        kind: 'pan',
+        pointerId: e.pointerId,
+        pointerType: e.pointerType,
+        lastX: x,
+        lastY: y,
+        axis: panAxis,
+        lastMoveTime: now,
+        velocityX: e.pointerType === 'touch' ? dxPan / Math.max(1, now - state.lastMoveTime) : 0,
+        velocityY: e.pointerType === 'touch' ? dyPan / Math.max(1, now - state.lastMoveTime) : 0,
+      };
+      this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });
+      return;
+    }
+
+    this.state = {
+      kind: 'box',
+      pointerId: e.pointerId,
+      pointerType: e.pointerType,
+      startX: state.startX,
+      startY: state.startY,
+      lastX: x,
+      lastY: y,
+      mode: 'zoom',
+    };
+    this.eventBus.emit('action:box-start', { x: state.startX, y: state.startY });
+    this.eventBus.emit('action:box-update', { x, y });
   }
 
   private onPointerUp(e: PointerEvent): void {
     const ptr = this.pointers.get(e.pointerId);
     this.pointers.delete(e.pointerId);
     try { this.target.releasePointerCapture(e.pointerId); } catch {}
+    if (ptr && (ptr.pointerType === 'touch' || ptr.pointerType === 'pen')) {
+      e.preventDefault();
+    }
 
     this.clearLongPress();
 
@@ -417,69 +621,79 @@ export class GestureManager {
     }
 
     const { x, y } = this.localCoords(e);
-    const dist = Math.sqrt((x - ptr.startX) ** 2 + (y - ptr.startY) ** 2);
+    const dist = this.distance(x, y, ptr.startX, ptr.startY);
     const elapsed = Date.now() - ptr.startTime;
+    const state = this.state;
 
     // ── Finalize box selection / box zoom ──
-    if (this.state === 'selecting' || (this.state === 'dragging' && !this.dragIsPan(e))) {
+    if (state.kind === 'box' && state.pointerId === e.pointerId) {
       if (dist >= MIN_DRAG_DISTANCE) {
         this.eventBus.emit('action:box-end', {
-          x1: this.boxStartX, y1: this.boxStartY,
+          x1: state.startX, y1: state.startY,
           x2: x, y2: y,
         });
       } else {
-        // Cancelled, clear the box
         this.eventBus.emit('action:box-end', { x1: 0, y1: 0, x2: 0, y2: 0 });
       }
       this.resetState();
       return;
     }
 
-    // ── Tap detection (< 10px movement AND < 300ms) ──
-    if (dist < MIN_DRAG_DISTANCE && elapsed < TAP_TIMEOUT) {
-      const now = Date.now();
-      const tapDist = Math.sqrt((x - this.lastTapX) ** 2 + (y - this.lastTapY) ** 2);
-
-      if (now - this.lastTapTime < DOUBLE_TAP_TIMEOUT && tapDist < 30) {
-        // Double-tap → reset zoom
+    if (state.kind === 'selection-pending' && state.pointerId === e.pointerId) {
+      if (dist < MIN_DRAG_DISTANCE) {
         this.eventBus.emit('action:reset-zoom', undefined);
-        this.lastTapTime = 0;
+        this.resetTapMemory();
+      }
+      this.resetState();
+      return;
+    }
+
+    if (state.kind === 'pan' && state.pointerId === e.pointerId) {
+      if (ptr.pointerType === 'touch' && this.pointers.size === 0) {
+        this.startMomentum(state.velocityX, state.velocityY, state.axis);
+      }
+      this.resetState();
+      return;
+    }
+
+    if (state.kind === 'cursor' && state.pointerId === e.pointerId) {
+      this.resetState();
+      return;
+    }
+
+    // ── Pinch ended (one finger lifted) ──
+    if (state.kind === 'pinch') {
+      if (this.pointers.size === 1) {
+        const survivor = this.pointers.values().next().value;
+        if (survivor) {
+          survivor.startX = survivor.x;
+          survivor.startY = survivor.y;
+          survivor.startTime = Date.now();
+          this.state = this.makePressState('press', survivor, this.getAxisArea(survivor.x, survivor.y));
+        }
       } else {
-        // Single tap
+        this.resetState();
+      }
+      return;
+    }
+
+    // ── Tap detection (< 10px movement AND < 300ms) ──
+    if (
+      (state.kind === 'press' || state.kind === 'long-press-ready') &&
+      state.pointerId === e.pointerId &&
+      dist < MIN_DRAG_DISTANCE &&
+      elapsed < TAP_TIMEOUT
+    ) {
+      const now = Date.now();
+      if (this.isDoubleTapCandidate(x, y, now)) {
+        this.eventBus.emit('action:reset-zoom', undefined);
+        this.resetTapMemory();
+      } else {
         this.eventBus.emit('action:tap', { x, y, pointerType: ptr.pointerType });
         this.lastTapTime = now;
         this.lastTapX = x;
         this.lastTapY = y;
       }
-    }
-
-    // ── Pinch ended (one finger lifted) ──
-    if (this.state === 'pinching' && this.pointers.size < 2) {
-      // Don't reset to idle yet if one finger is still down
-      if (this.pointers.size === 1) {
-        this.state = 'idle';
-        // Rebase pan state on the surviving finger's current position.
-        // Without this, `dragStartX/Y` still reflect the original (now-lifted)
-        // finger's down-position and the next pan emits a huge first-frame
-        // delta (pinch-to-drag jump bug).
-        const survivor = this.pointers.values().next().value;
-        if (survivor) {
-          this.dragStartX = survivor.x;
-          this.dragStartY = survivor.y;
-          this.lastMoveTime = performance.now();
-          this.velocityX = 0;
-          this.velocityY = 0;
-        }
-      }
-    }
-
-    // ── Touch pan released: start momentum if the flick was fast enough ──
-    if (
-      ptr.pointerType === 'touch' &&
-      this.state === 'dragging' &&
-      this.pointers.size === 0
-    ) {
-      this.startMomentum();
     }
 
     this.resetState();
@@ -489,31 +703,33 @@ export class GestureManager {
     // Suppress cursor-leave while a gesture is in flight, pointer capture
     // keeps the drag alive even when the pointer briefly leaves the canvas
     // bounds. Without this guard the crosshair/tooltip flickers mid-pan.
-    if (this.state !== 'idle') return;
+    if (this.state.kind !== 'idle') return;
     this.eventBus.emit('action:cursor-leave', undefined);
   }
 
   private resetState(): void {
     if (this.pointers.size === 0) {
-      this.state = 'idle';
-      this.boxStartX = 0;
-      this.boxStartY = 0;
+      this.state = { kind: 'idle' };
     }
   }
 
   // ─── Pan momentum (touch only) ────────────────────────────
 
-  private startMomentum(): void {
+  private startMomentum(velocityX: number, velocityY: number, axis: string | undefined): void {
+    if (typeof requestAnimationFrame === 'undefined') return;
+
     // Threshold of 0.1 px/ms ≈ 100 px/s, below this it's just a static release.
-    const vMag = Math.hypot(this.velocityX, this.velocityY);
+    const vMag = Math.hypot(velocityX, velocityY);
     if (vMag < 0.1) return;
 
     // Cap peak velocity so a jittery last sample can't launch the chart.
     const MAX_V = 2.5; // px/ms ≈ 2500 px/s
+    let vx = velocityX;
+    let vy = velocityY;
     if (vMag > MAX_V) {
       const s = MAX_V / vMag;
-      this.velocityX *= s;
-      this.velocityY *= s;
+      vx *= s;
+      vy *= s;
     }
 
     let lastT = performance.now();
@@ -521,16 +737,16 @@ export class GestureManager {
       const dt = Math.min(32, now - lastT); // clamp frame to avoid teleporting after tab blur
       lastT = now;
 
-      const dx = this.velocityX * dt;
-      const dy = this.velocityY * dt;
-      this.eventBus.emit('action:pan', { dx, dy, axis: this.momentumAxis });
+      const dx = vx * dt;
+      const dy = vy * dt;
+      this.eventBus.emit('action:pan', { dx, dy, axis });
 
       // Exponential decay, halves roughly every ~130ms.
       const decay = Math.exp(-dt / 180);
-      this.velocityX *= decay;
-      this.velocityY *= decay;
+      vx *= decay;
+      vy *= decay;
 
-      if (Math.hypot(this.velocityX, this.velocityY) < 0.02) {
+      if (Math.hypot(vx, vy) < 0.02) {
         this.momentumFrame = null;
         return;
       }
@@ -541,11 +757,9 @@ export class GestureManager {
 
   private cancelMomentum(): void {
     if (this.momentumFrame !== null) {
-      cancelAnimationFrame(this.momentumFrame);
+      if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(this.momentumFrame);
       this.momentumFrame = null;
     }
-    this.velocityX = 0;
-    this.velocityY = 0;
   }
 
   // ─── Wheel (mouse scroll / trackpad pinch) ────────────────
@@ -575,9 +789,9 @@ export class GestureManager {
       // Only zoom if scroll STARTED on an axis area
       const startedOnAxis = this.scrollStartArea.type === 'axis';
       if (startedOnAxis && area.type === 'axis') {
-        e.preventDefault();
         const zoom = this.getZoomConfig();
-        if (!zoom.enabled) return;
+        if (!zoom.enabled || zoom.axis !== true) return;
+        e.preventDefault();
 
         // Magnitude only, direction comes from the sign of deltaY.
         // Negative values are clamped to 0 (disabled); there's no
@@ -595,12 +809,15 @@ export class GestureManager {
       return;
     }
 
-    // Pinch-to-zoom (ctrlKey on wheel)
-    if (!this.inPlotArea(x, y) && area.type !== 'axis') return;
+    // Pinch-to-zoom (ctrlKey on wheel). Axis gutters are inert by default;
+    // `zoom.axis: true` opts back into axis-origin wheel/pinch controls.
+    const zoom = this.getZoomConfig();
+    if (!this.inPlotArea(x, y)) {
+      if (area.type !== 'axis' || zoom.axis !== true) return;
+    }
 
     e.preventDefault();
 
-    const zoom = this.getZoomConfig();
     if (!zoom.enabled) return;
 
     const strength = Math.max(0, zoom.wheelStep ?? DEFAULT_WHEEL_STEP);

@@ -28,7 +28,7 @@ export default function Docs() {
           Every example below is <b>live and editable</b>. Change the config and the chart updates instantly.
         </Prose>
         <Prose>
-          <b>Driving the demos:</b> drag inside a chart to box-zoom, scroll on an axis to zoom that axis, shift+drag to pan, double-click to reset, hover for tooltips. Full reference under{' '}
+          <b>Driving the demos:</b> drag inside a chart to box-zoom, pinch or cmd-scroll over the plot to zoom, shift+drag to pan, double-click to reset, hover for tooltips. Axis controls are opt-in. Full reference under{' '}
           <button
             type="button"
             onClick={() => scrollTo('interaction-modes')}

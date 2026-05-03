@@ -263,7 +263,7 @@ export default function Home() {
                 'text-align': 'right',
               }}
             >
-              drag to zoom · scroll an axis to zoom it · shift+drag to pan · double-click to reset · hover to inspect
+              drag to zoom · cmd-scroll or pinch to zoom · double-click to reset · hover to inspect
             </div>
           </div>
           <div style={{ height: 'clamp(280px, 44vh, 380px)', padding: '8px 0 var(--space-2)' }}>

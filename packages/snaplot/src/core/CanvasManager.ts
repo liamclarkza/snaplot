@@ -15,6 +15,7 @@ export class CanvasManager {
   readonly dataCanvas: HTMLCanvasElement;
   readonly overlayCanvas: HTMLCanvasElement;
   readonly domLayer: HTMLDivElement;
+  readonly interactionLayer: HTMLDivElement;
 
   readonly gridCtx: CanvasRenderingContext2D;
   readonly dataCtx: CanvasRenderingContext2D;
@@ -36,14 +37,13 @@ export class CanvasManager {
     this.container.tabIndex = 0;
     this.container.setAttribute('role', 'application');
     this.container.style.cssText =
-      'position:relative;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;border-radius:6px;outline:none;';
+      'position:relative;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:auto;border-radius:6px;outline:none;';
     parent.appendChild(this.container);
 
     // Create canvases
     this.gridCanvas = this.createCanvas(0);
     this.dataCanvas = this.createCanvas(1);
     this.overlayCanvas = this.createCanvas(2);
-    this.overlayCanvas.style.pointerEvents = 'none';
 
     // Grid canvas is opaque (no transparency compositing needed)
     this.gridCtx = this.gridCanvas.getContext('2d', { alpha: false })!;
@@ -55,6 +55,14 @@ export class CanvasManager {
     this.domLayer.style.cssText =
       'position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden;';
     this.container.appendChild(this.domLayer);
+
+    // Transparent input layer. It is resized to the plot area by ChartCore so
+    // axis labels/gutters remain regular page surface unless axis controls are
+    // explicitly enabled.
+    this.interactionLayer = document.createElement('div');
+    this.interactionLayer.style.cssText =
+      'position:absolute;z-index:4;background:transparent;pointer-events:auto;touch-action:none;';
+    this.container.appendChild(this.interactionLayer);
   }
 
   get dpr(): number {
@@ -126,9 +134,16 @@ export class CanvasManager {
     this.container.remove();
   }
 
+  setInteractionRect(rect: { left: number; top: number; width: number; height: number }): void {
+    this.interactionLayer.style.left = rect.left + 'px';
+    this.interactionLayer.style.top = rect.top + 'px';
+    this.interactionLayer.style.width = rect.width + 'px';
+    this.interactionLayer.style.height = rect.height + 'px';
+  }
+
   private createCanvas(zIndex: number): HTMLCanvasElement {
     const canvas = document.createElement('canvas');
-    canvas.style.cssText = `position:absolute;inset:0;z-index:${zIndex};`;
+    canvas.style.cssText = `position:absolute;inset:0;z-index:${zIndex};pointer-events:none;`;
     this.container.appendChild(canvas);
     return canvas;
   }

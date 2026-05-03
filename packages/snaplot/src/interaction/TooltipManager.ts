@@ -71,6 +71,7 @@ export class TooltipManager {
     clientX: number,
     clientY: number,
     config?: TooltipConfig,
+    pointerType?: 'mouse' | 'touch' | 'pen',
   ): void {
     if (points.length === 0) {
       this.hide();
@@ -97,8 +98,20 @@ export class TooltipManager {
     this.visible = true;
 
     const offset = config?.offset ?? TOOLTIP_OFFSET;
-    this.el.style.left = (clientX + offset) + 'px';
-    this.el.style.top = (clientY + offset) + 'px';
+    if (pointerType === 'touch' || pointerType === 'pen') {
+      const margin = 8;
+      const touchClearance = Math.max(offset, 72);
+      const width = this.el.offsetWidth;
+      const height = this.el.offsetHeight;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || width + margin * 2;
+      const left = Math.max(margin, Math.min(viewportWidth - width - margin, clientX - width / 2));
+      const top = Math.max(margin, clientY - height - touchClearance);
+      this.el.style.left = left + 'px';
+      this.el.style.top = top + 'px';
+    } else {
+      this.el.style.left = (clientX + offset) + 'px';
+      this.el.style.top = (clientY + offset) + 'px';
+    }
   }
 
   hide(): void {

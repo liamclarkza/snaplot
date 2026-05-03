@@ -41,13 +41,13 @@ export default function Interactions() {
                 ['Mouse drag', 'Box zoom', 'Box zoom', '\u2014'],
                 ['Shift+drag', 'Pan', 'Pan', '\u2014'],
                 ['Pinch', 'Zoom X', 'Zoom XY', '\u2014'],
-                ['Touch drag', 'Pan', 'Pan', '\u2014'],
-                ['Long-press+drag', 'Box zoom', 'Box zoom', '\u2014'],
+                ['Touch drag', 'Cursor', 'Cursor', 'Cursor'],
+                ['Double-tap+drag', 'Box zoom', 'Box zoom', '\u2014'],
                 ['Tap', 'Tooltip', 'Tooltip', 'Tooltip'],
                 ['Double-tap/click', 'Reset', 'Reset', '\u2014'],
                 ['Scroll', 'Page', 'Page', 'Page'],
-                ['Axis scroll', 'Zoom axis', 'Zoom axis', '\u2014'],
-                ['Axis drag', 'Pan axis', 'Pan axis', '\u2014'],
+                ['Axis scroll', 'Opt-in', 'Opt-in', '\u2014'],
+                ['Axis drag', 'Opt-in', 'Opt-in', '\u2014'],
               ].map(([gesture, ts, an, ro]) => (
                 <tr style={{ 'border-bottom': '1px solid var(--border)' }}>
                   <td style={{ padding: '8px 12px', 'font-weight': '500' }}>{gesture}</td>
@@ -60,7 +60,7 @@ export default function Interactions() {
           </table>
         </div>
         <Prose>
-          <b>Touch checks</b>: iOS Safari and Android Chrome should support one-finger pan, two-finger pinch zoom, tap tooltip, double-tap reset, and long-press box zoom. Keep chart containers at least 240px tall on narrow screens so pinch and long-press gestures have enough room; regular page scroll is left alone unless the gesture starts inside the chart or on an axis.
+          <b>Touch checks</b>: iOS Safari and Android Chrome should support one-finger cursor movement, two-finger pinch zoom, tap tooltip, double-tap reset, and double-tap-drag selection. Axis labels and tick gutters are inert unless explicitly enabled.
         </Prose>
         <Demo title="Interaction mode demo" desc="Change 'timeseries' to 'analytical' (enables Y zoom + XY pinch) or 'readonly' (tooltip only)"
           data={d_interaction()}
@@ -83,6 +83,8 @@ export default function Interactions() {
         <Prose>
           <b>Double-click</b> (or double-tap) resets zoom to the full data extent.
           Use <code>minRange</code> and <code>maxRange</code> to set zoom limits. <code>wheelStep</code> controls the zoom fraction per max wheel / pinch tick (default <code>0.1</code>; <code>0</code> disables wheel zoom).
+          When both axes are zoomable, touch pinch uses a uniform map/image-style 2D zoom by default; use <code>pinchMode: 'axis-lock'</code> for direction-based locking.
+          Axis-gutter wheel zoom is opt-in with <code>zoom.axis: true</code>.
           The <code>onZoom</code> callback fires whenever the viewport changes.
         </Prose>
         <Prose>
@@ -111,9 +113,9 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
 
       <Section id="pan" title="Pan">
         <Prose>
-          Enable panning with <code>pan: {'{ enabled: true, x: true, y: true }'}</code>. In the <code>timeseries</code> interaction mode, shift+drag activates pan. You can also drag on the axis areas to pan along a single axis.
+          Enable panning with <code>pan: {'{ enabled: true, x: true, y: true }'}</code>. In the <code>timeseries</code> interaction mode, shift+drag activates pan. Axis-gutter panning is opt-in with <code>pan.axis: true</code>.
         </Prose>
-        <Demo title="Pan demo" desc="Hold shift and drag to pan, or drag on an axis"
+        <Demo title="Pan demo" desc="Hold shift and drag to pan"
           data={d_pan()}
           code={`{
   axes: { x: { type: 'time' } },
@@ -160,11 +162,12 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
       <Section id="touch" title="Touch Gestures">
         <Prose>Touch-specific interaction behaviors:</Prose>
         <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
-          <li><b>One-finger drag</b>, pan along the X axis</li>
-          <li><b>Two-finger pinch</b>, zoom (X-only in timeseries mode, XY in analytical mode). Axis locking is automatic based on the pinch direction.</li>
-          <li><b>Long-press + drag</b>, activates box zoom (same as mouse drag)</li>
+          <li><b>One-finger drag</b>, move the cursor and tooltip by default; set <code>drag: 'pan'</code> for one-finger panning</li>
+          <li><b>Two-finger pinch</b>, zoom (X-only in timeseries mode, uniform XY in analytical mode). Direction-based axis locking is opt-in.</li>
+          <li><b>Double-tap + drag</b>, activates box selection or box zoom when selection is enabled</li>
           <li><b>Tap</b>, shows tooltip at the nearest data point</li>
           <li><b>Double-tap</b>, resets zoom to full data extent</li>
+          <li><b>Long-press + drag</b>, available only with <code>selectionGesture: 'long-press'</code></li>
         </ul>
         <Prose>
           Configure touch behavior with the <code>touch</code> config:
@@ -172,7 +175,9 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         <CodeBlock code={`touch: {
   hitRadius: 44,    // CSS pixels. Defaults: 44 for touch, 32 for mouse
                     // (per WCAG 2.5.5). Set here to override both.
-  longPressMs: 400, // ms before long-press activates box zoom
+  drag: 'cursor',   // or 'pan' for one-finger panning
+  selectionGesture: 'double-tap-drag', // default unless drag is 'pan';
+                                       // use 'long-press' or 'none' as needed
 }`} />
       </Section>
     </>

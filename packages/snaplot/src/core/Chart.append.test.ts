@@ -154,6 +154,10 @@ function chartEventBus(chart: ChartCore): EventBus {
   return (chart as unknown as { eventBus: EventBus }).eventBus;
 }
 
+function interactionLayer(chart: ChartCore): MockElement {
+  return (chart as unknown as { canvasManager: { interactionLayer: MockElement } }).canvasManager.interactionLayer;
+}
+
 function plotPoint(chart: ChartCore, xFraction = 0.5): { x: number; y: number } {
   const { plot } = chart.getLayout();
   return {
@@ -338,6 +342,70 @@ describe('ChartCore runtime options', () => {
     expect(chart.use({ id: 'runtime-plugin', install: vi.fn() })).toBe(false);
     expect(plugin.install).toHaveBeenCalledTimes(1);
 
+    chart.destroy();
+  });
+
+  it('limits the input layer to the plot area by default', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        zoom: { enabled: true, x: true },
+        pan: { enabled: true, x: true },
+        series: [{ label: 'value', dataIndex: 1 }],
+      },
+      [f([0, 1]), f([10, 20])],
+    );
+
+    const { plot } = chart.getLayout();
+    const layer = interactionLayer(chart);
+
+    expect(layer.style.left).toBe(`${plot.left}px`);
+    expect(layer.style.top).toBe(`${plot.top}px`);
+    expect(layer.style.width).toBe(`${plot.width}px`);
+    expect(layer.style.height).toBe(`${plot.height}px`);
+
+    chart.destroy();
+  });
+
+  it('expands the input layer over axes only when axis controls are enabled', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        zoom: { enabled: true, x: true },
+        pan: { enabled: true, x: true },
+        series: [{ label: 'value', dataIndex: 1 }],
+      },
+      [f([0, 1]), f([10, 20])],
+    );
+
+    chart.setOptions({ zoom: { axis: true } });
+
+    const layout = chart.getLayout();
+    const layer = interactionLayer(chart);
+    expect(layer.style.left).toBe('0px');
+    expect(layer.style.top).toBe('0px');
+    expect(layer.style.width).toBe(`${layout.width}px`);
+    expect(layer.style.height).toBe(`${layout.height}px`);
+
+    chart.destroy();
+  });
+
+  it('lets explicit zoom and pan fields override interaction mode presets', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        interaction: 'analytical',
+        zoom: { enabled: false },
+        pan: { y: false },
+        series: [{ label: 'value', dataIndex: 1 }],
+      },
+      [f([1, 2]), f([10, 20])],
+    );
+
+    expect(chart.getOptions().zoom).toMatchObject({ enabled: false, x: true, y: true });
+    expect(chart.getOptions().pan).toMatchObject({ enabled: true, x: true, y: false });
     chart.destroy();
   });
 
@@ -681,6 +749,51 @@ describe('ChartCore scatter selection', () => {
 
     chart.destroy();
   });
+
+  it('coalesces touch cursor updates onto the next animation frame', () => {
+    let raf: FrameRequestCallback | undefined;
+    vi.stubGlobal('requestAnimationFrame', vi.fn((cb: FrameRequestCallback) => {
+      raf = cb;
+      return 7;
+    }));
+    const moves: Array<[number | null, number | null]> = [];
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', padding: 0 }, y: { type: 'linear', padding: 0 } },
+        tooltip: { show: true, mode: 'nearest' },
+        series: [{ label: 'points', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
+      },
+      [
+        f([0, 1, 2]),
+        f([0, 10, 20]),
+        f([0, 10, 20]),
+      ],
+    );
+    chart.on('cursor:move', (dataX, dataIdx) => {
+      moves.push([dataX, dataIdx]);
+    });
+
+    const xScale = chart.getAxis('x')!;
+    const yScale = chart.getAxis('y')!;
+    chartEventBus(chart).emit('action:cursor', {
+      x: xScale.dataToPixel(10),
+      y: yScale.dataToPixel(10),
+      pointerType: 'touch',
+    });
+    chartEventBus(chart).emit('action:cursor', {
+      x: xScale.dataToPixel(20),
+      y: yScale.dataToPixel(20),
+      pointerType: 'touch',
+    });
+
+    expect(moves).toEqual([]);
+    expect(raf).toBeDefined();
+    raf?.(0);
+    expect(moves.at(-1)).toEqual([20, 2]);
+
+    chart.destroy();
+  });
 });
 
 describe('ChartCore log interactions', () => {
@@ -793,13 +906,121 @@ describe('ChartCore log interactions', () => {
     chartEventBus(chart).emit('action:zoom', {
       factor: 0.5,
       anchorX: xScale.dataToPixel(1e-3),
-      anchorY: 0,
+      anchorY: chart.getLayout().plot.top + chart.getLayout().plot.height / 2,
       axis: 'x',
     });
 
     expect(xScale.min).toBeCloseTo(1e-4, 10);
     expect(xScale.max).toBeCloseTo(1e-2, 10);
 
+    chart.destroy();
+  });
+
+  it('keeps log pan clamped without shrinking the viewport at the lower bound', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: {
+          x: { type: 'log', padding: 0 },
+          y: { type: 'linear', padding: 0 },
+        },
+        zoom: {
+          enabled: true,
+          x: true,
+          y: true,
+          bounds: { x: 'data', y: 'unbounded' },
+        },
+        pan: { enabled: true, x: true, y: true },
+        series: [{ label: 'points', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
+      },
+      [
+        f([0, 1, 2]),
+        f([1e-5, 1e-3, 1e-1]),
+        f([0.2, 0.3, 0.4]),
+      ],
+    );
+    const xScale = chart.getAxis('x')!;
+    const initial = { min: xScale.min, max: xScale.max };
+
+    chartEventBus(chart).emit('action:pan', { dx: 40, dy: 0 });
+
+    expect(xScale.min).toBeCloseTo(initial.min, 12);
+    expect(xScale.max).toBeCloseTo(initial.max, 12);
+
+    chart.destroy();
+  });
+
+  it('keeps xy zoom uniform when one axis reaches its bounds', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        zoom: {
+          enabled: true,
+          x: true,
+          y: true,
+          bounds: {
+            x: { min: 0, max: 100 },
+            y: { min: 0, max: 10 },
+          },
+        },
+        series: [{ label: 'points', dataIndex: 1 }],
+      },
+      [f([0, 100]), f([0, 10])],
+    );
+
+    chart.setAxis('x', { min: 25, max: 75 });
+    chart.setAxis('y', { min: 2, max: 8 });
+
+    const { plot } = chart.getLayout();
+    chartEventBus(chart).emit('action:zoom', {
+      factor: 2,
+      anchorX: plot.left + plot.width / 2,
+      anchorY: plot.top + plot.height / 2,
+      axis: 'xy',
+    });
+
+    const xScale = chart.getAxis('x')!;
+    const yScale = chart.getAxis('y')!;
+    expect(yScale.max - yScale.min).toBeCloseTo(10, 10);
+    expect(xScale.max - xScale.min).toBeCloseTo(50 * (10 / 6), 10);
+
+    chart.destroy();
+  });
+
+  it('ignores axis-origin zoom events unless axis zooming is enabled', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        zoom: { enabled: true, x: true, bounds: 'unbounded' },
+        series: [{ label: 'value', dataIndex: 1 }],
+      },
+      [f([0, 100]), f([0, 10])],
+    );
+    const xScale = chart.getAxis('x')!;
+    const { plot } = chart.getLayout();
+    const initial = { min: xScale.min, max: xScale.max };
+
+    chartEventBus(chart).emit('action:zoom', {
+      factor: 0.5,
+      anchorX: plot.left + plot.width / 2,
+      anchorY: plot.top + plot.height + 8,
+      axis: 'x',
+    });
+
+    expect(xScale.min).toBe(initial.min);
+    expect(xScale.max).toBe(initial.max);
+
+    chart.setOptions({ zoom: { axis: true } });
+    chartEventBus(chart).emit('action:zoom', {
+      factor: 0.5,
+      anchorX: plot.left + plot.width / 2,
+      anchorY: plot.top + plot.height + 8,
+      axis: 'x',
+    });
+
+    expect(xScale.max - xScale.min).toBeLessThan(initial.max - initial.min);
     chart.destroy();
   });
 });

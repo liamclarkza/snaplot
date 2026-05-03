@@ -292,9 +292,12 @@ export interface AxisConfig {
 
 /**
  * Interaction modes define default gesture→action mappings:
- * - timeseries: drag=pan, shift+drag=box-zoom, pinch=zoom-x (dashboards, monitoring)
- * - analytical: drag=box-zoom, shift+drag=pan, pinch=zoom-xy (scatter, exploration)
+ * - timeseries: mouse drag=box-zoom, shift+drag=pan, pinch=zoom-x
+ * - analytical: mouse drag=box-zoom, shift+drag=pan, pinch=zoom-xy
  * - readonly: tooltip only, all navigation disabled (reports, embeds)
+ *
+ * Touch defaults are cursor-first: one-finger drag moves the cursor,
+ * double-tap+drag selects, and two-finger pinch zooms.
  */
 export type InteractionMode = 'timeseries' | 'analytical' | 'readonly';
 
@@ -330,6 +333,8 @@ export interface ZoomConfig {
   enabled?: boolean;
   x?: boolean;
   y?: boolean;
+  /** Enable wheel/pinch zoom gestures that start over axis gutters. Default: `false`. */
+  axis?: boolean;
   /**
    * Zoom fraction per maximum wheel / pinch tick. 0 disables wheel zoom;
    * 0.1 (the default) scales by up to 10% per tick; 0.3 is aggressive.
@@ -337,6 +342,12 @@ export interface ZoomConfig {
    * which was easy to misread.
    */
   wheelStep?: number;
+  /**
+   * Touch pinch behavior when both `zoom.x` and `zoom.y` are enabled.
+   * Default: `'xy'`, apply a uniform map/image-style 2D zoom. Set to
+   * `'axis-lock'` to infer X-only or Y-only zoom from the pinch direction.
+   */
+  pinchMode?: 'xy' | 'axis-lock';
   minRange?: number;
   maxRange?: number;
   /**
@@ -367,12 +378,14 @@ export interface PanConfig {
   enabled?: boolean;
   x?: boolean;
   y?: boolean;
+  /** Enable drag-to-pan gestures that start over axis gutters. Default: `false`. */
+  axis?: boolean;
 }
 
 export interface SelectionConfig {
   /**
    * Callback fired after a box-select gesture resolves (mouse drag /
-   * long-press + drag on touch). The `x` range is always set; `y` is
+   * double-tap + drag on touch by default). The `x` range is always set; `y` is
    * only present when the selection tracked both axes.
    */
   onSelect?: (selection: SelectionResult) => void;
@@ -410,7 +423,20 @@ export interface TouchConfig {
    * (WCAG 2.5.5 tap-target minimum) and 32 px for mouse / pen.
    */
   hitRadius?: number;
-  /** Long-press duration in ms before box-zoom activates (default: 400) */
+  /**
+   * One-finger drag behavior. Default: `'cursor'`, which moves the cursor
+   * and tooltip without changing the viewport. Set to `'pan'` for the old
+   * one-finger pan behavior.
+   */
+  drag?: 'cursor' | 'pan';
+  /**
+   * Touch gesture for box selection. Default: `'double-tap-drag'`.
+   * When `drag: 'pan'`, the default becomes `'none'` so ordinary pan
+   * gestures are not mistaken for selections. Set to `'double-tap-drag'`
+   * explicitly to combine touch panning with touch selection.
+   */
+  selectionGesture?: 'double-tap-drag' | 'long-press' | 'none';
+  /** Long-press duration in ms before box selection activates. */
   longPressMs?: number;
 }
 

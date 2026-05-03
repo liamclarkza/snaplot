@@ -376,6 +376,7 @@ export default function HeroDashboard() {
 
   const streamConfig = createMemo<ChartConfig>(() => ({
     theme: activeTheme(),
+    interaction: 'readonly',
     debug: { stats: true },
     streaming: { maxLen: STREAM_WINDOW_POINTS },
     axes: { x: { type: 'time' }, y: { type: 'linear' } },
@@ -385,7 +386,8 @@ export default function HeroDashboard() {
       { label: 'Errors', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 1.6 },
     ],
     cursor: { show: true, indicators: true },
-    zoom: { enabled: true, x: true, bounds: 'data' },
+    zoom: { enabled: false },
+    pan: { enabled: false },
     tooltip: { show: true, mode: 'index' },
     padding: { top: 20, right: 22, bottom: 36, left: 48 },
   }));
@@ -455,6 +457,7 @@ export default function HeroDashboard() {
 
   const heatConfig = createMemo<ChartConfig>(() => ({
     theme: activeTheme(),
+    interaction: 'analytical',
     axes: { x: { type: 'linear' }, y: { type: 'linear' } },
     series: [{
       label: 'Density',
@@ -463,9 +466,11 @@ export default function HeroDashboard() {
       heatmap: true,
       heatmapBinSize: 1,
     }],
-    cursor: { show: true },
+    cursor: { show: false },
     zoom: { enabled: true, x: true, y: true, bounds: 'data' },
-    tooltip: { show: true, mode: 'nearest' },
+    pan: { enabled: true, x: true, y: true },
+    touch: { drag: 'pan', selectionGesture: 'double-tap-drag' },
+    tooltip: { show: false },
     padding: { top: 18, right: 20, bottom: 34, left: 44 },
   }));
 
@@ -506,7 +511,9 @@ export default function HeroDashboard() {
       renderMode: 'points',
     }],
     cursor: { show: true, indicators: true },
-    zoom: { enabled: false, x: true, y: true },
+    zoom: { enabled: true, x: true, y: true, bounds: 'data' },
+    pan: { enabled: true, x: true, y: true },
+    touch: { drag: 'pan', selectionGesture: 'double-tap-drag' },
     selection: {
       onSelect: (selection) => setSelectedSweepPoints(selection.points?.length ?? 0),
     },

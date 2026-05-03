@@ -106,6 +106,8 @@ export class ChartCore implements ChartInstance {
   private mouseY: number | null = null;
   /** Pointer type of the most recent cursor event, drives hit-test radius. */
   private lastPointerType: 'mouse' | 'touch' | 'pen' = 'mouse';
+  private pendingTouchCursor: { x: number; y: number; pointerType: 'touch' | 'pen'; publishSync: boolean } | null = null;
+  private touchCursorFrame: number | null = null;
   /** Active selection box (shift+drag) */
   private selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
   /** Transient tap-feedback ring, cleared automatically once its lifetime expires. */
@@ -162,7 +164,7 @@ export class ChartCore implements ChartInstance {
     ) as unknown as ChartConfig;
 
     // 1b. Apply interaction mode presets (if zoom/pan not explicitly configured)
-    this.applyModePresets();
+    this.applyModePresets(config);
 
     // 2. Create canvas layers
     this.canvasManager = new CanvasManager(parent, (w, h) => {
@@ -193,12 +195,14 @@ export class ChartCore implements ChartInstance {
     this.tooltipManager = new TooltipManager(this.theme);
 
     this.gestureManager = new GestureManager(
-      this.canvasManager.dataCanvas,
+      this.canvasManager.interactionLayer,
       this.eventBus,
       () => this.config.interaction ?? 'timeseries',
       () => this.layout,
       () => this.config.zoom ?? { enabled: true, x: true },
-      this.config.touch?.longPressMs,
+      () => this.config.pan ?? { enabled: true, x: true },
+      () => this.config.touch ?? {},
+      this.canvasManager.container,
     );
 
     // 9. Create plugin manager and register plugins
@@ -342,7 +346,7 @@ export class ChartCore implements ChartInstance {
 
   private applyConfigSideEffects(partial: DeepPartial<ChartConfig>, fullReplace: boolean): void {
     if (fullReplace || partial.interaction) {
-      this.applyModePresets();
+      this.applyModePresets(partial);
       this.gestureManager.updateTouchAction();
     }
 
@@ -397,6 +401,7 @@ export class ChartCore implements ChartInstance {
     if (this.destroyed) return;
     this.destroyed = true;
 
+    this.cancelPendingTouchCursor();
     this.scheduler.destroy();
     this.gestureManager.detach();
     this.tooltipManager.destroy();
@@ -565,20 +570,42 @@ export class ChartCore implements ChartInstance {
 
   /**
    * Apply interaction mode presets to zoom/pan config.
-   * When a mode is set, it always overrides zoom/pan axes settings
-   * (the mode IS the intent). Users can still override after via setOptions
-   * with explicit zoom/pan config without setting a mode.
+   * Mode presets provide default zoom/pan axes while preserving explicit
+   * zoom/pan fields supplied by the caller.
    */
-  private applyModePresets(): void {
+  private applyModePresets(source?: DeepPartial<ChartConfig>): void {
     const mode = this.config.interaction;
     if (!mode) return;
 
+    const zoom = source?.zoom;
+    const pan = source?.pan;
+
     if (mode === 'analytical') {
-      this.config.zoom = { ...this.config.zoom, enabled: true, x: true, y: true };
-      this.config.pan = { ...this.config.pan, enabled: true, x: true, y: true };
+      this.config.zoom = {
+        ...this.config.zoom,
+        enabled: zoom?.enabled ?? true,
+        x: zoom?.x ?? true,
+        y: zoom?.y ?? true,
+      };
+      this.config.pan = {
+        ...this.config.pan,
+        enabled: pan?.enabled ?? true,
+        x: pan?.x ?? true,
+        y: pan?.y ?? true,
+      };
     } else if (mode === 'timeseries') {
-      this.config.zoom = { ...this.config.zoom, enabled: true, x: true, y: false };
-      this.config.pan = { ...this.config.pan, enabled: true, x: true, y: false };
+      this.config.zoom = {
+        ...this.config.zoom,
+        enabled: zoom?.enabled ?? true,
+        x: zoom?.x ?? true,
+        y: zoom?.y ?? false,
+      };
+      this.config.pan = {
+        ...this.config.pan,
+        enabled: pan?.enabled ?? true,
+        x: pan?.x ?? true,
+        y: pan?.y ?? false,
+      };
     } else if (mode === 'readonly') {
       this.config.zoom = { enabled: false };
       this.config.pan = { enabled: false };
@@ -1102,7 +1129,10 @@ export class ChartCore implements ChartInstance {
     const w = this.canvasManager.cssWidth || 600;
     const h = this.canvasManager.cssHeight || 400;
     const cacheKey = this.createLayoutCacheKey(w, h);
-    if (this.layout && cacheKey === this.layoutCacheKey) return;
+    if (this.layout && cacheKey === this.layoutCacheKey) {
+      this.updateInteractionLayer();
+      return;
+    }
 
     this.layout = computeLayout(
       w, h,
@@ -1113,6 +1143,14 @@ export class ChartCore implements ChartInstance {
       this.theme.fontSize,
     );
     this.layoutCacheKey = cacheKey;
+    this.updateInteractionLayer();
+  }
+
+  private updateInteractionLayer(): void {
+    const axisControls = this.config.pan?.axis === true || this.config.zoom?.axis === true;
+    this.canvasManager.setInteractionRect(axisControls
+      ? { left: 0, top: 0, width: this.layout.width, height: this.layout.height }
+      : this.layout.plot);
   }
 
   private createLayoutCacheKey(width: number, height: number): string {
@@ -1158,16 +1196,62 @@ export class ChartCore implements ChartInstance {
     }
   }
 
+  private queueTouchCursor(
+    x: number,
+    y: number,
+    pointerType: 'touch' | 'pen',
+    publishSync: boolean,
+  ): void {
+    this.pendingTouchCursor = { x, y, pointerType, publishSync };
+    if (this.touchCursorFrame !== null) return;
+
+    if (typeof requestAnimationFrame === 'undefined') {
+      this.flushPendingTouchCursor();
+      return;
+    }
+
+    this.touchCursorFrame = requestAnimationFrame(() => {
+      this.touchCursorFrame = null;
+      this.flushPendingTouchCursor();
+    });
+  }
+
+  private flushPendingTouchCursor(): void {
+    const pending = this.pendingTouchCursor;
+    this.pendingTouchCursor = null;
+    if (!pending) return;
+    this.updateLocalCursorFromPoint(
+      pending.x,
+      pending.y,
+      pending.pointerType,
+      pending.publishSync,
+    );
+  }
+
+  private cancelPendingTouchCursor(): void {
+    this.pendingTouchCursor = null;
+    if (this.touchCursorFrame !== null && typeof cancelAnimationFrame !== 'undefined') {
+      cancelAnimationFrame(this.touchCursorFrame);
+    }
+    this.touchCursorFrame = null;
+  }
+
   // ─── Private: Event wiring ──────────────────────────────────
 
   private wireEvents(): void {
     // ── Cursor tracking ──
     this.eventBus.on('action:cursor', ({ x, y, pointerType }) => {
+      if (pointerType === 'touch' || pointerType === 'pen') {
+        this.queueTouchCursor(x, y, pointerType, true);
+        return;
+      }
+      this.cancelPendingTouchCursor();
       this.updateLocalCursorFromPoint(x, y, pointerType, true);
     });
 
     // ── Cursor leave ──
     this.eventBus.on('action:cursor-leave', () => {
+      this.cancelPendingTouchCursor();
       this.cursorX = null;
       this.cursorY = null;
       this.mouseX = null;
@@ -1195,6 +1279,7 @@ export class ChartCore implements ChartInstance {
       const axisConfigs = this.config.axes ?? {};
 
       if (axis) {
+        if (pan.axis !== true) return;
         // Drag started on a specific axis, only pan that axis
         const scale = this.scales.get(axis);
         if (scale) {
@@ -1230,23 +1315,10 @@ export class ChartCore implements ChartInstance {
       if (!zoom.enabled) return;
 
       const axisConfigs = this.config.axes ?? {};
+      if (!this.canZoomFromAnchor(axis, anchorX, anchorY, zoom.axis === true, axisConfigs)) return;
 
       if (axis === 'xy') {
-        // Zoom all enabled axes
-        for (const [key, scale] of this.scales) {
-          const pos = inferPosition(key, axisConfigs[key]?.position);
-          const isHoriz = pos === 'bottom' || pos === 'top';
-          if (isHoriz && zoom.x !== false) {
-            const [newMin, newMax] = this.zoomedScaleRange(scale, anchorX, factor);
-            const range = newMax - newMin;
-            if ((!zoom.minRange || range >= zoom.minRange) && (!zoom.maxRange || range <= zoom.maxRange)) {
-              this.applyViewportChange(key, newMin, newMax);
-            }
-          } else if (!isHoriz && zoom.y) {
-            const [newMin, newMax] = this.zoomedScaleRange(scale, anchorY, factor);
-            this.applyViewportChange(key, newMin, newMax);
-          }
-        }
+        this.applyUniformZoom(factor, anchorX, anchorY);
       } else {
         // Zoom a specific axis by key
         const scale = this.scales.get(axis);
@@ -1362,6 +1434,7 @@ export class ChartCore implements ChartInstance {
 
     // ── Tap (touch: show/persist tooltip) ──
     this.eventBus.on('action:tap', ({ x, y, pointerType }) => {
+      this.cancelPendingTouchCursor();
       const inPlot = this.isInPlotArea(x, y);
       this.updateLocalCursorFromPoint(x, y, pointerType, true);
       if (inPlot) {
@@ -1392,6 +1465,77 @@ export class ChartCore implements ChartInstance {
       10 ** (logAnchor - (logAnchor - logMin) * factor),
       10 ** (logAnchor + (logMax - logAnchor) * factor),
     ];
+  }
+
+  private canZoomFromAnchor(
+    axis: string,
+    anchorX: number,
+    anchorY: number,
+    axisControlsEnabled: boolean,
+    axisConfigs: NonNullable<ChartConfig['axes']>,
+  ): boolean {
+    if (axisControlsEnabled) return true;
+    const { plot } = this.layout;
+    if (axis === 'xy') return this.isInPlotArea(anchorX, anchorY);
+
+    const ac = axisConfigs[axis];
+    const pos = inferPosition(axis, ac?.position);
+    if (pos === 'bottom' || pos === 'top') {
+      return anchorY > plot.top && anchorY < plot.top + plot.height;
+    }
+    return anchorX > plot.left && anchorX < plot.left + plot.width;
+  }
+
+  private applyUniformZoom(factor: number, anchorX: number, anchorY: number): void {
+    const zoom = this.config.zoom ?? { enabled: true, x: true };
+    const axisConfigs = this.config.axes ?? {};
+    const targets: Array<{ key: string; scale: Scale; pos: 'top' | 'bottom' | 'left' | 'right'; anchorPx: number }> = [];
+
+    for (const [key, scale] of this.scales) {
+      const pos = inferPosition(key, axisConfigs[key]?.position);
+      const isHoriz = pos === 'bottom' || pos === 'top';
+      if (isHoriz ? zoom.x !== false : zoom.y) {
+        targets.push({ key, scale, pos, anchorPx: isHoriz ? anchorX : anchorY });
+      }
+    }
+    if (targets.length === 0) return;
+
+    let effectiveFactor = factor;
+    for (const target of targets) {
+      const span = this.scaleDomainSpan(target.scale, target.scale.min, target.scale.max);
+      if (span <= 0 || !Number.isFinite(span)) continue;
+
+      const isHoriz = target.pos === 'bottom' || target.pos === 'top';
+      const proposed = this.zoomedScaleRange(target.scale, target.anchorPx, effectiveFactor);
+      const proposedSpan = this.scaleDomainSpan(target.scale, proposed[0], proposed[1]);
+
+      if (isHoriz && zoom.minRange && proposed[1] - proposed[0] < zoom.minRange) {
+        effectiveFactor = Math.max(effectiveFactor, zoom.minRange / (target.scale.max - target.scale.min));
+      }
+      if (isHoriz && zoom.maxRange && proposed[1] - proposed[0] > zoom.maxRange) {
+        effectiveFactor = Math.min(effectiveFactor, zoom.maxRange / (target.scale.max - target.scale.min));
+      }
+
+      const bounds = this.resolveBounds(target.key, target.pos);
+      if (bounds?.min !== undefined && bounds.max !== undefined && proposedSpan > 0) {
+        const boundsSpan = this.scaleDomainSpan(target.scale, bounds.min, bounds.max);
+        if (Number.isFinite(boundsSpan) && boundsSpan > 0 && proposedSpan > boundsSpan) {
+          effectiveFactor = Math.min(effectiveFactor, boundsSpan / span);
+        }
+      }
+    }
+
+    for (const target of targets) {
+      const [newMin, newMax] = this.zoomedScaleRange(target.scale, target.anchorPx, effectiveFactor);
+      this.applyViewportChange(target.key, newMin, newMax);
+    }
+  }
+
+  private scaleDomainSpan(scale: Scale, min: number, max: number): number {
+    if (scale.type !== 'log') return max - min;
+    const safeMin = Math.max(min, 1e-10);
+    const safeMax = Math.max(max, safeMin);
+    return Math.log10(safeMax) - Math.log10(safeMin);
   }
 
   private pannedScaleRange(scale: Scale, deltaPx: number): [number, number] {
@@ -1531,27 +1675,42 @@ export class ChartCore implements ChartInstance {
 
     const bMin = b.min;
     const bMax = b.max;
-    const span = max - min;
+    const scale = this.scales.get(scaleKey);
+    const span = scale ? this.scaleDomainSpan(scale, min, max) : max - min;
 
     if (bMin !== undefined && bMax !== undefined) {
-      const boundedSpan = bMax - bMin;
+      const boundedSpan = scale ? this.scaleDomainSpan(scale, bMin, bMax) : bMax - bMin;
       if (span >= boundedSpan) {
         // User is trying to see more than the full range, clamp to it.
         return [bMin, bMax];
       }
     }
     if (bMin !== undefined && min < bMin) {
-      min = bMin;
-      max = min + span;
+      [min, max] = this.rangeFromMin(scale, bMin, span);
     }
     if (bMax !== undefined && max > bMax) {
-      max = bMax;
-      min = max - span;
+      [min, max] = this.rangeFromMax(scale, bMax, span);
     }
     // After shifting, the opposite edge may have crossed its bound.
     if (bMin !== undefined && min < bMin) min = bMin;
     if (bMax !== undefined && max > bMax) max = bMax;
     return [min, max];
+  }
+
+  private rangeFromMin(scale: Scale | undefined, min: number, span: number): [number, number] {
+    if (scale?.type === 'log') {
+      const safeMin = Math.max(min, 1e-10);
+      return [min, 10 ** (Math.log10(safeMin) + span)];
+    }
+    return [min, min + span];
+  }
+
+  private rangeFromMax(scale: Scale | undefined, max: number, span: number): [number, number] {
+    if (scale?.type === 'log') {
+      const safeMax = Math.max(max, 1e-10);
+      return [10 ** (Math.log10(safeMax) - span), max];
+    }
+    return [max - span, max];
   }
 
   // ─── Private: Render pipeline ───────────────────────────────
@@ -1852,6 +2011,7 @@ export class ChartCore implements ChartInstance {
         rect.left + this.mouseX,
         rect.top + (this.mouseY ?? 0),
         this.config.tooltip,
+        this.lastPointerType,
       );
     } else {
       this.tooltipManager.hide();
