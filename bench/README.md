@@ -11,6 +11,7 @@ npm install
 npx playwright install chromium   # one-time browser download
 npm run bench                     # all scenarios, desktop + mobile profiles
 npm run bench -- --profile mobile --filter scatter-pan
+npm run bench -- --headed         # GPU rasterization (headless is software)
 npm run bench:compare             # latest run vs bench/baselines/baseline.json
 ```
 

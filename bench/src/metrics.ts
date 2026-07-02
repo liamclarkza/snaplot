@@ -97,6 +97,18 @@ export class LayerTracker {
   }
 }
 
+/** Wait a few frames so ResizeObserver and initial layout settle before measuring. */
+export function settleFrames(count = 5): Promise<void> {
+  return new Promise((resolvePromise) => {
+    let remaining = count;
+    const tick = () => {
+      if (--remaining <= 0) resolvePromise();
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
 /**
  * Drive `step` once per animation frame and record frame-to-frame deltas.
  * The first `warmup` frames run but are not recorded, so stamp caches,

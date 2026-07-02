@@ -1,0 +1,670 @@
+{
+  "meta": {
+    "sha": "d7e17b9",
+    "date": "2026-07-02T20:02:49.257Z",
+    "node": "v24.18.0",
+    "filter": null
+  },
+  "profiles": {
+    "desktop": {
+      "cpuThrottle": 1,
+      "deviceScaleFactor": 2,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "results": [
+        {
+          "name": "scatter-render-10k",
+          "valid": true,
+          "frame": {
+            "frames": 60,
+            "meanMs": 25.56,
+            "medianMs": 25,
+            "p95Ms": 33.2,
+            "maxMs": 33.4,
+            "over60": 1,
+            "over30": 0.03
+          },
+          "layers": {
+            "grid": {
+              "renders": 69,
+              "meanMs": 0.2
+            },
+            "data": {
+              "renders": 69,
+              "meanMs": 19.06
+            },
+            "overlay": {
+              "renders": 69,
+              "meanMs": 0
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 10000
+          }
+        },
+        {
+          "name": "scatter-render-50k",
+          "valid": true,
+          "frame": {
+            "frames": 60,
+            "meanMs": 92.08,
+            "medianMs": 91.7,
+            "p95Ms": 100,
+            "maxMs": 100.1,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 69,
+              "meanMs": 0.29
+            },
+            "data": {
+              "renders": 69,
+              "meanMs": 86.55
+            },
+            "overlay": {
+              "renders": 69,
+              "meanMs": 0.01
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
+        },
+        {
+          "name": "scatter-render-200k",
+          "valid": true,
+          "frame": {
+            "frames": 60,
+            "meanMs": 374.79,
+            "medianMs": 375,
+            "p95Ms": 391.6,
+            "maxMs": 392.6,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 69,
+              "meanMs": 0.43
+            },
+            "data": {
+              "renders": 69,
+              "meanMs": 366.45
+            },
+            "overlay": {
+              "renders": 69,
+              "meanMs": 0.03
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 200000
+          }
+        },
+        {
+          "name": "scatter-pan-50k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 39.36,
+            "medianMs": 41.6,
+            "p95Ms": 42,
+            "maxMs": 42.5,
+            "over60": 1,
+            "over30": 0.8
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.27
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 34.99
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.01
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
+        },
+        {
+          "name": "scatter-pan-200k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 148.38,
+            "medianMs": 150,
+            "p95Ms": 158.3,
+            "maxMs": 158.7,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.24
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 142.43
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.02
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 200000
+          }
+        },
+        {
+          "name": "scatter-zoom-50k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 49.77,
+            "medianMs": 50,
+            "p95Ms": 91.6,
+            "maxMs": 91.8,
+            "over60": 0.88,
+            "over30": 0.67
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.23
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 48.6
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.01
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
+        },
+        {
+          "name": "scatter-zoom-200k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 190.65,
+            "medianMs": 191.7,
+            "p95Ms": 341.7,
+            "maxMs": 366.8,
+            "over60": 0.99,
+            "over30": 0.94
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.28
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 199.42
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.01
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 200000
+          }
+        },
+        {
+          "name": "scatter-offaxis-pan-50k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 62.57,
+            "medianMs": 66.6,
+            "p95Ms": 75,
+            "maxMs": 75.1,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.09
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 57.68
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.01
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
+        },
+        {
+          "name": "scatter-encoded-pan-50k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 110.6,
+            "medianMs": 116.6,
+            "p95Ms": 129.3,
+            "maxMs": 133.4,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.09
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 102.66
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.01
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
+        },
+        {
+          "name": "heatmap-pan-300k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 8.75,
+            "medianMs": 8.3,
+            "p95Ms": 9.3,
+            "maxMs": 17.6,
+            "over60": 0.04,
+            "over30": 0
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.23
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 3.58
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 300000
+          }
+        },
+        {
+          "name": "line-pan-200k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 76.74,
+            "medianMs": 75,
+            "p95Ms": 83.4,
+            "maxMs": 92.5,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.24
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 1.46
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 200000
+          }
+        },
+        {
+          "name": "two-heatmaps-highlight-150k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 11.25,
+            "medianMs": 8.4,
+            "p95Ms": 16.8,
+            "maxMs": 17.4,
+            "over60": 0.15,
+            "over30": 0
+          },
+          "layers": {
+            "grid": {
+              "renders": 1,
+              "meanMs": 0.3
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 3.03
+            },
+            "overlay": {
+              "renders": 1,
+              "meanMs": 0
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 300000,
+            "chartBDataRenders": 199,
+            "chartBDataMeanMs": 3.13
+          }
+        },
+        {
+          "name": "append-stream-50k-window",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 115.28,
+            "medianMs": 116.7,
+            "p95Ms": 183.3,
+            "maxMs": 191.8,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.23
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 0.74
+            },
+            "overlay": {
+              "renders": 1,
+              "meanMs": 0
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "finalPoints": 50000
+          }
+        },
+        {
+          "name": "hover-sweep-50k",
+          "valid": false,
+          "frame": {
+            "frames": 180,
+            "meanMs": 8.33,
+            "medianMs": 8.3,
+            "p95Ms": 8.5,
+            "maxMs": 9.3,
+            "over60": 0,
+            "over30": 0
+          },
+          "layers": {
+            "grid": {
+              "renders": 1,
+              "meanMs": 0.3
+            },
+            "data": {
+              "renders": 1,
+              "meanMs": 86.6
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.03
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
+        },
+        {
+          "name": "touch-pan-gesture-50k",
+          "valid": false,
+          "frame": {
+            "frames": 180,
+            "meanMs": 91.94,
+            "medianMs": 91.7,
+            "p95Ms": 100,
+            "maxMs": 100.9,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.23
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 86.29
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.13
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
+        },
+        {
+          "name": "pinch-zoom-gesture-50k",
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 43.4,
+            "medianMs": 39.1,
+            "p95Ms": 83.4,
+            "maxMs": 92.5,
+            "over60": 0.99,
+            "over30": 0.53
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.18
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 42.15
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.05
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
+        },
+        {
+          "name": "wheel-zoom-gesture-50k",
+          "valid": false,
+          "frame": {
+            "frames": 180,
+            "meanMs": 8.33,
+            "medianMs": 8.3,
+            "p95Ms": 9,
+            "maxMs": 9.2,
+            "over60": 0,
+            "over30": 0
+          },
+          "layers": {
+            "grid": {
+              "renders": 1,
+              "meanMs": 0.4
+            },
+            "data": {
+              "renders": 1,
+              "meanMs": 87.2
+            },
+            "overlay": {
+              "renders": 1,
+              "meanMs": 0
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
+        }
+      ]
+    },
+    "mobile": {
+      "cpuThrottle": 4,
+      "deviceScaleFactor": 3,
+      "viewport": {
+        "width": 390,
+        "height": 720
+      },
+      "results": [
+        {
+          "name": "scatter-render-10k",
+          "valid": true,
+          "frame": {
+            "frames": 60,
+            "meanMs": 155.14,
+            "medianMs": 157.4,
+            "p95Ms": 166.5,
+            "maxMs": 166.8,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 69,
+              "meanMs": 1
+            },
+            "data": {
+              "renders": 69,
+              "meanMs": 113.32
+            },
+            "overlay": {
+              "renders": 69,
+              "meanMs": 0.04
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 10000
+          }
+        },
+        {
+          "name": "scatter-render-50k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Users/liam/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/_y/m465st_x6jnfjn00mz8j56qr0000gn/T/playwright_chromiumdev_profile-VzNB9L --remote-debugging-pipe --no-startup-window\n<launched> pid=85803\n[pid=85803] <gracefully close start>\n[pid=85803] <forcefully close>\n[pid=85803] <kill>\n[pid=85803] <will force kill>"
+        },
+        {
+          "name": "scatter-render-200k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "scatter-pan-50k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "scatter-pan-200k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "scatter-zoom-50k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "scatter-zoom-200k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "scatter-offaxis-pan-50k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "scatter-encoded-pan-50k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "heatmap-pan-300k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "line-pan-200k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "two-heatmaps-highlight-150k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "append-stream-50k-window",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "hover-sweep-50k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "touch-pan-gesture-50k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "pinch-zoom-gesture-50k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "name": "wheel-zoom-gesture-50k",
+          "valid": false,
+          "error": "page.evaluate: Target page, context or browser has been closed"
+        }
+      ]
+    }
+  }
+}

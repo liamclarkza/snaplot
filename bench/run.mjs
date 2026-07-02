@@ -31,6 +31,9 @@ const filter = argValue('--filter', '');
 const outPath = argValue('--out', join(benchDir, 'results', 'latest.json'));
 const saveBaseline = args.includes('--save-baseline');
 const skipBuild = args.includes('--skip-build');
+// Headless shell rasterizes canvas in software, which overstates blit-heavy
+// paths (drawImage stamps) relative to real devices. --headed uses the GPU.
+const headed = args.includes('--headed');
 
 const PROFILES = {
   desktop: {
@@ -111,7 +114,7 @@ async function main() {
 
   let browser;
   try {
-    browser = await chromium.launch();
+    browser = await chromium.launch({ headless: !headed });
   } catch (err) {
     console.error('failed to launch Chromium. Install it with:');
     console.error('  npx playwright install chromium');

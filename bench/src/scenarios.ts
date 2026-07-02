@@ -6,6 +6,7 @@ import {
   LayerTracker,
   measureFrames,
   type ScenarioResult,
+  settleFrames,
   summarizeFrames,
 } from './metrics';
 
@@ -97,6 +98,7 @@ async function runSweep(
 ): Promise<ScenarioResult> {
   const handle = makeChart(opts.stage, config, data);
   const extent = xExtent(data);
+  await settleFrames();
   const tracker = new LayerTracker(handle.chart);
   const heapBefore = heapMB();
 
@@ -138,6 +140,7 @@ async function runRedrawLoop(
   meta: Record<string, string | number> = {},
 ): Promise<ScenarioResult> {
   const handle = makeChart(opts.stage, config, data);
+  await settleFrames();
   const tracker = new LayerTracker(handle.chart);
   const heapBefore = heapMB();
 
@@ -254,6 +257,7 @@ async function runGesture(
 ): Promise<ScenarioResult> {
   const handle = makeChart(opts.stage, config, data);
   handle.el.scrollIntoView();
+  await settleFrames();
   const { cx, cy } = plotCenterClient(handle.chart);
   const el = gestureTarget(cx, cy);
   const tracker = new LayerTracker(handle.chart);
@@ -362,6 +366,7 @@ export const scenarios: Scenario[] = [
       // cache degrades it to a full rebin per chart per frame.
       const a = makeChart(o.stage, densityConfig, genTimeSeries(150_000, 1), 300);
       const b = makeChart(o.stage, densityConfig, genTimeSeries(150_000, 2), 300);
+      await settleFrames();
       const trackerA = new LayerTracker(a.chart);
       const trackerB = new LayerTracker(b.chart);
       const heapBefore = heapMB();
@@ -412,6 +417,7 @@ export const scenarios: Scenario[] = [
         { ...lineConfig, streaming: { maxLen: 50_000 } },
         initial,
       );
+      await settleFrames();
       const tracker = new LayerTracker(handle.chart);
       const heapBefore = heapMB();
       let lastX = initial[0][initial[0].length - 1];
