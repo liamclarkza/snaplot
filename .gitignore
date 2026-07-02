@@ -20,6 +20,9 @@ specification.md
 .codex/
 codex-reviews/
 
+# Benchmark output (baselines are tracked, raw results are not)
+bench/results/
+
 # Build artifacts
 .vinxi/
 .output/
