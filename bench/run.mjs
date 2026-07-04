@@ -156,6 +156,10 @@ async function main() {
 
     const results = [];
     for (const name of names) {
+      // Fresh page per scenario so one scenario's leftovers (leaked rAFs,
+      // observers, heap growth) cannot skew the next one's numbers.
+      await page.reload();
+      await page.waitForFunction(() => typeof window.__snaplotBench !== 'undefined');
       process.stdout.write(`  ${name} ... `);
       try {
         const r = await page.evaluate(

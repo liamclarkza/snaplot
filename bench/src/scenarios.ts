@@ -103,14 +103,14 @@ async function runSweep(
   const heapBefore = heapMB();
 
   const startMin = handle.chart.getAxis('x')?.min ?? Number.NaN;
-  let movedMin = startMin;
+  let everMoved = false;
   const deltas = await measureFrames(
     SWEEP_STEPS,
     SWEEP_WARMUP,
     (i) => {
       step(handle.chart, extent, i);
       const min = handle.chart.getAxis('x')?.min;
-      if (min !== undefined && min !== startMin) movedMin = min;
+      if (min !== undefined && min !== startMin) everMoved = true;
     },
     () => tracker.sample(),
   );
@@ -119,7 +119,7 @@ async function runSweep(
   const layers = tracker.result();
   const result: ScenarioResult = {
     name,
-    valid: movedMin !== startMin && layers.data.renders > 0,
+    valid: everMoved && layers.data.renders > 0,
     frame: summarizeFrames(deltas),
     layers,
     heapDeltaMB:
@@ -268,11 +268,17 @@ async function runGesture(
   const startMax = xScale?.max ?? Number.NaN;
   const { step, end } = makeStep(handle.chart, el, cx, cy);
 
-  const deltas = await measureFrames(SWEEP_STEPS, SWEEP_WARMUP, step, () => tracker.sample());
+  // A sweep that returns to its origin ends with the starting viewport, so
+  // validity must track whether the viewport EVER moved, not the end state.
+  let everMoved = false;
+  const deltas = await measureFrames(SWEEP_STEPS, SWEEP_WARMUP, step, () => {
+    tracker.sample();
+    const s = handle.chart.getAxis('x');
+    if (s && (s.min !== startMin || s.max !== startMax)) everMoved = true;
+  });
   end();
 
-  const endScale = handle.chart.getAxis('x');
-  const moved = endScale !== undefined && (endScale.min !== startMin || endScale.max !== startMax);
+  const moved = everMoved;
   const heapAfter = heapMB();
   const layers = tracker.result();
   const result: ScenarioResult = {
@@ -557,12 +563,15 @@ export const scenarios: Scenario[] = [
         (_chart, el, cx, cy) => ({
           step: (i) => {
             // Zoom in for the first half of the sweep, back out for the rest.
+            // ctrlKey marks the event as a trackpad pinch; plain wheel
+            // deliberately passes through to page scroll.
             const dir = (i % SWEEP_STEPS) < SWEEP_STEPS / 2 ? -1 : 1;
             el.dispatchEvent(
               new WheelEvent('wheel', {
                 deltaY: dir * 60,
                 clientX: cx,
                 clientY: cy,
+                ctrlKey: true,
                 bubbles: true,
                 cancelable: true,
               }),
