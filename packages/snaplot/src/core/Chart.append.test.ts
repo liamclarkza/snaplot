@@ -1433,6 +1433,45 @@ describe('ChartCore live-follow viewport', () => {
     chart.destroy();
   });
 
+  it('decimates a large line only while a gesture is active, full fidelity at rest', () => {
+    const n = 5000;
+    const xs = new Float64Array(n);
+    const ys = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      xs[i] = i;
+      ys[i] = Math.sin(i / 20);
+    }
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
+        series: [{ label: 'v', dataIndex: 1, type: 'line' }] as SeriesConfig[],
+      },
+      [xs, ys],
+    );
+
+    const seg = { xData: xs, yData: ys, startIdx: 0, endIdx: n - 1 };
+    const internal = chart as unknown as {
+      viewportActiveUntil: number;
+      decimateLineSegments: (s: typeof seg[]) => typeof seg[];
+      layout: { plot: { width: number } };
+    };
+
+    // At rest: no decimation, the exact segments pass through.
+    internal.viewportActiveUntil = 0;
+    expect(internal.decimateLineSegments([seg])).toEqual([seg]);
+
+    // During a gesture: decimated to at most 4 points per pixel column.
+    internal.viewportActiveUntil = performance.now() + 10_000;
+    const decimated = internal.decimateLineSegments([seg]);
+    const total = decimated.reduce((acc, s) => acc + (s.endIdx - s.startIdx + 1), 0);
+    const budget = Math.max(1, Math.round(internal.layout.plot.width)) * 4;
+    expect(total).toBeLessThanOrEqual(budget);
+    expect(total).toBeGreaterThan(1);
+    expect(total).toBeLessThan(n);
+    chart.destroy();
+  });
+
   it('without a follow window, isFollowing tracks full-extent auto-range', () => {
     const chart = new ChartCore(
       document.createElement('div'),

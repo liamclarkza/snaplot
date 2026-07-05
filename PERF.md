@@ -100,15 +100,23 @@ Desktop profile (no throttle, DPR 2): every scatter pan/zoom scenario is
 now rAF-bound at 16.7ms (60fps), down from 33-190ms. The render work no
 longer sets the frame budget; the display refresh does.
 
-Line/area pan at 200k on mobile (~390ms) is the largest remaining
-interactive cost and did not materially improve: the affine hoist helped
-the per-point math, but a wide line still strokes every visible segment.
-Shape-preserving render-time decimation for line/area is the proposed
-follow-up (`docs/feature-proposal-1.0.md`), held for sign-off because
-dropping points from a line distorts its shape more visibly than sampling
-a point cloud. First-frame render of a resting 200k scatter (~2s mobile)
-is also unchanged; this work targeted the interaction path, not cold
-paint.
+Line/area pan at 200k on mobile is now 17.5ms (from ~390ms, a 22x cut)
+after the interaction-pass decimation described below. First-frame render
+of a resting 200k scatter (~2s mobile) is still unchanged; this work
+targeted the interaction path, not cold paint.
+
+### Line/area interaction decimation
+
+While a gesture moves the viewport, line and area series whose visible
+sample count exceeds four points per plot pixel are decimated with M4
+(first, last, min, and max per pixel column) into a small fresh array,
+then repainted at full fidelity when the gesture settles. M4 is
+shape-preserving (the vertical envelope is exact to the pixel) and
+gap-aware, so the transient in-gesture frames look the same as the full
+render, and hit-testing and tooltips always use the complete data. This
+uses the same `performance.interactionSampling` on/off gate as scatter
+sampling. Scatter uses stride sampling (a point cloud tolerates it);
+lines use M4 (a stroked path does not).
 
 ## Keeping it fixed
 

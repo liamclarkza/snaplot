@@ -49,7 +49,8 @@ import { DEFAULT_CONFIG } from '../config/defaults';
 import { resolveTheme } from '../config/theme';
 
 import { renderAxes, updateDOMLabels } from '../renderers/AxesRenderer';
-import { renderLineSegments, renderAreaSegments, renderBandSegments } from '../renderers/LineRenderer';
+import { renderLineSegments, renderAreaSegments, renderBandSegments, type LineRenderSegment } from '../renderers/LineRenderer';
+import { m4 } from '../data/downsampling/m4';
 import { isDensityScatterSeries, renderScatterSegments, ScatterSeriesCache } from '../renderers/ScatterRenderer';
 import {
   buildScatterEncodingState,
@@ -1379,6 +1380,48 @@ export class ChartCore implements ChartInstance {
     return DEFAULT_INTERACTION_SAMPLING;
   }
 
+  /** True while a gesture is moving the viewport and reduced-fidelity drawing is enabled. */
+  private interactionActive(): boolean {
+    return this.interactionSamplingBudget() !== null && performance.now() < this.viewportActiveUntil;
+  }
+
+  /**
+   * During an active viewport gesture, replace line/area render segments with
+   * an M4-decimated copy (first/last/min/max per pixel column) so a wide line
+   * strokes ~4 points per column instead of every visible sample. M4 is
+   * shape-preserving (the vertical envelope is exact) and gap-aware, and the
+   * full data repaints on gesture settle. Returns the segments unchanged when
+   * decimation is off, the gesture is idle, or the series already fits the
+   * pixel budget. Sets sampledLastDataRender so the settle timer refines.
+   */
+  private decimateLineSegments(segments: LineRenderSegment[]): LineRenderSegment[] {
+    if (!this.interactionActive()) return segments;
+    const xScale = this.scales.get('x');
+    if (!xScale) return segments;
+    const pixelWidth = Math.max(1, Math.round(this.layout.plot.width));
+    const budget = pixelWidth * 4;
+
+    let total = 0;
+    for (const s of segments) total += s.endIdx - s.startIdx + 1;
+    if (total <= budget) return segments;
+
+    const out: LineRenderSegment[] = [];
+    for (const s of segments) {
+      const [dx, dy] = m4(
+        s.xData.subarray(s.startIdx, s.endIdx + 1),
+        s.yData.subarray(s.startIdx, s.endIdx + 1),
+        pixelWidth,
+        xScale.min,
+        xScale.max,
+      );
+      if (dx.length === 0) continue;
+      out.push({ xData: dx, yData: dy, startIdx: 0, endIdx: dx.length - 1 });
+    }
+    if (out.length === 0) return segments;
+    this.sampledLastDataRender = true;
+    return out;
+  }
+
   private scatterResolvers(si: number, series: SeriesConfig, fallbackColor: string) {
     const cached = this.scatterEncodingCache.get(si);
     if (
@@ -2310,10 +2353,10 @@ export class ChartCore implements ChartInstance {
 
       switch (type) {
         case 'line':
-          renderLineSegments(ctx, renderSegments, xScale, yScale, this.layout, renderSeries, color, opacityMul);
+          renderLineSegments(ctx, this.decimateLineSegments(renderSegments), xScale, yScale, this.layout, renderSeries, color, opacityMul);
           break;
         case 'area':
-          renderAreaSegments(ctx, renderSegments, xScale, yScale, this.layout, renderSeries, color, opacityMul);
+          renderAreaSegments(ctx, this.decimateLineSegments(renderSegments), xScale, yScale, this.layout, renderSeries, color, opacityMul);
           break;
         case 'band': {
           const upperIdx = series.upperDataIndex;
@@ -2352,7 +2395,7 @@ export class ChartCore implements ChartInstance {
           // stay full-fidelity.
           let sampleStride = 1;
           const budget = this.interactionSamplingBudget();
-          if (budget !== null && performance.now() < this.viewportActiveUntil) {
+          if (budget !== null && this.interactionActive()) {
             let visible = 0;
             for (const segment of renderSegments) {
               visible += segment.endIdx - segment.startIdx + 1;

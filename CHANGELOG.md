@@ -39,11 +39,14 @@ to [Semantic Versioning](https://semver.org/).
   production bundles.
 
 ### Changed
-- Added an interaction pass for large scatter series: while the viewport
-  is actively changing, series above the
+- Added an interaction pass for large series: while the viewport is
+  actively changing, scatter series above the
   `performance.interactionSampling` point budget (default 10000) are
-  stride-sampled, then repainted at full fidelity as soon as the gesture
-  settles. Hit-testing and tooltips always use the full data. Set
+  stride-sampled, and line/area series above four points per plot pixel
+  are decimated with shape-preserving, gap-aware M4 (first/last/min/max
+  per pixel column). Both repaint at full fidelity as soon as the gesture
+  settles, and hit-testing and tooltips always use the full data. This
+  cut mobile line-pan at 200K points from ~390ms to ~18ms per frame. Set
   `performance: { interactionSampling: false }` to opt out.
 - Viewport changes that clamp to the current range (panning at the data
   edge, zooming out at full extent) no longer repaint or publish sync;
