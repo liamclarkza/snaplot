@@ -7,6 +7,12 @@ to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Added live-follow streaming: `streaming.follow` pins the X viewport to a
+  trailing window of that width and scrolls it as data arrives.
+  `chart.scrollToLatest()` resumes following after a pan/zoom pauses it,
+  `chart.isFollowing()` reports live/paused state, and a `follow:change`
+  event fires on the transition. Follows every horizontal axis and
+  propagates through `zoom.syncKey`.
 - Added `series.spanGaps` to bridge NaN gaps in line and area series
   instead of breaking the path.
 - Added `AxisConfig.label` axis titles: rendered below bottom axes and

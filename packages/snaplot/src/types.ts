@@ -829,6 +829,17 @@ export interface StreamingConfig {
    * full-window dataset on every tick.
    */
   maxLen?: number;
+  /**
+   * Live-follow window width in X data units. When set and the chart is
+   * "following" (the default until the user pans or zooms X), each
+   * `appendData` keeps the X viewport at `[latestX - follow, latestX]`, so
+   * the view scrolls with the newest data. Panning or zooming X pauses
+   * following; `chart.scrollToLatest()` or a double-click reset resumes it.
+   * Without this, a following chart tracks the full data extent instead of a
+   * fixed trailing window. Follows the default `x` axis (and any horizontal
+   * axis) and propagates through `zoom.syncKey`.
+   */
+  follow?: number;
 }
 
 // ============================================================
@@ -1092,6 +1103,21 @@ export interface ChartInstance {
   redraw(): void;
   /** Resize chart */
   resize(width: number, height: number): void;
+
+  /**
+   * Resume live-follow and snap the X viewport to the newest data. With
+   * `streaming.follow` set this jumps to the trailing window; otherwise it
+   * resets X to the full data extent. Re-enables following after the user
+   * paused it by panning or zooming, and fires `follow:change`.
+   */
+  scrollToLatest(): void;
+  /**
+   * Whether the X viewport is tracking new data (live) rather than pinned by
+   * a user pan/zoom (paused). Starts `true`; a horizontal pan or zoom sets it
+   * `false`; `scrollToLatest()` and a double-click reset set it `true`.
+   */
+  isFollowing(): boolean;
+
   /** Destroy and clean up all resources */
   destroy(): void;
 
@@ -1175,6 +1201,12 @@ export interface ChartEventMap {
   'data:update': (data: ColumnarData) => void;
   /** Config changed via `setOptions`/`replaceOptions`, with the resolved config. */
   'options:update': (config: ChartConfig) => void;
+  /**
+   * Live-follow state toggled: `true` when the X viewport resumed tracking
+   * new data, `false` when a pan/zoom paused it. Drive a live/paused badge
+   * from this. See `isFollowing()` / `scrollToLatest()`.
+   */
+  'follow:change': (following: boolean) => void;
   /** Chart resized, with the new CSS-pixel dimensions. */
   'resize': (width: number, height: number) => void;
   /** Reserved click event. Not currently emitted by the core (see the DX audit). */

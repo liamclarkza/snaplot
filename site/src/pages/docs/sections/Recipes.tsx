@@ -65,6 +65,26 @@ setInterval(() => {
     if (samples >= 5) samples = 0;  // bucket closes, next tick opens a new one
   }
 }, 200);`} />
+        <Prose>
+          For a live monitor, add <code>streaming.follow</code> to keep a fixed
+          trailing window that scrolls with the newest data. The view follows
+          until the user pans or zooms X (which pauses it); a
+          <code>Go live</code> button calls <code>chart.scrollToLatest()</code>
+          to resume. Read <code>chart.isFollowing()</code> or listen to
+          <code>follow:change</code> to drive a live/paused badge.
+        </Prose>
+        <CodeBlock code={`const chart = new ChartCore(container, {
+  streaming: { maxLen: 5000, follow: 60_000 },  // trailing 60s window
+  axes: { x: { type: 'time' } },
+  series: [{ label: 'throughput', dataIndex: 1, type: 'line' }],
+}, seed);
+
+chart.on('follow:change', (live) => {
+  goLiveButton.hidden = live;   // show "Go live" only while paused
+});
+
+// resume live scrolling after the user zoomed in to inspect
+goLiveButton.onclick = () => chart.scrollToLatest();`} />
         <div style={{ height: '12px' }} />
         <StreamingDashboardDemo />
       </Section>

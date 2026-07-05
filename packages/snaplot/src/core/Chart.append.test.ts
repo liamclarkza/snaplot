@@ -1344,3 +1344,112 @@ describe('ChartCore lifecycle + config integrity', () => {
     chart.destroy();
   });
 });
+
+describe('ChartCore live-follow viewport', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', new MockDocument());
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const streamConfig = {
+    axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
+    series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
+    streaming: { follow: 10 },
+  };
+
+  it('starts following and pins the X window to the trailing follow width', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      streamConfig,
+      [f([0, 1, 2]), f([5, 6, 7])],
+    );
+    expect(chart.isFollowing()).toBe(true);
+    // window 10, lastX 2, dataMin 0 -> [0, 2] (clamped to data start)
+    expect(chart.getAxis('x')?.min).toBe(0);
+    expect(chart.getAxis('x')?.max).toBe(2);
+
+    // Append past the window: X should scroll to [lastX - 10, lastX].
+    chart.appendData([f([12, 15]), f([8, 9])]);
+    expect(chart.getAxis('x')?.min).toBe(5);
+    expect(chart.getAxis('x')?.max).toBe(15);
+    chart.destroy();
+  });
+
+  const zoomIn = (chart: ChartCore) => {
+    const anchor = plotPoint(chart, 0.5);
+    chartEventBus(chart).emit('action:zoom', {
+      factor: 0.5,
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+      axis: 'x',
+    });
+  };
+
+  it('pauses following on a horizontal zoom and stops scrolling with data', () => {
+    const changes: boolean[] = [];
+    const chart = new ChartCore(
+      document.createElement('div'),
+      streamConfig,
+      [f([0, 5, 10]), f([1, 2, 3])],
+    );
+    chart.on('follow:change', (f2) => changes.push(f2));
+
+    zoomIn(chart);
+    expect(chart.isFollowing()).toBe(false);
+    expect(changes).toEqual([false]);
+
+    const pausedMin = chart.getAxis('x')?.min;
+    const pausedMax = chart.getAxis('x')?.max;
+    // Streaming continues but the paused viewport must not move.
+    chart.appendData([f([20]), f([4])]);
+    expect(chart.getAxis('x')?.min).toBe(pausedMin);
+    expect(chart.getAxis('x')?.max).toBe(pausedMax);
+    chart.destroy();
+  });
+
+  it('scrollToLatest resumes following and snaps to the newest window', () => {
+    const changes: boolean[] = [];
+    const chart = new ChartCore(
+      document.createElement('div'),
+      streamConfig,
+      [f([0, 5, 10]), f([1, 2, 3])],
+    );
+    chart.on('follow:change', (f2) => changes.push(f2));
+
+    zoomIn(chart);
+    chart.appendData([f([20]), f([4])]);
+    expect(chart.isFollowing()).toBe(false);
+
+    chart.scrollToLatest();
+    expect(chart.isFollowing()).toBe(true);
+    expect(changes).toEqual([false, true]);
+    // lastX 20, window 10 -> [10, 20].
+    expect(chart.getAxis('x')?.min).toBe(10);
+    expect(chart.getAxis('x')?.max).toBe(20);
+    chart.destroy();
+  });
+
+  it('without a follow window, isFollowing tracks full-extent auto-range', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
+        series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
+      },
+      [f([0, 1, 2]), f([5, 6, 7])],
+    );
+    expect(chart.isFollowing()).toBe(true);
+    zoomIn(chart);
+    expect(chart.isFollowing()).toBe(false);
+    chart.scrollToLatest();
+    expect(chart.isFollowing()).toBe(true);
+    // Full extent restored.
+    expect(chart.getAxis('x')?.min).toBe(0);
+    expect(chart.getAxis('x')?.max).toBe(2);
+    chart.destroy();
+  });
+});

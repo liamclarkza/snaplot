@@ -193,6 +193,13 @@ export class ChartCore implements ChartInstance {
    */
   private userZoomedAxes = new Set<string>();
 
+  /**
+   * Live-follow state: the X viewport tracks new data while true, and is
+   * pinned by a user pan/zoom while false. Starts true; toggled by the first
+   * horizontal viewport change, by `scrollToLatest()`, and by `resetZoom()`.
+   */
+  private following = true;
+
   // Event listeners. Handlers have per-event signatures (see ChartEventMap);
   // the storage is a contravariant-friendly callable so every event's
   // handler shape assigns in without a cast (Function is banned by lint).
@@ -325,7 +332,7 @@ export class ChartCore implements ChartInstance {
     this.setStoreData(data);
     this.stats.dataVersion++;
     this.stats.setDataCount++;
-    const gridDirty = this.autoRangeTracked();
+    const gridDirty = this.rangeForDataChange();
     this.refreshCursor();
     this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
     this.dispatchDataUpdate();
@@ -349,10 +356,60 @@ export class ChartCore implements ChartInstance {
 
     this.stats.dataVersion++;
     this.stats.appendDataCount++;
-    const gridDirty = this.autoRangeTracked();
+    const gridDirty = this.rangeForDataChange();
     this.refreshCursor();
     this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
     this.dispatchDataUpdate();
+  }
+
+  /**
+   * Range the axes after a data change. When live-follow is active with a
+   * window, the X viewport is pinned to the trailing window and only Y
+   * auto-ranges; otherwise the normal auto-range runs (which itself respects
+   * user-zoomed axes). Returns whether the grid layer needs a repaint.
+   */
+  private rangeForDataChange(): boolean {
+    if (this.following && this.followWindow() !== undefined && this.store.length > 0) {
+      return this.applyFollowWindow();
+    }
+    return this.autoRangeTracked();
+  }
+
+  private followWindow(): number | undefined {
+    const follow = (this.config.streaming as StreamingConfig | undefined)?.follow;
+    if (follow === undefined) return undefined;
+    // A non-positive window is meaningless; treat it as "no window" so the
+    // chart follows the full extent rather than collapsing to a zero span.
+    return follow > 0 ? follow : undefined;
+  }
+
+  /**
+   * Pin every horizontal axis to `[latestX - window, latestX]` (clamped to
+   * the data) and re-fit Y over that window. Returns whether any bound moved,
+   * so the caller knows if the grid must repaint.
+   */
+  private applyFollowWindow(): boolean {
+    const window = this.followWindow();
+    if (window === undefined || this.store.length === 0) return false;
+    const lastX = this.store.xAt(this.store.length - 1);
+    const dataMin = this.store.xAt(0);
+    const min = Math.max(dataMin, lastX - window);
+
+    let moved = false;
+    const axisConfigs = this.config.axes ?? {};
+    for (const [key, scale] of this.scales) {
+      const pos = inferPosition(key, axisConfigs[key]?.position);
+      if (pos !== 'bottom' && pos !== 'top') continue;
+      if (scale.min !== min || scale.max !== lastX) moved = true;
+      scale.min = min;
+      scale.max = lastX;
+      this.naturalExtent.set(key, [min, lastX]);
+      if (this.zoomSyncKey && !this.suppressZoomSync) {
+        SyncGroup.publishScale(this.zoomSyncKey, this, key, { min, max: lastX });
+      }
+    }
+    if (!this.config.zoom?.y) this.autoRangeVertical(true);
+    return moved;
   }
 
   /**
@@ -538,7 +595,10 @@ export class ChartCore implements ChartInstance {
   /** Reset zoom to full data extent (double-click handler) */
   resetZoom(): void {
     this.userZoomedAxes.clear();
+    this.setFollowing(true);
     this.autoRangeHorizontal();
+    // Follow window (if configured) takes precedence over full-extent X.
+    this.applyFollowWindow();
     this.autoRangeVertical();
     this.scheduler.markDirty(DirtyFlag.ALL);
 
@@ -547,6 +607,36 @@ export class ChartCore implements ChartInstance {
         SyncGroup.publishScale(this.zoomSyncKey, this, scaleKey, { min: scale.min, max: scale.max });
       }
     }
+  }
+
+  scrollToLatest(): void {
+    if (this.destroyed) return;
+    this.userZoomedAxes.clear();
+    this.setFollowing(true);
+    if (this.followWindow() !== undefined && this.store.length > 0) {
+      this.applyFollowWindow();
+    } else {
+      this.autoRangeHorizontal();
+      this.autoRangeVertical();
+    }
+    this.refreshCursor();
+    this.scheduler.markDirty(DirtyFlag.ALL);
+    if (this.zoomSyncKey && !this.suppressZoomSync) {
+      for (const [scaleKey, scale] of this.scales) {
+        SyncGroup.publishScale(this.zoomSyncKey, this, scaleKey, { min: scale.min, max: scale.max });
+      }
+    }
+  }
+
+  isFollowing(): boolean {
+    return this.following;
+  }
+
+  /** Set follow state and emit `follow:change` only on a real transition. */
+  private setFollowing(next: boolean): void {
+    if (this.following === next) return;
+    this.following = next;
+    this.emitEvent('follow:change', next);
   }
 
   resize(width: number, height: number): void {
@@ -1006,6 +1096,9 @@ export class ChartCore implements ChartInstance {
     }
 
     this.autoRange();
+    // A configured follow window overrides full-extent X on first paint and
+    // after a config replace, as long as the user has not paused following.
+    if (this.following) this.applyFollowWindow();
   }
 
   /**
@@ -1881,6 +1974,9 @@ export class ChartCore implements ChartInstance {
 
     this.markViewportActive();
     this.userZoomedAxes.add(scaleKey);
+    // A horizontal pan/zoom pauses live-follow (the user took control of the
+    // X window); a Y-only change leaves follow untouched.
+    if (isHoriz) this.setFollowing(false);
 
     scale.min = min;
     scale.max = max;
