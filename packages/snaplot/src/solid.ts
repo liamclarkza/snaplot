@@ -7,7 +7,13 @@ export { createChart } from './solid/createChart';
 export { createCursorSnapshot } from './solid/createCursorSnapshot';
 export { createHighlight, createHighlightKey } from './solid/createHighlight';
 export { createChartGroup } from './solid/createChartGroup';
-export type { ChartGroup, ChartGroupBindings } from './solid/createChartGroup';
+export type {
+  ChartGroup,
+  ChartGroupBindings,
+  ChartGroupBindOptions,
+  ChartGroupOptions,
+  ChartGroupLinkOptions,
+} from './solid/createChartGroup';
 
 export { LegendTable } from './solid/LegendTable';
 export type {

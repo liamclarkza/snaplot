@@ -7,6 +7,13 @@ to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Added chart-group fleet config: `createChartGroup({ defaults })` gives
+  every chart in the group a shared base config (deep-merged under each
+  chart's own, which wins), so a dashboard defines axes/theme/tooltip once
+  instead of drifting per chart. `group.link(chart)` coordinates live
+  instances to share one Y domain (the union of their data extents) and
+  align their left gutters to the widest one, each toggleable per chart and
+  returning an unlink function.
 - Added persistent brush selection: `selection.mode: 'brush'` leaves a
   data-anchored X-range band as chart state instead of zooming. Drag to
   create it, drag inside to move it, drag an edge to resize it; wheel still

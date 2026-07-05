@@ -125,6 +125,27 @@ const config = group.apply({
 </button>`} />
         <div style={{ height: '12px' }} />
         <LinkedChartsDemo />
+        <Prose>
+          For a wall of many charts, pass <code>defaults</code> once so every
+          chart inherits the same axes, theme, and interaction instead of
+          drifting, and call <code>group.link(chart)</code> on each mounted
+          instance to share one Y domain (the union of their extents, so
+          values compare fairly) and align their left gutters.
+        </Prose>
+        <CodeBlock code={`const group = createChartGroup({
+  defaults: {                       // inherited by every chart in the group
+    axes: { x: { type: 'time' }, y: { type: 'linear' } },
+    theme: darkTheme,
+    tooltip: { mode: 'nearest' },
+  },
+});
+
+// createChart returns the instance accessor; link it once it exists.
+const chart = createChart(() => ref, () => group.apply(config), data);
+createEffect(() => {
+  const c = chart();
+  if (c) onCleanup(group.link(c));   // shared Y domain + aligned gutters
+});`} />
       </Section>
 
       <Section id="recipe-brush" title="Recipe: Persistent Brush Selection">
