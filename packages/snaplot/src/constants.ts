@@ -577,6 +577,12 @@ export const DEFAULT_LONG_PRESS_MS = 400;
 /** Default tap timeout (ms), max time for a press to count as a tap */
 export const TAP_TIMEOUT = 300;
 
+/** Default scatter point budget while the viewport is changing */
+export const DEFAULT_INTERACTION_SAMPLING = 10_000;
+
+/** Quiet period (ms) after the last viewport change before the crisp repaint */
+export const INTERACTION_REFINE_MS = 150;
+
 /** Double-tap timeout (ms), max time between two taps */
 export const DOUBLE_TAP_TIMEOUT = 300;
 

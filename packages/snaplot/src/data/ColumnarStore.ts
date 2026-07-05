@@ -23,6 +23,12 @@ function describeType(v: unknown): string {
  */
 export class ColumnarStore implements DataStore {
   private columns: Float64Array[];
+  /**
+   * setData stores references to the caller's arrays (zero copy), so
+   * in-place mutation is forbidden until append() has swapped in arrays
+   * the store allocated itself. replaceLast() clones once when needed.
+   */
+  private ownsColumns = false;
 
   constructor(data: ColumnarData) {
     ColumnarStore.validate(data);
@@ -179,6 +185,37 @@ export class ColumnarStore implements DataStore {
   setData(data: ColumnarData): void {
     ColumnarStore.validate(data);
     this.columns = [...data];
+    this.ownsColumns = false;
+  }
+
+  replaceLast(row: number[]): void {
+    if (this.length === 0) {
+      throw new Error('replaceLast() requires at least one existing data point.');
+    }
+    if (row.length !== this.columns.length) {
+      throw new Error(
+        `replaceLast() expects ${this.columns.length} values (one per column), ` +
+          `but got ${row.length}.`,
+      );
+    }
+    if (!Number.isFinite(row[0])) {
+      throw new Error(`replaceLast() X value must be finite, received ${row[0]}.`);
+    }
+    const last = this.length - 1;
+    if (last >= 1 && row[0] < this.columns[0][last - 1]) {
+      throw new Error(
+        `replaceLast() X value must keep the column sorted, but ` +
+          `${row[0]} < previous x[${last - 1}] = ${this.columns[0][last - 1]}.`,
+      );
+    }
+
+    if (!this.ownsColumns) {
+      this.columns = this.columns.map((col) => col.slice());
+      this.ownsColumns = true;
+    }
+    for (let c = 0; c < this.columns.length; c++) {
+      this.columns[c][last] = row[c];
+    }
   }
 
   /**
@@ -245,6 +282,7 @@ export class ColumnarStore implements DataStore {
       });
     }
 
+    this.ownsColumns = true;
     return true;
   }
 

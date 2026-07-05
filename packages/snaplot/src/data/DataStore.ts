@@ -19,6 +19,13 @@ export interface DataStore {
 
   setData(data: ColumnarData): void;
   append(data: ColumnarData): boolean;
+  /**
+   * Overwrite the last row in place, one value per column (row[0] is X).
+   * Powers streaming tail corrections (in-progress buckets) without a
+   * full-window reallocation. The new X must keep the column sorted.
+   * Throws on an empty store.
+   */
+  replaceLast(row: number[]): void;
 
   xAt(index: number): number;
   yAt(seriesIdx: number, index: number): number;

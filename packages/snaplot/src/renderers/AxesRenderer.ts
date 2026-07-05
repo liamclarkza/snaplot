@@ -15,6 +15,8 @@ export interface AxisLabel {
   x: number;
   y: number;
   anchor: 'start' | 'middle' | 'end';
+  /** Axis titles render in the reserved outer gutter strip, rotated on vertical axes. */
+  kind?: 'tick' | 'title';
 }
 
 export interface AxesRenderResult {
@@ -137,6 +139,27 @@ export function renderAxes(
         break;
     }
 
+    if (ac.label) {
+      const area = layout.axes[key]?.area;
+      if (area) {
+        const strip = (theme.fontSize + 8) / 2;
+        switch (pos) {
+          case 'left':
+            labels.push({ text: ac.label, x: area.left + strip, y: plot.top + plot.height / 2, anchor: 'middle', kind: 'title' });
+            break;
+          case 'right':
+            labels.push({ text: ac.label, x: area.left + area.width - strip, y: plot.top + plot.height / 2, anchor: 'middle', kind: 'title' });
+            break;
+          case 'bottom':
+            labels.push({ text: ac.label, x: plot.left + plot.width / 2, y: area.top + area.height - strip, anchor: 'middle', kind: 'title' });
+            break;
+          case 'top':
+            labels.push({ text: ac.label, x: plot.left + plot.width / 2, y: area.top + strip, anchor: 'middle', kind: 'title' });
+            break;
+        }
+      }
+    }
+
     result.labels.set(key, labels);
   }
 
@@ -164,7 +187,12 @@ export function renderAxes(
 
 /**
  * Update DOM labels from AxesRenderResult.
- * Creates/recycles positioned span elements in the DOM overlay.
+ *
+ * Spans are pooled and updated in place: the grid layer redraws on every
+ * pan/zoom frame, and rebuilding all label nodes per frame (the previous
+ * innerHTML approach) churned the DOM at gesture rate. The static style
+ * (font, color, transform) is stamped only when its signature changes;
+ * steady-state frames touch just left/top/textContent.
  */
 export function updateDOMLabels(
   domLayer: HTMLDivElement,
@@ -172,48 +200,58 @@ export function updateDOMLabels(
   theme: ThemeConfig,
   layout: Layout,
 ): void {
-  // Clear existing labels
-  domLayer.innerHTML = '';
+  const baseStyle = `position:absolute;font-family:${theme.fontFamily};font-size:${theme.fontSize}px;font-variant-numeric:tabular-nums;color:${theme.textColor};white-space:nowrap;pointer-events:none;`;
 
-  const style = `position:absolute;font-family:${theme.fontFamily};font-size:${theme.fontSize}px;font-variant-numeric:tabular-nums;color:${theme.textColor};white-space:nowrap;pointer-events:none;`;
+  const pool = domLayer.children;
+  let used = 0;
 
   for (const [key, labels] of axesResult.labels) {
     const axisInfo = layout.axes[key];
     if (!axisInfo) continue;
 
     const pos = axisInfo.position;
+    let posStyle: string;
+    switch (pos) {
+      case 'left':
+        posStyle = 'text-align:right;transform:translate(-100%, -50%);';
+        break;
+      case 'right':
+        posStyle = 'transform:translateY(-50%);';
+        break;
+      case 'top':
+        posStyle = 'text-align:center;transform:translateX(-50%);';
+        break;
+      default:
+        posStyle = 'transform:translateX(-50%);';
+        break;
+    }
+    // Titles center on their anchor point and rotate to read along
+    // vertical axes; slightly muted so tick values stay the loudest text.
+    const vertical = pos === 'left' || pos === 'right';
+    const titleStyle =
+      `opacity:0.75;letter-spacing:0.02em;transform:translate(-50%, -50%)` +
+      (vertical ? ` rotate(${pos === 'left' ? -90 : 90}deg);` : ';');
 
     for (const label of labels) {
-      const el = document.createElement('span');
-
-      switch (pos) {
-        case 'left':
-          el.style.cssText = style + `right:auto;transform:translateY(-50%);`;
-          el.style.left = label.x + 'px';
-          el.style.top = label.y + 'px';
-          el.style.textAlign = 'right';
-          el.style.transform = 'translate(-100%, -50%)';
-          break;
-        case 'right':
-          el.style.cssText = style + `transform:translateY(-50%);`;
-          el.style.left = label.x + 'px';
-          el.style.top = label.y + 'px';
-          break;
-        case 'bottom':
-          el.style.cssText = style + `transform:translateX(-50%);`;
-          el.style.left = label.x + 'px';
-          el.style.top = label.y + 'px';
-          break;
-        case 'top':
-          el.style.cssText = style + `transform:translateX(-50%);`;
-          el.style.left = label.x + 'px';
-          el.style.top = label.y + 'px';
-          el.style.textAlign = 'center';
-          break;
+      let el = pool[used] as HTMLSpanElement | undefined;
+      if (!el) {
+        el = document.createElement('span');
+        domLayer.appendChild(el);
       }
+      used++;
 
-      el.textContent = label.text;
-      domLayer.appendChild(el);
+      const styleSig = baseStyle + (label.kind === 'title' ? titleStyle : posStyle);
+      if (el.dataset.labelStyle !== styleSig) {
+        el.style.cssText = styleSig;
+        el.dataset.labelStyle = styleSig;
+      }
+      el.style.left = label.x + 'px';
+      el.style.top = label.y + 'px';
+      if (el.textContent !== label.text) el.textContent = label.text;
     }
+  }
+
+  while (domLayer.children.length > used) {
+    domLayer.lastChild?.remove();
   }
 }

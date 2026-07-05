@@ -151,6 +151,14 @@ export interface SeriesConfig<TMeta = unknown> {
   // Line/area
   interpolation?: InterpolationMode;
   /**
+   * Bridge missing values (NaN) with a connecting line instead of breaking
+   * the path. Default: `false`, NaN creates a visible gap. Useful when
+   * gaps mean "not sampled" (multi-run data joined onto a shared X column,
+   * missed scrapes) rather than "no signal". Applies to line and area
+   * series across every interpolation mode.
+   */
+  spanGaps?: boolean;
+  /**
    * Dash pattern for line strokes, following the Canvas `setLineDash()` spec.
    * Array of segment lengths alternating between dash and gap (e.g. `[6, 3]`
    * for a 6px dash with 3px gap). `undefined` or `[]` renders a solid line.
@@ -253,6 +261,12 @@ export type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
 /** Configuration for an axis entry in ChartConfig.axes */
 export interface AxisConfig {
   type?: ScaleType;
+  /**
+   * Axis title rendered outside the tick labels: below a bottom axis,
+   * rotated alongside a left/right axis. Layout reserves the extra gutter
+   * space automatically.
+   */
+  label?: string;
   /** Fixed lower bound. Pinned, auto-range will restore to this value on reset. */
   min?: number;
   /** Fixed upper bound. Pinned, auto-range will restore to this value on reset. */
@@ -543,6 +557,13 @@ export interface HighlightConfig<TMeta = unknown> {
    */
   syncKey?: string | null;
   /**
+   * Auto-highlight the series nearest the cursor when its hit-tested
+   * point is within this many CSS pixels vertically; clear the highlight
+   * when nothing qualifies. Off when unset. Propagates through `syncKey`
+   * like a manual `setHighlight()`, so linked charts dim together.
+   */
+  proximity?: number;
+  /**
    * Optional stable identity resolver for cross-chart highlight sync.
    *
    * By default, sync publishes the local numeric `seriesIndex`, which is
@@ -556,6 +577,26 @@ export interface HighlightConfig<TMeta = unknown> {
     series: SeriesConfig<TMeta>,
     seriesIndex: number,
   ) => HighlightSyncKey | null | undefined;
+}
+
+// ============================================================
+// PERFORMANCE
+// ============================================================
+
+export interface PerformanceConfig {
+  /**
+   * Point budget per scatter series while the viewport is actively
+   * changing. When the visible count exceeds it, points are
+   * stride-sampled for the duration of the gesture and a full-fidelity
+   * repaint follows as soon as the viewport settles. Keeps pan and zoom
+   * responsive on large point clouds without giving up crisp rendering
+   * at rest. `false` disables sampling. Default: 10000.
+   *
+   * Density (heatmap) scatter ignores the budget, its cost is already
+   * bounded by pixels, not points. Hit-testing and tooltips always use
+   * the full data.
+   */
+  interactionSampling?: number | false;
 }
 
 // ============================================================
@@ -629,6 +670,7 @@ export interface ChartConfig<TMeta = unknown> {
   touch?: TouchConfig;
   highlight?: HighlightConfig<TMeta>;
   streaming?: StreamingConfig;
+  performance?: PerformanceConfig;
   debug?: DebugConfig;
 
   theme?: Partial<ThemeConfig>;
@@ -739,11 +781,24 @@ export interface Plugin {
 // CHART INSTANCE (public interface)
 // ============================================================
 
+export interface AppendDataOptions {
+  /**
+   * Treat the first row of `data` as a correction of the current last row
+   * instead of a new point: the last row is overwritten in place and any
+   * remaining rows append normally. This is the streaming verb for
+   * in-progress buckets (a live epoch aggregate, a forming candle) and
+   * avoids the full-window reallocation that `setData` implies. The
+   * replacement X must keep the X column sorted; it is usually the same
+   * X the row was first appended with.
+   */
+  updateLast?: boolean;
+}
+
 export interface ChartInstance {
   /** Replace all data */
   setData(data: ColumnarData): void;
   /** Append data for streaming */
-  appendData(data: ColumnarData): void;
+  appendData(data: ColumnarData, opts?: AppendDataOptions): void;
   /** Get current data */
   getData(): ColumnarData;
 
@@ -762,6 +817,14 @@ export interface ChartInstance {
   replaceOptions(config: ChartConfig): void;
   /** Get resolved config */
   getOptions(): ChartConfig;
+
+  /**
+   * Resolved theme after defaults, light/dark detection, and CSS variable
+   * overrides. Plugins should color against this rather than re-deriving
+   * palettes from `getOptions().theme`, which holds only the caller's
+   * partial overrides.
+   */
+  getTheme(): ThemeConfig;
 
   /** Get current layout */
   getLayout(): Layout;

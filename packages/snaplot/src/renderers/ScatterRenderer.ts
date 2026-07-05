@@ -1,8 +1,10 @@
 import type { Scale, Layout, SeriesConfig } from '../types';
+import { affineParams } from '../scales/affine';
 import {
   createScatterStyleResolver,
   type IndexRange,
   parseHex,
+  type ScatterStyleResolver,
   seriesYDataIndex,
   type ScatterPalettes,
 } from './scatterEncoding';
@@ -29,16 +31,9 @@ export interface ScatterRenderSegment {
  * - >= 200K points: 2D histogram heatmap via putImageData()
  */
 
-// Cache the stamp canvas per (radius, color, dpr) to avoid recreating each frame
-let stampCache: {
-  canvas: OffscreenCanvas | HTMLCanvasElement;
-  radius: number;
-  color: string;
-  alpha: number;
-  shape: string;
-  dpr: number;
-} | null = null;
-
+// Stamp canvases are pure functions of their key, so one module-level cache
+// serves every chart instance; sharing helps dashboards where many charts use
+// the same theme. Eviction is LRU: hits re-insert so hot stamps survive.
 const stampCacheMap = new Map<string, OffscreenCanvas | HTMLCanvasElement>();
 const STAMP_CACHE_MAX = 512;
 export const SCATTER_DENSITY_THRESHOLD = 200_000;
@@ -52,28 +47,21 @@ function isOffscreenCanvas(canvas: OffscreenCanvas | HTMLCanvasElement): canvas 
   return typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas;
 }
 
+/** Radius passed here must already be quantized (see quantizeRadius). */
 function getStamp(
-  radius: number,
+  roundedRadius: number,
   color: string,
   alpha: number,
   shape: string,
   dpr: number,
 ): OffscreenCanvas | HTMLCanvasElement {
-  const roundedRadius = Math.round(radius * 10) / 10;
   const key = `${shape}|${roundedRadius}|${color}|${alpha}|${dpr}`;
   const cached = stampCacheMap.get(key);
-  if (cached) return cached;
-
-  // Reuse cached stamp if params match
-  if (
-    stampCache &&
-    stampCache.radius === roundedRadius &&
-    stampCache.color === color &&
-    stampCache.alpha === alpha &&
-    stampCache.shape === shape &&
-    stampCache.dpr === dpr
-  ) {
-    return stampCache.canvas;
+  if (cached) {
+    // Re-insert so Map iteration order tracks recency and eviction is LRU.
+    stampCacheMap.delete(key);
+    stampCacheMap.set(key, cached);
+    return cached;
   }
 
   const size = Math.ceil((roundedRadius * 2 + 2) * dpr);
@@ -106,13 +94,20 @@ function getStamp(
   ctx.globalAlpha = alpha;
   ctx.fill();
 
-  stampCache = { canvas, radius: roundedRadius, color, alpha, shape, dpr };
   stampCacheMap.set(key, canvas);
   if (stampCacheMap.size > STAMP_CACHE_MAX) {
     const oldest = stampCacheMap.keys().next().value;
     if (oldest) stampCacheMap.delete(oldest);
   }
   return canvas;
+}
+
+/**
+ * Stamps are rasterized at a 0.1px-quantized radius; the blit box must use
+ * the same value or the sprite gets sub-pixel scaled and blurs.
+ */
+function quantizeRadius(radius: number): number {
+  return Math.round(radius * 10) / 10;
 }
 
 export function renderScatter(
@@ -129,6 +124,8 @@ export function renderScatter(
   /** Multiplied with the per-point alpha. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
   palettes: ScatterPalettes = { categorical: [] },
+  cache?: ScatterSeriesCache,
+  resolver?: ScatterStyleResolver,
 ): void {
   renderScatterSegments(
     ctx,
@@ -140,6 +137,8 @@ export function renderScatter(
     color,
     opacityMultiplier,
     palettes,
+    cache,
+    resolver,
   );
 }
 
@@ -154,6 +153,18 @@ export function renderScatterSegments(
   /** Multiplied with the per-point alpha. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
   palettes: ScatterPalettes = { categorical: [] },
+  cache?: ScatterSeriesCache,
+  /**
+   * Style resolver built by the chart once per data/config change. When
+   * omitted (tests, direct calls) one is built from the segment data,
+   * which re-scans the encoded columns on every call.
+   */
+  resolver?: ScatterStyleResolver,
+  /**
+   * Draw every Nth point (interaction pass while the viewport moves).
+   * 1 = full fidelity. Ignored by density rendering.
+   */
+  sampleStride: number = 1,
 ): void {
   const count = segmentPointCount(segments);
   if (count <= 0) return;
@@ -167,9 +178,30 @@ export function renderScatterSegments(
   ctx.globalAlpha = opacityMultiplier;
 
   if (isDensityScatterSeries(series, count)) {
-    drawHeatmapSegments(ctx, segments, scaleX, scaleY, layout, series.heatmapBinSize, series.heatmapGradient);
+    drawHeatmapSegments(
+      ctx,
+      segments,
+      scaleX,
+      scaleY,
+      layout,
+      cache ?? new ScatterSeriesCache(),
+      series.heatmapBinSize,
+      series.heatmapGradient,
+    );
   } else {
-    drawStampedSegments(ctx, segments, scaleX, scaleY, layout, series, color, palettes);
+    drawStampedSegments(
+      ctx,
+      segments,
+      scaleX,
+      scaleY,
+      layout,
+      series,
+      color,
+      palettes,
+      cache,
+      resolver,
+      sampleStride,
+    );
   }
 
   ctx.restore();
@@ -186,56 +218,59 @@ function drawStampedSegments(
   series: SeriesConfig,
   color: string,
   palettes: ScatterPalettes,
+  cache?: ScatterSeriesCache,
+  chartResolver?: ScatterStyleResolver,
+  sampleStride: number = 1,
 ): void {
   const count = segmentPointCount(segments);
   const radius = series.pointRadius ?? (count > 10_000 ? 1.5 : 3);
   const alpha = series.opacity ?? (count > 10_000 ? 0.4 : 0.8);
   const dpr = layout.dpr;
   const shape = series.pointShape ?? 'circle';
-  const ranges: IndexRange[] = segments.map((segment) => ({
-    startIdx: segment.startIdx,
-    endIdx: segment.endIdx,
-  }));
-  const colorData = segments[0]?.colorData;
-  const sizeData = segments[0]?.sizeData;
-  const resolver = createScatterStyleResolver({
-    series,
-    fallbackColor: color,
-    fallbackRadius: radius,
-    palettes,
-    columnCount: 1 +
-      (colorData ? Math.max(series.colorBy && typeof series.colorBy !== 'number' ? series.colorBy.dataIndex : typeof series.colorBy === 'number' ? series.colorBy : 0, 0) : 0) +
-      (sizeData ? Math.max(series.sizeBy && typeof series.sizeBy !== 'number' ? series.sizeBy.dataIndex : typeof series.sizeBy === 'number' ? series.sizeBy : 0, 0) : 0),
-    ranges,
-    valueAt(columnIdx, index) {
-      if (columnIdx === series.xDataIndex) return segments[0]?.xData[index] ?? Number.NaN;
-      if (columnIdx === seriesYDataIndex(series)) return segments[0]?.yData[index] ?? Number.NaN;
-      const colorBy = series.colorBy;
-      const colorIdx = typeof colorBy === 'number' ? colorBy : colorBy?.dataIndex;
-      if (columnIdx === colorIdx) return colorData?.[index] ?? Number.NaN;
-      const sizeBy = series.sizeBy;
-      const sizeIdx = typeof sizeBy === 'number' ? sizeBy : sizeBy?.dataIndex;
-      if (columnIdx === sizeIdx) return sizeData?.[index] ?? Number.NaN;
-      return Number.NaN;
-    },
-  });
+  const resolver = chartResolver ?? buildSegmentResolver(segments, series, color, radius, palettes);
 
+  const constantRadius = quantizeRadius(radius);
   const constantStamp = !resolver.variableColor && !resolver.variableRadius
-    ? getStamp(radius, color, alpha, shape, dpr)
+    ? getStamp(constantRadius, color, alpha, shape, dpr)
     : null;
-  const constantStampSize = radius * 2 + 2;
-  const constantOffset = radius + 1;
+  const constantStampSize = constantRadius * 2 + 2;
+  const constantOffset = constantRadius + 1;
+
+  // Points outside the plot rect are clipped away anyway; skipping them
+  // here saves the drawImage call. Matters for arbitrary-xDataIndex series,
+  // which reach this loop unculled.
+  const maxRadius = Math.max(constantRadius, radius, 8);
+  const pxMin = layout.plot.left - maxRadius;
+  const pxMax = layout.plot.left + layout.plot.width + maxRadius;
+  const pyMin = layout.plot.top - maxRadius;
+  const pyMax = layout.plot.top + layout.plot.height + maxRadius;
+
+  // Hoist affine scale transforms out of the loop; log/custom scales keep
+  // the method-call path.
+  const ax = affineParams(scaleX);
+  const ay = affineParams(scaleY);
+  const kx = ax ? ax[0] : 0;
+  const bx = ax ? ax[1] : 0;
+  const ky = ay ? ay[0] : 0;
+  const by = ay ? ay[1] : 0;
+
+  const stampTable = cache
+    ? cache.stampTableFor(resolver, alpha, shape, dpr)
+    : new Map<number, OffscreenCanvas | HTMLCanvasElement>();
+
+  const stride = Math.max(1, Math.floor(sampleStride));
 
   // drawImage with a canvas source is a fast GPU blit, no path overhead
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
-    for (let i = startIdx; i <= endIdx; i++) {
+    for (let i = startIdx; i <= endIdx; i += stride) {
       const yVal = yData[i];
       if (!Number.isFinite(yVal)) continue;
 
-      const px = scaleX.dataToPixel(xData[i]);
-      const py = scaleY.dataToPixel(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+      const px = ax ? xData[i] * kx + bx : scaleX.dataToPixel(xData[i]);
+      const py = ay ? yVal * ky + by : scaleY.dataToPixel(yVal);
+      // The range checks also reject NaN, covering non-finite X values.
+      if (px < pxMin || px > pxMax || py < pyMin || py > pyMax) continue;
 
       if (constantStamp) {
         ctx.drawImage(
@@ -248,9 +283,16 @@ function drawStampedSegments(
         continue;
       }
 
-      const pointRadius = resolver.radiusAt(i);
-      const pointColor = resolver.colorAt(i);
-      const stamp = getStamp(pointRadius, pointColor, alpha, shape, dpr);
+      const pointRadius = quantizeRadius(resolver.radiusAt(i));
+      const bin = resolver.colorBinAt(i);
+      // bin >= -1 and quantized radius has one decimal, so the pair packs
+      // into one integer key: no string allocation per point.
+      const tableKey = (bin + 2) * 16384 + Math.round(pointRadius * 10);
+      let stamp = stampTable.get(tableKey);
+      if (!stamp) {
+        stamp = getStamp(pointRadius, resolver.colorForBin(bin), alpha, shape, dpr);
+        stampTable.set(tableKey, stamp);
+      }
       const stampSize = pointRadius * 2 + 2;
       const offset = pointRadius + 1;
       ctx.drawImage(stamp, px - offset, py - offset, stampSize, stampSize);
@@ -258,18 +300,56 @@ function drawStampedSegments(
   }
 }
 
+/**
+ * Fallback resolver for direct renderScatter calls that do not come from a
+ * chart instance: derives encoding state from the segment arrays alone.
+ */
+function buildSegmentResolver(
+  segments: ScatterRenderSegment[],
+  series: SeriesConfig,
+  color: string,
+  radius: number,
+  palettes: ScatterPalettes,
+): ScatterStyleResolver {
+  const ranges: IndexRange[] = segments.map((segment) => ({
+    startIdx: segment.startIdx,
+    endIdx: segment.endIdx,
+  }));
+  const colorData = segments[0]?.colorData;
+  const sizeData = segments[0]?.sizeData;
+  const colorBy = series.colorBy;
+  const colorIdx = typeof colorBy === 'number' ? colorBy : colorBy?.dataIndex;
+  const sizeBy = series.sizeBy;
+  const sizeIdx = typeof sizeBy === 'number' ? sizeBy : sizeBy?.dataIndex;
+
+  let columnCount = Math.max(series.xDataIndex ?? 0, seriesYDataIndex(series)) + 1;
+  if (colorData && colorIdx !== undefined) columnCount = Math.max(columnCount, colorIdx + 1);
+  if (sizeData && sizeIdx !== undefined) columnCount = Math.max(columnCount, sizeIdx + 1);
+
+  return createScatterStyleResolver({
+    series,
+    fallbackColor: color,
+    fallbackRadius: radius,
+    palettes,
+    columnCount,
+    ranges,
+    valueAt(columnIdx, index) {
+      if (columnIdx === series.xDataIndex) return segments[0]?.xData[index] ?? Number.NaN;
+      if (columnIdx === seriesYDataIndex(series)) return segments[0]?.yData[index] ?? Number.NaN;
+      if (columnIdx === colorIdx) return colorData?.[index] ?? Number.NaN;
+      if (columnIdx === sizeIdx) return sizeData?.[index] ?? Number.NaN;
+      return Number.NaN;
+    },
+  });
+}
+
 // ─── Heatmap: 2D histogram for extreme point counts ────────────
 
-// Cache the rendered heatmap to avoid flicker on overlay-only redraws.
-// `gradientKey` is a stable join of the configured stops so a theme swap
-// invalidates the cache without us tracking the array identity.
-let heatmapCache: {
+interface HeatmapCacheEntry {
   canvas: OffscreenCanvas | HTMLCanvasElement;
   xData: Float64Array;
   yData: Float64Array;
   segmentKey: string;
-  start: number;
-  end: number;
   w: number;
   h: number;
   dpr: number;
@@ -280,7 +360,44 @@ let heatmapCache: {
   yMax: number;
   binSize: number;
   gradientKey: string;
-} | null = null;
+}
+
+/**
+ * Per-series render cache, owned by the chart instance and passed into
+ * renderScatterSegments. Heatmap bitmaps used to live in a module-level
+ * single slot; two density series (or two charts) then invalidated each
+ * other every frame and paid a full O(n) rebin per repaint.
+ * `gradientKey` is a stable join of the configured stops so a theme swap
+ * invalidates the cache without us tracking the array identity.
+ */
+export class ScatterSeriesCache {
+  heatmap: HeatmapCacheEntry | null = null;
+
+  private stampTable = new Map<number, OffscreenCanvas | HTMLCanvasElement>();
+  private stampTableResolver: ScatterStyleResolver | null = null;
+  private stampTableSig = '';
+
+  /**
+   * Numeric-keyed stamp lookup for the variable-style path, so the per
+   * point cost is integer math plus a Map hit instead of building a
+   * string key. Reset whenever the resolver or the stamp parameters
+   * change; both are stable across the frames of a gesture.
+   */
+  stampTableFor(
+    resolver: ScatterStyleResolver,
+    alpha: number,
+    shape: string,
+    dpr: number,
+  ): Map<number, OffscreenCanvas | HTMLCanvasElement> {
+    const sig = alpha + '|' + shape + '|' + dpr;
+    if (this.stampTableResolver !== resolver || this.stampTableSig !== sig) {
+      this.stampTable.clear();
+      this.stampTableResolver = resolver;
+      this.stampTableSig = sig;
+    }
+    return this.stampTable;
+  }
+}
 
 /**
  * Sample a multi-stop gradient at t ∈ [0, 1]. Stops are spaced evenly;
@@ -306,6 +423,7 @@ function drawHeatmapSegments(
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
+  cache: ScatterSeriesCache,
   binSizeCss?: number,
   gradient?: string[],
 ): void {
@@ -335,23 +453,24 @@ function drawHeatmapSegments(
     .join('|');
 
   // Check cache: reuse if data, viewport, and gradient haven't changed
+  const cached = cache.heatmap;
   if (
-    heatmapCache &&
-    heatmapCache.xData === firstSegment.xData &&
-    heatmapCache.yData === firstSegment.yData &&
-    heatmapCache.segmentKey === segmentKey &&
-    heatmapCache.w === w &&
-    heatmapCache.h === h &&
-    heatmapCache.dpr === dpr &&
-    heatmapCache.dataLen === dataLen &&
-    heatmapCache.xMin === scaleX.min &&
-    heatmapCache.xMax === scaleX.max &&
-    heatmapCache.yMin === scaleY.min &&
-    heatmapCache.yMax === scaleY.max &&
-    heatmapCache.binSize === bs &&
-    heatmapCache.gradientKey === gradientKey
+    cached &&
+    cached.xData === firstSegment.xData &&
+    cached.yData === firstSegment.yData &&
+    cached.segmentKey === segmentKey &&
+    cached.w === w &&
+    cached.h === h &&
+    cached.dpr === dpr &&
+    cached.dataLen === dataLen &&
+    cached.xMin === scaleX.min &&
+    cached.xMax === scaleX.max &&
+    cached.yMin === scaleY.min &&
+    cached.yMax === scaleY.max &&
+    cached.binSize === bs &&
+    cached.gradientKey === gradientKey
   ) {
-    ctx.drawImage(heatmapCache.canvas, plot.left, plot.top, plot.width, plot.height);
+    ctx.drawImage(cached.canvas, plot.left, plot.top, plot.width, plot.height);
     return;
   }
 
@@ -360,9 +479,18 @@ function drawHeatmapSegments(
     ? gradient.map(parseHex)
     : null;
 
-  // Bin all points
+  // Bin all points. Affine scales fold the whole data-to-bin transform
+  // into one multiply-add per axis.
   const bins = new Uint32Array(w * h);
   let maxCount = 0;
+
+  const ax = affineParams(scaleX);
+  const ay = affineParams(scaleY);
+  const binScale = dpr / binPx;
+  const kx = ax ? ax[0] * binScale : 0;
+  const bx = ax ? (ax[1] - plot.left) * binScale : 0;
+  const ky = ay ? ay[0] * binScale : 0;
+  const by = ay ? (ay[1] - plot.top) * binScale : 0;
 
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
@@ -370,10 +498,14 @@ function drawHeatmapSegments(
       const yVal = yData[i];
       if (!Number.isFinite(yVal)) continue;
 
-      const px = Math.floor(((scaleX.dataToPixel(xData[i]) - plot.left) * dpr) / binPx);
-      const py = Math.floor(((scaleY.dataToPixel(yVal) - plot.top) * dpr) / binPx);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+      const px = Math.floor(
+        ax ? xData[i] * kx + bx : ((scaleX.dataToPixel(xData[i]) - plot.left) * dpr) / binPx,
+      );
+      const py = Math.floor(
+        ay ? yVal * ky + by : ((scaleY.dataToPixel(yVal) - plot.top) * dpr) / binPx,
+      );
 
+      // The bounds checks also reject NaN from non-finite X values.
       if (px >= 0 && px < w && py >= 0 && py < h) {
         const idx = py * w + px;
         bins[idx]++;
@@ -411,13 +543,11 @@ function drawHeatmapSegments(
   tmpCtx.putImageData(imageData, 0, 0);
 
   // Cache for subsequent frames (e.g. overlay-only redraws)
-  heatmapCache = {
+  cache.heatmap = {
     canvas: tmpCanvas,
     xData: firstSegment.xData,
     yData: firstSegment.yData,
     segmentKey,
-    start: firstSegment.startIdx,
-    end: segments[segments.length - 1].endIdx,
     w,
     h,
     dpr,

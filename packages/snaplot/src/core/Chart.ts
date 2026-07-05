@@ -3,6 +3,7 @@ import type {
   ChartConfig,
   ChartEventMap,
   ChartStats,
+  AppendDataOptions,
   AxisConfig,
   ColumnarData,
   CursorEventOrigin,
@@ -15,6 +16,7 @@ import type {
   Plugin,
   Scale,
   ScaleRange,
+  SeriesConfig,
   StreamingConfig,
   ThemeConfig,
   TooltipPoint,
@@ -30,9 +32,16 @@ import { computeLayout, inferPosition } from './Layout';
 import type { ColumnarSegment, DataStore } from '../data/DataStore';
 import { validateMaxLen } from '../data/DataStore';
 import { ColumnarStore } from '../data/ColumnarStore';
+import { ColumnRangeIndex, ScatterColumnRangeIndex } from '../data/columnRangeIndex';
 import { RingColumnarStore } from '../data/RingColumnarStore';
 import { createScale } from '../scales/createScale';
-import { AUTO_RANGE_PADDING, DEFAULT_TICK_COUNT, MIN_DRAG_DISTANCE } from '../constants';
+import {
+  AUTO_RANGE_PADDING,
+  DEFAULT_INTERACTION_SAMPLING,
+  DEFAULT_TICK_COUNT,
+  INTERACTION_REFINE_MS,
+  MIN_DRAG_DISTANCE,
+} from '../constants';
 
 import { deepMerge } from '../config/merge';
 import { DEFAULT_CONFIG } from '../config/defaults';
@@ -40,11 +49,13 @@ import { resolveTheme } from '../config/theme';
 
 import { renderAxes, updateDOMLabels } from '../renderers/AxesRenderer';
 import { renderLineSegments, renderAreaSegments, renderBandSegments } from '../renderers/LineRenderer';
-import { isDensityScatterSeries, renderScatterSegments } from '../renderers/ScatterRenderer';
+import { isDensityScatterSeries, renderScatterSegments, ScatterSeriesCache } from '../renderers/ScatterRenderer';
 import {
-  createScatterStyleResolver,
+  buildScatterEncodingState,
   normalizeScatterColorBy,
   normalizeScatterSizeBy,
+  resolverFromEncodingState,
+  type ScatterStyleResolver,
   seriesYDataIndex,
   scatterXDataIndex,
   type ScatterPalettes,
@@ -60,6 +71,21 @@ import { TooltipManager } from '../interaction/TooltipManager';
 
 import { PluginManager } from '../plugins/PluginManager';
 
+// Stable identity for user tickFormat functions in the layout cache key.
+// Stringifying the function body per frame allocated the whole source text
+// on every render; a WeakMap id is O(1) and never retains the function.
+const tickFormatIds = new WeakMap<(value: number) => string, number>();
+let nextTickFormatId = 1;
+
+function tickFormatId(fn: ((value: number) => string) | undefined): number {
+  if (!fn) return 0;
+  let id = tickFormatIds.get(fn);
+  if (id === undefined) {
+    id = nextTickFormatId++;
+    tickFormatIds.set(fn, id);
+  }
+  return id;
+}
 
 /**
  * Chart, the composition root.
@@ -82,8 +108,54 @@ export class ChartCore implements ChartInstance {
   private layout!: Layout;
   private layoutCacheKey = '';
   private theme!: ThemeConfig;
-  private rangeCacheDataVersion = -1;
-  private yRangeCache = new Map<string, [number, number]>();
+  /**
+   * Block-aggregate range indexes for viewport-driven vertical auto-range,
+   * built lazily on the first pan/zoom query after a data change. Keyed by
+   * series column (or x:y column pair for arbitrary-X scatter). The
+   * data-change auto-range path deliberately does not build these: a
+   * streaming append per tick would pay an O(n) rebuild for a single query.
+   */
+  private rangeIndexVersion = -1;
+  private columnRangeIndexes = new Map<number, ColumnRangeIndex>();
+  private scatterRangeIndexes = new Map<string, ScatterColumnRangeIndex>();
+  /**
+   * Per-series scatter render caches (heatmap bitmaps), keyed by series
+   * index. Owned here so two charts, or two density series in one chart,
+   * never share cache slots. Entries self-invalidate on data identity and
+   * viewport changes; the map is dropped wholesale on store replacement so
+   * stale bitmaps do not retain replaced Float64Array columns.
+   */
+  private scatterSeriesCaches = new Map<number, ScatterSeriesCache>();
+  /**
+   * Interaction-pass state: while the viewport is actively changing,
+   * scatter series above the `performance.interactionSampling` budget are
+   * stride-sampled, then repainted at full fidelity once the viewport has
+   * been quiet for INTERACTION_REFINE_MS.
+   */
+  private viewportActiveUntil = 0;
+  private refineTimer: ReturnType<typeof setTimeout> | null = null;
+  private sampledLastDataRender = false;
+  /**
+   * Scatter style resolvers cached per series index. Building one scans
+   * the encoded columns (colorBy/sizeBy domains, category detection), so
+   * it must happen once per data/config/theme change, not once per frame
+   * or per pointer move. Domains derive from the full column: a point's
+   * color and size stay stable while the viewport pans.
+   *
+   * Two views share one scan: the render loop addresses points by
+   * physical index (segment ranges), hit-testing and selection by logical
+   * index.
+   */
+  private scatterEncodingCache = new Map<
+    number,
+    {
+      series: SeriesConfig;
+      theme: ThemeConfig;
+      version: number;
+      renderResolver: ScatterStyleResolver;
+      logicalResolver: ScatterStyleResolver;
+    }
+  >();
 
   private gestureManager: GestureManager;
   private hitTester: HitTester;
@@ -246,23 +318,61 @@ export class ChartCore implements ChartInstance {
     this.setStoreData(data);
     this.stats.dataVersion++;
     this.stats.setDataCount++;
-    this.autoRange();
+    const gridDirty = this.autoRangeTracked();
     this.refreshCursor();
-    this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID);
+    this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
     this.dispatchDataUpdate();
   }
 
-  appendData(data: ColumnarData): void {
+  appendData(data: ColumnarData, opts?: AppendDataOptions): void {
     this.ensureStoreMatchesStreaming();
-    const changed = this.store.append(data);
+
+    let changed: boolean;
+    if (opts?.updateLast && this.store.length > 0 && data.length > 0 && data[0].length > 0) {
+      this.store.replaceLast(Array.from(data, (col) => col[0]));
+      if (data[0].length > 1) {
+        this.store.append(data.map((col) => col.subarray(1)) as ColumnarData);
+      }
+      changed = true;
+    } else {
+      changed = this.store.append(data);
+    }
     if (!changed) return;
 
     this.stats.dataVersion++;
     this.stats.appendDataCount++;
-    this.autoRange();
+    const gridDirty = this.autoRangeTracked();
     this.refreshCursor();
-    this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID);
+    this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
     this.dispatchDataUpdate();
+  }
+
+  /**
+   * Run auto-range and report whether the grid layer needs a repaint.
+   * When no scale moved (zoomed or pinned axes during streaming), ticks
+   * and gridlines are unchanged and a data update can skip the grid layer
+   * entirely. Bar and histogram X ticks derive from data positions rather
+   * than the domain alone, so those charts always repaint the grid.
+   */
+  private autoRangeTracked(): boolean {
+    const hasBarLike = this.config.series.some(
+      (s) => s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
+    );
+    if (hasBarLike) {
+      this.autoRange();
+      return true;
+    }
+
+    let signature = '';
+    for (const [key, scale] of this.scales) {
+      signature += key + ':' + scale.min + ':' + scale.max + '|';
+    }
+    this.autoRange();
+    let after = '';
+    for (const [key, scale] of this.scales) {
+      after += key + ':' + scale.min + ':' + scale.max + '|';
+    }
+    return signature !== after;
   }
 
   getData(): ColumnarData {
@@ -282,8 +392,12 @@ export class ChartCore implements ChartInstance {
     const pos = inferPosition(key, ac?.position);
     const isHoriz = pos === 'bottom' || pos === 'top';
     if (isHoriz && !this.config.zoom?.y) {
-      this.autoRangeVertical();
+      this.autoRangeVertical(true);
     }
+
+    // Sync peers relay a gesture in flight on another chart, so they get
+    // the same interaction-pass sampling the originating chart does.
+    this.markViewportActive();
 
     // Suppress zoom sync to prevent infinite peer→peer loops.
     // setAxis is the entry point for SyncGroup.publishScale() peers.
@@ -370,6 +484,10 @@ export class ChartCore implements ChartInstance {
     return this.config;
   }
 
+  getTheme(): ThemeConfig {
+    return this.theme;
+  }
+
   getLayout(): Layout {
     return this.layout;
   }
@@ -402,6 +520,10 @@ export class ChartCore implements ChartInstance {
     this.destroyed = true;
 
     this.cancelPendingTouchCursor();
+    if (this.refineTimer !== null) {
+      clearTimeout(this.refineTimer);
+      this.refineTimer = null;
+    }
     this.scheduler.destroy();
     this.gestureManager.detach();
     this.tooltipManager.destroy();
@@ -948,10 +1070,14 @@ export class ChartCore implements ChartInstance {
    * Auto-range vertical (left/right) axes to fit the data visible in the current X viewport.
    * Called on zoom/pan (viewport change) AND on data change.
    * This is the key to "zoom X, Y follows" behavior.
+   *
+   * `fromViewport` marks the pan/zoom path, which runs once per gesture
+   * frame: it answers range queries from block-aggregate indexes instead of
+   * scanning every visible point. Data-change callers keep the direct scan
+   * because their data version bump would invalidate any index anyway.
    */
-  private autoRangeVertical(): void {
+  private autoRangeVertical(fromViewport = false): void {
     if (this.store.length === 0) return;
-    this.ensureRangeCacheFresh();
 
     const axisConfigs = this.config.axes ?? {};
     for (const [key, scale] of this.scales) {
@@ -981,14 +1107,16 @@ export class ChartCore implements ChartInstance {
       };
 
       const includeColumnRange = (columnIdx: number, startIdx: number, endIdx: number) => {
-        includeRange(this.cachedColumnRange(columnIdx, startIdx, endIdx, scale.type));
+        includeRange(this.columnRange(columnIdx, startIdx, endIdx, scale.type, fromViewport));
       };
       const includeColumnForScatterViewport = (
         yColumnIdx: number,
         xColumnIdx: number,
         xScale: Scale | undefined,
       ) => {
-        includeRange(this.cachedScatterViewportColumnRange(yColumnIdx, xColumnIdx, xScale, scale.type));
+        includeRange(
+          this.scatterViewportColumnRange(yColumnIdx, xColumnIdx, xScale, scale.type, fromViewport),
+        );
       };
 
       for (const s of this.config.series) {
@@ -1053,60 +1181,159 @@ export class ChartCore implements ChartInstance {
     }
   }
 
-  private ensureRangeCacheFresh(): void {
-    if (this.rangeCacheDataVersion === this.stats.dataVersion) return;
-    this.rangeCacheDataVersion = this.stats.dataVersion;
-    this.yRangeCache.clear();
+  private ensureRangeIndexesFresh(): void {
+    if (this.rangeIndexVersion === this.stats.dataVersion) return;
+    this.rangeIndexVersion = this.stats.dataVersion;
+    this.columnRangeIndexes.clear();
+    this.scatterRangeIndexes.clear();
   }
 
   private invalidateRangeCache(): void {
-    this.rangeCacheDataVersion = -1;
-    this.yRangeCache.clear();
+    this.rangeIndexVersion = -1;
+    this.columnRangeIndexes.clear();
+    this.scatterRangeIndexes.clear();
+    this.scatterSeriesCaches.clear();
+    this.scatterEncodingCache.clear();
   }
 
-  private cachedColumnRange(
+  private markViewportActive(): void {
+    if (this.interactionSamplingBudget() === null) return;
+    this.viewportActiveUntil = performance.now() + INTERACTION_REFINE_MS;
+    if (this.refineTimer !== null) clearTimeout(this.refineTimer);
+    this.refineTimer = setTimeout(() => {
+      this.refineTimer = null;
+      if (this.destroyed) return;
+      // Only repaint if the last data pass actually dropped points.
+      if (this.sampledLastDataRender) this.scheduler.markDirty(DirtyFlag.DATA);
+    }, INTERACTION_REFINE_MS);
+  }
+
+  private interactionSamplingBudget(): number | null {
+    const configured = this.config.performance?.interactionSampling;
+    if (configured === false) return null;
+    if (typeof configured === 'number') return configured > 0 ? configured : null;
+    return DEFAULT_INTERACTION_SAMPLING;
+  }
+
+  private scatterResolvers(si: number, series: SeriesConfig, fallbackColor: string) {
+    const cached = this.scatterEncodingCache.get(si);
+    if (
+      cached &&
+      cached.series === series &&
+      cached.theme === this.theme &&
+      cached.version === this.stats.dataVersion
+    ) {
+      return cached;
+    }
+
+    const logicalValueAt = (columnIdx: number, index: number) =>
+      this.store.valueAt(columnIdx, index);
+    const state = buildScatterEncodingState({
+      series,
+      fallbackColor,
+      fallbackRadius: series.pointRadius ?? (this.store.length > 10_000 ? 1.5 : 3),
+      palettes: this.scatterPalettes(),
+      columnCount: this.store.seriesCount + 1,
+      ranges: [{ startIdx: 0, endIdx: this.store.length - 1 }],
+      valueAt: logicalValueAt,
+    });
+
+    const physicalColumns = new Map<number, Float64Array>();
+    const physicalValueAt = (columnIdx: number, index: number) => {
+      let column = physicalColumns.get(columnIdx);
+      if (!column) {
+        column = this.store.getPhysicalColumn(columnIdx);
+        physicalColumns.set(columnIdx, column);
+      }
+      return column[index] ?? Number.NaN;
+    };
+
+    const entry = {
+      series,
+      theme: this.theme,
+      version: this.stats.dataVersion,
+      renderResolver: resolverFromEncodingState(state, physicalValueAt),
+      logicalResolver: resolverFromEncodingState(state, logicalValueAt),
+    };
+    this.scatterEncodingCache.set(si, entry);
+    return entry;
+  }
+
+  private columnRange(
     columnIdx: number,
     startIdx: number,
     endIdx: number,
     scaleType: Scale['type'],
+    useIndex: boolean,
   ): [number, number] | null {
     if (columnIdx < 0 || columnIdx >= this.store.seriesCount) return null;
     const start = Math.max(0, startIdx);
     const end = Math.min(this.store.length - 1, endIdx);
     if (end < start) return null;
+    const positiveOnly = scaleType === 'log';
 
-    const key = ['column', columnIdx, start, end, scaleType].join(':');
-    const cached = this.yRangeCache.get(key);
-    if (cached) return cached;
+    if (useIndex) {
+      this.ensureRangeIndexesFresh();
+      let index = this.columnRangeIndexes.get(columnIdx);
+      if (!index) {
+        // Physical column columnIdx + 1: column 0 is X, series are 1-based.
+        index = new ColumnRangeIndex(this.store.getPhysicalColumn(columnIdx + 1));
+        this.columnRangeIndexes.set(columnIdx, index);
+      }
+      // Segments map the logical range onto live physical ranges, so ring
+      // buffers never query dead slots between head and tail.
+      let min = Infinity;
+      let max = -Infinity;
+      for (const segment of this.store.getSegments(start, end)) {
+        const range = index.query(segment.physicalStart, segment.physicalEnd, positiveOnly);
+        if (!range) continue;
+        if (range[0] < min) min = range[0];
+        if (range[1] > max) max = range[1];
+      }
+      return min === Infinity ? null : [min, max];
+    }
 
     let min = Infinity;
     let max = -Infinity;
     for (let i = start; i <= end; i++) {
       const v = this.store.yAt(columnIdx, i);
-      if (!Number.isFinite(v) || (scaleType === 'log' && v <= 0)) continue;
+      if (!Number.isFinite(v) || (positiveOnly && v <= 0)) continue;
       if (v < min) min = v;
       if (v > max) max = v;
     }
-    if (min === Infinity) return null;
-    const range: [number, number] = [min, max];
-    this.yRangeCache.set(key, range);
-    return range;
+    return min === Infinity ? null : [min, max];
   }
 
-  private cachedScatterViewportColumnRange(
+  private scatterViewportColumnRange(
     yColumnIdx: number,
     xColumnIdx: number,
     xScale: Scale | undefined,
     scaleType: Scale['type'],
+    useIndex: boolean,
   ): [number, number] | null {
     if (yColumnIdx < 0 || yColumnIdx >= this.store.seriesCount) return null;
     if (!this.isValidColumn(xColumnIdx)) return null;
 
     const xMin = xScale?.min ?? -Infinity;
     const xMax = xScale?.max ?? Infinity;
-    const key = ['scatter', yColumnIdx, xColumnIdx, xMin, xMax, scaleType].join(':');
-    const cached = this.yRangeCache.get(key);
-    if (cached) return cached;
+    const positiveOnly = scaleType === 'log';
+
+    // The sorted-permutation index assumes physical position == logical
+    // position, which only holds for the plain columnar store. Ring buffers
+    // fall back to the direct scan.
+    if (useIndex && this.store instanceof ColumnarStore) {
+      this.ensureRangeIndexesFresh();
+      const key = xColumnIdx + ':' + yColumnIdx;
+      let index = this.scatterRangeIndexes.get(key);
+      if (!index) {
+        index = new ScatterColumnRangeIndex(
+          this.store.getPhysicalColumn(xColumnIdx),
+          this.store.getPhysicalColumn(yColumnIdx + 1),
+        );
+        this.scatterRangeIndexes.set(key, index);
+      }
+      return index.query(xMin, xMax, positiveOnly);
+    }
 
     let min = Infinity;
     let max = -Infinity;
@@ -1115,14 +1342,11 @@ export class ChartCore implements ChartInstance {
       if (!Number.isFinite(x)) continue;
       if (x < xMin || x > xMax) continue;
       const v = this.store.yAt(yColumnIdx, i);
-      if (!Number.isFinite(v) || (scaleType === 'log' && v <= 0)) continue;
+      if (!Number.isFinite(v) || (positiveOnly && v <= 0)) continue;
       if (v < min) min = v;
       if (v > max) max = v;
     }
-    if (min === Infinity) return null;
-    const range: [number, number] = [min, max];
-    this.yRangeCache.set(key, range);
-    return range;
+    return min === Infinity ? null : [min, max];
   }
 
   private updateLayout(): void {
@@ -1162,7 +1386,8 @@ export class ChartCore implements ChartInstance {
         scale.type,
         scale.min,
         scale.max,
-        ac?.tickFormat?.toString() ?? '',
+        tickFormatId(ac?.tickFormat),
+        ac?.label ?? '',
       ].join(':');
     }).join('|');
     const padding = this.config.padding ?? {};
@@ -1260,6 +1485,7 @@ export class ChartCore implements ChartInstance {
       this.cursorDataIdx = null;
       this.tooltipPoints = [];
       this.tooltipManager.hide();
+      this.clearProximityHighlight();
       this.scheduler.markDirty(DirtyFlag.OVERLAY);
 
       // Notify listeners and plugins that the cursor is gone, without
@@ -1568,13 +1794,20 @@ export class ChartCore implements ChartInstance {
     min = clamped[0];
     max = clamped[1];
 
+    // Fully clamped no-op (panning at the data edge, zooming out at full
+    // extent): nothing changes, so skip the repaint, events, and sync
+    // publish. Without this, dragging against the edge repaints all three
+    // layers at gesture rate for zero visual change.
+    if (scale.min === min && scale.max === max) return;
+
+    this.markViewportActive();
     this.userZoomedAxes.add(scaleKey);
 
     scale.min = min;
     scale.max = max;
 
     if (isHoriz && !this.config.zoom?.y) {
-      this.autoRangeVertical();
+      this.autoRangeVertical(true);
     }
 
     this.refreshCursor();
@@ -1825,6 +2058,8 @@ export class ChartCore implements ChartInstance {
   private renderAllSeries(): void {
     const ctx = this.canvasManager.dataCtx;
     const palette = this.categoricalPalette();
+    // Reset per data pass; drawOne sets it when a scatter series samples.
+    this.sampledLastDataRender = false;
 
     // Count bar-type series for grouped width calculation. This mapping is
     // position-based (which slot a bar occupies in each group), so it must
@@ -1929,7 +2164,27 @@ export class ChartCore implements ChartInstance {
           }
           break;
         }
-        case 'scatter':
+        case 'scatter': {
+          let cache = this.scatterSeriesCaches.get(si);
+          if (!cache) {
+            cache = new ScatterSeriesCache();
+            this.scatterSeriesCaches.set(si, cache);
+          }
+          // Interaction pass: while the viewport is in motion, cap the
+          // points drawn this frame; hit-testing and the settled repaint
+          // stay full-fidelity.
+          let sampleStride = 1;
+          const budget = this.interactionSamplingBudget();
+          if (budget !== null && performance.now() < this.viewportActiveUntil) {
+            let visible = 0;
+            for (const segment of renderSegments) {
+              visible += segment.endIdx - segment.startIdx + 1;
+            }
+            if (visible > budget) {
+              sampleStride = Math.ceil(visible / budget);
+              this.sampledLastDataRender = true;
+            }
+          }
           renderScatterSegments(
             ctx,
             renderSegments,
@@ -1940,8 +2195,12 @@ export class ChartCore implements ChartInstance {
             color,
             opacityMul,
             this.scatterPalettes(),
+            cache,
+            this.scatterResolvers(si, series, color).renderResolver,
+            sampleStride,
           );
           break;
+        }
         case 'bar':
           renderBarsSegments(ctx, renderSegments, xScale, yScale, this.layout, renderSeries, color, barIdxFor.get(si) ?? 0, barSeries.length, opacityMul);
           break;
@@ -2228,6 +2487,7 @@ export class ChartCore implements ChartInstance {
 
       this.updateTooltipPoints();
       this.applyNearestScatterCursor();
+      this.applyProximityHighlight();
 
       if (publishSync) this.publishCursorSync(this.cursorDataX);
     } else {
@@ -2237,6 +2497,7 @@ export class ChartCore implements ChartInstance {
       this.cursorDataIdx = null;
       this.tooltipPoints = [];
       this.tooltipManager.hide();
+      this.clearProximityHighlight();
 
       if (publishSync) this.publishCursorSync(null);
     }
@@ -2244,6 +2505,42 @@ export class ChartCore implements ChartInstance {
     this.scheduler.markDirty(DirtyFlag.OVERLAY);
     this.emitEvent('cursor:move', this.cursorDataX, this.cursorDataIdx, 'local');
     this.pluginManager.dispatch('onCursorMove', this, this.cursorDataX, this.cursorDataIdx, 'local');
+  }
+
+  /**
+   * highlight.proximity: auto-focus the series whose hit-tested point is
+   * vertically closest to the pointer, clear when none is within range.
+   * setHighlight() no-ops on unchanged values, so steady hover costs
+   * nothing, and sync propagation rides the normal highlight path.
+   */
+  private applyProximityHighlight(): void {
+    const proximity = this.config.highlight?.proximity;
+    if (proximity === undefined || this.config.highlight?.enabled === false) return;
+    if (this.mouseY === null) return;
+
+    let best: number | null = null;
+    let bestDist = Infinity;
+    for (const point of this.tooltipPoints) {
+      const sc = this.config.series[point.seriesIndex];
+      if (!sc) continue;
+      const yScale = this.scales.get(sc.yAxisKey ?? 'y');
+      if (!yScale) continue;
+      const py = yScale.dataToPixel(point.y);
+      if (!Number.isFinite(py)) continue;
+      const dist = Math.abs(py - this.mouseY);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = point.seriesIndex;
+      }
+    }
+
+    this.setHighlight(bestDist <= proximity ? best : null);
+  }
+
+  private clearProximityHighlight(): void {
+    if (this.config.highlight?.proximity === undefined) return;
+    if (this.config.highlight?.enabled === false) return;
+    this.setHighlight(null);
   }
 
   private updateTooltipPoints(): void {
@@ -2265,6 +2562,7 @@ export class ChartCore implements ChartInstance {
       const mode = this.config.tooltip?.mode ?? 'index';
       const hitX = mode === 'nearest' && this.mouseX !== null ? this.mouseX : this.cursorX;
       const hitY = mode === 'nearest' && this.mouseY !== null ? this.mouseY : this.cursorY;
+      const palette = this.categoricalPalette();
       this.tooltipPoints = this.hitTester.findPoints(
         this.store,
         this.scales,
@@ -2272,10 +2570,15 @@ export class ChartCore implements ChartInstance {
         hitX,
         hitY,
         mode,
-        this.categoricalPalette(),
+        palette,
         this.lastPointerType,
         this.scatterPalettes(),
         this.stats.dataVersion,
+        (si) => {
+          const series = this.config.series[si];
+          const fallback = series.stroke ?? palette[si % palette.length];
+          return this.scatterResolvers(si, series, fallback).logicalResolver;
+        },
       );
     }
   }
@@ -2555,7 +2858,6 @@ export class ChartCore implements ChartInstance {
   ) {
     const points = [];
     const palette = this.categoricalPalette();
-    const palettes = this.scatterPalettes();
 
     for (let si = 0; si < this.config.series.length; si++) {
       const series = this.config.series[si];
@@ -2565,15 +2867,7 @@ export class ChartCore implements ChartInstance {
       if (!this.isValidColumn(xColumnIdx) || !this.isValidColumn(yColumnIdx)) continue;
 
       const fallbackColor = series.stroke ?? palette[si % palette.length];
-      const style = createScatterStyleResolver({
-        series,
-        fallbackColor,
-        fallbackRadius: series.pointRadius ?? (this.store.length > 10_000 ? 1.5 : 3),
-        palettes,
-        columnCount: this.store.seriesCount + 1,
-        ranges: [{ startIdx: 0, endIdx: this.store.length - 1 }],
-        valueAt: (columnIdx, index) => this.store.valueAt(columnIdx, index),
-      });
+      const style = this.scatterResolvers(si, series, fallbackColor).logicalResolver;
 
       for (let i = 0; i < this.store.length; i++) {
         const x = this.store.valueAt(xColumnIdx, i);

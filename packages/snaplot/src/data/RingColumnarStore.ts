@@ -96,6 +96,35 @@ export class RingColumnarStore implements DataStore {
     return true;
   }
 
+  replaceLast(row: number[]): void {
+    if (this.len === 0) {
+      throw new Error('replaceLast() requires at least one existing data point.');
+    }
+    if (row.length !== this.columns.length) {
+      throw new Error(
+        `replaceLast() expects ${this.columns.length} values (one per column), ` +
+          `but got ${row.length}.`,
+      );
+    }
+    if (!Number.isFinite(row[0])) {
+      throw new Error(`replaceLast() X value must be finite, received ${row[0]}.`);
+    }
+    if (this.len >= 2 && row[0] < this.xAt(this.len - 2)) {
+      throw new Error(
+        `replaceLast() X value must keep the column sorted, but ` +
+          `${row[0]} < previous x = ${this.xAt(this.len - 2)}.`,
+      );
+    }
+
+    // The ring owns its buffers (reset/append copy into them), so an
+    // in-place write never touches caller arrays.
+    const physical = this.physicalIndex(this.len - 1);
+    for (let c = 0; c < this.columns.length; c++) {
+      this.columns[c][physical] = row[c];
+    }
+    this.materialized = null;
+  }
+
   xAt(index: number): number {
     return this.valueAt(0, index);
   }

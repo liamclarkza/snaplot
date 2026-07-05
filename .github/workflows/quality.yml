@@ -37,3 +37,31 @@ jobs:
 
       - name: Build site
         run: npm run build:site
+
+  # Best-effort performance guard. CI hardware is noisy and differs from the
+  # machine that produced the committed baseline, so this is a coarse
+  # smoke check for gross regressions, not a tight gate: it runs the desktop
+  # profile and compares against the tracked baseline with a generous ratio.
+  # continue-on-error keeps a loaded-runner outlier from blocking a merge;
+  # the run annotation is the signal. Tighten by refreshing the baseline on a
+  # known-quiet runner and lowering --max-ratio once CI variance is measured.
+  perf:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "lts/*"
+          cache: npm
+
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+
+      - name: Benchmark (desktop profile)
+        run: node bench/run.mjs --profile desktop --out bench/results/pr.json
+
+      - name: Compare against tracked baseline
+        run: node bench/compare.mjs --current bench/results/pr.json --max-ratio 2.5

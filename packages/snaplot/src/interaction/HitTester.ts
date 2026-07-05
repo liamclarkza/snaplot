@@ -3,6 +3,7 @@ import type { DataStore } from '../data/DataStore';
 import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
 import {
   createScatterStyleResolver,
+  type ScatterStyleResolver,
   seriesYDataIndex,
   scatterTooltipFields,
   scatterXDataIndex,
@@ -24,7 +25,12 @@ export type PointerKind = 'mouse' | 'touch' | 'pen';
 export class HitTester {
   /** Optional override, takes precedence over the pointer-type default. */
   private proximityOverride: number | null;
-  private scatterGridCache: ScatterGridCache | null = null;
+  /**
+   * Screen-space lookup grids keyed by series index. One slot per scatter
+   * series: a single shared slot made two scatter series evict each other
+   * on every pointer move, degrading each move to an O(n) rebuild.
+   */
+  private scatterGridCaches = new Map<number, ScatterGridCache>();
 
   constructor(proximityThreshold?: number) {
     this.proximityOverride = proximityThreshold ?? null;
@@ -59,6 +65,11 @@ export class HitTester {
     pointerType?: PointerKind,
     scatterPalettes?: ScatterPalettes,
     dataVersion = 0,
+    /**
+     * Chart-cached style resolver per series. When omitted, one is built
+     * per scatter hit, which re-scans the encoded columns.
+     */
+    getResolver?: (seriesIndex: number) => ScatterStyleResolver,
   ): TooltipPoint[] {
     const xScale = scales.get('x');
     if (!xScale || store.length === 0) return [];
@@ -79,6 +90,7 @@ export class HitTester {
       proximity,
       scatterPalettes ?? { categorical: palette },
       dataVersion,
+      getResolver,
     );
   }
 
@@ -148,6 +160,7 @@ export class HitTester {
     proximity: number,
     scatterPalettes: ScatterPalettes,
     dataVersion: number,
+    getResolver?: (seriesIndex: number) => ScatterStyleResolver,
   ): TooltipPoint[] {
     let bestDist = Infinity;
     let bestPoint: TooltipPoint | null = null;
@@ -168,6 +181,7 @@ export class HitTester {
           proximity,
           scatterPalettes,
           dataVersion,
+          getResolver,
         );
         if (scatterPoint) {
           const dist = (scatterPoint.pixelX - pixelX) ** 2 + (scatterPoint.pixelY - pixelY) ** 2;
@@ -240,6 +254,7 @@ export class HitTester {
     proximity: number,
     palettes: ScatterPalettes,
     dataVersion: number,
+    getResolver?: (seriesIndex: number) => ScatterStyleResolver,
   ): { point: TooltipPoint; pixelX: number; pixelY: number } | null {
     const xScale = scales.get(sc.xAxisKey ?? 'x');
     const yScale = scales.get(sc.yAxisKey ?? 'y');
@@ -265,7 +280,7 @@ export class HitTester {
 
     for (let gx = cx - 1; gx <= cx + 1; gx++) {
       for (let gy = cy - 1; gy <= cy + 1; gy++) {
-        const indices = grid.cells.get(`${gx}:${gy}`);
+        const indices = grid.cells.get(gx * CELL_STRIDE + gy);
         if (!indices) continue;
         for (const idx of indices) {
           const px = grid.pixelX[idx];
@@ -283,15 +298,17 @@ export class HitTester {
 
     const xVal = store.valueAt(xCol, bestIdx);
     const yVal = store.valueAt(yCol, bestIdx);
-    const style = createScatterStyleResolver({
-      series: sc,
-      fallbackColor,
-      fallbackRadius: sc.pointRadius ?? (store.length > 10_000 ? 1.5 : 3),
-      palettes,
-      columnCount: store.seriesCount + 1,
-      ranges: [{ startIdx: 0, endIdx: store.length - 1 }],
-      valueAt: (columnIdx, index) => store.valueAt(columnIdx, index),
-    });
+    const style = getResolver
+      ? getResolver(seriesIndex)
+      : createScatterStyleResolver({
+          series: sc,
+          fallbackColor,
+          fallbackRadius: sc.pointRadius ?? (store.length > 10_000 ? 1.5 : 3),
+          palettes,
+          columnCount: store.seriesCount + 1,
+          ranges: [{ startIdx: 0, endIdx: store.length - 1 }],
+          valueAt: (columnIdx, index) => store.valueAt(columnIdx, index),
+        });
 
     return {
       pixelX: grid.pixelX[bestIdx],
@@ -344,11 +361,12 @@ export class HitTester {
       cellSize,
     ].join('|');
 
-    if (this.scatterGridCache?.store === store && this.scatterGridCache.key === key) {
-      return this.scatterGridCache;
+    const cached = this.scatterGridCaches.get(seriesIndex);
+    if (cached?.store === store && cached.key === key) {
+      return cached;
     }
 
-    const cells = new Map<string, number[]>();
+    const cells = new Map<number, number[]>();
     const pixelX = new Float64Array(store.length);
     const pixelY = new Float64Array(store.length);
 
@@ -364,7 +382,7 @@ export class HitTester {
       const py = yScale.dataToPixel(y);
       pixelX[i] = px;
       pixelY[i] = py;
-      const cellKey = `${Math.floor(px / cellSize)}:${Math.floor(py / cellSize)}`;
+      const cellKey = Math.floor(px / cellSize) * CELL_STRIDE + Math.floor(py / cellSize);
       let bucket = cells.get(cellKey);
       if (!bucket) {
         bucket = [];
@@ -373,15 +391,24 @@ export class HitTester {
       bucket.push(i);
     }
 
-    this.scatterGridCache = { store, key, cells, pixelX, pixelY };
-    return this.scatterGridCache;
+    const entry: ScatterGridCache = { store, key, cells, pixelX, pixelY };
+    this.scatterGridCaches.set(seriesIndex, entry);
+    return entry;
   }
 }
+
+/**
+ * Packs (gx, gy) cell coordinates into one integer Map key, avoiding a
+ * string allocation per point on rebuild and per neighbor cell on query.
+ * Cell coordinates are pixel positions divided by the hit radius, so their
+ * magnitude stays far below the stride.
+ */
+const CELL_STRIDE = 1 << 20;
 
 interface ScatterGridCache {
   store: DataStore;
   key: string;
-  cells: Map<string, number[]>;
+  cells: Map<number, number[]>;
   pixelX: Float64Array;
   pixelY: Float64Array;
 }

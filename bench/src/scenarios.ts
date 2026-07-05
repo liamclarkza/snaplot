@@ -206,6 +206,13 @@ const densityConfig: ChartConfig = {
 
 // ─── Gesture helpers ────────────────────────────────────────────
 
+/** Start gestures from a 40% window so pans and zoom-outs have room to move. */
+function zoomToMidWindow(chart: ChartInstance, extent: [number, number]): void {
+  const [lo, hi] = extent;
+  const full = hi - lo;
+  chart.setAxis('x', { min: lo + full * 0.3, max: lo + full * 0.7 });
+}
+
 function plotCenterClient(chart: ChartInstance): { cx: number; cy: number } {
   const rect = chart.container.getBoundingClientRect();
   const plot = chart.getLayout().plot;
@@ -254,10 +261,18 @@ async function runGesture(
     end: () => void;
   },
   meta: Record<string, string | number> = {},
+  /**
+   * Runs before measurement starts, typically to zoom into a window.
+   * Gestures at the full data extent are clamped to no-ops by the default
+   * zoom bounds, which measures nothing.
+   */
+  prepare?: (chart: ChartInstance, extent: [number, number]) => void,
 ): Promise<ScenarioResult> {
   const handle = makeChart(opts.stage, config, data);
   handle.el.scrollIntoView();
   await settleFrames();
+  prepare?.(handle.chart, xExtent(data));
+  await settleFrames(2);
   const { cx, cy } = plotCenterClient(handle.chart);
   const el = gestureTarget(cx, cy);
   const tracker = new LayerTracker(handle.chart);
@@ -520,6 +535,8 @@ export const scenarios: Scenario[] = [
             end: () => firePointer(el, 'pointerup', p),
           };
         },
+        {},
+        zoomToMidWindow,
       ),
   },
   {
@@ -550,6 +567,8 @@ export const scenarios: Scenario[] = [
             },
           };
         },
+        {},
+        zoomToMidWindow,
       ),
   },
   {
@@ -579,6 +598,8 @@ export const scenarios: Scenario[] = [
           },
           end: () => {},
         }),
+        {},
+        zoomToMidWindow,
       ),
   },
 ];

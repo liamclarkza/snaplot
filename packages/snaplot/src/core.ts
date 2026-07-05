@@ -63,6 +63,7 @@ export type { HistogramBins, HistogramOptions } from './utils/histogram';
 
 // Types
 export type {
+  AppendDataOptions,
   ChartInstance,
   ChartConfig,
   ChartType,

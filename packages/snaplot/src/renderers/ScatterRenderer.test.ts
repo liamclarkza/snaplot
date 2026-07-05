@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderScatter } from './ScatterRenderer';
+import { renderScatter, ScatterSeriesCache } from './ScatterRenderer';
 import type { Layout, Scale, SeriesConfig } from '../types';
 
 let createImageDataCalls = 0;
@@ -95,14 +95,47 @@ describe('renderScatter cache keys', () => {
       type: 'scatter',
       heatmap: true,
     };
+    const cache = new ScatterSeriesCache();
+    const palettes = { categorical: [] };
 
-    renderScatter(ctx, xData, yDataA, 0, 3, xScale, yScale, layout, series, '#4e79a7');
-    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7');
-    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7');
+    renderScatter(ctx, xData, yDataA, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cache);
+    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cache);
+    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cache);
 
     // First render bins yDataA, second bins yDataB, third reuses yDataB cache.
     expect(createImageDataCalls).toBe(2);
     expect(ctx.drawImage).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps separate caches warm when two heatmap series interleave', () => {
+    // Regression test for the module-level single-slot cache: two charts
+    // (or two density series) alternating repaints used to evict each
+    // other every frame, degrading every repaint to a full rebin.
+    const ctx = createContext();
+    const xData = Float64Array.from([0, 1, 2, 3]);
+    const yDataA = Float64Array.from([1, 2, 3, 2]);
+    const yDataB = Float64Array.from([3, 2, 1, 2]);
+    const xScale = createScale(0, 3, 0, 20);
+    const yScale = createScale(0, 4, 0, 20);
+    const layout = createLayout();
+    const series: SeriesConfig = {
+      label: 'heat',
+      yDataIndex: 1,
+      type: 'scatter',
+      heatmap: true,
+    };
+    const cacheA = new ScatterSeriesCache();
+    const cacheB = new ScatterSeriesCache();
+    const palettes = { categorical: [] };
+
+    renderScatter(ctx, xData, yDataA, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cacheA);
+    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cacheB);
+    renderScatter(ctx, xData, yDataA, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cacheA);
+    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cacheB);
+
+    // One bin pass per series; the interleaved repaints hit their caches.
+    expect(createImageDataCalls).toBe(2);
+    expect(ctx.drawImage).toHaveBeenCalledTimes(4);
   });
 
   it('includes opacity in the stamped-point cache key', () => {

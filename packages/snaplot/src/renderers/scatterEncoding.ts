@@ -22,6 +22,34 @@ export interface ScatterStyleResolver {
   variableRadius: boolean;
   colorAt(index: number): string;
   radiusAt(index: number): number;
+  /**
+   * Fast path for render loops: a small-integer color bin per point
+   * (category index, or a quantized position on the continuous ramp).
+   * -1 means "missing value", which maps to the null/fallback color.
+   * Bins avoid the per-point string building that colorAt() implies.
+   */
+  colorBinAt(index: number): number;
+  /** Color for a bin from colorBinAt. Cached; safe to call per point. */
+  colorForBin(bin: number): string;
+}
+
+/** Bin count for continuous ramps in the fast path; 64 steps are visually smooth. */
+const CONTINUOUS_COLOR_BINS = 64;
+
+/**
+ * Everything derived from a scan of the encoded columns: domains, category
+ * maps, palettes. Expensive to build (O(n) per encoded column), cheap to
+ * consume. Charts cache one per series per data version and derive
+ * resolvers over different index spaces (render uses physical indices,
+ * hit-testing logical ones) from the same state.
+ */
+export interface ScatterEncodingState {
+  colorBy: ScatterColorEncoding | null;
+  sizeBy: ScatterSizeEncoding | null;
+  colorState: ColorState | null;
+  sizeState: SizeState | null;
+  fallbackColor: string;
+  fallbackRadius: number;
 }
 
 export function scatterXDataIndex(series: SeriesConfig): number {
@@ -101,7 +129,7 @@ export function scatterTooltipFields(
   return out.length > 0 ? out : undefined;
 }
 
-export function createScatterStyleResolver(params: {
+export function buildScatterEncodingState(params: {
   series: SeriesConfig;
   fallbackColor: string;
   fallbackRadius: number;
@@ -109,32 +137,70 @@ export function createScatterStyleResolver(params: {
   columnCount: number;
   ranges: IndexRange[];
   valueAt: (columnIdx: number, index: number) => number;
-}): ScatterStyleResolver {
-  const {
-    series,
-    fallbackColor,
-    fallbackRadius,
-    palettes,
-    columnCount,
-    ranges,
-    valueAt,
-  } = params;
+}): ScatterEncodingState {
+  const { series, fallbackColor, fallbackRadius, palettes, columnCount, ranges, valueAt } = params;
 
   const colorBy = normalizeScatterColorBy(series.colorBy);
   const colorValid = !!colorBy && colorBy.dataIndex >= 0 && colorBy.dataIndex < columnCount;
   const sizeBy = normalizeScatterSizeBy(series.sizeBy);
   const sizeValid = !!sizeBy && sizeBy.dataIndex >= 0 && sizeBy.dataIndex < columnCount;
 
-  const colorState = colorValid
-    ? buildColorState(colorBy, ranges, valueAt, palettes, fallbackColor)
-    : null;
-  const sizeState = sizeValid
-    ? buildSizeState(sizeBy, ranges, valueAt)
-    : null;
+  return {
+    colorBy: colorValid ? colorBy : null,
+    sizeBy: sizeValid ? sizeBy : null,
+    colorState: colorValid
+      ? buildColorState(colorBy, ranges, valueAt, palettes, fallbackColor)
+      : null,
+    sizeState: sizeValid ? buildSizeState(sizeBy, ranges, valueAt) : null,
+    fallbackColor,
+    fallbackRadius,
+  };
+}
+
+export function resolverFromEncodingState(
+  state: ScatterEncodingState,
+  valueAt: (columnIdx: number, index: number) => number,
+): ScatterStyleResolver {
+  const { colorBy, sizeBy, colorState, sizeState, fallbackColor, fallbackRadius } = state;
+
+  // Per-bin color cache: bins are stable for the resolver's lifetime, so
+  // gradient sampling and palette lookups happen once per bin, not per point.
+  const binColors = new Map<number, string>();
+
+  const colorForBin = (bin: number): string => {
+    if (!colorState || !colorBy || bin < 0) return colorBy?.nullColor ?? fallbackColor;
+    const cached = binColors.get(bin);
+    if (cached !== undefined) return cached;
+
+    let color: string;
+    if (colorState.type === 'category') {
+      color = colorState.palette[bin % colorState.palette.length] ?? fallbackColor;
+    } else {
+      const t = bin / (CONTINUOUS_COLOR_BINS - 1);
+      color = sampleGradientRgb(colorState.rgbStops, t);
+    }
+    binColors.set(bin, color);
+    return color;
+  };
+
+  const colorBinAt = (index: number): number => {
+    if (!colorState || !colorBy) return -1;
+    const value = valueAt(colorBy.dataIndex, index);
+    if (!Number.isFinite(value)) return -1;
+    if (colorState.type === 'category') {
+      return colorState.categoryIndex.get(value) ?? -1;
+    }
+    const [min, max] = colorState.domain;
+    const t = max === min ? 0.5 : (value - min) / (max - min);
+    const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+    return Math.round(clamped * (CONTINUOUS_COLOR_BINS - 1));
+  };
 
   return {
     variableColor: !!colorState,
     variableRadius: !!sizeState,
+    colorBinAt,
+    colorForBin,
     colorAt(index: number): string {
       if (!colorState || !colorBy) return fallbackColor;
       const value = valueAt(colorBy.dataIndex, index);
@@ -148,7 +214,7 @@ export function createScatterStyleResolver(params: {
 
       const [min, max] = colorState.domain;
       const t = max === min ? 0.5 : (value - min) / (max - min);
-      return sampleGradient(colorState.palette, Math.max(0, Math.min(1, t)));
+      return sampleGradientRgb(colorState.rgbStops, Math.max(0, Math.min(1, t)));
     },
     radiusAt(index: number): number {
       if (!sizeState || !sizeBy) return fallbackRadius;
@@ -164,9 +230,37 @@ export function createScatterStyleResolver(params: {
   };
 }
 
+export function createScatterStyleResolver(params: {
+  series: SeriesConfig;
+  fallbackColor: string;
+  fallbackRadius: number;
+  palettes: ScatterPalettes;
+  columnCount: number;
+  ranges: IndexRange[];
+  valueAt: (columnIdx: number, index: number) => number;
+}): ScatterStyleResolver {
+  return resolverFromEncodingState(buildScatterEncodingState(params), params.valueAt);
+}
+
 type ColorState =
-  | { type: 'category'; palette: string[]; categoryIndex: Map<number, number>; domain: [number, number] }
-  | { type: 'continuous' | 'diverging'; palette: string[]; domain: [number, number] };
+  | {
+      type: 'category';
+      palette: string[];
+      categoryIndex: Map<number, number>;
+      domain: [number, number];
+    }
+  | {
+      type: 'continuous' | 'diverging';
+      palette: string[];
+      domain: [number, number];
+      rgbStops: [number, number, number][];
+    };
+
+interface SizeState {
+  domain: [number, number];
+  range: [number, number];
+  scale: 'linear' | 'sqrt';
+}
 
 function buildColorState(
   colorBy: ScatterColorEncoding,
@@ -184,7 +278,8 @@ function buildColorState(
     : requestedType;
 
   if (type === 'category') {
-    const palette = colorBy.palette ?? palettes.categorical;
+    const rawPalette = colorBy.palette ?? palettes.categorical;
+    const palette = rawPalette.length > 0 ? rawPalette : [fallbackColor];
     const categoryIndex = new Map<number, number>();
     const values = stats.categoryValues.length > 0 ? stats.categoryValues : [0];
     values.sort((a, b) => a - b);
@@ -193,15 +288,16 @@ function buildColorState(
     });
     return {
       type: 'category',
-      palette: palette.length > 0 ? palette : [fallbackColor],
+      palette,
       categoryIndex,
       domain: [stats.min, stats.max],
     };
   }
 
-  const palette = colorBy.palette ??
+  const rawPalette = colorBy.palette ??
     (type === 'diverging' ? palettes.diverging : palettes.sequential) ??
     palettes.categorical;
+  const palette = rawPalette.length > 0 ? rawPalette : [fallbackColor];
   let domain = colorBy.domain ?? [stats.min, stats.max] as [number, number];
   if (type === 'diverging' && !colorBy.domain) {
     const maxAbs = Math.max(Math.abs(stats.min), Math.abs(stats.max), 1);
@@ -210,8 +306,9 @@ function buildColorState(
   if (!Number.isFinite(domain[0]) || !Number.isFinite(domain[1])) domain = [0, 1];
   return {
     type,
-    palette: palette.length > 0 ? palette : [fallbackColor],
+    palette,
     domain,
+    rgbStops: palette.map(parseHex),
   };
 }
 
@@ -219,11 +316,7 @@ function buildSizeState(
   sizeBy: ScatterSizeEncoding,
   ranges: IndexRange[],
   valueAt: (columnIdx: number, index: number) => number,
-): {
-  domain: [number, number];
-  range: [number, number];
-  scale: 'linear' | 'sqrt';
-} {
+): SizeState {
   const stats = scanColumn(sizeBy.dataIndex, ranges, valueAt);
   let domain = sizeBy.domain ?? [stats.min, stats.max] as [number, number];
   if (!Number.isFinite(domain[0]) || !Number.isFinite(domain[1])) domain = [0, 1];
@@ -290,16 +383,25 @@ export function parseHex(hex: string): [number, number, number] {
 export function sampleGradient(stops: string[], t: number): string {
   if (stops.length === 0) return '#000000';
   if (stops.length === 1) return stops[0];
-  const rgbStops = stops.map(parseHex);
+  return sampleGradientRgb(stops.map(parseHex), t);
+}
+
+/** sampleGradient over pre-parsed stops, for callers that sample repeatedly. */
+function sampleGradientRgb(rgbStops: [number, number, number][], t: number): string {
+  if (rgbStops.length === 0) return '#000000';
+  if (rgbStops.length === 1) return rgbToHex(rgbStops[0]);
   const scaled = t * (rgbStops.length - 1);
   const i = Math.min(rgbStops.length - 2, Math.floor(scaled));
   const f = scaled - i;
   const a = rgbStops[i];
   const b = rgbStops[i + 1];
-  const rgb = [
+  return rgbToHex([
     Math.round(a[0] + (b[0] - a[0]) * f),
     Math.round(a[1] + (b[1] - a[1]) * f),
     Math.round(a[2] + (b[2] - a[2]) * f),
-  ];
+  ]);
+}
+
+function rgbToHex(rgb: [number, number, number]): string {
   return `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }

@@ -1,3 +1,4 @@
+import { affineParams } from '../scales/affine';
 import type { Scale, Layout, SeriesConfig } from '../types';
 
 export interface LineRenderSegment {
@@ -24,8 +25,9 @@ export interface BandRenderSegment {
  * - monotone: Fritsch-Carlson monotone cubic (no overshoot)
  * - step-before/after/middle: horizontal-then-vertical segments
  *
- * NaN handling: NaN triggers moveTo() instead of lineTo(), breaking the line.
- * Check via `value !== value` (faster than isNaN()).
+ * Missing-value handling: non-finite Y (NaN, Infinity) breaks the path,
+ * the next valid point starts with moveTo(). `series.spanGaps` skips the
+ * break and connects across the gap instead.
  */
 
 export function renderLine(
@@ -88,12 +90,13 @@ export function renderLineSegments(
     ctx.setLineDash(series.lineDash);
   }
 
+  const spanGaps = series.spanGaps === true;
   if (interp === 'monotone') {
-    drawMonotoneCubicSegments(ctx, segments, scaleX, scaleY);
+    drawMonotoneCubicSegments(ctx, segments, scaleX, scaleY, spanGaps);
   } else if (interp.startsWith('step')) {
-    drawSteppedSegments(ctx, segments, scaleX, scaleY, interp);
+    drawSteppedSegments(ctx, segments, scaleX, scaleY, interp, spanGaps);
   } else {
-    drawLinearSegments(ctx, segments, scaleX, scaleY);
+    drawLinearSegments(ctx, segments, scaleX, scaleY, spanGaps);
   }
 
   ctx.stroke();
@@ -162,7 +165,19 @@ export function renderAreaSegments(
     ctx.fillStyle = grad;
   }
 
-  // Fill each contiguous valid segment separately so NaN gaps stay visible.
+  // Hoist affine transforms; both the fill and stroke passes reuse them.
+  const ax = affineParams(scaleX);
+  const ay = affineParams(scaleY);
+  const kx = ax ? ax[0] : 0;
+  const bx = ax ? ax[1] : 0;
+  const ky = ay ? ay[0] : 0;
+  const by = ay ? ay[1] : 0;
+  const projX = (v: number) => (ax ? v * kx + bx : scaleX.dataToPixel(v));
+  const projY = (v: number) => (ay ? v * ky + by : scaleY.dataToPixel(v));
+
+  // Fill each contiguous valid segment separately so NaN gaps stay visible
+  // (unless the series opts into spanGaps, which fills straight across).
+  const spanGaps = series.spanGaps === true;
   let firstPx = 0;
   let lastPx = 0;
   let hasSegment = false;
@@ -180,17 +195,17 @@ export function renderAreaSegments(
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
       if (!Number.isFinite(yVal)) {
-        if (hasSegment) {
+        if (hasSegment && !spanGaps) {
           closeAndFillSegment();
           hasSegment = false;
         }
         continue;
       }
 
-      const px = scaleX.dataToPixel(xData[i]);
-      const py = scaleY.dataToPixel(yVal);
+      const px = projX(xData[i]);
+      const py = projY(yVal);
       if (!Number.isFinite(px) || !Number.isFinite(py)) {
-        if (hasSegment) {
+        if (hasSegment && !spanGaps) {
           closeAndFillSegment();
           hasSegment = false;
         }
@@ -220,10 +235,10 @@ export function renderAreaSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (!Number.isFinite(yVal)) { hasPath = false; continue; }
-      const px = scaleX.dataToPixel(xData[i]);
-      const py = scaleY.dataToPixel(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) { hasPath = false; continue; }
+      if (!Number.isFinite(yVal)) { if (!spanGaps) hasPath = false; continue; }
+      const px = projX(xData[i]);
+      const py = projY(yVal);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) { if (!spanGaps) hasPath = false; continue; }
       if (!hasPath) { ctx.moveTo(px, py); hasPath = true; }
       else { ctx.lineTo(px, py); }
     }
@@ -400,19 +415,30 @@ function drawLinearSegments(
   segments: LineRenderSegment[],
   scaleX: Scale,
   scaleY: Scale,
+  spanGaps: boolean,
 ): void {
   ctx.beginPath();
   let moved = false;
+
+  // Hoist affine scale transforms so the hot loop is inline multiply-add
+  // instead of a polymorphic dataToPixel call per point; log/custom scales
+  // fall back to the method path.
+  const ax = affineParams(scaleX);
+  const ay = affineParams(scaleY);
+  const kx = ax ? ax[0] : 0;
+  const bx = ax ? ax[1] : 0;
+  const ky = ay ? ay[0] : 0;
+  const by = ay ? ay[1] : 0;
 
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (!Number.isFinite(yVal)) { moved = false; continue; }
+      if (!Number.isFinite(yVal)) { if (!spanGaps) moved = false; continue; }
 
-      const px = scaleX.dataToPixel(xData[i]);
-      const py = scaleY.dataToPixel(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) { moved = false; continue; }
+      const px = ax ? xData[i] * kx + bx : scaleX.dataToPixel(xData[i]);
+      const py = ay ? yVal * ky + by : scaleY.dataToPixel(yVal);
+      if (!Number.isFinite(px) || !Number.isFinite(py)) { if (!spanGaps) moved = false; continue; }
 
       if (!moved) { ctx.moveTo(px, py); moved = true; }
       else { ctx.lineTo(px, py); }
@@ -428,6 +454,7 @@ function drawSteppedSegments(
   scaleX: Scale,
   scaleY: Scale,
   mode: string,
+  spanGaps: boolean,
 ): void {
   ctx.beginPath();
   let moved = false;
@@ -437,11 +464,11 @@ function drawSteppedSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (!Number.isFinite(yVal)) { moved = false; continue; }
+      if (!Number.isFinite(yVal)) { if (!spanGaps) moved = false; continue; }
 
       const px = scaleX.dataToPixel(xData[i]);
       const py = scaleY.dataToPixel(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) { moved = false; continue; }
+      if (!Number.isFinite(px) || !Number.isFinite(py)) { if (!spanGaps) moved = false; continue; }
 
       if (!moved) {
         ctx.moveTo(px, py);
@@ -481,6 +508,7 @@ function drawMonotoneCubicSegments(
   segments: LineRenderSegment[],
   scaleX: Scale,
   scaleY: Scale,
+  spanGaps: boolean,
 ): void {
   ctx.beginPath();
   let px: number[] = [];
@@ -492,24 +520,26 @@ function drawMonotoneCubicSegments(
     py = [];
   };
 
+  // Runs accumulate across segment boundaries: a ring buffer splits
+  // logically contiguous data into two physical segments, and flushing
+  // between them would leave a visible gap in the curve at the seam.
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
       if (!Number.isFinite(yVal)) {
-        flushRun();
+        if (!spanGaps) flushRun();
         continue;
       }
       const x = scaleX.dataToPixel(xData[i]);
       const y = scaleY.dataToPixel(yVal);
       if (!Number.isFinite(x) || !Number.isFinite(y)) {
-        flushRun();
+        if (!spanGaps) flushRun();
         continue;
       }
       px.push(x);
       py.push(y);
     }
-    flushRun();
   }
 
   flushRun();

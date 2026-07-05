@@ -1,7 +1,7 @@
 {
   "meta": {
-    "sha": "d7e17b9",
-    "date": "2026-07-02T20:02:49.257Z",
+    "sha": "24f06c6",
+    "date": "2026-07-04T10:02:11.215Z",
     "node": "v24.18.0",
     "filter": null
   },
@@ -19,12 +19,12 @@
           "valid": true,
           "frame": {
             "frames": 60,
-            "meanMs": 25.56,
+            "meanMs": 24.04,
             "medianMs": 25,
-            "p95Ms": 33.2,
+            "p95Ms": 25.5,
             "maxMs": 33.4,
-            "over60": 1,
-            "over30": 0.03
+            "over60": 0.93,
+            "over30": 0.02
           },
           "layers": {
             "grid": {
@@ -33,7 +33,7 @@
             },
             "data": {
               "renders": 69,
-              "meanMs": 19.06
+              "meanMs": 17.87
             },
             "overlay": {
               "renders": 69,
@@ -50,10 +50,10 @@
           "valid": true,
           "frame": {
             "frames": 60,
-            "meanMs": 92.08,
-            "medianMs": 91.7,
-            "p95Ms": 100,
-            "maxMs": 100.1,
+            "meanMs": 87.06,
+            "medianMs": 83.4,
+            "p95Ms": 91.8,
+            "maxMs": 91.9,
             "over60": 1,
             "over30": 1
           },
@@ -64,7 +64,7 @@
             },
             "data": {
               "renders": 69,
-              "meanMs": 86.55
+              "meanMs": 81.97
             },
             "overlay": {
               "renders": 69,
@@ -81,25 +81,25 @@
           "valid": true,
           "frame": {
             "frames": 60,
-            "meanMs": 374.79,
-            "medianMs": 375,
-            "p95Ms": 391.6,
-            "maxMs": 392.6,
+            "meanMs": 343.47,
+            "medianMs": 341.7,
+            "p95Ms": 358.3,
+            "maxMs": 359.1,
             "over60": 1,
             "over30": 1
           },
           "layers": {
             "grid": {
               "renders": 69,
-              "meanMs": 0.43
+              "meanMs": 0.39
             },
             "data": {
               "renders": 69,
-              "meanMs": 366.45
+              "meanMs": 337.04
             },
             "overlay": {
               "renders": 69,
-              "meanMs": 0.03
+              "meanMs": 0.02
             }
           },
           "heapDeltaMB": 0,
@@ -112,21 +112,21 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 39.36,
-            "medianMs": 41.6,
-            "p95Ms": 42,
-            "maxMs": 42.5,
+            "meanMs": 36.3,
+            "medianMs": 33.4,
+            "p95Ms": 41.7,
+            "maxMs": 42.6,
             "over60": 1,
-            "over30": 0.8
+            "over30": 0.53
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.27
+              "meanMs": 0.25
             },
             "data": {
               "renders": 199,
-              "meanMs": 34.99
+              "meanMs": 32.31
             },
             "overlay": {
               "renders": 199,
@@ -143,21 +143,21 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 148.38,
-            "medianMs": 150,
-            "p95Ms": 158.3,
-            "maxMs": 158.7,
+            "meanMs": 146.36,
+            "medianMs": 149.1,
+            "p95Ms": 154.8,
+            "maxMs": 163,
             "over60": 1,
             "over30": 1
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.24
+              "meanMs": 0.26
             },
             "data": {
               "renders": 199,
-              "meanMs": 142.43
+              "meanMs": 139.68
             },
             "overlay": {
               "renders": 199,
@@ -174,21 +174,21 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 49.77,
+            "meanMs": 48.61,
             "medianMs": 50,
-            "p95Ms": 91.6,
-            "maxMs": 91.8,
-            "over60": 0.88,
-            "over30": 0.67
+            "p95Ms": 83.4,
+            "maxMs": 91.7,
+            "over60": 0.89,
+            "over30": 0.64
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.23
+              "meanMs": 0.21
             },
             "data": {
               "renders": 199,
-              "meanMs": 48.6
+              "meanMs": 47.46
             },
             "overlay": {
               "renders": 199,
@@ -205,21 +205,21 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 190.65,
-            "medianMs": 191.7,
-            "p95Ms": 341.7,
-            "maxMs": 366.8,
+            "meanMs": 183.56,
+            "medianMs": 183.3,
+            "p95Ms": 333.2,
+            "maxMs": 350,
             "over60": 0.99,
             "over30": 0.94
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.28
+              "meanMs": 0.26
             },
             "data": {
               "renders": 199,
-              "meanMs": 199.42
+              "meanMs": 192.37
             },
             "overlay": {
               "renders": 199,
@@ -236,21 +236,21 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 62.57,
-            "medianMs": 66.6,
-            "p95Ms": 75,
-            "maxMs": 75.1,
+            "meanMs": 59.86,
+            "medianMs": 58.4,
+            "p95Ms": 67,
+            "maxMs": 75,
             "over60": 1,
             "over30": 1
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.09
+              "meanMs": 0.07
             },
             "data": {
               "renders": 199,
-              "meanMs": 57.68
+              "meanMs": 55.22
             },
             "overlay": {
               "renders": 199,
@@ -267,21 +267,21 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 110.6,
-            "medianMs": 116.6,
-            "p95Ms": 129.3,
-            "maxMs": 133.4,
+            "meanMs": 105.6,
+            "medianMs": 108.4,
+            "p95Ms": 125,
+            "maxMs": 125.3,
             "over60": 1,
             "over30": 1
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.09
+              "meanMs": 0.1
             },
             "data": {
               "renders": 199,
-              "meanMs": 102.66
+              "meanMs": 97.97
             },
             "overlay": {
               "renders": 199,
@@ -298,21 +298,21 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 8.75,
+            "meanMs": 8.38,
             "medianMs": 8.3,
-            "p95Ms": 9.3,
-            "maxMs": 17.6,
-            "over60": 0.04,
+            "p95Ms": 8.5,
+            "maxMs": 16.7,
+            "over60": 0,
             "over30": 0
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.23
+              "meanMs": 0.24
             },
             "data": {
               "renders": 199,
-              "meanMs": 3.58
+              "meanMs": 3.41
             },
             "overlay": {
               "renders": 199,
@@ -329,21 +329,21 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 76.74,
-            "medianMs": 75,
-            "p95Ms": 83.4,
-            "maxMs": 92.5,
+            "meanMs": 70.93,
+            "medianMs": 66.8,
+            "p95Ms": 75.1,
+            "maxMs": 83.3,
             "over60": 1,
             "over30": 1
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.24
+              "meanMs": 0.23
             },
             "data": {
               "renders": 199,
-              "meanMs": 1.46
+              "meanMs": 1.37
             },
             "overlay": {
               "renders": 199,
@@ -360,24 +360,24 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 11.25,
+            "meanMs": 10.64,
             "medianMs": 8.4,
             "p95Ms": 16.8,
             "maxMs": 17.4,
-            "over60": 0.15,
+            "over60": 0.13,
             "over30": 0
           },
           "layers": {
             "grid": {
-              "renders": 1,
-              "meanMs": 0.3
+              "renders": 0,
+              "meanMs": 0
             },
             "data": {
               "renders": 199,
-              "meanMs": 3.03
+              "meanMs": 2.91
             },
             "overlay": {
-              "renders": 1,
+              "renders": 0,
               "meanMs": 0
             }
           },
@@ -385,7 +385,7 @@
           "meta": {
             "points": 300000,
             "chartBDataRenders": 199,
-            "chartBDataMeanMs": 3.13
+            "chartBDataMeanMs": 2.87
           }
         },
         {
@@ -393,24 +393,24 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 115.28,
-            "medianMs": 116.7,
-            "p95Ms": 183.3,
-            "maxMs": 191.8,
+            "meanMs": 108.24,
+            "medianMs": 108.3,
+            "p95Ms": 175,
+            "maxMs": 183.4,
             "over60": 1,
-            "over30": 1
+            "over30": 0.99
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.23
+              "meanMs": 0.22
             },
             "data": {
               "renders": 199,
-              "meanMs": 0.74
+              "meanMs": 0.68
             },
             "overlay": {
-              "renders": 1,
+              "renders": 0,
               "meanMs": 0
             }
           },
@@ -421,28 +421,28 @@
         },
         {
           "name": "hover-sweep-50k",
-          "valid": false,
+          "valid": true,
           "frame": {
             "frames": 180,
             "meanMs": 8.33,
             "medianMs": 8.3,
-            "p95Ms": 8.5,
-            "maxMs": 9.3,
+            "p95Ms": 8.4,
+            "maxMs": 9.4,
             "over60": 0,
             "over30": 0
           },
           "layers": {
             "grid": {
-              "renders": 1,
-              "meanMs": 0.3
+              "renders": 0,
+              "meanMs": 0
             },
             "data": {
-              "renders": 1,
-              "meanMs": 86.6
+              "renders": 0,
+              "meanMs": 0
             },
             "overlay": {
               "renders": 199,
-              "meanMs": 0.03
+              "meanMs": 0.04
             }
           },
           "heapDeltaMB": 0,
@@ -455,25 +455,25 @@
           "valid": false,
           "frame": {
             "frames": 180,
-            "meanMs": 91.94,
+            "meanMs": 91.99,
             "medianMs": 91.7,
             "p95Ms": 100,
-            "maxMs": 100.9,
+            "maxMs": 108.4,
             "over60": 1,
             "over30": 1
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.23
+              "meanMs": 0.25
             },
             "data": {
               "renders": 199,
-              "meanMs": 86.29
+              "meanMs": 86.17
             },
             "overlay": {
               "renders": 199,
-              "meanMs": 0.13
+              "meanMs": 0.12
             }
           },
           "heapDeltaMB": 0,
@@ -486,25 +486,25 @@
           "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 43.4,
-            "medianMs": 39.1,
+            "meanMs": 43.19,
+            "medianMs": 33.4,
             "p95Ms": 83.4,
-            "maxMs": 92.5,
+            "maxMs": 91.7,
             "over60": 0.99,
-            "over30": 0.53
+            "over30": 0.57
           },
           "layers": {
             "grid": {
               "renders": 199,
-              "meanMs": 0.18
+              "meanMs": 0.19
             },
             "data": {
               "renders": 199,
-              "meanMs": 42.15
+              "meanMs": 42.08
             },
             "overlay": {
               "renders": 199,
-              "meanMs": 0.05
+              "meanMs": 0.04
             }
           },
           "heapDeltaMB": 0,
@@ -514,27 +514,27 @@
         },
         {
           "name": "wheel-zoom-gesture-50k",
-          "valid": false,
+          "valid": true,
           "frame": {
             "frames": 180,
-            "meanMs": 8.33,
-            "medianMs": 8.3,
-            "p95Ms": 9,
-            "maxMs": 9.2,
-            "over60": 0,
-            "over30": 0
+            "meanMs": 17.41,
+            "medianMs": 8.4,
+            "p95Ms": 58.4,
+            "maxMs": 91.7,
+            "over60": 0.26,
+            "over30": 0.12
           },
           "layers": {
             "grid": {
-              "renders": 1,
-              "meanMs": 0.4
+              "renders": 199,
+              "meanMs": 0.2
             },
             "data": {
-              "renders": 1,
-              "meanMs": 87.2
+              "renders": 199,
+              "meanMs": 13.58
             },
             "overlay": {
-              "renders": 1,
+              "renders": 199,
               "meanMs": 0
             }
           },
@@ -558,9 +558,9 @@
           "valid": true,
           "frame": {
             "frames": 60,
-            "meanMs": 155.14,
-            "medianMs": 157.4,
-            "p95Ms": 166.5,
+            "meanMs": 151.53,
+            "medianMs": 150,
+            "p95Ms": 165.8,
             "maxMs": 166.8,
             "over60": 1,
             "over30": 1
@@ -568,11 +568,11 @@
           "layers": {
             "grid": {
               "renders": 69,
-              "meanMs": 1
+              "meanMs": 0.85
             },
             "data": {
               "renders": 69,
-              "meanMs": 113.32
+              "meanMs": 110.06
             },
             "overlay": {
               "renders": 69,
@@ -586,83 +586,501 @@
         },
         {
           "name": "scatter-render-50k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Users/liam/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/_y/m465st_x6jnfjn00mz8j56qr0000gn/T/playwright_chromiumdev_profile-VzNB9L --remote-debugging-pipe --no-startup-window\n<launched> pid=85803\n[pid=85803] <gracefully close start>\n[pid=85803] <forcefully close>\n[pid=85803] <kill>\n[pid=85803] <will force kill>"
+          "valid": true,
+          "frame": {
+            "frames": 60,
+            "meanMs": 478.89,
+            "medianMs": 475.1,
+            "p95Ms": 508.4,
+            "maxMs": 516.5,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 69,
+              "meanMs": 1.09
+            },
+            "data": {
+              "renders": 69,
+              "meanMs": 450.44
+            },
+            "overlay": {
+              "renders": 69,
+              "meanMs": 0.07
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
         },
         {
           "name": "scatter-render-200k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 60,
+            "meanMs": 1847.9,
+            "medianMs": 1841.6,
+            "p95Ms": 1908.4,
+            "maxMs": 1925.7,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 69,
+              "meanMs": 1.22
+            },
+            "data": {
+              "renders": 69,
+              "meanMs": 1812.11
+            },
+            "overlay": {
+              "renders": 69,
+              "meanMs": 0.15
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 200000
+          }
         },
         {
           "name": "scatter-pan-50k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 196.72,
+            "medianMs": 192.4,
+            "p95Ms": 216.6,
+            "maxMs": 225,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.95
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 174.22
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.08
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
         },
         {
           "name": "scatter-pan-200k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 784.12,
+            "medianMs": 783.4,
+            "p95Ms": 833.9,
+            "maxMs": 858.1,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 1.01
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 746.57
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.09
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 200000
+          }
         },
         {
           "name": "scatter-zoom-50k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 284.53,
+            "medianMs": 275.6,
+            "p95Ms": 492.4,
+            "maxMs": 533.8,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 1.21
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 275.34
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.08
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
         },
         {
           "name": "scatter-zoom-200k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 1047.13,
+            "medianMs": 1067.6,
+            "p95Ms": 1909,
+            "maxMs": 2024.1,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 1.06
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 1098.81
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.09
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 200000
+          }
         },
         {
           "name": "scatter-offaxis-pan-50k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 342.22,
+            "medianMs": 349.7,
+            "p95Ms": 408.8,
+            "maxMs": 449.9,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.51
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 312.3
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.08
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
         },
         {
           "name": "scatter-encoded-pan-50k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 747.68,
+            "medianMs": 790.7,
+            "p95Ms": 925,
+            "maxMs": 975.3,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.51
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 687.09
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.09
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
         },
         {
           "name": "heatmap-pan-300k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 30.74,
+            "medianMs": 33,
+            "p95Ms": 34.2,
+            "maxMs": 42.6,
+            "over60": 1,
+            "over30": 0.29
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.83
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 10.58
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.02
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 300000
+          }
         },
         {
           "name": "line-pan-200k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 401.76,
+            "medianMs": 400,
+            "p95Ms": 449.1,
+            "maxMs": 499.7,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 1.18
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 6.48
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.03
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 200000
+          }
         },
         {
           "name": "two-heatmaps-highlight-150k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 40.69,
+            "medianMs": 41.6,
+            "p95Ms": 42.5,
+            "maxMs": 50,
+            "over60": 1,
+            "over30": 0.93
+          },
+          "layers": {
+            "grid": {
+              "renders": 0,
+              "meanMs": 0
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 10.96
+            },
+            "overlay": {
+              "renders": 0,
+              "meanMs": 0
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 300000,
+            "chartBDataRenders": 199,
+            "chartBDataMeanMs": 10.72
+          }
         },
         {
           "name": "append-stream-50k-window",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 693.93,
+            "medianMs": 699.1,
+            "p95Ms": 1133.3,
+            "maxMs": 1325.1,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 1.08
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 3.3
+            },
+            "overlay": {
+              "renders": 0,
+              "meanMs": 0
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "finalPoints": 50000
+          }
         },
         {
           "name": "hover-sweep-50k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 8.33,
+            "medianMs": 8.3,
+            "p95Ms": 9.3,
+            "maxMs": 9.4,
+            "over60": 0,
+            "over30": 0
+          },
+          "layers": {
+            "grid": {
+              "renders": 0,
+              "meanMs": 0
+            },
+            "data": {
+              "renders": 0,
+              "meanMs": 0
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.11
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
         },
         {
           "name": "touch-pan-gesture-50k",
           "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "frame": {
+            "frames": 180,
+            "meanMs": 497.27,
+            "medianMs": 494.8,
+            "p95Ms": 519.2,
+            "maxMs": 528.1,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.96
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 466.86
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.63
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
         },
         {
           "name": "pinch-zoom-gesture-50k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 229.52,
+            "medianMs": 200.5,
+            "p95Ms": 445,
+            "maxMs": 483.8,
+            "over60": 1,
+            "over30": 1
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.72
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 222.18
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.6
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
         },
         {
           "name": "wheel-zoom-gesture-50k",
-          "valid": false,
-          "error": "page.evaluate: Target page, context or browser has been closed"
+          "valid": true,
+          "frame": {
+            "frames": 180,
+            "meanMs": 73.81,
+            "medianMs": 17,
+            "p95Ms": 326,
+            "maxMs": 482.1,
+            "over60": 0.51,
+            "over30": 0.41
+          },
+          "layers": {
+            "grid": {
+              "renders": 199,
+              "meanMs": 0.67
+            },
+            "data": {
+              "renders": 199,
+              "meanMs": 71.17
+            },
+            "overlay": {
+              "renders": 199,
+              "meanMs": 0.02
+            }
+          },
+          "heapDeltaMB": 0,
+          "meta": {
+            "points": 50000
+          }
         }
       ]
     }

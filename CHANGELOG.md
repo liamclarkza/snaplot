@@ -6,6 +6,70 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Added `series.spanGaps` to bridge NaN gaps in line and area series
+  instead of breaking the path.
+- Added `AxisConfig.label` axis titles: rendered below bottom axes and
+  rotated alongside left/right axes, with gutter space reserved
+  automatically.
+- Added `appendData(data, { updateLast: true })` so streaming ticks can
+  correct an in-progress tail row (live epoch aggregates, forming
+  buckets) without a full-window reallocation. `ColumnarStore` and the
+  ring store expose the underlying `replaceLast()`.
+- Added `highlight.proximity`: auto-highlight the series nearest the
+  cursor within a pixel threshold, propagated through highlight sync.
+- Added `chart.getTheme()` returning the resolved theme so plugins can
+  color against the same palette the canvas uses.
+- Added a benchmark workspace (`bench/`) with scripted pan/zoom sweeps,
+  gesture scenarios, and a CPU-throttled mobile profile, plus a tracked
+  baseline and comparison script for regression checks.
+
+### Changed
+- Added an interaction pass for large scatter series: while the viewport
+  is actively changing, series above the
+  `performance.interactionSampling` point budget (default 10000) are
+  stride-sampled, then repainted at full fidelity as soon as the gesture
+  settles. Hit-testing and tooltips always use the full data. Set
+  `performance: { interactionSampling: false }` to opt out.
+- Viewport changes that clamp to the current range (panning at the data
+  edge, zooming out at full extent) no longer repaint or publish sync;
+  they are recognized as no-ops.
+- Pan and zoom no longer rescan visible data for vertical auto-range on
+  every frame: range queries run against block-aggregate indexes built
+  once per data change. Scatter series with a custom `xDataIndex` use a
+  sorted-permutation index instead of a full-store scan per frame.
+- Scatter `colorBy`/`sizeBy` domains now derive from the full column
+  rather than the visible viewport, so a point keeps its color and size
+  while panning and zooming. Explicit `domain` overrides are unchanged.
+- Tick-label measurement moved from hidden-span `offsetWidth` reads to
+  canvas `measureText`, removing forced DOM reflows from the render
+  path. Axis gutters are quantized to 8px steps so tick-label width
+  jitter during a gesture no longer shifts the plot rect every frame.
+- Axis tick labels reuse pooled DOM nodes instead of rebuilding every
+  span on each grid repaint.
+- Data updates now skip the grid layer when auto-range leaves every
+  scale unchanged (pinned axes, zoomed streaming), honoring the
+  documented layered-repaint contract.
+- Scatter points outside the plot area are skipped before `drawImage`,
+  which bounds off-viewport cost for arbitrary `xDataIndex` series.
+
+### Fixed
+- The scatter heatmap bitmap cache is now owned per chart series instead
+  of one module-level slot: two density charts on a page (or two density
+  series in one chart) no longer invalidate each other every frame, and
+  repeated repaints at an unchanged viewport reuse the cached bitmap.
+- The scatter hit-test grid keeps one cache slot per series, so charts
+  with several scatter series no longer rebuild the full grid on every
+  pointer move.
+- Variable-style scatter (colorBy/sizeBy) no longer allocates a string
+  cache key and re-parses the color ramp for every point on every frame.
+- Monotone interpolation no longer breaks the curve at ring-buffer
+  segment boundaries.
+- Scatter stamps are rasterized and blitted at the same quantized
+  radius, removing sub-pixel scaling blur on non-integer point radii.
+- Axis gutter width is measured with the axis's custom `tickFormat`
+  when one is set, instead of the scale's default formatting.
+
 ## [0.9.0] - 2026-05-03
 
 ### Added

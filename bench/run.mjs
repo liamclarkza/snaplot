@@ -134,9 +134,11 @@ async function main() {
     profiles: {},
   };
 
-  for (const profileName of profileNames) {
-    const profile = PROFILES[profileName];
-    console.log(`\n=== profile: ${profileName} (throttle ${profile.cpuThrottle}x, dpr ${profile.deviceScaleFactor}) ===`);
+  async function openPage(profile) {
+    if (!browser.isConnected()) {
+      console.log('  (relaunching crashed browser)');
+      browser = await chromium.launch({ headless: !headed });
+    }
     const context = await browser.newContext({
       viewport: profile.viewport,
       deviceScaleFactor: profile.deviceScaleFactor,
@@ -146,9 +148,15 @@ async function main() {
     page.on('pageerror', (err) => console.error('  page error:', err.message));
     const cdp = await context.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: profile.cpuThrottle });
-
     await page.goto(url);
     await page.waitForFunction(() => typeof window.__snaplotBench !== 'undefined');
+    return { context, page };
+  }
+
+  for (const profileName of profileNames) {
+    const profile = PROFILES[profileName];
+    console.log(`\n=== profile: ${profileName} (throttle ${profile.cpuThrottle}x, dpr ${profile.deviceScaleFactor}) ===`);
+    let { context, page } = await openPage(profile);
 
     const names = (await page.evaluate(() => window.__snaplotBench.list())).filter(
       (n) => !filter || n.includes(filter),
@@ -156,12 +164,12 @@ async function main() {
 
     const results = [];
     for (const name of names) {
-      // Fresh page per scenario so one scenario's leftovers (leaked rAFs,
-      // observers, heap growth) cannot skew the next one's numbers.
-      await page.reload();
-      await page.waitForFunction(() => typeof window.__snaplotBench !== 'undefined');
       process.stdout.write(`  ${name} ... `);
       try {
+        // Fresh page per scenario so one scenario's leftovers (leaked
+        // rAFs, observers, heap growth) cannot skew the next one.
+        await page.reload();
+        await page.waitForFunction(() => typeof window.__snaplotBench !== 'undefined');
         const r = await page.evaluate(
           (scenarioName) => window.__snaplotBench.run(scenarioName),
           name,
@@ -173,6 +181,12 @@ async function main() {
         console.log('FAILED');
         console.error('   ', String(err?.message ?? err).split('\n')[0]);
         results.push({ name, valid: false, error: String(err?.message ?? err) });
+        // A renderer crash (heavy software-raster scenarios can OOM the
+        // headless shell) takes the page down; rebuild and continue.
+        try {
+          await context.close();
+        } catch {}
+        ({ context, page } = await openPage(profile));
       }
     }
     output.profiles[profileName] = {
@@ -181,14 +195,14 @@ async function main() {
       viewport: profile.viewport,
       results,
     };
+    // Persist after every profile so a crash cannot lose completed work.
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, JSON.stringify(output, null, 2) + '\n');
     await context.close();
   }
 
   await browser.close();
   server.close();
-
-  mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, JSON.stringify(output, null, 2) + '\n');
   console.log(`\nwrote ${outPath}`);
   if (saveBaseline) {
     const baselinePath = join(benchDir, 'baselines', 'baseline.json');
