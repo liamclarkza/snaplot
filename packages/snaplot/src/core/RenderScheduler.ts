@@ -9,6 +9,7 @@ import { DirtyFlag } from '../types';
 export class RenderScheduler {
   private dirty: DirtyFlag = DirtyFlag.NONE;
   private rafId: number | null = null;
+  private destroyed = false;
 
   constructor(private renderCallback: (flags: DirtyFlag) => void) {}
 
@@ -17,7 +18,10 @@ export class RenderScheduler {
    * Schedules a rAF if one isn't already pending.
    */
   markDirty(flag: DirtyFlag): void {
+    if (this.destroyed) return;
     this.dirty |= flag;
+    // NONE is an empty mask, booking a frame for it would render nothing.
+    if (this.dirty === DirtyFlag.NONE) return;
     if (this.rafId === null) {
       this.rafId = requestAnimationFrame(() => {
         this.rafId = null;
@@ -42,6 +46,7 @@ export class RenderScheduler {
   }
 
   destroy(): void {
+    this.destroyed = true;
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;

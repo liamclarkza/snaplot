@@ -69,8 +69,109 @@ to [Semantic Versioning](https://semver.org/).
   radius, removing sub-pixel scaling blur on non-integer point radii.
 - Axis gutter width is measured with the axis's custom `tickFormat`
   when one is set, instead of the scale's default formatting.
-
-## [0.9.0] - 2026-05-03
+- `m4()` no longer drops the point just left of the viewport: low
+  buckets are clamped into bucket 0, so downsampled slices keep
+  left-edge line continuity symmetric with the right edge.
+- Linear axes no longer render an empty tick set when a low tick count
+  meets a narrow zoomed domain; the axis falls back to an even
+  subdivision with at least two ticks.
+- Linear axis labels now take their decimal precision from the tick
+  spacing actually requested, so a high tick count on a small domain no
+  longer rounds neighbouring fractional ticks to the same integer.
+- Reversed axis domains (`max < min`) produce finite ticks instead of
+  `NaN`.
+- Time axes render a correct sub-second label for pre-1970 timestamps
+  instead of a negative fractional suffix.
+- An OS-cancelled touch (palm rejection, notification shade, browser
+  gesture take-over) or a lost pointer capture now resets the gesture
+  state instead of stranding the pointer, so the next single-finger
+  touch is no longer misread as a pinch.
+- A mode flip to `readonly` mid-gesture no longer strands the crosshair
+  and tooltip: the gesture resets on pointerup and leaving the chart
+  dismisses them.
+- Axis wheel zoom now anchors on the axis under the pointer rather than
+  the gesture-start axis, so scrolling from one gutter into another
+  within the same gesture no longer zooms off an off-plot anchor.
+- Keyboard pan/zoom shortcuts only `preventDefault` when the chart will
+  act, so a focused chart with pan and zoom disabled no longer swallows
+  arrow-key page scrolling.
+- One throwing event handler no longer aborts delivery to the remaining
+  handlers, and handlers added during dispatch run on the next emit
+  rather than the current one.
+- A `devicePixelRatio` change with no size change (dragging the window
+  between monitors of different scale) now re-renders at the new backing
+  resolution instead of staying blurry until an unrelated resize.
+- Canvas clears cover the full backing store, so no stale edge pixels
+  survive on fractional-width containers (ghost trails on streaming
+  data).
+- Constructing a chart no longer mutates the caller's config object:
+  the injected `axes.x`/`axes.y` entries land on the chart's own copy,
+  so inspecting the passed config or building two charts from one config
+  object no longer leaks shared axis state.
+- `setOptions`/`replaceOptions` no longer corrupt `Date`, `Map`, `Set`,
+  or non-`Float64Array` typed-array values in config: non-plain objects
+  are replaced by reference instead of being spread into a plain object.
+- Zoom-synced peers stay synced across data updates: a viewport received
+  from a sync peer now survives the next `setData`/`appendData` instead
+  of snapping back to the full extent.
+- `zoom.bounds: 'data'` tracks appended data on a user-zoomed axis, so
+  streaming points beyond the pre-zoom extent are reachable by pan and
+  zoom-out without a `resetZoom()` first.
+- `zoom.minRange`/`maxRange` are enforced consistently on vertical axes
+  and per-axis zoom, and measured in the scale's own span metric so the
+  limit lands correctly on log axes.
+- `setData`, `appendData`, `setOptions`, and `resize` are no-ops after
+  `destroy()`, so a destroyed chart can no longer re-schedule renders or
+  rejoin a sync group.
+- `stats.renderCount` counts only layers that actually paint; a
+  `beforeDraw*` plugin that vetoes a layer no longer inflates the count.
+- Cursor indicator ring luminance now classifies 3-digit hex and named
+  background colors correctly instead of treating them as light.
+- `data:update` listeners written with rest (`(...args)`) or defaulted
+  parameters now receive the `ColumnarData` payload their type promises.
+- A synced or programmatic `setCursorDataX` no longer snaps against
+  column 0 when a visible scatter series uses a non-zero `xDataIndex`,
+  matching the local pointer path.
+- Plugins installed via `use()` are recorded in `config.plugins`, and
+  `replaceOptions` reinstalls plugins only when the plugin set actually
+  changes, so plugin lifecycle is consistent across both entry points.
+- Area/line fills with a named, `rgb()`, or short-hex stroke color now
+  apply their gradient alpha correctly instead of falling back to an
+  arbitrary fill from an `rgba(NaN, ...)` color string.
+- Tooltip shadow selection classifies 3-digit hex and named background
+  colors correctly, and repeated shows with identical content skip the
+  `innerHTML` write and layout-forcing size reads.
+- A dark non-hex chart background (named/`rgb()` color) now selects the
+  dark sequential/diverging/heatmap role palettes instead of the light
+  ones.
+- A single visible bar (viewport culled to one) keeps its data-spacing
+  width instead of ballooning to a fraction of the plot, and a
+  non-finite neighbor center no longer collapses bar width to the
+  fallback.
+- Bars and histograms render on a log Y axis: the baseline anchors at
+  the plot bottom instead of the undefined pixel for value 0.
+- Left/right axis tick labels outside the plot's vertical extent are
+  filtered out, matching the bottom/top axes.
+- Built-in legend swatches use the resolved theme palette, so dots match
+  the series colors the canvas draws.
+- The legend-table plugin updates cells in place on cursor moves (no
+  subtree rewrites when the shape is unchanged) and blanks value cells
+  when the data clears instead of leaving stale numbers.
+- The legend and legend-table plugins restore the host container's
+  inline styles on destroy, so removing them no longer leaves it flexed.
+- The legend and legend-table plugins keep per-chart state, so one plugin
+  object spread across multiple charts no longer cross-wires or leaks
+  their DOM.
+- Solid `<LegendTable>`: `fallback="hide"` hides with a string `style`
+  prop and beats a user `display`; a series with no snapshot row still
+  shows its name; and `series-only` blanks every value-reading column,
+  not just the one keyed `value`. Columns are recognized as Solid only
+  via an explicit `kind: 'solid'`.
+- Solid `<Chart>` applies the user `style` prop over the default
+  `width`/`height` consistently for both string and object styles.
+- `createChartGroup().apply()` no longer clobbers a caller-set `syncKey`,
+  and zoom sync is opt-in (`bind({ zoom: true })` / `apply(config,
+  { zoom: true })`) rather than forced on every grouped chart.
 
 ### Added
 - Added touch interaction knobs for one-finger drag behavior and touch

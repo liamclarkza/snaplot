@@ -1,4 +1,5 @@
 import { affineParams } from '../scales/affine';
+import { withAlpha } from '../utils/color';
 import type { Scale, Layout, SeriesConfig } from '../types';
 
 export interface LineRenderSegment {
@@ -626,12 +627,4 @@ function segmentPointCount(segments: Array<{ startIdx: number; endIdx: number }>
     count += segment.endIdx - segment.startIdx + 1;
   }
   return count;
-}
-
-function withAlpha(hex: string, alpha: number): string {
-  // Convert hex to rgba
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
 }

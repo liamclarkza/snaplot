@@ -16,9 +16,14 @@ const SQRT_50 = Math.sqrt(50); // ~7.071
 export function niceStep(min: number, max: number, count: number): number {
   if (count <= 1) return max - min;
 
+  // Derive magnitude/fraction from the absolute raw step: a reversed domain
+  // (max < min) gives a negative rawStep whose Math.log10 is NaN, which would
+  // otherwise poison every downstream tick. The step is a positive spacing;
+  // callers that pass a reversed domain still get a finite, deterministic step.
   const rawStep = (max - min) / (count - 1);
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
-  const fraction = rawStep / magnitude;
+  const absRawStep = Math.abs(rawStep);
+  const magnitude = Math.pow(10, Math.floor(Math.log10(absRawStep)));
+  const fraction = absRawStep / magnitude;
 
   let niceF: number;
   if (fraction <= SQRT_2) niceF = 1;
@@ -92,8 +97,22 @@ export function niceTicks(
 
   // Compute tick count using integer arithmetic
   const n = Math.round((nMax - nMin) / step) + 1;
-  const ticks: number[] = new Array(n);
 
+  // A nice step wider than the domain can leave 0 or 1 aligned ticks
+  // (e.g. a narrow zoomed domain with a small requested count), or a
+  // reversed domain can drive n negative. Subdivide evenly instead so the
+  // axis always carries at least a start/end reference. The sequence keeps
+  // the sign of (max - min), so reversed domains stay reversed.
+  if (n < 2) {
+    const steps = count - 1;
+    const fallback: number[] = new Array(steps + 1);
+    for (let i = 0; i <= steps; i++) {
+      fallback[i] = min + ((max - min) * i) / steps;
+    }
+    return fallback;
+  }
+
+  const ticks: number[] = new Array(n);
   for (let i = 0; i < n; i++) {
     ticks[i] = nMin + i * step;
   }

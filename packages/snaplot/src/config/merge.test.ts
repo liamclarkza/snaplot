@@ -78,4 +78,45 @@ describe('deepMerge', () => {
     const result = deepMerge(obj({ a: 1 }), undefined as unknown as Bag);
     expect(result).toEqual({ a: 1 });
   });
+
+  it('does not alias a source-only nested object into the result', () => {
+    // Regression: DEFAULT_CONFIG has no `axes`, so the source's axes object
+    // used to be assigned by reference. initAxes then mutated it, corrupting
+    // the caller's config object and any chart sharing it.
+    const source = obj({ axes: { x: { type: 'linear' } } });
+    const result = deepMerge(obj({}), source);
+
+    (result.axes as { y?: unknown }).y = { type: 'log' };
+    expect(source.axes).not.toHaveProperty('y');
+    expect(result.axes).not.toBe(source.axes);
+  });
+
+  it('deep-clones source-only nested objects so two merges never share state', () => {
+    const shared = obj({ axes: { x: { type: 'linear' } } });
+    const a = deepMerge(obj({}), shared);
+    const b = deepMerge(obj({}), shared);
+
+    (a.axes as { x: Record<string, unknown> }).x.min = 5;
+    expect((b.axes as { x: Record<string, unknown> }).x).not.toHaveProperty('min');
+  });
+
+  it('replaces class instances by reference instead of spreading them', () => {
+    // Regression: isPlainObject used to return true for Date/Map/typed arrays,
+    // so `{ ...instance }` silently destroyed them into index-keyed bags.
+    const date = new Date(0);
+    const map = new Map([['k', 1]]);
+    const bytes = new Int32Array([1, 2, 3]);
+
+    const result = deepMerge(
+      obj({ date: new Date(1), map: new Map(), bytes: new Int32Array(0) }),
+      obj({ date, map, bytes }),
+    );
+
+    expect(result.date).toBe(date);
+    expect(result.map).toBe(map);
+    expect(result.bytes).toBe(bytes);
+    expect(result.date).toBeInstanceOf(Date);
+    expect(result.map).toBeInstanceOf(Map);
+    expect(result.bytes).toBeInstanceOf(Int32Array);
+  });
 });

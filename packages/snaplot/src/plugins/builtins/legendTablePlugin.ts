@@ -45,6 +45,82 @@ export interface LegendTableOptions {
   className?: string;
 }
 
+interface RowEntry {
+  tr: HTMLTableRowElement;
+  cells: HTMLTableCellElement[];
+}
+
+/**
+ * Per-chart state. Keying by chart lets one plugin object be spread across
+ * several charts without the second install clobbering the first chart's DOM
+ * refs and event handlers.
+ */
+interface TableState {
+  chart: ChartInstance;
+  container: HTMLDivElement;
+  stepEl: HTMLSpanElement;
+  stepLabelEl: HTMLDivElement;
+  tbody: HTMLTableSectionElement;
+  // Per-row cache keyed by the *series* index from config (not visible-only)
+  // so cells can be shown/hidden when visibility changes.
+  rowCache: Map<number, RowEntry>;
+  snapshot: CursorSnapshot;
+  offHandlers: Array<() => void>;
+  // Inline styles we overwrite on install and restore on destroy so removing
+  // the plugin doesn't leave the host container permanently flexed.
+  styledParent: HTMLElement;
+  styledCanvas: HTMLElement | null;
+  prevParentDisplay: string;
+  prevParentFlexDirection: string;
+  prevCanvasFlex: string;
+  prevCanvasMinHeight: string;
+}
+
+// Update a cell in place, keeping the promise that cursor:move only swaps
+// text and never rewrites subtrees when the cell shape is unchanged:
+//  - string content swaps textContent (value placeholder, plain columns).
+//  - a single childless element (the value column's <span>) has its text
+//    swapped in place when the tag matches, so no node is replaced.
+//  - richer content (name/swatch cell) is only re-appended when its
+//    serialized markup actually differs from what is already mounted, so a
+//    steady-state cursor move touches nothing.
+function placeContent(td: HTMLTableCellElement, content: string | Node) {
+  if (typeof content === 'string') {
+    if (td.childElementCount > 0 || td.textContent !== content) {
+      td.textContent = content;
+    }
+    return;
+  }
+
+  const existing = td.firstElementChild;
+  if (
+    content instanceof HTMLElement &&
+    content.childElementCount === 0 &&
+    existing instanceof HTMLElement &&
+    td.childNodes.length === 1 &&
+    existing.tagName === content.tagName &&
+    existing.childElementCount === 0 &&
+    existing.getAttribute('style') === content.getAttribute('style')
+  ) {
+    if (existing.textContent !== content.textContent) {
+      existing.textContent = content.textContent;
+    }
+    return;
+  }
+
+  if (
+    content instanceof Element &&
+    existing instanceof Element &&
+    td.childNodes.length === 1 &&
+    existing.outerHTML === content.outerHTML
+  ) {
+    return;
+  }
+
+  td.textContent = '';
+  td.appendChild(content);
+}
+
 /**
  * Cursor-synchronised legend table plugin.
  *
@@ -68,42 +144,11 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
   const bufferFallback: 'hide' | 'latest' | 'first' =
     fallbackMode === 'series-only' ? 'latest' : fallbackMode;
 
-  let chartRef: ChartInstance | null = null;
-  let container: HTMLDivElement | null = null;
-  let stepEl: HTMLSpanElement | null = null;
-  let stepLabelEl: HTMLDivElement | null = null;
-  let table: HTMLTableElement | null = null;
-  let tbody: HTMLTableSectionElement | null = null;
+  const states = new Map<ChartInstance, TableState>();
 
-  // Per-row cache: for each series index, the <tr> + the <td> for each column.
-  // Indexed by the *series* index from config (not visible-only) so we can
-  // hide/show cells when visibility changes.
-  const rowCache = new Map<number, { tr: HTMLTableRowElement; cells: HTMLTableCellElement[] }>();
-
-  // Reused snapshot buffer.
-  const snapshot: CursorSnapshot = {
-    dataIndex: null,
-    dataX: null,
-    formattedX: '',
-    points: [],
-    source: 'none',
-    activeSeriesIndex: null,
-  };
-
-  const offHandlers: Array<() => void> = [];
-
-  function placeContent(td: HTMLTableCellElement, content: string | Node) {
-    if (typeof content === 'string') {
-      td.textContent = content;
-    } else {
-      td.textContent = '';
-      td.appendChild(content);
-    }
-  }
-
-  function rebuildRows() {
-    if (!chartRef || !tbody) return;
-    const series = chartRef.getOptions().series;
+  function rebuildRows(state: TableState) {
+    const { chart, tbody, rowCache } = state;
+    const series = chart.getOptions().series;
 
     // Drop cached rows that no longer correspond to a series.
     for (const key of Array.from(rowCache.keys())) {
@@ -137,23 +182,22 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
         });
 
         if (highlightOnHover) {
-          tr.addEventListener('mouseenter', () => chartRef?.setHighlight(si));
-          tr.addEventListener('mouseleave', () => chartRef?.setHighlight(null));
+          tr.addEventListener('mouseenter', () => chart.setHighlight(si));
+          tr.addEventListener('mouseleave', () => chart.setHighlight(null));
         }
         if (toggleOnClick) {
           tr.style.cursor = 'pointer';
           tr.addEventListener('click', () => {
-            if (!chartRef) return;
-            const cfg = chartRef.getOptions();
+            const cfg = chart.getOptions();
             const visible = cfg.series[si].visible !== false;
-            chartRef.setOptions({
+            chart.setOptions({
               series: cfg.series.map((sc, i) =>
                 i === si ? { ...sc, visible: !visible } : sc,
               ),
             });
             // setOptions does not emit data:update, so refresh the table by hand.
-            rebuildRows();
-            refreshCells();
+            rebuildRows(state);
+            refreshCells(state);
           });
         }
 
@@ -161,15 +205,15 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
         rowCache.set(si, entry);
       }
 
-      tbody!.appendChild(entry.tr);
+      tbody.appendChild(entry.tr);
     });
 
     // Apply current highlight (e.g. coming back after a re-mount)
-    applyHighlightHighlightAttr(chartRef!.getHighlight());
+    applyHighlightAttr(state, chart.getHighlight());
   }
 
-  function applyHighlightHighlightAttr(highlightedIdx: number | null) {
-    rowCache.forEach((entry, si) => {
+  function applyHighlightAttr(state: TableState, highlightedIdx: number | null) {
+    state.rowCache.forEach((entry, si) => {
       if (highlightedIdx === null) {
         entry.tr.removeAttribute('data-highlighted');
         entry.tr.removeAttribute('data-dimmed');
@@ -183,10 +227,10 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
     });
   }
 
-  function refreshCells() {
-    if (!chartRef || !container) return;
+  function refreshCells(state: TableState) {
+    const { chart, container, snapshot, rowCache, stepEl, stepLabelEl } = state;
 
-    chartRef.getCursorSnapshotInto(snapshot, { fallback: bufferFallback });
+    chart.getCursorSnapshotInto(snapshot, { fallback: bufferFallback });
     const isCursor = snapshot.source === 'cursor';
     const seriesOnly = !isCursor && fallbackMode === 'series-only';
 
@@ -200,31 +244,37 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
     // Step header, the slot is always reserved when `showStepHeader` is
     // true so cursor enter/leave doesn't jolt the chart layout. Only the
     // value's visibility flips, keeping the row height constant.
-    if (stepLabelEl && stepEl) {
-      const hasValue = snapshot.source === 'cursor' && snapshot.dataX !== null;
-      stepLabelEl.style.display = showStepHeader ? '' : 'none';
-      if (hasValue) {
-        stepEl.style.visibility = 'visible';
-        stepEl.textContent = options.formatStep
-          ? options.formatStep(snapshot.dataX!)
-          : snapshot.formattedX;
-      } else {
-        // Non-breaking space keeps the line-height stable across states.
-        stepEl.style.visibility = 'hidden';
-        stepEl.textContent = '\u00a0';
-      }
+    const hasValue = snapshot.source === 'cursor' && snapshot.dataX !== null;
+    stepLabelEl.style.display = showStepHeader ? '' : 'none';
+    if (hasValue) {
+      stepEl.style.visibility = 'visible';
+      stepEl.textContent = options.formatStep
+        ? options.formatStep(snapshot.dataX!)
+        : snapshot.formattedX;
+    } else {
+      // Non-breaking space keeps the line-height stable across states.
+      stepEl.style.visibility = 'hidden';
+      stepEl.textContent = '\u00a0';
     }
 
     // Index points by series index for O(1) lookup per row.
     const pointBySeries = new Map<number, CursorSeriesPoint>();
     for (const p of snapshot.points) pointBySeries.set(p.seriesIndex, p);
 
-    const seriesList = chartRef.getOptions().series;
+    const seriesList = chart.getOptions().series;
     rowCache.forEach((entry, si) => {
       const series = seriesList[si];
       if (!series) return;
       const point = pointBySeries.get(si);
-      if (!point) return;
+      if (!point) {
+        // Snapshot has no row for this series (e.g. data cleared → source
+        // 'none'). Blank the value cells so stale numbers don't linger; leave
+        // static columns (name/swatch) as last rendered.
+        columns.forEach((col, ci) => {
+          if (col.key === 'value') entry.cells[ci].textContent = '';
+        });
+        return;
+      }
 
       columns.forEach((col, ci) => {
         const td = entry.cells[ci];
@@ -242,20 +292,25 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
     id: 'builtin:legend-table',
 
     install(chart: ChartInstance) {
-      chartRef = chart;
       const parent = chart.container;
       if (!parent) return;
 
       // Make the parent a flex column so legend and canvas share space.
+      const prevParentDisplay = parent.style.display;
+      const prevParentFlexDirection = parent.style.flexDirection;
       parent.style.display = 'flex';
       parent.style.flexDirection = 'column';
-      const canvasContainer = parent.firstElementChild as HTMLElement;
+      const canvasContainer = parent.firstElementChild as HTMLElement | null;
+      let prevCanvasFlex = '';
+      let prevCanvasMinHeight = '';
       if (canvasContainer) {
+        prevCanvasFlex = canvasContainer.style.flex;
+        prevCanvasMinHeight = canvasContainer.style.minHeight;
         canvasContainer.style.flex = '1';
         canvasContainer.style.minHeight = '0';
       }
 
-      container = document.createElement('div');
+      const container = document.createElement('div');
       container.className = 'snaplot-legend-table-root';
       if (options.className) container.className += ' ' + options.className;
       container.style.cssText = `
@@ -268,12 +323,12 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
 
       // Step header row. `min-height` reserves space for the line so the
       // chart doesn't reflow when the cursor leaves and the value blanks.
-      stepLabelEl = document.createElement('div');
+      const stepLabelEl = document.createElement('div');
       stepLabelEl.className = 'snaplot-legend-step';
       stepLabelEl.style.cssText = 'margin-bottom:6px;font-size:11px;opacity:0.75;min-height:16px;';
       const stepLabelText = document.createElement('span');
       stepLabelText.textContent = 'Step: ';
-      stepEl = document.createElement('span');
+      const stepEl = document.createElement('span');
       stepEl.style.fontWeight = '600';
       stepEl.style.fontVariantNumeric = 'tabular-nums';
       stepLabelEl.appendChild(stepLabelText);
@@ -281,7 +336,7 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
       container.appendChild(stepLabelEl);
 
       // Table
-      table = document.createElement('table');
+      const table = document.createElement('table');
       table.className = 'snaplot-legend-table';
       table.style.cssText = 'width:100%;border-collapse:collapse;';
 
@@ -304,8 +359,7 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
       });
       thead.appendChild(headerRow);
 
-      tbody = document.createElement('tbody');
-
+      const tbody = document.createElement('tbody');
       table.appendChild(thead);
       table.appendChild(tbody);
       container.appendChild(table);
@@ -313,36 +367,68 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
       if (position === 'top') parent.insertBefore(container, parent.firstChild);
       else parent.appendChild(container);
 
-      rebuildRows();
-      refreshCells();
+      const state: TableState = {
+        chart,
+        container,
+        stepEl,
+        stepLabelEl,
+        tbody,
+        rowCache: new Map(),
+        snapshot: {
+          dataIndex: null,
+          dataX: null,
+          formattedX: '',
+          points: [],
+          source: 'none',
+          activeSeriesIndex: null,
+        },
+        offHandlers: [],
+        styledParent: parent,
+        styledCanvas: canvasContainer,
+        prevParentDisplay,
+        prevParentFlexDirection,
+        prevCanvasFlex,
+        prevCanvasMinHeight,
+      };
+      states.set(chart, state);
+
+      rebuildRows(state);
+      refreshCells(state);
 
       // Subscribe to events.
-      offHandlers.push(chart.on('cursor:move', refreshCells));
+      state.offHandlers.push(chart.on('cursor:move', () => refreshCells(state)));
       // Data updates only change values, refresh cells, don't rebuild
       // the row list. Rebuilding wipes <tr>s under the cursor/mouse at
       // streaming tick rates, which swallows clicks and hovers.
-      offHandlers.push(chart.on('data:update', refreshCells));
-      offHandlers.push(chart.on('highlight:change', applyHighlightHighlightAttr));
+      state.offHandlers.push(chart.on('data:update', () => refreshCells(state)));
+      state.offHandlers.push(
+        chart.on('highlight:change', (idx) => applyHighlightAttr(state, idx)),
+      );
     },
 
     // Series added/removed/visibility flipped, rebuild row list, then
     // reflow values.
-    onSetOptions() {
-      rebuildRows();
-      refreshCells();
+    onSetOptions(chart: ChartInstance) {
+      const state = states.get(chart);
+      if (!state) return;
+      rebuildRows(state);
+      refreshCells(state);
     },
 
-    destroy() {
-      for (const off of offHandlers) off();
-      offHandlers.length = 0;
-      container?.remove();
-      container = null;
-      stepEl = null;
-      stepLabelEl = null;
-      table = null;
-      tbody = null;
-      rowCache.clear();
-      chartRef = null;
+    destroy(chart: ChartInstance) {
+      const state = states.get(chart);
+      if (!state) return;
+      for (const off of state.offHandlers) off();
+      state.offHandlers.length = 0;
+      state.container.remove();
+      state.styledParent.style.display = state.prevParentDisplay;
+      state.styledParent.style.flexDirection = state.prevParentFlexDirection;
+      if (state.styledCanvas) {
+        state.styledCanvas.style.flex = state.prevCanvasFlex;
+        state.styledCanvas.style.minHeight = state.prevCanvasMinHeight;
+      }
+      state.rowCache.clear();
+      states.delete(chart);
     },
   };
 }

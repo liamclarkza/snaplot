@@ -34,6 +34,11 @@ export type LegendTableFallback = 'hide' | 'latest' | 'first' | 'series-only';
  * the plugin works fine and is forwarded through `columns`.
  */
 export interface LegendTableSolidColumn<TMeta = unknown> {
+  /**
+   * Must be `'solid'` for this column to be recognized as a Solid column
+   * (JSX cell + `api` argument). Columns without it are treated as plugin
+   * `LegendTableColumn`s whose cells return `string | Node`.
+   */
   kind?: 'solid';
   key: string;
   header: string;
@@ -88,9 +93,19 @@ export interface LegendTableProps<TMeta = unknown> {
   ) => JSX.Element;
 }
 
-function isSolidColumn<T>(c: any): c is LegendTableSolidColumn<T> {
-  if (c.kind !== undefined) return c.kind === 'solid';
-  return typeof c.cell === 'function' && c.cell.length === 3;
+/**
+ * A column is treated as a Solid column (its `cell` may return JSX and
+ * receives the `{ setHighlight }` api as a third argument) only when it
+ * explicitly declares `kind: 'solid'`. Columns without a `kind` default to
+ * the plugin shape (`string | Node` cells, no api argument). The previous
+ * `cell.length === 3` arity sniff misclassified 1-arg Solid cells and cells
+ * using default/rest params, and could call a plugin cell with an api it
+ * never expected.
+ */
+function isSolidColumn<T>(
+  c: LegendTableSolidColumn<T> | LegendTableColumn<T>,
+): c is LegendTableSolidColumn<T> {
+  return (c as LegendTableSolidColumn<T>).kind === 'solid';
 }
 
 function renderPluginCell(content: string | Node): JSX.Element {
@@ -195,6 +210,44 @@ export function LegendTable<TMeta = unknown>(
     return undefined;
   };
 
+  // Resolved categorical palette, matching the canvas. Used to color a
+  // synthesized fallback point when a series has no snapshot row.
+  const palette = createMemo<string[]>(() => {
+    const c = props.chart();
+    if (!c) return [];
+    const theme = c.getTheme();
+    return theme.categoricalPalette ?? theme.palette ?? [];
+  });
+
+  const colorFor = (si: number, series: SeriesConfig<TMeta>): string => {
+    const pal = palette();
+    return series.stroke ?? (pal.length > 0 ? pal[si % pal.length] : '');
+  };
+
+  /**
+   * The point to render for a row. Falls back to a synthesized point built
+   * from the series config when the snapshot has no row for this series, so a
+   * series without data still shows its name/swatch instead of vanishing. In
+   * series-only mode the value fields are blanked so *any* value-reading
+   * column (not only `key === 'value'`) shows its placeholder rather than
+   * stale latest-row numbers.
+   */
+  const effectivePoint = (si: number, series: SeriesConfig<TMeta>): CursorSeriesPoint<TMeta> => {
+    const base: CursorSeriesPoint<TMeta> = pointOf(si) ?? {
+      seriesIndex: si,
+      dataIndex: -1,
+      label: series.label,
+      color: colorFor(si, series),
+      value: Number.NaN,
+      formattedValue: '',
+      meta: series.meta,
+    };
+    if (isSeriesOnly()) {
+      return { ...base, value: Number.NaN, formattedValue: '' };
+    }
+    return base;
+  };
+
   /** True when there is anything to show, drives the "Step:" label. */
   const haveStepValue = () => {
     const snap = snapshot();
@@ -212,15 +265,17 @@ export function LegendTable<TMeta = unknown>(
       class={['snaplot-legend-table-root', props.class].filter(Boolean).join(' ')}
       style={
         typeof props.style === 'string'
-          ? props.style
+          ? (shouldHide() ? props.style + ';display:none' : props.style)
           : {
               'flex-shrink': '0',
               padding: '8px 12px',
               'font-size': '12px',
               'line-height': '1.4',
               ...(props.maxHeight ? { 'max-height': props.maxHeight, overflow: 'auto' } : {}),
-              display: shouldHide() ? 'none' : '',
               ...(props.style as JSX.CSSProperties),
+              // Applied last so fallback='hide' wins over a user-supplied
+              // `display` in the style object.
+              ...(shouldHide() ? { display: 'none' } : {}),
             }
       }
     >
@@ -306,9 +361,7 @@ export function LegendTable<TMeta = unknown>(
                            every cursor tick, even though the row object
                            reference is reused for zero-alloc buffering. */}
                         {(() => {
-                          const p = pointOf(si);
-                          if (!p) return null;
-                          if (isSeriesOnly() && col.key === 'value') return null;
+                          const p = effectivePoint(si, series as SeriesConfig<TMeta>);
                           if (isSolidColumn<TMeta>(col)) {
                             return col.cell(p, series as SeriesConfig<TMeta>, { setHighlight });
                           }

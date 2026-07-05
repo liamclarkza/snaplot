@@ -5,11 +5,17 @@ import type { InteractionMode, Layout, PanConfig, TouchConfig, ZoomConfig } from
 
 class FakeTarget {
   readonly style: Record<string, string> = {};
-  readonly parentElement = {
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  };
   private handlers = new Map<string, (event: Event) => void>();
+  private keyHandlers = new Map<string, (event: Event) => void>();
+  // Keyboard events are attached to the parent container, not the target.
+  readonly parentElement = {
+    addEventListener: (type: string, handler: EventListener) => {
+      this.keyHandlers.set(type, handler as (event: Event) => void);
+    },
+    removeEventListener: (type: string) => {
+      this.keyHandlers.delete(type);
+    },
+  };
 
   addEventListener(type: string, handler: EventListener): void {
     this.handlers.set(type, handler as (event: Event) => void);
@@ -72,6 +78,18 @@ class FakeTarget {
       ...event,
     } as TouchEvent;
     this.handlers.get(type)?.(dispatched as Event);
+    return dispatched;
+  }
+
+  dispatchKey(key: string, event: Partial<KeyboardEvent> = {}): KeyboardEvent {
+    const dispatched = {
+      key,
+      shiftKey: false,
+      target: null,
+      preventDefault: vi.fn(),
+      ...event,
+    } as unknown as KeyboardEvent;
+    this.keyHandlers.get('keydown')?.(dispatched as Event);
     return dispatched;
   }
 }
@@ -629,6 +647,166 @@ describe('GestureManager cursor emission', () => {
     target.dispatchWheel({ clientX: 100, clientY: 250, ctrlKey: true, deltaY: -10 });
 
     expect(zoomMove).toHaveBeenCalledWith(expect.objectContaining({ axis: 'x' }));
+    manager.detach();
+  });
+});
+
+describe('GestureManager pointer cancellation', () => {
+  it('resets gesture state on pointercancel so the next touch is not a pinch', () => {
+    const { target, eventBus, manager } = createGesture('analytical', {
+      zoom: { enabled: true, x: true, y: true },
+    });
+    const zoomMove = vi.fn();
+    eventBus.on('action:zoom', zoomMove);
+
+    // First finger goes down, then the OS cancels the touch (no pointerup).
+    target.dispatch('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, pointerType: 'touch' });
+    target.dispatch('pointercancel', { pointerId: 1, clientX: 100, clientY: 100, pointerType: 'touch' });
+
+    // A fresh single-finger touch must act as one pointer, not a second finger.
+    target.dispatch('pointerdown', { pointerId: 2, clientX: 150, clientY: 120, pointerType: 'touch' });
+    target.dispatch('pointermove', { pointerId: 2, clientX: 180, clientY: 120, pointerType: 'touch' });
+
+    expect(zoomMove).not.toHaveBeenCalled();
+    manager.detach();
+  });
+
+  it('clears an in-progress selection box and crosshair on pointercancel', () => {
+    const { target, eventBus, manager } = createGesture('analytical');
+    const boxEnd = vi.fn();
+    const cursorLeave = vi.fn();
+    eventBus.on('action:box-end', boxEnd);
+    eventBus.on('action:cursor-leave', cursorLeave);
+
+    // Mouse drag opens a zoom box, then capture is lost mid-drag.
+    target.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+    target.dispatch('pointermove', { clientX: 140, clientY: 130 });
+    target.dispatch('lostpointercapture', { clientX: 140, clientY: 130 });
+
+    expect(boxEnd).toHaveBeenCalledWith({ x1: 0, y1: 0, x2: 0, y2: 0 });
+    expect(cursorLeave).toHaveBeenCalled();
+    manager.detach();
+  });
+});
+
+describe('GestureManager mid-gesture mode change', () => {
+  function createModeGesture(getMode: () => InteractionMode) {
+    const target = new FakeTarget();
+    const eventBus = new EventBus();
+    const manager = new GestureManager(
+      target as unknown as HTMLElement,
+      eventBus,
+      getMode,
+      () => layout,
+      () => ({ enabled: true, x: true, y: true }),
+      () => ({ enabled: true, x: true, y: true }),
+      () => ({}),
+    );
+    manager.attach();
+    return { target, eventBus, manager };
+  }
+
+  it('dismisses the crosshair on leave when the mode flips to readonly mid-gesture', () => {
+    let mode: InteractionMode = 'analytical';
+    const { target, eventBus, manager } = createModeGesture(() => mode);
+    const cursorLeave = vi.fn();
+    eventBus.on('action:cursor-leave', cursorLeave);
+
+    target.dispatch('pointerdown', { clientX: 100, clientY: 100, shiftKey: true });
+    target.dispatch('pointermove', { clientX: 140, clientY: 100, shiftKey: true });
+    mode = 'readonly';
+    target.dispatch('pointerleave', {});
+
+    expect(cursorLeave).toHaveBeenCalled();
+    manager.detach();
+  });
+
+  it('returns to idle on pointerup after a mid-gesture flip to readonly', () => {
+    let mode: InteractionMode = 'analytical';
+    const { target, eventBus, manager } = createModeGesture(() => mode);
+    const cursorLeave = vi.fn();
+    eventBus.on('action:cursor-leave', cursorLeave);
+
+    target.dispatch('pointerdown', { clientX: 100, clientY: 100, shiftKey: true });
+    target.dispatch('pointermove', { clientX: 140, clientY: 100, shiftKey: true });
+    mode = 'readonly';
+    target.dispatch('pointerup', { clientX: 140, clientY: 100, shiftKey: true });
+
+    // Back in an interactive mode, leaving the chart must dismiss the crosshair,
+    // which only happens if the state machine returned to idle.
+    mode = 'analytical';
+    target.dispatch('pointerleave', {});
+
+    expect(cursorLeave).toHaveBeenCalled();
+    manager.detach();
+  });
+});
+
+describe('GestureManager wheel axis anchoring', () => {
+  const axisLayout: Layout = {
+    ...layout,
+    axes: {
+      x: { position: 'bottom', area: { left: 40, top: 240, width: 320, height: 40 } },
+      y: { position: 'left', area: { left: 0, top: 20, width: 40, height: 220 } },
+    },
+  };
+
+  it('anchors axis wheel zoom on the axis under the pointer, not the gesture-start axis', () => {
+    const target = new FakeTarget();
+    const eventBus = new EventBus();
+    const manager = new GestureManager(
+      target as unknown as HTMLElement,
+      eventBus,
+      () => 'analytical',
+      () => axisLayout,
+      () => ({ enabled: true, x: true, y: true, axis: true }),
+      () => pan,
+      () => ({}),
+    );
+    const zoomMove = vi.fn();
+    eventBus.on('action:zoom', zoomMove);
+    manager.attach();
+
+    // Scroll starts on the X gutter, then crosses into the Y gutter within the
+    // 200ms window. The zoom must target the Y axis (matching the live anchor).
+    target.dispatchWheel({ clientX: 100, clientY: 250, deltaY: 10 });
+    target.dispatchWheel({ clientX: 20, clientY: 100, deltaY: 10 });
+
+    expect(zoomMove).toHaveBeenLastCalledWith(
+      expect.objectContaining({ axis: 'y', anchorX: 20, anchorY: 100 }),
+    );
+    manager.detach();
+  });
+});
+
+describe('GestureManager keyboard', () => {
+  it('does not preventDefault navigation keys when pan and zoom are disabled', () => {
+    const { target, manager } = createGesture('analytical', {
+      zoom: { enabled: false },
+      pan: { enabled: false },
+    });
+
+    const left = target.dispatchKey('ArrowLeft');
+    const plus = target.dispatchKey('+');
+
+    expect(left.preventDefault).not.toHaveBeenCalled();
+    expect(plus.preventDefault).not.toHaveBeenCalled();
+    manager.detach();
+  });
+
+  it('preventDefaults navigation keys only for actions the chart will take', () => {
+    const { target, manager } = createGesture('analytical', {
+      zoom: { enabled: true, x: true, y: false },
+      pan: { enabled: true, x: true, y: false },
+    });
+
+    const left = target.dispatchKey('ArrowLeft');
+    const plus = target.dispatchKey('+');
+    const up = target.dispatchKey('ArrowUp'); // pan.y disabled, no-op
+
+    expect(left.preventDefault).toHaveBeenCalled();
+    expect(plus.preventDefault).toHaveBeenCalled();
+    expect(up.preventDefault).not.toHaveBeenCalled();
     manager.detach();
   });
 });

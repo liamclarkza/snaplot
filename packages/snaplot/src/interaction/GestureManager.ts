@@ -121,6 +121,7 @@ export class GestureManager {
   private boundPointerMove: (e: PointerEvent) => void;
   private boundPointerUp: (e: PointerEvent) => void;
   private boundPointerLeave: (e: PointerEvent) => void;
+  private boundPointerCancel: (e: PointerEvent) => void;
   private boundWheel: (e: WheelEvent) => void;
   private boundDblClick: (e: MouseEvent) => void;
   private boundKeyDown: (e: KeyboardEvent) => void;
@@ -142,6 +143,7 @@ export class GestureManager {
     this.boundPointerMove = this.onPointerMove.bind(this);
     this.boundPointerUp = this.onPointerUp.bind(this);
     this.boundPointerLeave = this.onPointerLeave.bind(this);
+    this.boundPointerCancel = this.onPointerCancel.bind(this);
     this.boundWheel = this.onWheel.bind(this);
     this.boundDblClick = this.onDblClick.bind(this);
     this.boundKeyDown = this.onKeyDown.bind(this);
@@ -154,6 +156,12 @@ export class GestureManager {
     this.target.addEventListener('pointermove', this.boundPointerMove);
     this.target.addEventListener('pointerup', this.boundPointerUp);
     this.target.addEventListener('pointerleave', this.boundPointerLeave);
+    // An OS-cancelled pointer (palm rejection, notification shade, browser
+    // gesture take-over) never fires pointerup, and losing pointer capture
+    // mid-drag has the same effect: without cleanup the pointer stays in the
+    // map and the next touch is misread as a second finger (spurious pinch).
+    this.target.addEventListener('pointercancel', this.boundPointerCancel);
+    this.target.addEventListener('lostpointercapture', this.boundPointerCancel);
     this.target.addEventListener('wheel', this.boundWheel, { passive: false });
     this.target.addEventListener('dblclick', this.boundDblClick);
     this.target.addEventListener('touchstart', this.boundTouchPreventDefault, { passive: false });
@@ -174,6 +182,8 @@ export class GestureManager {
     this.target.removeEventListener('pointermove', this.boundPointerMove);
     this.target.removeEventListener('pointerup', this.boundPointerUp);
     this.target.removeEventListener('pointerleave', this.boundPointerLeave);
+    this.target.removeEventListener('pointercancel', this.boundPointerCancel);
+    this.target.removeEventListener('lostpointercapture', this.boundPointerCancel);
     this.target.removeEventListener('wheel', this.boundWheel);
     this.target.removeEventListener('dblclick', this.boundDblClick);
     this.target.removeEventListener('touchstart', this.boundTouchPreventDefault);
@@ -613,7 +623,13 @@ export class GestureManager {
     this.clearLongPress();
 
     const mode = this.getMode();
-    if (mode === 'readonly') return;
+    if (mode === 'readonly') {
+      // A gesture begun before a mid-gesture flip to readonly would otherwise
+      // leave state non-idle for the readonly period, which suppresses
+      // cursor-leave. Reset so the crosshair/tooltip can dismiss.
+      this.resetState();
+      return;
+    }
 
     if (!ptr) {
       this.resetState();
@@ -703,8 +719,30 @@ export class GestureManager {
     // Suppress cursor-leave while a gesture is in flight, pointer capture
     // keeps the drag alive even when the pointer briefly leaves the canvas
     // bounds. Without this guard the crosshair/tooltip flickers mid-pan.
-    if (this.state.kind !== 'idle') return;
+    // In readonly there is no active gesture to protect, and a mode flip to
+    // readonly mid-gesture can strand a non-idle state with no pointerup to
+    // clear it, so always allow the crosshair/tooltip to dismiss there.
+    if (this.getMode() !== 'readonly' && this.state.kind !== 'idle') return;
     this.eventBus.emit('action:cursor-leave', undefined);
+  }
+
+  private onPointerCancel(e: PointerEvent): void {
+    if (!this.pointers.has(e.pointerId)) return;
+    this.pointers.delete(e.pointerId);
+    try { this.target.releasePointerCapture(e.pointerId); } catch {}
+    this.clearLongPress();
+    this.cancelMomentum();
+
+    // Cancel is terminal: drop every stranded pointer so the next touch starts
+    // from a clean single-pointer state rather than being read as a pinch.
+    const wasBox = this.state.kind === 'box';
+    const wasActive = this.state.kind !== 'idle';
+    this.pointers.clear();
+    this.state = { kind: 'idle' };
+
+    // Clear any in-progress selection/zoom box overlay (zero-area = cancel).
+    if (wasBox) this.eventBus.emit('action:box-end', { x1: 0, y1: 0, x2: 0, y2: 0 });
+    if (wasActive) this.eventBus.emit('action:cursor-leave', undefined);
   }
 
   private resetState(): void {
@@ -799,7 +837,11 @@ export class GestureManager {
         const strength = Math.max(0, zoom.wheelStep ?? DEFAULT_WHEEL_STEP);
         const delta = Math.min(Math.abs(e.deltaY), 20) * 0.005;
         const factor = e.deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
-        const axis = this.scrollStartArea.axisKey!;
+        // Anchor and axis must agree: use the axis under the pointer now, not
+        // the gesture-start axis. Crossing from one gutter into another within
+        // the 200ms window would otherwise zoom the start axis anchored at a
+        // pixel inside the other gutter (an off-plot anchor).
+        const axis = area.axisKey!;
 
         this.eventBus.emit('action:zoom', { factor, anchorX: x, anchorY: y, axis });
         return;
@@ -879,40 +921,63 @@ export class GestureManager {
     const centreX = layout.plot.left + layout.plot.width / 2;
     const centreY = layout.plot.top + layout.plot.height / 2;
 
-    let handled = true;
+    // Only preventDefault when the chart will actually act, otherwise a focused
+    // chart with pan/zoom disabled would silently swallow page-scroll keys.
+    // These mirror ChartCore's own guards (pan.enabled / pan.x / pan.y and
+    // zoom.enabled) so the two never disagree.
+    const pan = this.getPanConfig();
+    const zoom = this.getZoomConfig();
+    const canPanX = !!pan.enabled && pan.x !== false;
+    const canPanY = !!pan.enabled && !!pan.y;
+
+    let handled = false;
     switch (e.key) {
       case 'ArrowLeft':
-        this.eventBus.emit('action:pan', { dx: e.shiftKey ? PAN_STEP_FAST : PAN_STEP, dy: 0 });
+        if (canPanX) {
+          this.eventBus.emit('action:pan', { dx: e.shiftKey ? PAN_STEP_FAST : PAN_STEP, dy: 0 });
+          handled = true;
+        }
         break;
       case 'ArrowRight':
-        this.eventBus.emit('action:pan', { dx: -(e.shiftKey ? PAN_STEP_FAST : PAN_STEP), dy: 0 });
+        if (canPanX) {
+          this.eventBus.emit('action:pan', { dx: -(e.shiftKey ? PAN_STEP_FAST : PAN_STEP), dy: 0 });
+          handled = true;
+        }
         break;
       case 'ArrowUp':
-        this.eventBus.emit('action:pan', { dx: 0, dy: e.shiftKey ? PAN_STEP_FAST : PAN_STEP });
+        if (canPanY) {
+          this.eventBus.emit('action:pan', { dx: 0, dy: e.shiftKey ? PAN_STEP_FAST : PAN_STEP });
+          handled = true;
+        }
         break;
       case 'ArrowDown':
-        this.eventBus.emit('action:pan', { dx: 0, dy: -(e.shiftKey ? PAN_STEP_FAST : PAN_STEP) });
+        if (canPanY) {
+          this.eventBus.emit('action:pan', { dx: 0, dy: -(e.shiftKey ? PAN_STEP_FAST : PAN_STEP) });
+          handled = true;
+        }
         break;
       case '+':
-      case '=': {
-        const zoom = this.getZoomConfig();
-        const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
-        this.eventBus.emit('action:zoom', { factor: 1 / ZOOM_FACTOR, anchorX: centreX, anchorY: centreY, axis });
+      case '=':
+        if (zoom.enabled) {
+          const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
+          this.eventBus.emit('action:zoom', { factor: 1 / ZOOM_FACTOR, anchorX: centreX, anchorY: centreY, axis });
+          handled = true;
+        }
         break;
-      }
       case '-':
-      case '_': {
-        const zoom = this.getZoomConfig();
-        const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
-        this.eventBus.emit('action:zoom', { factor: ZOOM_FACTOR, anchorX: centreX, anchorY: centreY, axis });
+      case '_':
+        if (zoom.enabled) {
+          const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
+          this.eventBus.emit('action:zoom', { factor: ZOOM_FACTOR, anchorX: centreX, anchorY: centreY, axis });
+          handled = true;
+        }
         break;
-      }
       case '0':
       case 'Home':
+        // Reset always acts (ChartCore.resetZoom has no enable guard).
         this.eventBus.emit('action:reset-zoom', undefined);
+        handled = true;
         break;
-      default:
-        handled = false;
     }
 
     if (handled) e.preventDefault();

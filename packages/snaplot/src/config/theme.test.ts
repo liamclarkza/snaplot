@@ -32,6 +32,16 @@ describe('resolveTheme palette roles', () => {
     expect(theme.heatmapGradient).toEqual([...PALETTE_SEQUENTIAL_DARK]);
   });
 
+  it('chooses dark ramps for a dark named background', () => {
+    const theme = resolveTheme({} as HTMLElement, {
+      backgroundColor: 'black',
+      palette: ['#7aa2f7', '#9ece6a'],
+    });
+
+    expect(theme.sequentialPalette).toEqual([...PALETTE_SEQUENTIAL_DARK]);
+    expect(theme.heatmapGradient).toEqual([...PALETTE_SEQUENTIAL_DARK]);
+  });
+
   it('uses explicit heatmap gradients before sequential palettes', () => {
     const theme = resolveTheme({} as HTMLElement, {
       sequentialPalette: ['#111111', '#222222'],

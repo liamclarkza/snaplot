@@ -48,6 +48,17 @@ export class RingColumnarStore implements DataStore {
     return this.columns.length - 1;
   }
 
+  /**
+   * Get all columns as ColumnarData in logical (oldest -> newest) order.
+   *
+   * Read-only, no-copy contract. The result comes from materialize(), which
+   * when the ring is unwrapped (head === 0) returns subarray VIEWS over the
+   * live ring buffer rather than copies. A caller that mutates a column in
+   * place corrupts the ring; and a caller that retains this result across a
+   * later append() that overflows capacity will see those "snapshot" contents
+   * change retroactively, because append writes into the same backing buffer.
+   * Copy (`col.slice()`) if you need a stable or mutable snapshot.
+   */
   getData(): ColumnarData {
     return this.materialize() as unknown as ColumnarData;
   }
@@ -286,6 +297,9 @@ export class RingColumnarStore implements DataStore {
     }
 
     if (this.head === 0) {
+      // Unwrapped: hand back views over the live buffer to skip the copy. The
+      // cache is invalidated on append/replaceLast, but views already handed
+      // out to callers are not, hence the read-only contract on getData().
       this.materialized = this.columns.map((col) => col.subarray(0, this.len));
       return this.materialized;
     }

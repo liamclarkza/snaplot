@@ -12,10 +12,25 @@ import type { Plugin, ChartInstance } from '../../types';
  * consumers that want to override individual bits without fighting
  * specificity.
  */
+interface LegendState {
+  container: HTMLDivElement;
+  // Inline styles we overwrite on install and must restore on destroy so
+  // removing the plugin (setOptions rebuilds plugins) doesn't leave the host
+  // container permanently flexed.
+  styledParent: HTMLElement;
+  styledCanvas: HTMLElement | null;
+  prevParentDisplay: string;
+  prevParentFlexDirection: string;
+  prevCanvasFlex: string;
+  prevCanvasMinHeight: string;
+}
+
 export function createLegendPlugin(options?: {
   position?: 'top' | 'bottom';
 }): Plugin {
-  let container: HTMLDivElement | null = null;
+  // State is keyed per chart so a single plugin object spread across several
+  // charts doesn't overwrite the first chart's DOM refs on the second install.
+  const states = new Map<ChartInstance, LegendState>();
 
   return {
     id: 'builtin:legend',
@@ -25,17 +40,23 @@ export function createLegendPlugin(options?: {
       if (!parent) return;
 
       // Make the parent a flex column so legend and canvas share space
+      const prevParentDisplay = parent.style.display;
+      const prevParentFlexDirection = parent.style.flexDirection;
       parent.style.display = 'flex';
       parent.style.flexDirection = 'column';
 
       // The CanvasManager's container (first child) should fill remaining space
-      const canvasContainer = parent.firstElementChild as HTMLElement;
+      const canvasContainer = parent.firstElementChild as HTMLElement | null;
+      let prevCanvasFlex = '';
+      let prevCanvasMinHeight = '';
       if (canvasContainer) {
+        prevCanvasFlex = canvasContainer.style.flex;
+        prevCanvasMinHeight = canvasContainer.style.minHeight;
         canvasContainer.style.flex = '1';
         canvasContainer.style.minHeight = '0';
       }
 
-      container = document.createElement('div');
+      const container = document.createElement('div');
       container.className = 'snaplot-legend-root';
 
       const pos = options?.position ?? 'bottom';
@@ -45,6 +66,16 @@ export function createLegendPlugin(options?: {
         parent.appendChild(container);
       }
 
+      states.set(chart, {
+        container,
+        styledParent: parent,
+        styledCanvas: canvasContainer,
+        prevParentDisplay,
+        prevParentFlexDirection,
+        prevCanvasFlex,
+        prevCanvasMinHeight,
+      });
+
       renderItems(chart, container);
     },
 
@@ -53,12 +84,21 @@ export function createLegendPlugin(options?: {
     // meant a 10 Hz stream would wipe the button under the cursor
     // before a click could register.
     onSetOptions(chart: ChartInstance) {
-      if (container) renderItems(chart, container);
+      const state = states.get(chart);
+      if (state) renderItems(chart, state.container);
     },
 
-    destroy() {
-      container?.remove();
-      container = null;
+    destroy(chart: ChartInstance) {
+      const state = states.get(chart);
+      if (!state) return;
+      state.container.remove();
+      state.styledParent.style.display = state.prevParentDisplay;
+      state.styledParent.style.flexDirection = state.prevParentFlexDirection;
+      if (state.styledCanvas) {
+        state.styledCanvas.style.flex = state.prevCanvasFlex;
+        state.styledCanvas.style.minHeight = state.prevCanvasMinHeight;
+      }
+      states.delete(chart);
     },
   };
 }
@@ -69,7 +109,12 @@ const FALLBACK_PALETTE = [
 
 function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
   const config = chart.getOptions();
-  const palette = config.theme?.categoricalPalette ?? config.theme?.palette ?? FALLBACK_PALETTE;
+  // Match the canvas: it colors series from the *resolved* theme palette
+  // (light/dark defaults, CSS-var overrides), not the raw config theme. Using
+  // the raw config here left swatches on the 7-color Okabe-Ito fallback while
+  // the lines used the 8-color resolved palette, so every dot was wrong.
+  const theme = chart.getTheme();
+  const palette = theme.categoricalPalette ?? theme.palette ?? FALLBACK_PALETTE;
 
   // Wiping innerHTML detaches the old <button> items and their click
   // handlers from the DOM; both become GC-eligible when this function

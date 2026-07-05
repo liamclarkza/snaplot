@@ -13,14 +13,26 @@ export interface BarRect {
 export function categoryWidthFromCenters(
   centers: number[],
   ordinal: number,
-  fallbackWidth: number,
+  // Thunk so a caller can derive an expensive fallback (e.g. projecting a
+  // data-space spacing) only when the pixel neighbors can't supply a width.
+  fallbackWidth: number | (() => number),
 ): number {
-  if (centers.length <= 1) return fallbackWidth;
-
-  const prevGap = ordinal > 0 ? Math.abs(centers[ordinal] - centers[ordinal - 1]) : Infinity;
-  const nextGap = ordinal < centers.length - 1 ? Math.abs(centers[ordinal + 1] - centers[ordinal]) : Infinity;
-  const width = Math.min(prevGap, nextGap);
-  return Number.isFinite(width) && width > 0 ? width : fallbackWidth;
+  // Gather only finite, positive neighbor gaps. A non-finite neighbor center
+  // (e.g. a log-X point that projects to NaN) must not poison Math.min and
+  // collapse the whole category to the fallback; the other neighbor still
+  // gives a usable spacing.
+  const center = centers[ordinal];
+  let width = Infinity;
+  if (ordinal > 0 && Number.isFinite(center) && Number.isFinite(centers[ordinal - 1])) {
+    const gap = Math.abs(center - centers[ordinal - 1]);
+    if (gap > 0) width = Math.min(width, gap);
+  }
+  if (ordinal < centers.length - 1 && Number.isFinite(center) && Number.isFinite(centers[ordinal + 1])) {
+    const gap = Math.abs(centers[ordinal + 1] - center);
+    if (gap > 0) width = Math.min(width, gap);
+  }
+  if (Number.isFinite(width) && width > 0) return width;
+  return typeof fallbackWidth === 'function' ? fallbackWidth() : fallbackWidth;
 }
 
 export function categoryWidthFromData(

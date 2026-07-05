@@ -112,13 +112,17 @@ export function renderAxes(
       case 'left':
         for (const t of ticks) {
           const py = scale.dataToPixel(t);
-          labels.push({ text: formatTick(t), x: plot.left - 6, y: py, anchor: 'end' });
+          if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
+            labels.push({ text: formatTick(t), x: plot.left - 6, y: py, anchor: 'end' });
+          }
         }
         break;
       case 'right':
         for (const t of ticks) {
           const py = scale.dataToPixel(t);
-          labels.push({ text: formatTick(t), x: plot.left + plot.width + 6, y: py, anchor: 'start' });
+          if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
+            labels.push({ text: formatTick(t), x: plot.left + plot.width + 6, y: py, anchor: 'start' });
+          }
         }
         break;
       case 'bottom':

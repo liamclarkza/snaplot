@@ -1,18 +1,25 @@
 import { createSignal, type Accessor } from 'solid-js';
 import { SyncGroup } from '../core/EventBus';
-import type { ChartConfig, HighlightSyncKey } from '../types';
+import type { ChartConfig, ChartInstance, HighlightSyncKey } from '../types';
 
 let groupCounter = 0;
 
 /**
- * Bindings spread into each chart in the group. Sets matching
- * `cursor.syncKey`, `highlight.syncKey`, and optionally `zoom.syncKey`
- * so cross-chart sync works out of the box without the caller picking strings.
+ * Bindings spread into each chart in the group. Always sets matching
+ * `cursor.syncKey` and `highlight.syncKey`; `zoom.syncKey` is only included
+ * when zoom sync is opted into (`bind({ zoom: true })`), so grouping does not
+ * silently link every chart's zoom.
  */
 export interface ChartGroupBindings {
   cursor: { syncKey: string };
   highlight: { syncKey: string };
-  zoom: { syncKey: string };
+  zoom?: { syncKey: string };
+}
+
+/** Options controlling which channels a group binding links. */
+export interface ChartGroupBindOptions {
+  /** Also sync zoom/pan across the group. Defaults to `false`. */
+  zoom?: boolean;
 }
 
 /**
@@ -36,20 +43,23 @@ export interface ChartGroupBindings {
  */
 export interface ChartGroup {
   /**
-   * Low-level: returns `{ cursor: { syncKey }, highlight: { syncKey } }`.
-   * Spreading this into your config is fine when you don't have your
-   * own `cursor` / `highlight` config, otherwise a naïve spread will
-   * shadow your settings (including `cursor.show` and `indicators`).
-   * Prefer `group.apply(config)` for the safe merge.
+   * Low-level: returns `{ cursor: { syncKey }, highlight: { syncKey } }`
+   * (and `zoom: { syncKey }` only with `bind({ zoom: true })`). Spreading
+   * this into your config is fine when you don't have your own `cursor` /
+   * `highlight` config, otherwise a naïve spread will shadow your settings
+   * (including `cursor.show` and `indicators`). Prefer `group.apply(config)`
+   * for the safe merge.
    */
-  bind(): ChartGroupBindings;
+  bind(options?: ChartGroupBindOptions): ChartGroupBindings;
 
   /**
-   * Merge the group's sync keys into an existing config without
-   * clobbering the caller's own `cursor` / `highlight` fields. Use this
-   * in place of `{ ...config, ...group.bind() }`.
+   * Merge the group's sync keys into an existing config without clobbering
+   * the caller's own `cursor` / `highlight` / `zoom` fields (including a
+   * `syncKey` the caller set explicitly). Zoom sync is opt-in via
+   * `apply(config, { zoom: true })`. Use this in place of
+   * `{ ...config, ...group.bind() }`.
    */
-  apply<TMeta>(config: ChartConfig<TMeta>): ChartConfig<TMeta>;
+  apply<TMeta>(config: ChartConfig<TMeta>, options?: ChartGroupBindOptions): ChartConfig<TMeta>;
 
   /** Push a highlight to all charts in the group (or `null` to clear). */
   highlight(seriesIndex: number | null): void;
@@ -82,44 +92,50 @@ export function createChartGroup(): ChartGroup {
   const [highlightedKey, setHighlightKey] = createSignal<HighlightSyncKey | null>(null);
   const [cursorDataX, setCursor] = createSignal<number | null>(null);
 
-  // SyncGroup.publishHighlight/publishCursor compare peers by reference.
-  // Passing `null` as the source means every member receives the broadcast,
-  // which is exactly what an external coordinator wants.
-  const SOURCE = null as never;
-
   return {
-    bind() {
-      return {
+    bind(options) {
+      const bindings: ChartGroupBindings = {
         cursor: { syncKey },
         highlight: { syncKey },
-        zoom: { syncKey },
       };
+      if (options?.zoom) bindings.zoom = { syncKey };
+      return bindings;
     },
 
-    apply<TMeta>(config: ChartConfig<TMeta>): ChartConfig<TMeta> {
-      return {
+    apply<TMeta>(config: ChartConfig<TMeta>, options?: ChartGroupBindOptions): ChartConfig<TMeta> {
+      // `syncKey` first, caller's fields last, so an explicitly-set syncKey on
+      // the caller's config wins instead of being clobbered.
+      const merged: ChartConfig<TMeta> = {
         ...config,
-        cursor: { ...(config.cursor ?? {}), syncKey },
-        highlight: { ...(config.highlight ?? {}), syncKey },
-        zoom: { ...(config.zoom ?? {}), syncKey },
+        cursor: { syncKey, ...(config.cursor ?? {}) },
+        highlight: { syncKey, ...(config.highlight ?? {}) },
       };
+      if (options?.zoom) {
+        merged.zoom = { syncKey, ...(config.zoom ?? {}) };
+      }
+      return merged;
     },
 
     highlight(seriesIndex) {
       setHighlight(seriesIndex);
       setHighlightKey(null);
-      SyncGroup.publishHighlight(syncKey, SOURCE, { type: 'index', seriesIndex });
+      // A null source broadcasts to every member, which is what an external
+      // coordinator wants; publishHighlight's source is already nullable.
+      SyncGroup.publishHighlight(syncKey, null, { type: 'index', seriesIndex });
     },
 
     highlightKey(key) {
       setHighlight(null);
       setHighlightKey(key);
-      SyncGroup.publishHighlight(syncKey, SOURCE, { type: 'key', key });
+      SyncGroup.publishHighlight(syncKey, null, { type: 'key', key });
     },
 
     cursor(dataX) {
       setCursor(dataX);
-      SyncGroup.publishCursor(syncKey, SOURCE, dataX);
+      // publishCursor's `source` is not yet nullable in EventBus (owned by the
+      // interaction layer); a null source is safe at runtime (every peer !==
+      // null receives it). Cast until that signature is widened to accept null.
+      SyncGroup.publishCursor(syncKey, null as unknown as ChartInstance, dataX);
     },
 
     highlightedSeries,

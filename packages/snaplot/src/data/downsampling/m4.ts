@@ -91,10 +91,16 @@ function m4FiniteRun(
     const xi = x[i];
     const yi = y[i];
 
-    // Which pixel column does this point fall in?
-    const bucket = Math.min(
-      Math.floor(((xi - xMin) / xRange) * pixelWidth),
-      pixelWidth - 1,
+    // Which pixel column does this point fall in? Clamp both edges: callers
+    // pass a viewport-culled slice that deliberately includes one point just
+    // left of xMin for line continuity (see viewportIndices). Without the
+    // lower clamp those points get negative buckets, which both collide with
+    // the curBucket = -1 sentinel and are dropped by flushBucket's `< 0`
+    // guard, breaking left-edge continuity while the right edge (clamped to
+    // pixelWidth - 1) is retained. Clamp low into bucket 0 symmetrically.
+    const bucket = Math.max(
+      0,
+      Math.min(Math.floor(((xi - xMin) / xRange) * pixelWidth), pixelWidth - 1),
     );
 
     if (bucket !== curBucket) {
@@ -113,7 +119,11 @@ function m4FiniteRun(
 
   flushBucket();
 
-  return [tmpX.subarray(0, out), tmpY.subarray(0, out)];
+  // Trim-copy rather than subarray: a subarray view retains the full
+  // 4*pixelWidth scratch buffers for as long as the caller holds the result,
+  // and hands back what looks like a shared buffer. m4 is opt-in and not a
+  // per-frame call, so the small copy is cheap.
+  return [tmpX.slice(0, out), tmpY.slice(0, out)];
 }
 
 function m4Gapped(

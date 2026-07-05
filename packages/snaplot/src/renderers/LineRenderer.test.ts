@@ -77,6 +77,25 @@ describe('filled line renderers', () => {
     expect(ctx.stroke).toHaveBeenCalledTimes(1);
   });
 
+  it('applies alpha to non-hex area fills without producing NaN colors', () => {
+    const ctx = createContext();
+    const stops: string[] = [];
+    (ctx.createLinearGradient as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      addColorStop: (_offset: number, color: string) => { stops.push(color); },
+    });
+    const scale = createScale();
+    const layout = createLayout();
+    const series: SeriesConfig = { label: 'area', dataIndex: 1, type: 'area' };
+
+    // A named color (not #rrggbb) previously yielded 'rgba(NaN,NaN,NaN,...)'.
+    renderArea(ctx, f([0, 1, 2]), f([10, 15, 20]), 0, 2, scale, scale, layout, series, 'red');
+
+    expect(stops.length).toBe(2);
+    for (const stop of stops) expect(stop).not.toContain('NaN');
+    expect(stops[0]).toBe('rgba(255,0,0,0.3)');
+    expect(stops[1]).toBe('rgba(255,0,0,0.05)');
+  });
+
   it('fills band charts as separate segments around NaN bound gaps', () => {
     const ctx = createContext();
     const scale = createScale();

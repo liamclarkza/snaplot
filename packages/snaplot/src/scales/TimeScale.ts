@@ -98,6 +98,12 @@ export class TimeScale implements Scale {
     return fallback;
   }
 
+  // Known limitation: ticks are aligned to fixed-width multiples of the chosen
+  // interval measured from the UTC epoch. The 1M (30-day) and 1y (365-day)
+  // intervals are not calendar months/years, and day-level ticks land on UTC
+  // midnight rather than the viewer's local midnight, so month/year ticks can
+  // drift off calendar boundaries. Calendar-aware alignment is a larger design
+  // change (per-unit tick generators); intentionally not attempted here.
   private alignTicks(interval: number): number[] {
     const start = Math.ceil(this.min / interval) * interval;
     const ticks: number[] = [];
@@ -116,7 +122,10 @@ export class TimeScale implements Scale {
       const base = date.toLocaleTimeString(undefined, {
         hour: '2-digit', minute: '2-digit', second: '2-digit',
       });
-      const ms = String(Math.floor(value) % 1000).padStart(3, '0');
+      // Floored-modulo: JS `%` keeps the sign of the dividend, so a pre-1970
+      // epoch (negative value) would otherwise yield a negative "sub-second"
+      // label like ".-500". Wrap into [0, 999].
+      const ms = String(((Math.floor(value) % 1000) + 1000) % 1000).padStart(3, '0');
       return `${base}.${ms}`;
     }
     if (domain < 3600000) {

@@ -131,7 +131,19 @@ export class ColumnarStore implements DataStore {
     return this.columns.length - 1;
   }
 
-  /** Get all columns as ColumnarData */
+  /**
+   * Get all columns as ColumnarData.
+   *
+   * Returns the store's live internal column array by reference (no copy) for
+   * the hot path. The caller MUST treat the result as read-only: do not push,
+   * splice, or reorder the outer array, and do not write into any column in
+   * place. After setData() these are the caller's own arrays; after append()
+   * they are store-owned buffers. Either way, in-place mutation bypasses
+   * validation and can break the sorted-finite-X invariant that binary-search
+   * culling and hit-testing depend on, and it will not bump the data version,
+   * leaving downstream caches (yRange, hit-test grids) stale. Copy any column
+   * you need to modify (`col.slice()`).
+   */
   getData(): ColumnarData {
     return this.columns as unknown as ColumnarData;
   }

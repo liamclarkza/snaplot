@@ -22,6 +22,7 @@ import {
   PALETTE_DIVERGING_DARK,
 } from '../constants';
 import { deepMerge } from './merge';
+import { isDarkColor } from '../utils/color';
 
 export {
   DEFAULT_THEME as lightTheme,
@@ -58,52 +59,15 @@ function clonePalette(palette: readonly string[] | undefined): string[] | undefi
   return palette && palette.length > 0 ? [...palette] : undefined;
 }
 
-function parseRgb(color: string): [number, number, number] | null {
-  const value = color.trim();
-  const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (hex) {
-    const raw = hex[1];
-    const expanded = raw.length === 3
-      ? raw.split('').map((c) => c + c).join('')
-      : raw;
-    return [
-      parseInt(expanded.slice(0, 2), 16),
-      parseInt(expanded.slice(2, 4), 16),
-      parseInt(expanded.slice(4, 6), 16),
-    ];
-  }
-
-  const rgb = value.match(/^rgba?\(([^)]+)\)$/i);
-  if (!rgb) return null;
-  const parts = rgb[1].split(',').map((part) => Number.parseFloat(part.trim()));
-  if (parts.length < 3 || parts.some((part, i) => i < 3 && !Number.isFinite(part))) {
-    return null;
-  }
-  return [parts[0], parts[1], parts[2]];
-}
-
-function relativeLuminance([r, g, b]: [number, number, number]): number {
-  const linear = [r, g, b].map((value) => {
-    const channel = Math.max(0, Math.min(255, value)) / 255;
-    return channel <= 0.04045
-      ? channel / 12.92
-      : ((channel + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
-}
-
-function isDarkColor(color: string): boolean {
-  const rgb = parseRgb(color);
-  if (!rgb) return false;
-  return relativeLuminance(rgb) < 0.35;
-}
-
 function normalizeTheme(
   theme: ThemeConfig,
   userTheme: Partial<ThemeConfig> | undefined,
   hasCssOverrides: boolean,
 ): ThemeConfig {
-  const dark = isDarkColor(theme.backgroundColor);
+  // Unparseable backgrounds fall back to light role palettes (the historical
+  // default); a dark named/rgb/hex background now correctly selects the dark
+  // sequential/diverging/heatmap ramps.
+  const dark = isDarkColor(theme.backgroundColor, false);
   const defaultCategorical = dark ? PALETTE_CATEGORICAL_DARK : PALETTE_CATEGORICAL_LIGHT;
   const defaultSequential = dark ? PALETTE_SEQUENTIAL_DARK : PALETTE_SEQUENTIAL_LIGHT;
   const defaultDiverging = dark ? PALETTE_DIVERGING_DARK : PALETTE_DIVERGING_LIGHT;

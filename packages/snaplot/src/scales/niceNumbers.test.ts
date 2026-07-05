@@ -31,6 +31,15 @@ describe('niceStep', () => {
     // -10..10 / 5 → raw step 5, magnitude 1, fraction 5 → niceF = 5, step = 5
     expect(niceStep(-10, 10, 5)).toBe(5);
   });
+
+  it('returns a finite positive step for a reversed domain', () => {
+    // Regression: a reversed domain (max < min) gave a negative raw step whose
+    // Math.log10 is NaN, poisoning every downstream tick.
+    const step = niceStep(10, 0, 6);
+    expect(Number.isFinite(step)).toBe(true);
+    expect(step).toBeGreaterThan(0);
+    expect(step).toBe(niceStep(0, 10, 6));
+  });
 });
 
 describe('niceRange', () => {
@@ -42,6 +51,12 @@ describe('niceRange', () => {
     const [lo, hi] = niceRange(50, 50, 5);
     expect(lo).toBeLessThan(50);
     expect(hi).toBeGreaterThan(50);
+  });
+
+  it('does not return NaN for a reversed domain', () => {
+    const [lo, hi] = niceRange(10, 0, 6);
+    expect(Number.isFinite(lo)).toBe(true);
+    expect(Number.isFinite(hi)).toBe(true);
   });
 
   it('rounds outward to nice boundaries', () => {
@@ -145,5 +160,25 @@ describe('niceTicks', () => {
     // deep zoom; fall through to nice-step so we get finer ticks.
     const ticks = niceTicks(42.8, 44.3, 6);
     expect(ticks.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('never returns fewer than 2 ticks when a nice step overshoots a narrow domain', () => {
+    // Regression: nMin > nMax gave `new Array(0)` (empty) for a low tick count
+    // on a narrow domain, rendering an axis with zero ticks.
+    const empty = niceTicks(0.001, 0.041, 2);
+    expect(empty.length).toBeGreaterThanOrEqual(2);
+    expect(empty[0]).toBeLessThanOrEqual(0.001 + 1e-12);
+    expect(empty[empty.length - 1]).toBeCloseTo(0.041, 6);
+
+    // A single aligned tick is also below the promise; subdivide instead.
+    const single = niceTicks(0.001, 0.021, 2);
+    expect(single.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('produces a finite reversed sequence for a reversed domain', () => {
+    const ticks = niceTicks(10, 0, 6);
+    expect(ticks.length).toBeGreaterThanOrEqual(2);
+    expect(ticks.every((t) => Number.isFinite(t))).toBe(true);
+    expect(ticks[0]).toBeGreaterThan(ticks[ticks.length - 1]);
   });
 });

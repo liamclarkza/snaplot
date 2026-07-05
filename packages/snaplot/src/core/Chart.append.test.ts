@@ -1166,3 +1166,181 @@ describe('ChartCore highlight sync', () => {
     chartB.destroy();
   });
 });
+
+describe('ChartCore lifecycle + config integrity', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', new MockDocument());
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('does not mutate the caller config object when constructing a chart', () => {
+    const config = { series: [{ label: 'value', dataIndex: 1 }] };
+    const chart = new ChartCore(
+      document.createElement('div'),
+      config,
+      [f([1, 2]), f([10, 20])],
+    );
+
+    // initAxes writes x/y into config.axes; that must land on the chart's own
+    // copy, not the object the caller passed in.
+    expect(config).not.toHaveProperty('axes');
+    chart.destroy();
+  });
+
+  it('two charts built from one config object do not share axis state', () => {
+    const config = { series: [{ label: 'value', dataIndex: 1 }] };
+    const data: ColumnarData = [f([1, 2]), f([10, 20])];
+    const a = new ChartCore(document.createElement('div'), config, data);
+    const b = new ChartCore(document.createElement('div'), config, data);
+
+    expect(config).not.toHaveProperty('axes');
+    expect(a.getOptions().axes).not.toBe(b.getOptions().axes);
+    a.destroy();
+    b.destroy();
+  });
+
+  it('keeps a zoom-synced peer in sync across appendData', () => {
+    const syncKey = 'zoom-append-sync';
+    const data: ColumnarData = [f([0, 25, 50, 75, 100]), f([1, 2, 3, 2, 1])];
+    const chartA = new ChartCore(
+      document.createElement('div'),
+      { zoom: { syncKey, x: true, enabled: true }, series: [{ label: 'v', dataIndex: 1 }] },
+      [f([0, 25, 50, 75, 100]), f([1, 2, 3, 2, 1])],
+    );
+    const chartB = new ChartCore(
+      document.createElement('div'),
+      { zoom: { syncKey, x: true, enabled: true }, series: [{ label: 'v', dataIndex: 1 }] },
+      data,
+    );
+
+    // Zoom chart A in around the middle. Publishes to B via SyncGroup.
+    const anchor = plotPoint(chartA, 0.5);
+    chartEventBus(chartA).emit('action:zoom', { factor: 0.5, anchorX: anchor.x, anchorY: anchor.y, axis: 'x' });
+
+    const zoomedMax = chartA.getAxis('x')!.max;
+    const zoomedMin = chartA.getAxis('x')!.min;
+    expect(zoomedMax).toBeLessThan(100);
+    expect(chartB.getAxis('x')!.max).toBe(zoomedMax);
+    expect(chartB.getAxis('x')!.min).toBe(zoomedMin);
+
+    // Streaming data into B beyond the old extent must not snap its synced
+    // viewport back to the full range.
+    chartB.appendData([f([200]), f([0])]);
+    expect(chartB.getAxis('x')!.max).toBe(zoomedMax);
+    expect(chartB.getAxis('x')!.min).toBe(zoomedMin);
+
+    chartA.destroy();
+    chartB.destroy();
+  });
+
+  it('ignores mutating public calls after destroy()', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { series: [{ label: 'v', dataIndex: 1 }] },
+      [f([1, 2]), f([10, 20])],
+    );
+
+    chart.destroy();
+    chart.appendData([f([3]), f([30])]);
+    chart.setData([f([1, 2, 3, 4]), f([1, 2, 3, 4])]);
+
+    expect(chart.getStats()).toMatchObject({
+      dataVersion: 0,
+      setDataCount: 0,
+      appendDataCount: 0,
+    });
+  });
+
+  it('does not count a data-layer paint that a plugin vetoes', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        debug: { stats: true },
+        plugins: [{ id: 'veto-data', beforeDrawData: () => false }],
+        series: [{ label: 'v', dataIndex: 1 }],
+      },
+      [f([1, 2]), f([10, 20])],
+    );
+
+    const stats = chart.getStats();
+    expect(stats.renderCount.grid).toBe(1);
+    expect(stats.renderCount.data).toBe(0);
+    expect(stats.renderCount.overlay).toBe(1);
+    chart.destroy();
+  });
+
+  it('delivers the data payload to a variadic (...args) listener', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { series: [{ label: 'v', dataIndex: 1 }] },
+      [f([1, 2]), f([10, 20])],
+    );
+
+    let received: unknown[] = [];
+    chart.on('data:update', (...args) => {
+      received = args;
+    });
+
+    chart.appendData([f([3]), f([30])]);
+
+    expect(received).toHaveLength(1);
+    const payload = received[0] as ColumnarData;
+    expect(Array.from(payload[0])).toEqual([1, 2, 3]);
+    chart.destroy();
+  });
+
+  it('does not snap a synced cursor to column 0 for an off-axis scatter', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { series: [{ label: 'pts', type: 'scatter', dataIndex: 2, xDataIndex: 1 }] },
+      [f([0, 1, 2]), f([0, 10, 20]), f([5, 6, 7])],
+    );
+
+    chart.setCursorDataX(1.5, 'sync');
+
+    const idx = (chart as unknown as { cursorDataIdx: number | null }).cursorDataIdx;
+    expect(idx).toBeNull();
+    chart.destroy();
+  });
+
+  it('adds use()-installed plugins to config.plugins', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { series: [{ label: 'v', dataIndex: 1 }] },
+      [f([1, 2]), f([10, 20])],
+    );
+
+    chart.use({ id: 'runtime-added', install: vi.fn() });
+
+    expect(chart.getOptions().plugins?.some((p) => p.id === 'runtime-added')).toBe(true);
+    chart.destroy();
+  });
+
+  it('does not reinstall unchanged plugins on replaceOptions', () => {
+    const install = vi.fn();
+    const destroy = vi.fn();
+    const plugin: Plugin = { id: 'stable', install, destroy };
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { plugins: [plugin], series: [{ label: 'v', dataIndex: 1 }] },
+      [f([1, 2]), f([10, 20])],
+    );
+
+    expect(install).toHaveBeenCalledTimes(1);
+
+    // Fresh config object + fresh array literal, same plugin instance: the
+    // plugin set is unchanged, so no destroy/reinstall churn.
+    chart.replaceOptions({ plugins: [plugin], series: [{ label: 'v', dataIndex: 1 }] });
+
+    expect(install).toHaveBeenCalledTimes(1);
+    expect(destroy).not.toHaveBeenCalled();
+    chart.destroy();
+  });
+});

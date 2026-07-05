@@ -1,5 +1,6 @@
 import type { TooltipPoint, TooltipConfig, ThemeConfig } from '../types';
 import { TOOLTIP_OFFSET } from '../constants';
+import { isDarkColor } from '../utils/color';
 
 /** Escape the five characters that matter for HTML attribute + text contexts. */
 function escapeHtml(raw: string): string {
@@ -19,6 +20,12 @@ function escapeHtml(raw: string): string {
 export class TooltipManager {
   private el: HTMLDivElement;
   private visible = false;
+  // Last HTML string written and the dimensions it measured to. Lets a
+  // repeated show() with identical content skip the innerHTML write and the
+  // offsetWidth/offsetHeight reads (which force a synchronous layout).
+  private lastHtml: string | null = null;
+  private lastWidth = 0;
+  private lastHeight = 0;
 
   constructor(theme: ThemeConfig) {
     this.el = document.createElement('div');
@@ -53,17 +60,9 @@ export class TooltipManager {
   }
 
   private isBackgroundDark(bg: string): boolean {
-    if (bg.startsWith('#')) {
-      const r = parseInt(bg.slice(1, 3), 16);
-      const g = parseInt(bg.slice(3, 5), 16);
-      const b = parseInt(bg.slice(5, 7), 16);
-      return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
-    }
-    const m = bg.match(/\d+/g);
-    if (m && m.length >= 3) {
-      return (Number(m[0]) * 0.299 + Number(m[1]) * 0.587 + Number(m[2]) * 0.114) < 128;
-    }
-    return true;
+    // Unparseable backgrounds keep the previous default: assume dark so a
+    // deep glow shadow is used.
+    return isDarkColor(bg, true);
   }
 
   show(
@@ -82,16 +81,34 @@ export class TooltipManager {
     // trusted HTML (fast path, matches ChartConfig.tooltip.render's documented
     // contract). Callers rendering user-controlled data should return a DOM
     // node or pre-escape their string. The default renderer already escapes.
+    //
+    // A string identical to the last one written is a no-op: streaming ticks
+    // and cursor moves along a flat run repeatedly produce the same markup,
+    // and re-assigning innerHTML would re-parse the subtree and invalidate
+    // the cached measurement below.
+    let contentChanged = true;
     if (config?.render) {
       const content = config.render(points);
       if (typeof content === 'string') {
-        this.el.innerHTML = content;
+        if (content === this.lastHtml) {
+          contentChanged = false;
+        } else {
+          this.el.innerHTML = content;
+          this.lastHtml = content;
+        }
       } else {
         this.el.innerHTML = '';
         this.el.appendChild(content);
+        this.lastHtml = null;
       }
     } else {
-      this.el.innerHTML = this.defaultRender(points);
+      const html = this.defaultRender(points);
+      if (html === this.lastHtml) {
+        contentChanged = false;
+      } else {
+        this.el.innerHTML = html;
+        this.lastHtml = html;
+      }
     }
 
     this.el.style.opacity = '1';
@@ -101,8 +118,14 @@ export class TooltipManager {
     if (pointerType === 'touch' || pointerType === 'pen') {
       const margin = 8;
       const touchClearance = Math.max(offset, 72);
-      const width = this.el.offsetWidth;
-      const height = this.el.offsetHeight;
+      // Reading offset* forces layout; reuse the last measurement when the
+      // content (and therefore the box size) has not changed.
+      if (contentChanged) {
+        this.lastWidth = this.el.offsetWidth;
+        this.lastHeight = this.el.offsetHeight;
+      }
+      const width = this.lastWidth;
+      const height = this.lastHeight;
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth || width + margin * 2;
       const left = Math.max(margin, Math.min(viewportWidth - width - margin, clientX - width / 2));
       const top = Math.max(margin, clientY - height - touchClearance);

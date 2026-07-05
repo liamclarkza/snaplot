@@ -54,7 +54,9 @@ export function Chart<TMeta = unknown>(props: ChartProps<TMeta>): JSX.Element {
       ref={containerRef!}
       class={props.class}
       style={typeof props.style === 'string'
-        ? props.style + ';width:100%;height:100%'
+        // Defaults first so user declarations win in both forms (later inline
+        // declarations and later object keys both override).
+        ? 'width:100%;height:100%;' + props.style
         : { width: '100%', height: '100%', ...props.style }
       }
     />

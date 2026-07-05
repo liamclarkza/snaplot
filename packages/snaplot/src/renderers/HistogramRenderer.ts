@@ -70,7 +70,11 @@ export function renderHistogramSegments(
   ctx.strokeStyle = color;
   ctx.lineWidth = 0.5;
 
-  const baselineY = scaleY.dataToPixel(0);
+  // A log Y scale has no pixel for 0 (dataToPixel(0) is NaN), which would
+  // skip every bar; anchor to the scale minimum (the plot bottom) instead.
+  const baselineY = scaleY.type === 'log'
+    ? scaleY.dataToPixel(scaleY.min)
+    : scaleY.dataToPixel(0);
 
   for (let s = 0; s < segments.length; s++) {
     const segment = segments[s];

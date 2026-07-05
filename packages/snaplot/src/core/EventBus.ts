@@ -45,9 +45,16 @@ export class EventBus {
 
   emit<K extends keyof EventMap>(event: K, payload: EventMap[K]): void {
     const set = this.listeners.get(event);
-    if (set) {
-      for (const handler of set) {
+    if (!set) return;
+    // Snapshot before iterating: a handler may add or remove listeners during
+    // delivery. Iterating the live Set would run a just-added handler inside
+    // this same emit (a self-re-adding handler would loop forever).
+    for (const handler of Array.from(set)) {
+      try {
         handler(payload);
+      } catch (err) {
+        // One throwing handler must not abort delivery to the rest.
+        console.error(`[snaplot] '${event}' handler threw:`, err);
       }
     }
   }

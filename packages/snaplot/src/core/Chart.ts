@@ -70,6 +70,7 @@ import { HitTester } from '../interaction/HitTester';
 import { TooltipManager } from '../interaction/TooltipManager';
 
 import { PluginManager } from '../plugins/PluginManager';
+import { isDarkColor } from '../utils/color';
 
 // Stable identity for user tickFormat functions in the layout cache key.
 // Stringifying the function body per frame allocated the whole source text
@@ -315,6 +316,7 @@ export class ChartCore implements ChartInstance {
   // ─── Public API (ChartInstance) ─────────────────────────────
 
   setData(data: ColumnarData): void {
+    if (this.destroyed) return;
     this.setStoreData(data);
     this.stats.dataVersion++;
     this.stats.setDataCount++;
@@ -325,6 +327,7 @@ export class ChartCore implements ChartInstance {
   }
 
   appendData(data: ColumnarData, opts?: AppendDataOptions): void {
+    if (this.destroyed) return;
     this.ensureStoreMatchesStreaming();
 
     let changed: boolean;
@@ -380,11 +383,18 @@ export class ChartCore implements ChartInstance {
   }
 
   setAxis(key: string, range: Partial<ScaleRange>): void {
+    if (this.destroyed) return;
     const scale = this.scales.get(key);
     if (!scale) return;
 
     if (range.min !== undefined) scale.min = range.min;
     if (range.max !== undefined) scale.max = range.max;
+
+    // A peer-applied viewport must survive the next data update the same way a
+    // local zoom does. Without marking the axis user-zoomed, this receiving
+    // chart's next setData/appendData would auto-range back to the full extent
+    // and snap out of sync with the chart that drove the zoom.
+    this.userZoomedAxes.add(key);
 
     // When X axis changes (e.g. from a zoom sync peer), re-fit Y axis
     // to the new visible X range, otherwise the band/data may clip.
@@ -412,6 +422,7 @@ export class ChartCore implements ChartInstance {
   }
 
   setOptions(partial: DeepPartial<ChartConfig>): void {
+    if (this.destroyed) return;
     // Plugins are object instances, deep-merge would corrupt them.
     // Handle plugin updates separately: destroy old, install new.
     const newPlugins = (partial as Partial<ChartConfig>).plugins;
@@ -439,6 +450,7 @@ export class ChartCore implements ChartInstance {
   }
 
   replaceOptions(config: ChartConfig): void {
+    if (this.destroyed) return;
     const previousPlugins = this.config.plugins ?? [];
     this.config = deepMerge(
       DEFAULT_CONFIG as unknown as Record<string, unknown>,
@@ -446,7 +458,15 @@ export class ChartCore implements ChartInstance {
     ) as unknown as ChartConfig;
 
     const nextPlugins = this.config.plugins ?? [];
-    if (nextPlugins !== previousPlugins) {
+    // Compare by content, not reference: a fresh declarative config passes a
+    // new array instance every call (so `!==` would rebuild every time, even
+    // with the same or zero plugins), while a caller who mutates and re-passes
+    // the same instance would never reinstall. Rebuild only when the plugin
+    // set actually changed.
+    const samePlugins =
+      nextPlugins.length === previousPlugins.length &&
+      nextPlugins.every((plugin, i) => plugin === previousPlugins[i]);
+    if (!samePlugins) {
       this.pluginManager.destroyAll(this);
       this.pluginManager = new PluginManager();
       for (const plugin of nextPlugins) {
@@ -511,6 +531,7 @@ export class ChartCore implements ChartInstance {
   }
 
   resize(width: number, height: number): void {
+    if (this.destroyed) return;
     this.canvasManager.resize(width, height);
     this.onResize(width, height);
   }
@@ -536,9 +557,16 @@ export class ChartCore implements ChartInstance {
   }
 
   use(plugin: Plugin): boolean {
+    if (this.destroyed) return false;
     const registered = this.pluginManager.register(plugin);
     if (!registered) return false;
     plugin.install?.(this);
+    // Keep config.plugins in sync so the plugin lifecycle is identical no
+    // matter which entry point installed it: a later setOptions/replaceOptions
+    // rebuilds from config.plugins and would otherwise silently drop a
+    // use()-installed plugin. Reassign a new array rather than mutating the
+    // existing one, which may be the caller's array or the shared default.
+    this.config.plugins = [...(this.config.plugins ?? []), plugin];
     return true;
   }
 
@@ -578,13 +606,21 @@ export class ChartCore implements ChartInstance {
       this.cursorX = xScale.dataToPixel(this.cursorDataX);
     } else {
       this.cursorDataX = dataX;
-      this.cursorDataIdx = this.store.nearestXIndex(dataX);
-
-      // Snap to nearest actual data point's X for accurate crosshair placement
-      if (this.cursorDataIdx < this.store.length) {
-        const snappedX = this.store.xAt(this.cursorDataIdx);
-        this.cursorX = xScale.dataToPixel(snappedX);
+      // Mirror the local pointer path: column 0 is not the shared X axis when a
+      // visible scatter series draws against a different X column, so snapping
+      // this synced/programmatic cursor to nearestXIndex on column 0 would land
+      // on the wrong point. Fall back to placing the crosshair at the raw dataX.
+      if (this.canUseGlobalXCursor()) {
+        this.cursorDataIdx = this.store.nearestXIndex(dataX);
+        // Snap to nearest actual data point's X for accurate crosshair placement
+        if (this.cursorDataIdx < this.store.length) {
+          const snappedX = this.store.xAt(this.cursorDataIdx);
+          this.cursorX = xScale.dataToPixel(snappedX);
+        } else {
+          this.cursorX = xScale.dataToPixel(dataX);
+        }
       } else {
+        this.cursorDataIdx = null;
         this.cursorX = xScale.dataToPixel(dataX);
       }
     }
@@ -893,24 +929,23 @@ export class ChartCore implements ChartInstance {
     const dataListeners = this.listeners.get('data:update');
     const hasDataListeners = !!dataListeners && dataListeners.size > 0;
     const hasPluginHook = this.pluginManager.hasHook('onSetData');
+    // Nothing consumes the payload: no materialization, no emit.
     if (!hasDataListeners && !hasPluginHook) return;
 
-    // Built-in reactive helpers use zero-arg listeners as invalidation
-    // signals. Do not materialize a wrapped ring buffer unless a listener or
-    // plugin actually declares that it consumes the ColumnarData payload.
-    const listenerNeedsPayload = dataListeners
-      ? Array.from(dataListeners).some((handler) => handler.length > 0)
-      : false;
-    const data = hasPluginHook || listenerNeedsPayload
-      ? this.store.getData()
-      : undefined;
+    // The 'data:update' handler type is `(data: ColumnarData) => void`, so
+    // every listener is entitled to the payload. The previous Function.length
+    // heuristic silently withheld it from `(...args)` and `(data = x)`
+    // listeners (both report length 0), which arity cannot distinguish from a
+    // genuine zero-arg signal. Materialize once when any listener or plugin
+    // hook exists and pass it to all of them. The cost is one getData() per
+    // data update, and only when something is actually subscribed.
+    const data = this.store.getData();
 
     if (hasPluginHook) {
       this.pluginManager.dispatch('onSetData', this, data);
     }
     if (hasDataListeners) {
-      if (data) this.emitEvent('data:update', data);
-      else this.emitEvent('data:update');
+      this.emitEvent('data:update', data);
     }
   }
 
@@ -975,12 +1010,22 @@ export class ChartCore implements ChartInstance {
       const scale = this.scales.get(key);
       if (!scale) continue;
       if (ac.auto === false) continue;
-      if (this.userZoomedAxes.has(key)) continue;
+      // A user-zoomed axis keeps its viewport, but we still recompute its
+      // natural (reset-zoom / `bounds: 'data'`) extent below so streaming data
+      // beyond the pre-zoom extent stays reachable by pan/zoom-out instead of
+      // being frozen out until `resetZoom()`. We restore the live viewport
+      // after the computation.
+      const userZoomed = this.userZoomedAxes.has(key);
+      const preservedMin = scale.min;
+      const preservedMax = scale.max;
       // Both bounds pinned → restore to those values. Skipping here would
       // leave zoomed state intact after `resetZoom()`.
       if (ac.min !== undefined && ac.max !== undefined) {
-        scale.min = ac.min;
-        scale.max = ac.max;
+        if (!userZoomed) {
+          scale.min = ac.min;
+          scale.max = ac.max;
+        }
+        this.naturalExtent.set(key, [ac.min, ac.max]);
         continue;
       }
 
@@ -1063,6 +1108,13 @@ export class ChartCore implements ChartInstance {
       // Remember the "full" extent so zoom.bounds: 'data' knows how far
       // out reset-zoom would go.
       this.naturalExtent.set(key, [scale.min, scale.max]);
+
+      // The extent is refreshed above; a user-zoomed axis keeps the viewport
+      // it had on entry so streaming appends don't snap it back.
+      if (userZoomed) {
+        scale.min = preservedMin;
+        scale.max = preservedMax;
+      }
     }
   }
 
@@ -1553,11 +1605,16 @@ export class ChartCore implements ChartInstance {
           const isHoriz = pos === 'bottom' || pos === 'top';
           const anchorPx = isHoriz ? anchorX : anchorY;
           const [newMin, newMax] = this.zoomedScaleRange(scale, anchorPx, factor);
-          const range = newMax - newMin;
+          // minRange/maxRange are enforced in the scale's own span metric
+          // (`scaleDomainSpan`): a data-unit span for linear/time axes, a
+          // log10-decade span for log axes. Measuring in that metric keeps the
+          // limit consistent with how `zoomedScaleRange` applies the factor,
+          // and applies to vertical axes too, not just horizontal.
+          const span = this.scaleDomainSpan(scale, newMin, newMax);
+          if (zoom.minRange && span < zoom.minRange) return;
+          if (zoom.maxRange && span > zoom.maxRange) return;
           if (isHoriz) {
-            if (zoom.x !== false && (!zoom.minRange || range >= zoom.minRange) && (!zoom.maxRange || range <= zoom.maxRange)) {
-              this.applyViewportChange(axis, newMin, newMax);
-            }
+            if (zoom.x !== false) this.applyViewportChange(axis, newMin, newMax);
           } else {
             this.applyViewportChange(axis, newMin, newMax);
           }
@@ -1731,15 +1788,18 @@ export class ChartCore implements ChartInstance {
       const span = this.scaleDomainSpan(target.scale, target.scale.min, target.scale.max);
       if (span <= 0 || !Number.isFinite(span)) continue;
 
-      const isHoriz = target.pos === 'bottom' || target.pos === 'top';
       const proposed = this.zoomedScaleRange(target.scale, target.anchorPx, effectiveFactor);
       const proposedSpan = this.scaleDomainSpan(target.scale, proposed[0], proposed[1]);
 
-      if (isHoriz && zoom.minRange && proposed[1] - proposed[0] < zoom.minRange) {
-        effectiveFactor = Math.max(effectiveFactor, zoom.minRange / (target.scale.max - target.scale.min));
+      // minRange/maxRange are measured in the scale's own span metric so the
+      // factor correction matches how zoomedScaleRange applies it (linear span
+      // on linear/time axes, log10-decade span on log axes). Applies to every
+      // zoomed axis, including vertical, not just horizontal.
+      if (zoom.minRange && proposedSpan < zoom.minRange) {
+        effectiveFactor = Math.max(effectiveFactor, zoom.minRange / span);
       }
-      if (isHoriz && zoom.maxRange && proposed[1] - proposed[0] > zoom.maxRange) {
-        effectiveFactor = Math.min(effectiveFactor, zoom.maxRange / (target.scale.max - target.scale.min));
+      if (zoom.maxRange && proposedSpan > zoom.maxRange) {
+        effectiveFactor = Math.min(effectiveFactor, zoom.maxRange / span);
       }
 
       const bounds = this.resolveBounds(target.key, target.pos);
@@ -1981,8 +2041,10 @@ export class ChartCore implements ChartInstance {
         );
         updateDOMLabels(this.canvasManager.domLayer, labels, this.theme, this.layout);
         this.pluginManager.dispatch('afterDrawGrid', this, this.canvasManager.gridCtx);
+        // Count only actual paints: a beforeDraw* plugin that returns false
+        // vetoes the clear/draw, so it must not bump renderCount.
+        this.statsEnd('grid', start);
       }
-      this.statsEnd('grid', start);
     }
 
     // Step 4b: Data layer (series marks)
@@ -1993,8 +2055,8 @@ export class ChartCore implements ChartInstance {
         this.renderAllSeries();
         this.pluginManager.dispatch('afterDrawData', this, this.canvasManager.dataCtx);
         this.emitEvent('drawData', this.canvasManager.dataCtx, this.layout);
+        this.statsEnd('data', start);
       }
-      this.statsEnd('data', start);
     }
 
     // Step 4c: Overlay layer (crosshair, tooltip)
@@ -2005,8 +2067,8 @@ export class ChartCore implements ChartInstance {
         this.renderOverlay();
         this.pluginManager.dispatch('afterDrawOverlay', this, this.canvasManager.overlayCtx);
         this.emitEvent('drawOverlay', this.canvasManager.overlayCtx, this.layout);
+        this.statsEnd('overlay', start);
       }
-      this.statsEnd('overlay', start);
     }
   }
 
@@ -2321,7 +2383,10 @@ export class ChartCore implements ChartInstance {
     // the vibrant fill from the white canvas. Alpha varies by luminance so
     // the ring is visible but never harsh.
     const bg = this.theme.backgroundColor;
-    const isDark = this.isThemeDark(bg);
+    // Default unparseable backgrounds to dark, matching the previous behavior
+    // of this ring's luminance check. isDarkColor correctly handles 3-digit
+    // hex and named colors, which the old hand-rolled parser did not.
+    const isDark = isDarkColor(bg, true);
     const ringAlpha = isDark ? 0.15 : 0.08;
 
     // When a series is highlighted, only draw the indicator on that series,    // the others just get the crosshair line (matches Neptune/W&B behavior).
@@ -2426,23 +2491,6 @@ export class ChartCore implements ChartInstance {
     }
 
     ctx.restore();
-  }
-
-  /** Quick luminance check, is the background dark? */
-  private isThemeDark(bg: string): boolean {
-    // Parse hex
-    if (bg.startsWith('#')) {
-      const r = parseInt(bg.slice(1, 3), 16);
-      const g = parseInt(bg.slice(3, 5), 16);
-      const b = parseInt(bg.slice(5, 7), 16);
-      return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
-    }
-    // Parse rgb/rgba
-    const m = bg.match(/\d+/g);
-    if (m && m.length >= 3) {
-      return (Number(m[0]) * 0.299 + Number(m[1]) * 0.587 + Number(m[2]) * 0.114) < 128;
-    }
-    return true; // default to dark
   }
 
   private updateLocalCursorFromPoint(

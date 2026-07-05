@@ -23,6 +23,8 @@ export class CanvasManager {
 
   private resizeObserver: ResizeObserver | null = null;
   private _dpr = 1;
+  private dprMediaQuery: MediaQueryList | null = null;
+  private boundDprChange: (() => void) | null = null;
 
   constructor(
     parent: HTMLElement,
@@ -90,6 +92,38 @@ export class CanvasManager {
       }
     });
     this.resizeObserver.observe(this.container);
+    this.watchDpr();
+  }
+
+  /**
+   * Detect a devicePixelRatio change that leaves the CSS size unchanged, e.g.
+   * dragging the window between monitors with different scale factors. The
+   * ResizeObserver never fires in that case (the contentRect is identical), so
+   * the backing store would stay at the old resolution and render blurry until
+   * an unrelated resize. A `(resolution: Ndppx)` media query matches only the
+   * current dpr, so its `change` event fires exactly when dpr moves off N; we
+   * then re-size and re-arm for the new dpr.
+   */
+  private watchDpr(): void {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    this.unwatchDpr();
+    const dpr = window.devicePixelRatio || 1;
+    this.dprMediaQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
+    this.boundDprChange = () => {
+      this.resize(this.cssWidth, this.cssHeight);
+      this.onResize?.(this.cssWidth, this.cssHeight);
+      // The query is pinned to the old dpr, re-arm against the new one.
+      this.watchDpr();
+    };
+    this.dprMediaQuery.addEventListener('change', this.boundDprChange);
+  }
+
+  private unwatchDpr(): void {
+    if (this.dprMediaQuery && this.boundDprChange) {
+      this.dprMediaQuery.removeEventListener('change', this.boundDprChange);
+    }
+    this.dprMediaQuery = null;
+    this.boundDprChange = null;
   }
 
   /**
@@ -114,23 +148,31 @@ export class CanvasManager {
 
   /** Clear a specific layer or all layers */
   clear(layer: 'grid' | 'data' | 'overlay' | 'all'): void {
-    const w = this.cssWidth;
-    const h = this.cssHeight;
-
     if (layer === 'grid' || layer === 'all') {
-      this.gridCtx.clearRect(0, 0, w, h);
+      this.clearFull(this.gridCtx, this.gridCanvas);
     }
     if (layer === 'data' || layer === 'all') {
-      this.dataCtx.clearRect(0, 0, w, h);
+      this.clearFull(this.dataCtx, this.dataCanvas);
     }
     if (layer === 'overlay' || layer === 'all') {
-      this.overlayCtx.clearRect(0, 0, w, h);
+      this.clearFull(this.overlayCtx, this.overlayCanvas);
     }
+  }
+
+  /**
+   * Clear the full backing store. The context carries a dpr scale transform,
+   * so `canvas.width / dpr` in user space maps to the entire bitmap. Using the
+   * canvas's own size (not `container.clientWidth`, which is integer-rounded)
+   * means no stale edge pixels survive when the CSS box is fractional.
+   */
+  private clearFull(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+    ctx.clearRect(0, 0, canvas.width / this._dpr, canvas.height / this._dpr);
   }
 
   destroy(): void {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.unwatchDpr();
     this.container.remove();
   }
 

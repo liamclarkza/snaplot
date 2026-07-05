@@ -12,6 +12,18 @@ describe('bar geometry helpers', () => {
     expect(categoryWidthFromCenters([0, 12, 120], 1, 50)).toBe(12);
   });
 
+  it('ignores a non-finite neighbor center instead of collapsing to the fallback', () => {
+    // A log-X point left of the bar projects to NaN; the finite right
+    // neighbor still yields the spacing rather than poisoning Math.min.
+    expect(categoryWidthFromCenters([NaN, 100, 200], 1, 999)).toBe(100);
+    expect(categoryWidthFromCenters([50, 90, NaN], 1, 999)).toBe(40);
+  });
+
+  it('falls back only when no finite neighbor gap exists', () => {
+    expect(categoryWidthFromCenters([50], 0, 7)).toBe(7);
+    expect(categoryWidthFromCenters([NaN, 100, NaN], 1, 7)).toBe(7);
+  });
+
   it('computes grouped bar slots from the same category width', () => {
     const left = barRectForCategory({
       centerX: 100,
