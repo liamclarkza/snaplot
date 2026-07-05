@@ -70,6 +70,7 @@ export const NAV: NavItem[] = [
   { type: 'divider', label: 'Recipes' },
   { type: 'link', id: 'recipe-streaming', label: 'Streaming Dashboard' },
   { type: 'link', id: 'recipe-linked', label: 'Linked Charts' },
+  { type: 'link', id: 'recipe-brush', label: 'Brush Selection' },
   { type: 'link', id: 'recipe-scatter-encoding', label: 'Encoded Scatter' },
   { type: 'link', id: 'recipe-custom-tooltip', label: 'Custom Tooltip' },
   { type: 'link', id: 'recipe-custom-plugin', label: 'Custom Plugin' },

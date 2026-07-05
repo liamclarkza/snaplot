@@ -534,6 +534,31 @@ export interface SelectionConfig {
    * only present when the selection tracked both axes.
    */
   onSelect?: (selection: SelectionResult) => void;
+  /**
+   * What a box-select gesture does. `zoom` (the default) zooms the viewport
+   * to the box, preserving prior behavior. `brush` instead leaves a
+   * persistent X-range band drawn as chart state: drag to create it, drag
+   * inside to move it, drag an edge to resize it. Read it with
+   * `getSelection()`, set it with `setSelection()`, and observe changes via
+   * the `selection:change` event. Wheel still zooms and shift-drag still
+   * pans in brush mode.
+   */
+  mode?: 'zoom' | 'brush';
+  /**
+   * Callback fired whenever the persistent brush selection changes (create,
+   * move, resize, programmatic set, or clear). `null` means the selection
+   * was cleared. Mirrors the `selection:change` event.
+   */
+  onBrush?: (selection: SelectionRange | null) => void;
+}
+
+/**
+ * A persistent brush selection in data space, safe to serialize (e.g. into a
+ * URL). `x` is always present; `y` is reserved for a future 2D brush.
+ */
+export interface SelectionRange {
+  x: ScaleRange;
+  y?: ScaleRange;
 }
 
 /** A single scatter point captured inside a box selection. */
@@ -1105,6 +1130,20 @@ export interface ChartInstance {
   resize(width: number, height: number): void;
 
   /**
+   * The current persistent brush selection in data space, or `null`. Set by
+   * a `selection.mode: 'brush'` gesture or `setSelection()`. Safe to
+   * serialize; feed it back to `setSelection()` to restore.
+   */
+  getSelection(): SelectionRange | null;
+  /**
+   * Set or clear the persistent brush selection programmatically (`null`
+   * clears). Fires `selection:change` / `selection.onBrush` on a real
+   * change. Independent of `selection.mode`, so a zoom-mode chart can still
+   * carry a brush set from code.
+   */
+  setSelection(selection: SelectionRange | null): void;
+
+  /**
    * Resume live-follow and snap the X viewport to the newest data. With
    * `streaming.follow` set this jumps to the trailing window; otherwise it
    * resets X to the full data extent. Re-enables following after the user
@@ -1213,6 +1252,8 @@ export interface ChartEventMap {
   'click': (dataX: number, dataIdx: number) => void;
   /** Box selection resolved. Mirror of `selection.onSelect`. */
   'select': (selection: SelectionResult) => void;
+  /** Persistent brush selection changed (`null` when cleared). Mirror of `selection.onBrush`. */
+  'selection:change': (selection: SelectionRange | null) => void;
   /** Emitted while the data layer paints, for canvas-level custom drawing without a plugin. */
   'drawData': (ctx: CanvasRenderingContext2D, layout: Layout) => void;
   /** Emitted while the overlay layer paints, above the data. */

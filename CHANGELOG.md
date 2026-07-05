@@ -7,6 +7,13 @@ to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Added persistent brush selection: `selection.mode: 'brush'` leaves a
+  data-anchored X-range band as chart state instead of zooming. Drag to
+  create it, drag inside to move it, drag an edge to resize it; wheel still
+  zooms and shift-drag still pans. Read/write it with `chart.getSelection()`
+  and `chart.setSelection()` (data space, serializable), and observe changes
+  via the `selection:change` event or `selection.onBrush`. The band stays
+  anchored to the data as the viewport pans and zooms.
 - Added live-follow streaming: `streaming.follow` pins the X viewport to a
   trailing window of that width and scrolls it as data arrives.
   `chart.scrollToLatest()` resumes following after a pan/zoom pauses it,

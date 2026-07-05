@@ -16,6 +16,7 @@ import type {
   Plugin,
   Scale,
   ScaleRange,
+  SelectionRange,
   SeriesConfig,
   StreamingConfig,
   ThemeConfig,
@@ -38,6 +39,7 @@ import { RingColumnarStore } from '../data/RingColumnarStore';
 import { createScale } from '../scales/createScale';
 import {
   AUTO_RANGE_PADDING,
+  BRUSH_EDGE_GRAB_PX,
   DEFAULT_INTERACTION_SAMPLING,
   DEFAULT_TICK_COUNT,
   INTERACTION_REFINE_MS,
@@ -65,7 +67,7 @@ import {
 import { renderBarsSegments } from '../renderers/BarRenderer';
 import { barRectForCategory, categoryWidthFromData } from '../renderers/barGeometry';
 import { renderHistogramSegments } from '../renderers/HistogramRenderer';
-import { renderCrosshair, renderSelectionBox, renderTapRing } from '../renderers/InteractionRenderer';
+import { renderBrushSelection, renderCrosshair, renderSelectionBox, renderTapRing } from '../renderers/InteractionRenderer';
 
 import { GestureManager } from '../interaction/GestureManager';
 import { HitTester } from '../interaction/HitTester';
@@ -185,6 +187,14 @@ export class ChartCore implements ChartInstance {
   private touchCursorFrame: number | null = null;
   /** Active selection box (shift+drag) */
   private selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  /** Persistent brush selection in data space (selection.mode: 'brush'). */
+  private selection: SelectionRange | null = null;
+  /** Selection value at the last emitted selection:change, to skip no-op emits. */
+  private lastEmittedSelection: SelectionRange | null = null;
+  /** In-progress brush drag interaction. */
+  private brushDrag:
+    | { mode: 'create' | 'move' | 'resize-min' | 'resize-max'; anchorDataX: number; orig: ScaleRange }
+    | null = null;
   /** Transient tap-feedback ring, cleared automatically once its lifetime expires. */
   private tapFeedback: { x: number; y: number; startTime: number } | null = null;
   /**
@@ -631,6 +641,119 @@ export class ChartCore implements ChartInstance {
 
   isFollowing(): boolean {
     return this.following;
+  }
+
+  getSelection(): SelectionRange | null {
+    // Return a copy so callers cannot mutate internal state.
+    if (!this.selection) return null;
+    return {
+      x: { min: this.selection.x.min, max: this.selection.x.max },
+      ...(this.selection.y ? { y: { min: this.selection.y.min, max: this.selection.y.max } } : {}),
+    };
+  }
+
+  setSelection(selection: SelectionRange | null): void {
+    if (this.destroyed) return;
+    if (selection === null) {
+      if (this.selection === null) return;
+      this.selection = null;
+    } else {
+      const min = Math.min(selection.x.min, selection.x.max);
+      const max = Math.max(selection.x.min, selection.x.max);
+      this.selection = { x: { min, max } };
+    }
+    this.scheduler.markDirty(DirtyFlag.OVERLAY);
+    this.emitSelectionChange();
+  }
+
+  private isBrushMode(): boolean {
+    return this.config.selection?.mode === 'brush';
+  }
+
+  /** Fire selection:change / onBrush only when the selection actually changed. */
+  private emitSelectionChange(): void {
+    const cur = this.selection;
+    const prev = this.lastEmittedSelection;
+    const same =
+      (cur === null && prev === null) ||
+      (cur !== null &&
+        prev !== null &&
+        cur.x.min === prev.x.min &&
+        cur.x.max === prev.x.max);
+    if (same) return;
+    this.lastEmittedSelection = this.getSelection();
+    const payload = this.getSelection();
+    this.emitEvent('selection:change', payload);
+    this.config.selection?.onBrush?.(payload);
+  }
+
+  /** Pixel x of a data-space X value on the default axis, or null. */
+  private brushPixelRange(): { min: number; max: number } | null {
+    if (!this.selection) return null;
+    const xScale = this.scales.get('x');
+    if (!xScale) return null;
+    return {
+      min: xScale.dataToPixel(this.selection.x.min),
+      max: xScale.dataToPixel(this.selection.x.max),
+    };
+  }
+
+  private brushStart(px: number): void {
+    const xScale = this.scales.get('x');
+    if (!xScale) return;
+    const dataX = xScale.pixelToData(px);
+    const rect = this.brushPixelRange();
+    // Decide the interaction from where the drag begins relative to the
+    // existing band: near an edge resizes it, inside moves it, elsewhere
+    // starts a fresh selection.
+    if (this.selection && rect) {
+      const lo = Math.min(rect.min, rect.max);
+      const hi = Math.max(rect.min, rect.max);
+      if (Math.abs(px - lo) <= BRUSH_EDGE_GRAB_PX) {
+        this.brushDrag = { mode: 'resize-min', anchorDataX: dataX, orig: { ...this.selection.x } };
+        return;
+      }
+      if (Math.abs(px - hi) <= BRUSH_EDGE_GRAB_PX) {
+        this.brushDrag = { mode: 'resize-max', anchorDataX: dataX, orig: { ...this.selection.x } };
+        return;
+      }
+      if (px > lo && px < hi) {
+        this.brushDrag = { mode: 'move', anchorDataX: dataX, orig: { ...this.selection.x } };
+        return;
+      }
+    }
+    this.brushDrag = { mode: 'create', anchorDataX: dataX, orig: { min: dataX, max: dataX } };
+    this.selection = { x: { min: dataX, max: dataX } };
+  }
+
+  private brushUpdate(px: number): void {
+    const xScale = this.scales.get('x');
+    if (!xScale || !this.brushDrag) return;
+    const dataX = xScale.pixelToData(px);
+    const { mode, anchorDataX, orig } = this.brushDrag;
+
+    if (mode === 'create') {
+      this.selection = { x: { min: Math.min(anchorDataX, dataX), max: Math.max(anchorDataX, dataX) } };
+    } else if (mode === 'move') {
+      const delta = dataX - anchorDataX;
+      this.selection = { x: { min: orig.min + delta, max: orig.max + delta } };
+    } else if (mode === 'resize-min') {
+      this.selection = { x: { min: Math.min(dataX, orig.max), max: Math.max(dataX, orig.max) } };
+    } else {
+      this.selection = { x: { min: Math.min(orig.min, dataX), max: Math.max(orig.min, dataX) } };
+    }
+  }
+
+  private brushEnd(): void {
+    if (!this.brushDrag) return;
+    const wasCreate = this.brushDrag.mode === 'create';
+    this.brushDrag = null;
+    // A create gesture that never moved (a click) clears the selection
+    // rather than leaving a zero-width band.
+    if (wasCreate && this.selection && this.selection.x.min === this.selection.x.max) {
+      this.selection = null;
+    }
+    this.emitSelectionChange();
   }
 
   /** Set follow state and emit `follow:change` only on a real transition. */
@@ -1779,12 +1902,22 @@ export class ChartCore implements ChartInstance {
 
     // ── Box selection (start/update/end) ──
     this.eventBus.on('action:box-start', ({ x, y }) => {
+      if (this.isBrushMode()) {
+        this.brushStart(x);
+        this.scheduler.markDirty(DirtyFlag.OVERLAY);
+        return;
+      }
       this.selectionBox = { x1: x, y1: y, x2: x, y2: y };
       this.updateLocalCursorFromPoint(x, y, this.lastPointerType, true);
       this.scheduler.markDirty(DirtyFlag.OVERLAY);
     });
 
     this.eventBus.on('action:box-update', ({ x, y }) => {
+      if (this.isBrushMode()) {
+        this.brushUpdate(x);
+        this.scheduler.markDirty(DirtyFlag.OVERLAY);
+        return;
+      }
       if (!this.selectionBox) {
         this.selectionBox = { x1: x, y1: y, x2: x, y2: y };
       }
@@ -1807,6 +1940,11 @@ export class ChartCore implements ChartInstance {
     });
 
     this.eventBus.on('action:box-end', ({ x1, y1, x2, y2 }) => {
+      if (this.isBrushMode()) {
+        this.brushEnd();
+        this.scheduler.markDirty(DirtyFlag.OVERLAY);
+        return;
+      }
       this.selectionBox = null;
       this.scheduler.markDirty(DirtyFlag.OVERLAY);
 
@@ -2494,6 +2632,21 @@ export class ChartCore implements ChartInstance {
       );
     } else {
       this.tooltipManager.hide();
+    }
+
+    // Draw the persistent brush selection band (anchored in data space, so it
+    // stays put as the viewport pans/zooms), then edge handles.
+    if (this.selection) {
+      const rect = this.brushPixelRange();
+      if (rect) {
+        renderBrushSelection(
+          ctx,
+          rect.min,
+          rect.max,
+          this.layout,
+          this.theme.crosshairColor,
+        );
+      }
     }
 
     // Draw selection box

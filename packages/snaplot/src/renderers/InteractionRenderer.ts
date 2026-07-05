@@ -122,3 +122,54 @@ export function renderSelectionBox(
   ctx.strokeRect(rx + offset, ry + offset, rw, rh);
   ctx.restore();
 }
+
+/**
+ * Persistent brush selection: a full-height X-range band with two vertical
+ * edge handles. Unlike the transient selection box, this is drawn from
+ * data-space bounds every overlay frame, so it stays anchored to the data as
+ * the viewport pans and zooms. Edges are clamped to the plot so a band that
+ * scrolls partly off-screen still reads.
+ */
+export function renderBrushSelection(
+  ctx: CanvasRenderingContext2D,
+  pxMin: number,
+  pxMax: number,
+  layout: Layout,
+  color: string,
+): void {
+  const { plot } = layout;
+  const left = Math.max(plot.left, Math.min(pxMin, pxMax));
+  const right = Math.min(plot.left + plot.width, Math.max(pxMin, pxMax));
+  if (right < plot.left || left > plot.left + plot.width) return;
+
+  const offset = layout.dpr === 1 ? 0.5 : 0;
+  const rx = Math.round(left);
+  const rw = Math.round(right) - rx;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(plot.left, plot.top, plot.width, plot.height, 4);
+  ctx.clip();
+
+  ctx.fillStyle = 'rgba(99, 148, 255, 0.14)';
+  ctx.fillRect(rx, plot.top, rw, plot.height);
+
+  // Edge handles, only for edges that fall inside the plot (a band scrolled
+  // off one side shows just the visible edge).
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.85;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if (pxMin >= plot.left && pxMin <= plot.left + plot.width) {
+    const x = Math.round(Math.min(pxMin, pxMax)) + offset;
+    ctx.moveTo(x, plot.top);
+    ctx.lineTo(x, plot.top + plot.height);
+  }
+  if (pxMax >= plot.left && pxMax <= plot.left + plot.width) {
+    const x = Math.round(Math.max(pxMin, pxMax)) + offset;
+    ctx.moveTo(x, plot.top);
+    ctx.lineTo(x, plot.top + plot.height);
+  }
+  ctx.stroke();
+  ctx.restore();
+}

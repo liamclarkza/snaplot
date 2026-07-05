@@ -1472,6 +1472,96 @@ describe('ChartCore live-follow viewport', () => {
     chart.destroy();
   });
 
+  it('brush mode creates a persistent data-anchored selection without zooming', () => {
+    const changes: (unknown)[] = [];
+    const xs = new Float64Array(101);
+    const ys = new Float64Array(101);
+    for (let i = 0; i <= 100; i++) { xs[i] = i; ys[i] = i; }
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
+        series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
+        selection: { mode: 'brush' as const },
+      },
+      [xs, ys],
+    );
+    chart.on('selection:change', (s) => changes.push(s));
+    const x = chart.getAxis('x')!;
+    const beforeMin = x.min;
+    const beforeMax = x.max;
+
+    const bus = chartEventBus(chart);
+    bus.emit('action:box-start', { x: x.dataToPixel(20), y: plotPoint(chart).y });
+    bus.emit('action:box-update', { x: x.dataToPixel(60), y: plotPoint(chart).y });
+    bus.emit('action:box-end', { x1: 0, y1: 0, x2: 0, y2: 0 });
+
+    const sel = chart.getSelection();
+    expect(sel).not.toBeNull();
+    expect(sel!.x.min).toBeCloseTo(20, 6);
+    expect(sel!.x.max).toBeCloseTo(60, 6);
+    expect(changes.length).toBe(1);
+    // Brush must not zoom the viewport.
+    expect(x.min).toBe(beforeMin);
+    expect(x.max).toBe(beforeMax);
+
+    // The selection is stored in data space, so it survives a zoom.
+    chart.setAxis('x', { min: 10, max: 90 });
+    expect(chart.getSelection()!.x.min).toBeCloseTo(20, 6);
+    chart.destroy();
+  });
+
+  it('brush move shifts an existing selection by the drag delta', () => {
+    const xs = new Float64Array(101);
+    const ys = new Float64Array(101);
+    for (let i = 0; i <= 100; i++) { xs[i] = i; ys[i] = i; }
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
+        series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
+        selection: { mode: 'brush' as const },
+      },
+      [xs, ys],
+    );
+    chart.setSelection({ x: { min: 20, max: 40 } });
+    const x = chart.getAxis('x')!;
+
+    const bus = chartEventBus(chart);
+    // Start inside the band (data 30), drag to data 50: delta +20 -> [40, 60].
+    bus.emit('action:box-start', { x: x.dataToPixel(30), y: plotPoint(chart).y });
+    bus.emit('action:box-update', { x: x.dataToPixel(50), y: plotPoint(chart).y });
+    bus.emit('action:box-end', { x1: 0, y1: 0, x2: 0, y2: 0 });
+
+    const sel = chart.getSelection()!;
+    expect(sel.x.min).toBeCloseTo(40, 6);
+    expect(sel.x.max).toBeCloseTo(60, 6);
+    chart.destroy();
+  });
+
+  it('setSelection/getSelection round-trips and clearing fires a change', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
+        series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
+        selection: { mode: 'brush' as const },
+      },
+      [f([0, 50, 100]), f([1, 2, 3])],
+    );
+    const changes: (unknown)[] = [];
+    chart.on('selection:change', (s) => changes.push(s));
+
+    chart.setSelection({ x: { min: 30, max: 10 } }); // unordered -> normalized
+    expect(chart.getSelection()).toEqual({ x: { min: 10, max: 30 } });
+    chart.setSelection({ x: { min: 10, max: 30 } }); // identical -> no event
+    chart.setSelection(null);
+    expect(chart.getSelection()).toBeNull();
+
+    expect(changes).toEqual([{ x: { min: 10, max: 30 } }, null]);
+    chart.destroy();
+  });
+
   it('without a follow window, isFollowing tracks full-extent auto-range', () => {
     const chart = new ChartCore(
       document.createElement('div'),

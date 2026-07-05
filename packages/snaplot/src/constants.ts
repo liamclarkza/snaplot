@@ -599,6 +599,9 @@ export const TOOLTIP_OFFSET = 12;
 /** Minimum drag distance before zoom/selection activates (CSS pixels) */
 export const MIN_DRAG_DISTANCE = 10;
 
+/** Grab zone around a brush-selection edge for resize vs move (CSS pixels) */
+export const BRUSH_EDGE_GRAB_PX = 8;
+
 /** Default zoom fraction per max wheel/pinch tick (10 % per tick). */
 export const DEFAULT_WHEEL_STEP = 0.1;
 

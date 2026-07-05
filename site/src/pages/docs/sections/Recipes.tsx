@@ -127,6 +127,37 @@ const config = group.apply({
         <LinkedChartsDemo />
       </Section>
 
+      <Section id="recipe-brush" title="Recipe: Persistent Brush Selection">
+        <Prose>
+          <code>selection.mode: 'brush'</code> turns a drag into a persistent
+          X-range band instead of a zoom. Drag to create it, drag inside to move
+          it, drag an edge to resize it. The band is chart state in data space,
+          so it stays anchored as you pan and zoom, and
+          <code>getSelection()</code> returns a value you can drop straight into
+          a URL and restore with <code>setSelection()</code>. Wheel still zooms
+          and shift-drag still pans.
+        </Prose>
+        <CodeBlock code={`const chart = new ChartCore(container, {
+  selection: { mode: 'brush' },
+  axes: { x: { type: 'time' } },
+  series: [{ label: 'value', dataIndex: 1, type: 'line' }],
+}, data);
+
+// Persist the window in the URL and mirror it to a summary panel.
+chart.on('selection:change', (sel) => {
+  if (!sel) { history.replaceState(null, '', location.pathname); return; }
+  const q = new URLSearchParams({ from: String(sel.x.min), to: String(sel.x.max) });
+  history.replaceState(null, '', '?' + q);
+  summarize(sel.x.min, sel.x.max);
+});
+
+// Restore on load.
+const q = new URLSearchParams(location.search);
+if (q.has('from')) {
+  chart.setSelection({ x: { min: +q.get('from'), max: +q.get('to') } });
+}`} />
+      </Section>
+
       <Section id="recipe-scatter-encoding" title="Recipe: Encoded Scatter">
         <Prose>
           Scatter series map extra columns onto color, radius, and tooltip
