@@ -137,8 +137,15 @@ function ProximityDemo() {
 }
 
 const UPDATE_LAST_MAXLEN = 24;
-const UPDATE_LAST_TICK_MS = 90;
-const UPDATE_LAST_TICKS_PER_BUCKET = 15;
+// Deliberately unhurried so each change reads as a discrete update, not lag:
+// the forming bar visibly steps up a few times (updateLast, in place), then a
+// new bar commits and the window scrolls one slot. A faster cadence blurred
+// the in-place refinement into the once-per-bucket scroll and looked jittery.
+const UPDATE_LAST_TICK_MS = 220;
+const UPDATE_LAST_TICKS_PER_BUCKET = 6;
+// Reach most of the target within those few grow ticks so the "fills, then
+// commits" story is legible at the slower cadence.
+const UPDATE_LAST_GROW_RATE = 0.42;
 
 function seedBuckets(rand: () => number): ColumnarData {
   const x = new Float64Array(UPDATE_LAST_MAXLEN);
@@ -185,7 +192,7 @@ function UpdateLastDemo() {
       } else {
         // The open bucket keeps filling: overwrite the tail in place rather
         // than appending a new point for every partial update.
-        forming += (target - forming) * 0.28;
+        forming += (target - forming) * UPDATE_LAST_GROW_RATE;
         chart.appendData([f([lastX]), f([forming])], { updateLast: true });
       }
     }, UPDATE_LAST_TICK_MS);
