@@ -24,6 +24,11 @@ export interface ChartGroupLinkOptions {
    */
   yDomain?: boolean;
   /**
+   * Axis key the shared Y domain reads and writes. Default `'y'`. Set this
+   * for charts whose value axis uses a different key (e.g. `'value'`).
+   */
+  yAxisKey?: string;
+  /**
    * Align the left plot edge across linked charts by matching the widest
    * axis gutter, so stacked charts line up. Default: true.
    */
@@ -132,7 +137,10 @@ export function createChartGroup<TMeta = unknown>(
   const defaults = groupOptions?.defaults;
 
   // Linked instances for domain/gutter coordination.
-  const linked = new Map<ChartInstance, { off: () => void; opts: Required<ChartGroupLinkOptions> }>();
+  const linked = new Map<
+    ChartInstance,
+    { off: () => void; opts: Required<Omit<ChartGroupLinkOptions, 'yAxisKey'>> & { yAxisKey: string } }
+  >();
   // Re-entrancy guard: applying setAxis/setOptions during coordination must
   // not recurse. We only listen to data:update/resize, and neither is emitted
   // by setAxis (viewport:change) or setOptions (options:update), so this guard
@@ -148,7 +156,7 @@ export function createChartGroup<TMeta = unknown>(
       let yMax = Number.NEGATIVE_INFINITY;
       for (const [chart, { opts }] of linked) {
         if (!opts.yDomain) continue;
-        const y = chart.getAxis('y');
+        const y = chart.getAxis(opts.yAxisKey);
         if (y && Number.isFinite(y.min) && Number.isFinite(y.max)) {
           if (y.min < yMin) yMin = y.min;
           if (y.max > yMax) yMax = y.max;
@@ -157,8 +165,10 @@ export function createChartGroup<TMeta = unknown>(
       if (yMin < yMax) {
         for (const [chart, { opts }] of linked) {
           if (!opts.yDomain) continue;
-          const y = chart.getAxis('y');
-          if (y && (y.min !== yMin || y.max !== yMax)) chart.setAxis('y', { min: yMin, max: yMax });
+          const y = chart.getAxis(opts.yAxisKey);
+          if (y && (y.min !== yMin || y.max !== yMax)) {
+            chart.setAxis(opts.yAxisKey, { min: yMin, max: yMax });
+          }
         }
       }
 
@@ -213,7 +223,11 @@ export function createChartGroup<TMeta = unknown>(
     },
 
     link(chart, options) {
-      const opts = { yDomain: options?.yDomain !== false, gutters: options?.gutters !== false };
+      const opts = {
+        yDomain: options?.yDomain !== false,
+        gutters: options?.gutters !== false,
+        yAxisKey: options?.yAxisKey ?? 'y',
+      };
       const existing = linked.get(chart);
       if (existing) existing.off();
       const offData = chart.on('data:update', () => coordinate());

@@ -1411,6 +1411,38 @@ describe('ChartCore live-follow viewport', () => {
     chart.destroy();
   });
 
+  it('does not collapse to a zero-span X range with a single point', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      streamConfig,
+      [f([42]), f([7])],
+    );
+    const x = chart.getAxis('x')!;
+    // window 10, lastX 42, dataMin 42: rawMin === lastX, so expand to a unit
+    // window rather than [42, 42].
+    expect(x.min).toBeLessThan(x.max);
+    expect(x.min).toBe(41);
+    expect(x.max).toBe(43);
+    chart.destroy();
+  });
+
+  it('setAxis (sync-peer entry) pauses following on a horizontal viewport', () => {
+    const changes: boolean[] = [];
+    const chart = new ChartCore(
+      document.createElement('div'),
+      streamConfig,
+      [f([0, 5, 10]), f([1, 2, 3])],
+    );
+    chart.on('follow:change', (f2) => changes.push(f2));
+    expect(chart.isFollowing()).toBe(true);
+    // A peer broadcasts a viewport through setAxis; the receiver must stop
+    // following so its next tick does not scroll back over the synced window.
+    chart.setAxis('x', { min: 2, max: 8 });
+    expect(chart.isFollowing()).toBe(false);
+    expect(changes).toEqual([false]);
+    chart.destroy();
+  });
+
   it('scrollToLatest resumes following and snaps to the newest window', () => {
     const changes: boolean[] = [];
     const chart = new ChartCore(
@@ -1451,19 +1483,20 @@ describe('ChartCore live-follow viewport', () => {
     );
 
     const seg = { xData: xs, yData: ys, startIdx: 0, endIdx: n - 1 };
+    const xScale = chart.getAxis('x')!;
     const internal = chart as unknown as {
       viewportActiveUntil: number;
-      decimateLineSegments: (s: typeof seg[]) => typeof seg[];
+      decimateLineSegments: (s: typeof seg[], scale: typeof xScale) => typeof seg[];
       layout: { plot: { width: number } };
     };
 
     // At rest: no decimation, the exact segments pass through.
     internal.viewportActiveUntil = 0;
-    expect(internal.decimateLineSegments([seg])).toEqual([seg]);
+    expect(internal.decimateLineSegments([seg], xScale)).toEqual([seg]);
 
     // During a gesture: decimated to at most 4 points per pixel column.
     internal.viewportActiveUntil = performance.now() + 10_000;
-    const decimated = internal.decimateLineSegments([seg]);
+    const decimated = internal.decimateLineSegments([seg], xScale);
     const total = decimated.reduce((acc, s) => acc + (s.endIdx - s.startIdx + 1), 0);
     const budget = Math.max(1, Math.round(internal.layout.plot.width)) * 4;
     expect(total).toBeLessThanOrEqual(budget);

@@ -396,31 +396,48 @@ export class ChartCore implements ChartInstance {
 
   /**
    * Pin every horizontal axis to `[latestX - window, latestX]` (clamped to
-   * the data) and re-fit Y over that window. Returns whether any bound moved,
-   * so the caller knows if the grid must repaint.
+   * the data) and re-fit Y over that window. Returns whether any scale bound
+   * moved (X or the follow-driven Y auto-range), so the caller knows if the
+   * grid must repaint.
+   *
+   * This does not publish to zoom sync: a follow scroll is a local,
+   * data-driven motion, and syncing it would fight peers that have their own
+   * data or a paused viewport. Manual pan/zoom (applyViewportChange) and the
+   * explicit resume actions (resetZoom/scrollToLatest) are what sync.
    */
   private applyFollowWindow(): boolean {
     const window = this.followWindow();
     if (window === undefined || this.store.length === 0) return false;
     const lastX = this.store.xAt(this.store.length - 1);
     const dataMin = this.store.xAt(0);
-    const min = Math.max(dataMin, lastX - window);
+    // A single point (or a window wider than the data) would give a zero-span
+    // domain; expand to a unit window around the point, matching how
+    // autoRangeHorizontal handles xMin === xMax.
+    const rawMin = Math.max(dataMin, lastX - window);
+    const min = rawMin === lastX ? lastX - 1 : rawMin;
+    const max = rawMin === lastX ? lastX + 1 : lastX;
 
-    let moved = false;
+    // Signature over all scales so a Y-only change (follow keeps X fixed while
+    // the newest point shifts the Y extent) still reports moved=true and
+    // repaints the grid, matching autoRangeTracked.
+    const before = this.scaleSignature();
     const axisConfigs = this.config.axes ?? {};
     for (const [key, scale] of this.scales) {
       const pos = inferPosition(key, axisConfigs[key]?.position);
       if (pos !== 'bottom' && pos !== 'top') continue;
-      if (scale.min !== min || scale.max !== lastX) moved = true;
       scale.min = min;
-      scale.max = lastX;
-      this.naturalExtent.set(key, [min, lastX]);
-      if (this.zoomSyncKey && !this.suppressZoomSync) {
-        SyncGroup.publishScale(this.zoomSyncKey, this, key, { min, max: lastX });
-      }
+      scale.max = max;
+      this.naturalExtent.set(key, [min, max]);
     }
     if (!this.config.zoom?.y) this.autoRangeVertical(true);
-    return moved;
+    return this.scaleSignature() !== before;
+  }
+
+  /** Join every scale's key and bounds; used to detect any domain change. */
+  private scaleSignature(): string {
+    let sig = '';
+    for (const [key, scale] of this.scales) sig += key + ':' + scale.min + ':' + scale.max + '|';
+    return sig;
   }
 
   /**
@@ -439,16 +456,9 @@ export class ChartCore implements ChartInstance {
       return true;
     }
 
-    let signature = '';
-    for (const [key, scale] of this.scales) {
-      signature += key + ':' + scale.min + ':' + scale.max + '|';
-    }
+    const before = this.scaleSignature();
     this.autoRange();
-    let after = '';
-    for (const [key, scale] of this.scales) {
-      after += key + ':' + scale.min + ':' + scale.max + '|';
-    }
-    return signature !== after;
+    return this.scaleSignature() !== before;
   }
 
   getData(): ColumnarData {
@@ -474,6 +484,10 @@ export class ChartCore implements ChartInstance {
     const ac = this.config.axes?.[key];
     const pos = inferPosition(key, ac?.position);
     const isHoriz = pos === 'bottom' || pos === 'top';
+    // A received horizontal viewport means a peer took manual control; pause
+    // live-follow so this chart pins to the synced window instead of scrolling
+    // its own follow window back over the driver on the next data tick.
+    if (isHoriz) this.setFollowing(false);
     if (isHoriz && !this.config.zoom?.y) {
       this.autoRangeVertical(true);
     }
@@ -582,6 +596,10 @@ export class ChartCore implements ChartInstance {
     this.updateLayout();
     this.updateScalePixelRanges();
     this.autoRange();
+    // Reapply the follow window that autoRange just overwrote with the full
+    // extent, so a config update does not knock a following chart off its
+    // trailing window (matches initAxes).
+    if (this.following) this.applyFollowWindow();
     this.scheduler.markDirty(DirtyFlag.ALL);
     this.emitEvent('options:update', this.config);
     this.pluginManager.dispatch('onSetOptions', this);
@@ -1517,10 +1535,8 @@ export class ChartCore implements ChartInstance {
    * decimation is off, the gesture is idle, or the series already fits the
    * pixel budget. Sets sampledLastDataRender so the settle timer refines.
    */
-  private decimateLineSegments(segments: LineRenderSegment[]): LineRenderSegment[] {
+  private decimateLineSegments(segments: LineRenderSegment[], xScale: Scale): LineRenderSegment[] {
     if (!this.interactionActive()) return segments;
-    const xScale = this.scales.get('x');
-    if (!xScale) return segments;
     const pixelWidth = Math.max(1, Math.round(this.layout.plot.width));
     const budget = pixelWidth * 4;
 
@@ -2491,10 +2507,10 @@ export class ChartCore implements ChartInstance {
 
       switch (type) {
         case 'line':
-          renderLineSegments(ctx, this.decimateLineSegments(renderSegments), xScale, yScale, this.layout, renderSeries, color, opacityMul);
+          renderLineSegments(ctx, this.decimateLineSegments(renderSegments, xScale), xScale, yScale, this.layout, renderSeries, color, opacityMul);
           break;
         case 'area':
-          renderAreaSegments(ctx, this.decimateLineSegments(renderSegments), xScale, yScale, this.layout, renderSeries, color, opacityMul);
+          renderAreaSegments(ctx, this.decimateLineSegments(renderSegments, xScale), xScale, yScale, this.layout, renderSeries, color, opacityMul);
           break;
         case 'band': {
           const upperIdx = series.upperDataIndex;
