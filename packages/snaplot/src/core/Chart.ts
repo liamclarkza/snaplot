@@ -452,7 +452,11 @@ export class ChartCore implements ChartInstance {
     }
 
     if (shouldValidateConfig()) {
-      validateChartConfig(this.config, this.store.length > 0 ? this.store.getData() : undefined);
+      // Structural checks only here: a config update can legitimately add a
+      // series that references a column arriving with a later setData, so
+      // column-index bounds are validated by setData and the constructor, not
+      // against whatever data happens to be loaded now.
+      validateChartConfig(this.config);
     }
     this.applyConfigSideEffects(partial, false);
   }
@@ -484,7 +488,11 @@ export class ChartCore implements ChartInstance {
     }
 
     if (shouldValidateConfig()) {
-      validateChartConfig(this.config, this.store.length > 0 ? this.store.getData() : undefined);
+      // Structural checks only here: a config update can legitimately add a
+      // series that references a column arriving with a later setData, so
+      // column-index bounds are validated by setData and the constructor, not
+      // against whatever data happens to be loaded now.
+      validateChartConfig(this.config);
     }
     this.applyConfigSideEffects(config, true);
   }

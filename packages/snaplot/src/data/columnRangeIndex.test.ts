@@ -141,6 +141,19 @@ describe('ScatterColumnRangeIndex', () => {
     }
   });
 
+  it('includes the rightmost in-window point (inclusive upper bound)', () => {
+    // Regression: an off-by-one upper bound dropped the largest-X point in
+    // the window, so a Y extremum sitting on that point was clipped during
+    // viewport auto-range. The rightmost point here carries the Y max.
+    const x = Float64Array.from([1, 2, 3, 4, 5]);
+    const y = Float64Array.from([10, 20, 30, 40, 50]);
+    const index = new ScatterColumnRangeIndex(x, y);
+    expect(index.query(2, 3, false)).toEqual([20, 30]);
+    expect(index.query(1, 5, false)).toEqual([10, 50]);
+    expect(index.query(3, 3, false)).toEqual([30, 30]);
+    expect(index.query(2.5, 4.5, false)).toEqual([30, 40]);
+  });
+
   it('returns null when no X falls inside the window', () => {
     const x = Float64Array.from([1, 2, 3]);
     const y = Float64Array.from([10, 20, 30]);

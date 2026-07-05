@@ -143,7 +143,9 @@ export class ScatterColumnRangeIndex {
     if (this.finiteCount === 0) return null;
     const finite = this.sortedX.subarray(0, this.finiteCount);
     const start = lowerBound(finite, xMin);
-    const end = upperBound(finite, xMax) - 1;
+    // upperBound already returns the inclusive last index whose value <= xMax
+    // (it returns lo - 1); it is NOT the C++ "first greater" convention.
+    const end = upperBound(finite, xMax);
     if (end < start) return null;
     return this.yIndex.query(start, end, positiveOnly);
   }

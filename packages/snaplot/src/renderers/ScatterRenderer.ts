@@ -238,8 +238,10 @@ function drawStampedSegments(
 
   // Points outside the plot rect are clipped away anyway; skipping them
   // here saves the drawImage call. Matters for arbitrary-xDataIndex series,
-  // which reach this loop unculled.
-  const maxRadius = Math.max(constantRadius, radius, 8);
+  // which reach this loop unculled. The margin must cover the largest marker
+  // the resolver can produce (a sizeBy range max well above the base radius),
+  // or a big edge-straddling bubble whose body overlaps the plot gets dropped.
+  const maxRadius = Math.max(constantRadius, radius, resolver.maxRadius, 8);
   const pxMin = layout.plot.left - maxRadius;
   const pxMax = layout.plot.left + layout.plot.width + maxRadius;
   const pyMin = layout.plot.top - maxRadius;
@@ -269,7 +271,9 @@ function drawStampedSegments(
 
       const px = ax ? xData[i] * kx + bx : scaleX.dataToPixel(xData[i]);
       const py = ay ? yVal * ky + by : scaleY.dataToPixel(yVal);
-      // The range checks also reject NaN, covering non-finite X values.
+      // Cull off-plot points. A non-finite px/py passes these comparisons
+      // (every compare with NaN is false) but drawImage ignores non-finite
+      // coordinates, so such a point draws nothing either way.
       if (px < pxMin || px > pxMax || py < pyMin || py > pyMax) continue;
 
       if (constantStamp) {

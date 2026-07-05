@@ -31,6 +31,12 @@ export interface ScatterStyleResolver {
   colorBinAt(index: number): number;
   /** Color for a bin from colorBinAt. Cached; safe to call per point. */
   colorForBin(bin: number): string;
+  /**
+   * Largest radius radiusAt can return (the size range's upper bound, or the
+   * fixed fallback radius). The render loop needs it to size the off-screen
+   * cull margin so a large edge-straddling bubble is not dropped.
+   */
+  maxRadius: number;
 }
 
 /** Bin count for continuous ramps in the fast path; 64 steps are visually smooth. */
@@ -196,9 +202,14 @@ export function resolverFromEncodingState(
     return Math.round(clamped * (CONTINUOUS_COLOR_BINS - 1));
   };
 
+  // radiusAt maps t in [0,1] onto [rMin, rMax], so the max marker radius is
+  // the range upper bound (regardless of linear/sqrt) or the fixed fallback.
+  const maxRadius = sizeState ? Math.max(sizeState.range[0], sizeState.range[1]) : fallbackRadius;
+
   return {
     variableColor: !!colorState,
     variableRadius: !!sizeState,
+    maxRadius,
     colorBinAt,
     colorForBin,
     colorAt(index: number): string {
