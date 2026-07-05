@@ -23,6 +23,14 @@ to [Semantic Versioning](https://semver.org/).
 - Added a benchmark workspace (`bench/`) with scripted pan/zoom sweeps,
   gesture scenarios, and a CPU-throttled mobile profile, plus a tracked
   baseline and comparison script for regression checks.
+- Added development-mode config validation that runs on construction,
+  `setData`, `setOptions`, and `replaceOptions`. It throws a `TypeError`
+  naming the offending series and the valid range for out-of-range
+  column indices (dataIndex, yDataIndex, xDataIndex, upper/lowerDataIndex,
+  colorBy, sizeBy, tooltipFields), a band series missing a bound, or an
+  unknown series type, and warns for an unknown axis key, an invalid
+  tooltip mode, or a non-positive highlight proximity. Compiled out of
+  production bundles.
 
 ### Changed
 - Added an interaction pass for large scatter series: while the viewport
@@ -52,8 +60,24 @@ to [Semantic Versioning](https://semver.org/).
   documented layered-repaint contract.
 - Scatter points outside the plot area are skipped before `drawImage`,
   which bounds off-viewport cost for arbitrary `xDataIndex` series.
+- Gridlines now render as solid 1px hairlines instead of 0.5px dashes:
+  the dash pattern slid along each line during a pan and made the grid
+  shimmer, and a half-pixel stroke read as a blurry grey. The solid
+  hairline is drawn well below the theme's grid opacity so the grid
+  still recedes beneath the plot frame.
+- The default tooltip tightens its padding, line height, and corner
+  radius, caps long series lists at twelve rows with a "+N more" row,
+  and ellipsizes labels wider than the tooltip instead of overflowing.
+- Reduced motion is honored: with `prefers-reduced-motion: reduce` the
+  tap-feedback ring no longer expands (it fades in place) and the
+  tooltip appears without an opacity transition.
 
 ### Fixed
+- The plot frame is now crisp on all four edges at dpr 1: the right and
+  bottom strokes were laid at an unrounded, often fractional, plot
+  width/height and blurred while the top and left stayed sharp.
+- The drag selection box snaps to the pixel grid for a crisp outline and
+  uses a mid-blue accent that reads on both light and dark themes.
 - The scatter heatmap bitmap cache is now owned per chart series instead
   of one module-level slot: two density charts on a page (or two density
   series in one chart) no longer invalidate each other every frame, and
@@ -172,6 +196,8 @@ to [Semantic Versioning](https://semver.org/).
 - `createChartGroup().apply()` no longer clobbers a caller-set `syncKey`,
   and zoom sync is opt-in (`bind({ zoom: true })` / `apply(config,
   { zoom: true })`) rather than forced on every grouped chart.
+
+## [0.9.0] - 2026-05-03
 
 ### Added
 - Added touch interaction knobs for one-finger drag behavior and touch

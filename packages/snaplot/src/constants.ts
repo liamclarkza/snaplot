@@ -170,6 +170,9 @@ export const OCEAN_THEME: ThemeConfig = {
     '#0ea5e9', // deep sky
     '#f472b6', // reef pink
   ],
+  // Dark-anchored ocean ramp: rises from just above the navy bg to pale cyan.
+  sequentialPalette: ['#0e2033', '#123f63', '#1c6f9e', '#28a0c4', '#6bd0e0', '#cff3f7'],
+  heatmapGradient: ['#0e2033', '#123f63', '#1c6f9e', '#28a0c4', '#6bd0e0', '#cff3f7'],
   axisLineColor: '#1a3352',
   borderColor: '#1a3352',
   borderOpacity: 0.55,
@@ -203,6 +206,9 @@ export const FOREST_THEME: ThemeConfig = {
     '#84cc16', // lime
     '#0d9488', // deep teal
   ],
+  // Dark-anchored forest ramp: pine shadow up to pale leaf.
+  sequentialPalette: ['#0f1c17', '#143f2d', '#1a7350', '#2aa778', '#6fd6a0', '#ccf4da'],
+  heatmapGradient: ['#0f1c17', '#143f2d', '#1a7350', '#2aa778', '#6fd6a0', '#ccf4da'],
   axisLineColor: '#1a2a24',
   borderColor: '#1a2a24',
   borderOpacity: 0.55,
@@ -236,6 +242,9 @@ export const SUNSET_THEME: ThemeConfig = {
     '#e11d48', // sunset red
     '#facc15', // honey
   ],
+  // Dark-anchored dusk ramp: aubergine through ember to gold.
+  sequentialPalette: ['#1e1626', '#3d2342', '#7a3a5c', '#c25a4b', '#f0953c', '#fde08a'],
+  heatmapGradient: ['#1e1626', '#3d2342', '#7a3a5c', '#c25a4b', '#f0953c', '#fde08a'],
   axisLineColor: '#2e2133',
   borderColor: '#2e2133',
   borderOpacity: 0.7,
@@ -269,6 +278,9 @@ export const VIOLET_THEME: ThemeConfig = {
     '#60a5fa', // blue
     '#e0d9ff', // lilac haze
   ],
+  // Dark-anchored violet ramp: aubergine up through indigo to lilac haze.
+  sequentialPalette: ['#141126', '#241a4a', '#3f2f8a', '#6d5bd0', '#a78bfa', '#e3ddff'],
+  heatmapGradient: ['#141126', '#241a4a', '#3f2f8a', '#6d5bd0', '#a78bfa', '#e3ddff'],
   axisLineColor: '#242042',
   borderColor: '#242042',
   borderOpacity: 0.55,
@@ -302,10 +314,14 @@ export const FOG_THEME: ThemeConfig = {
     '#4f46e5', // indigo
     '#0d9488', // teal
   ],
+  // Light-anchored blue ramp starting at the fog bg, descending to deep blue.
+  sequentialPalette: ['#f5f7fb', '#dbe6f7', '#a9c7ee', '#5f97d6', '#2563eb', '#123a8a'],
+  heatmapGradient: ['#f5f7fb', '#dbe6f7', '#a9c7ee', '#5f97d6', '#2563eb', '#123a8a'],
   axisLineColor: '#c8cfdc',
   borderColor: '#c8cfdc',
   borderOpacity: 0.42,
-  tickColor: '#6a7386',
+  // Darkened one step from #6a7386 to clear WCAG AA (4.5:1) for small text.
+  tickColor: '#626b7d',
   crosshairColor: '#384050',
   tooltipBackground: '#ffffff',
   tooltipTextColor: '#1a2030',
@@ -334,10 +350,14 @@ export const IVORY_THEME: ThemeConfig = {
     '#0f766e', // teal
     '#7c2d12', // mahogany
   ],
+  // Light-anchored earth ramp starting at the cream bg, descending to mahogany.
+  sequentialPalette: ['#faf8f3', '#f2e3cf', '#e3bd8f', '#d1893f', '#c2410c', '#7c2d12'],
+  heatmapGradient: ['#faf8f3', '#f2e3cf', '#e3bd8f', '#d1893f', '#c2410c', '#7c2d12'],
   axisLineColor: '#d9d3c3',
   borderColor: '#d9d3c3',
   borderOpacity: 0.5,
-  tickColor: '#7d7458',
+  // Darkened one step from #7d7458 to clear WCAG AA (4.5:1) for small text.
+  tickColor: '#746c4f',
   crosshairColor: '#3f3826',
   tooltipBackground: '#ffffff',
   tooltipTextColor: '#2a2418',
@@ -361,11 +381,14 @@ export const MINT_THEME: ThemeConfig = {
     '#0891b2', // cyan
     '#a16207', // yellow-brown
     '#be185d', // pink-brown
-    '#7c3aed', // violet
+    '#8b5cf6', // violet (lightened from #7c3aed so it parts from the adjacent blue under deuteranopia)
     '#2563eb', // blue
     '#0d9488', // teal
     '#ca8a04', // amber
   ],
+  // Light-anchored emerald ramp starting at the mint bg, descending to deep pine.
+  sequentialPalette: ['#f3faf7', '#d0efe0', '#93d9bd', '#4fbf92', '#059669', '#064e3b'],
+  heatmapGradient: ['#f3faf7', '#d0efe0', '#93d9bd', '#4fbf92', '#059669', '#064e3b'],
   axisLineColor: '#c5d9cf',
   borderColor: '#c5d9cf',
   borderOpacity: 0.5,
@@ -481,10 +504,14 @@ export const MIDNIGHT_THEME: ThemeConfig = {
   gridColor: '#1f2028',
   gridOpacity: 0.55,
   palette: ['#ff6b6b', '#51cf66', '#339af0', '#fcc419', '#cc5de8', '#ff922b', '#22b8cf', '#e599f7'],
+  // Dark-anchored blue ramp for the near-black bg.
+  sequentialPalette: ['#0f1018', '#1c2340', '#2a4a86', '#3a7bd0', '#63b2ea', '#cfe8fb'],
+  heatmapGradient: ['#0f1018', '#1c2340', '#2a4a86', '#3a7bd0', '#63b2ea', '#cfe8fb'],
   axisLineColor: '#2a2b36',
   borderColor: '#2a2b36',
   borderOpacity: 0.7,
-  tickColor: '#666677',
+  // Lightened from #666677 (3.45:1, failed AA) to clear 4.5:1 on the near-black bg.
+  tickColor: '#828295',
   crosshairColor: '#888899',
   tooltipBackground: 'rgba(10, 10, 15, 0.95)',
   tooltipTextColor: '#e0e0e0',
@@ -507,6 +534,9 @@ export const MARS_THEME: ThemeConfig = {
     '#ff8a3d', '#e2504b', '#f4c27c', '#c06548',
     '#8e3a1e', '#e8a272', '#b04a2f', '#f2d7c0',
   ],
+  // Dark-anchored rust ramp for the burnt-umber bg.
+  sequentialPalette: ['#20120d', '#3f1f14', '#7a3a1e', '#c0632f', '#e89a5c', '#f7d9b0'],
+  heatmapGradient: ['#20120d', '#3f1f14', '#7a3a1e', '#c0632f', '#e89a5c', '#f7d9b0'],
   axisLineColor: '#3a1f17',
   borderColor: '#3a1f17',
   borderOpacity: 0.7,
@@ -530,6 +560,10 @@ export const REFINED_DARK_THEME: ThemeConfig = {
   gridColor: '#232634',
   gridOpacity: 0.5,
   palette: [...PALETTE_OKABE_ITO],
+  // Shares darkTheme's slate bg (#14161f), so reuse the dark-anchored ramp
+  // that was hand-tuned for that surface rather than a light-biased default.
+  sequentialPalette: [...PALETTE_SEQUENTIAL_DARK],
+  heatmapGradient: [...PALETTE_SEQUENTIAL_DARK],
   axisLineColor: '#2e3244',
   borderColor: '#2e3244',
   borderOpacity: 0.7,

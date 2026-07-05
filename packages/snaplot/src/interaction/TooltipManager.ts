@@ -1,6 +1,15 @@
 import type { TooltipPoint, TooltipConfig, ThemeConfig } from '../types';
 import { TOOLTIP_OFFSET } from '../constants';
 import { isDarkColor } from '../utils/color';
+import { prefersReducedMotion } from '../utils/motion';
+
+/**
+ * Cap on rows in the default multi-series tooltip. Beyond this the list is
+ * truncated to a "+N more" row so a chart with dozens of series does not
+ * produce a tooltip taller than the viewport. The cap is on the default
+ * renderer only; a caller's `render` override is free to show every row.
+ */
+const MAX_TOOLTIP_ROWS = 12;
 
 /** Escape the five characters that matter for HTML attribute + text contexts. */
 function escapeHtml(raw: string): string {
@@ -29,18 +38,22 @@ export class TooltipManager {
 
   constructor(theme: ThemeConfig) {
     this.el = document.createElement('div');
+    // Reduced motion: drop the fade so the tooltip appears instantly rather
+    // than transitioning opacity. Read once at construction from the cached
+    // query, never per show().
+    const transition = prefersReducedMotion() ? 'none' : 'opacity 0.1s ease';
     this.el.style.cssText = `
       position: fixed;
       z-index: 10000;
       pointer-events: none;
       opacity: 0;
-      transition: opacity 0.1s ease;
-      padding: 8px 12px;
-      border-radius: 4px;
+      transition: ${transition};
+      padding: 7px 10px;
+      border-radius: 6px;
       font-size: 12px;
       font-variant-numeric: tabular-nums;
-      line-height: 1.5;
-      max-width: 320px;
+      line-height: 1.45;
+      max-width: 280px;
       white-space: nowrap;
     `;
     this.applyTheme(theme);
@@ -52,11 +65,13 @@ export class TooltipManager {
     this.el.style.color = theme.tooltipTextColor;
     this.el.style.border = `1px solid ${theme.tooltipBorderColor}`;
     this.el.style.fontFamily = theme.fontFamily;
-    // Subtle shadow on light backgrounds; deeper glow on dark.
+    // Elevation is a two-layer shadow (ambient + contact) whose strength is
+    // derived from the background darkness: a dark surface needs a deeper cast
+    // to separate from a dark page, a light surface only a soft lift.
     const isDark = this.isBackgroundDark(theme.tooltipBackground);
     this.el.style.boxShadow = isDark
-      ? '0 4px 12px rgba(0, 0, 0, 0.4)'
-      : '0 2px 8px rgba(0, 0, 0, 0.1)';
+      ? '0 6px 16px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4)'
+      : '0 4px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08)';
   }
 
   private isBackgroundDark(bg: string): boolean {
@@ -157,7 +172,7 @@ export class TooltipManager {
    */
   private defaultRender(points: TooltipPoint[]): string {
     const dot = (color: string) =>
-      `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${escapeHtml(color)};margin-right:6px;vertical-align:middle"></span>`;
+      `<span style="display:inline-block;flex-shrink:0;width:8px;height:8px;border-radius:50%;background:${escapeHtml(color)};margin-right:6px;vertical-align:middle"></span>`;
 
     // Single point (nearest mode, e.g. scatter): show x, y as coordinate pair
     if (points.length === 1) {
@@ -174,12 +189,21 @@ export class TooltipManager {
     // Multiple points (index mode, e.g. time series): header + rows
     const header = `<div style="margin-bottom:4px;opacity:0.7;font-size:11px">${escapeHtml(points[0].formattedX)}</div>`;
 
-    const rows = points.map(p => {
-      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <span>${dot(p.color)}${escapeHtml(p.label)}</span>
-        <span style="font-weight:600">${escapeHtml(p.formattedY)}</span>
+    // Truncate long series lists so the box cannot outgrow the viewport. The
+    // label ellipsizes (flex child with min-width:0) while the value stays
+    // pinned right and never shrinks.
+    const shown = points.length > MAX_TOOLTIP_ROWS ? MAX_TOOLTIP_ROWS - 1 : points.length;
+    let rows = '';
+    for (let i = 0; i < shown; i++) {
+      const p = points[i];
+      rows += `<div style="display:flex;align-items:center;gap:12px">
+        <span style="display:flex;align-items:center;min-width:0;flex:1">${dot(p.color)}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.label)}</span></span>
+        <span style="font-weight:600;flex-shrink:0">${escapeHtml(p.formattedY)}</span>
       </div>`;
-    }).join('');
+    }
+    if (points.length > shown) {
+      rows += `<div style="opacity:0.6;font-size:11px;margin-top:2px">+${points.length - shown} more</div>`;
+    }
 
     return header + rows;
   }

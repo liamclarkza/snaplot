@@ -17,10 +17,18 @@ export type ColumnarData = [xValues: Float64Array, ...yValues: Float64Array[]];
 // SCALE TYPES
 // ============================================================
 
+/**
+ * Scale kind for an axis. `time` treats X values as epoch milliseconds and
+ * formats ticks in the viewer's local timezone; `log` requires strictly
+ * positive domains. Defaults to `linear` when omitted on an axis.
+ */
 export type ScaleType = 'linear' | 'log' | 'time';
 
+/** A closed data-space interval. `min` and `max` are in data units, not pixels. */
 export interface ScaleRange {
+  /** Lower bound, inclusive. May exceed `max` only transiently during a gesture. */
   min: number;
+  /** Upper bound, inclusive. */
   max: number;
 }
 
@@ -29,9 +37,16 @@ export interface ScaleRange {
  * Scales own a data domain and a pixel range, and convert between them.
  */
 export interface Scale {
+  /** Scale kind. Fixed at creation; changing an axis type rebuilds the scale. */
   readonly type: ScaleType;
+  /** The axis key this scale is bound to (the key in `ChartConfig.axes`). */
   readonly key: string;
+  /**
+   * Current domain lower bound in data units. Writable: assigning bypasses
+   * auto-range and repaint, so prefer `chart.setAxis()` for user-facing edits.
+   */
   min: number;
+  /** Current domain upper bound in data units. Same write caveat as `min`. */
   max: number;
 
   /** Map a data-space value to a pixel coordinate within the plot area */
@@ -40,16 +55,24 @@ export interface Scale {
   /** Map a pixel coordinate back to data-space */
   pixelToData(pixel: number): number;
 
-  /** Generate nice tick values for this scale's current domain */
+  /**
+   * Nice tick values for the current domain. `count` is a target hint, not a
+   * guarantee: linear scales honor it via nice-number rounding, while time
+   * and log scales derive density from the pixel range / decades and treat
+   * `count` loosely. Defaults to `DEFAULT_TICK_COUNT` (6).
+   */
   ticks(count?: number): number[];
 
-  /** Format a tick value for display */
+  /** Format a single tick value for display using this scale's conventions. */
   tickFormat(value: number): string;
 
-  /** Expand domain to nice boundaries */
+  /**
+   * Round the domain outward to clean tick boundaries. Mutates `min`/`max`.
+   * `count` is the same density hint as `ticks()`.
+   */
   nice(count?: number): void;
 
-  /** Update the pixel range (called on layout change) */
+  /** Set the pixel extent the domain maps onto. Called by layout on resize. */
   setPixelRange(pxMin: number, pxMax: number): void;
 }
 
@@ -74,10 +97,26 @@ export interface Layout {
 // SERIES CONFIGURATION
 // ============================================================
 
+/**
+ * Mark type for a series. `band` needs `upperDataIndex`/`lowerDataIndex`;
+ * `histogram` expects pre-binned N+1 edges data. Defaults to `line`.
+ */
 export type ChartType = 'line' | 'area' | 'band' | 'scatter' | 'bar' | 'histogram';
 
+/**
+ * Scatter draw path. `points` always draws individual marks; `density`
+ * always draws a binned heatmap; `auto` (the default) draws points until the
+ * visible count crosses the internal density threshold, then switches.
+ */
 export type ScatterRenderMode = 'points' | 'density' | 'auto';
+
+/** Mark glyph for non-density scatter rendering. Defaults to `circle`. */
 export type ScatterPointShape = 'circle' | 'square' | 'diamond';
+
+/**
+ * How a `colorBy` column is interpreted. `auto` treats low-cardinality
+ * integer columns as categories and everything else as a continuous ramp.
+ */
 export type ScatterColorEncodingType = 'auto' | 'category' | 'continuous' | 'diverging';
 
 export interface ScatterColorEncoding {
@@ -116,12 +155,19 @@ export interface ScatterSizeEncoding {
 }
 
 export interface ScatterTooltipField {
-  /** Absolute data column index. */
+  /** Absolute data column index whose value is shown for the hovered point. */
   dataIndex: number;
+  /** Row label in the tooltip. Defaults to `column N`. */
   label?: string;
+  /** Value formatter. Defaults to the number's default string form. */
   format?: (value: number) => string;
 }
 
+/**
+ * Line/area path interpolation. `monotone` is a shape-preserving cubic that
+ * never overshoots between points; the three `step-*` variants place the
+ * riser before, after, or centered on each point. Defaults to `linear`.
+ */
 export type InterpolationMode =
   | 'linear'
   | 'monotone'
@@ -142,10 +188,28 @@ export interface SeriesConfig<TMeta = unknown> {
   dataIndex?: number;
 
   // Visual
+  /**
+   * Line / mark outline color (any CSS color). Defaults to the theme's
+   * categorical palette entry for this series' index.
+   */
   stroke?: string;
+  /**
+   * Area / bar fill color. `null` forces no fill (useful to draw an
+   * `area` series as a bare outline). Defaults to a translucent `stroke`.
+   */
   fill?: string | null;
+  /** Stroke width in CSS pixels. Default: 1.5. Applies to line and area outlines. */
   lineWidth?: number;
+  /**
+   * Radius in CSS pixels for scatter marks and cursor indicators. Scatter's
+   * auto styling shrinks the effective radius for very dense clouds; set this
+   * to pin a fixed size.
+   */
   pointRadius?: number;
+  /**
+   * Mark opacity, 0 to 1. Defaults are type-specific (line/area outline 1,
+   * bar 0.85, histogram 0.75, band fill 0.15). Multiplied by highlight dimming.
+   */
   opacity?: number;
 
   // Line/area
@@ -175,6 +239,11 @@ export interface SeriesConfig<TMeta = unknown> {
   lineDash?: number[];
 
   // Area
+  /**
+   * Vertical fill gradient for `area` series, `top` at the line, `bottom`
+   * at the baseline. Overrides `fill`. Each stop is a full CSS color
+   * including its own alpha. Default: a translucent `stroke` ramp.
+   */
   fillGradient?: { top: string; bottom: string };
   // Band (confidence interval / error band)
   /**
@@ -237,10 +306,20 @@ export interface SeriesConfig<TMeta = unknown> {
   heatmapGradient?: string[];
 
   // Axis binding
+  /** Key of the X axis in `ChartConfig.axes` this series maps onto. Defaults to `'x'`. */
   xAxisKey?: string;
+  /**
+   * Key of the Y axis this series maps onto. Defaults to `'y'`. Point a
+   * second series at a different key (e.g. `'y2'`) for a dual-axis chart.
+   */
   yAxisKey?: string;
 
   // Visibility
+  /**
+   * Whether the series is drawn and included in auto-range. Default: `true`.
+   * Toggling this (e.g. from a legend) preserves the series' config and
+   * highlight state; a hidden series still occupies its `seriesIndex`.
+   */
   visible?: boolean;
 
   /**
@@ -260,6 +339,7 @@ export type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
 
 /** Configuration for an axis entry in ChartConfig.axes */
 export interface AxisConfig {
+  /** Scale kind for this axis. Default: `'linear'`. */
   type?: ScaleType;
   /**
    * Axis title rendered outside the tick labels: below a bottom axis,
@@ -291,6 +371,11 @@ export interface AxisConfig {
    * for bar/histogram X axes where exact-boundary rendering is required.
    */
   nice?: boolean;
+  /**
+   * Which side of the plot the axis renders on. Inferred from the axis key
+   * when omitted (keys starting with `x` go bottom, others left), so set it
+   * explicitly for a right-side or top axis.
+   */
   position?: AxisPosition;
   /**
    * Custom tick label formatter. Overrides the scale's default formatting
@@ -316,9 +401,19 @@ export interface AxisConfig {
 export type InteractionMode = 'timeseries' | 'analytical' | 'readonly';
 
 export interface CursorConfig {
+  /** Master switch for the crosshair + indicators. Default: `true`. */
   show?: boolean;
+  /**
+   * Snap the cursor to the nearest data X index instead of tracking the
+   * raw pointer position. Default: `true`. Keeps indicators on real samples.
+   */
   snap?: boolean;
+  /** Draw the vertical crosshair line. Default: `true`. */
   xLine?: boolean;
+  /**
+   * Draw the horizontal crosshair line. Default: `false`; most time-series
+   * charts only want the vertical line.
+   */
   yLine?: boolean;
   /**
    * Whether to draw the filled dot + ring at each series' hit-tested
@@ -327,9 +422,23 @@ export interface CursorConfig {
    * extra glyphs would be visual noise.
    */
   indicators?: boolean;
+  /** Crosshair line color. Defaults to `theme.crosshairColor`. */
   color?: string;
+  /**
+   * Crosshair dash pattern, alternating dash/gap lengths in CSS pixels per
+   * the Canvas `setLineDash()` spec. Default: solid.
+   */
   dash?: number[];
+  /**
+   * Sync key for cross-chart cursor coordination. Charts sharing a key
+   * mirror each other's cursor X position. `null` (default) disables sync.
+   */
   syncKey?: string | null;
+  /**
+   * On a synced chart, also show this chart's tooltip when the cursor is
+   * driven by a peer. Default: `false`, synced charts show crosshair only
+   * so a dashboard does not sprout duplicate tooltips.
+   */
   syncTooltip?: boolean;
 }
 
@@ -344,8 +453,14 @@ export type ZoomBoundsSpec =
   | { min?: number; max?: number };
 
 export interface ZoomConfig {
+  /** Master switch for all zoom gestures. Default: `true`. */
   enabled?: boolean;
+  /** Allow zooming the X axis. Default: `true`. */
   x?: boolean;
+  /**
+   * Allow zooming the Y axis. Default: `false`; time-series charts usually
+   * pin Y to auto-range. Enable for the `analytical` 2D-zoom experience.
+   */
   y?: boolean;
   /** Enable wheel/pinch zoom gestures that start over axis gutters. Default: `false`. */
   axis?: boolean;
@@ -362,7 +477,15 @@ export interface ZoomConfig {
    * `'axis-lock'` to infer X-only or Y-only zoom from the pinch direction.
    */
   pinchMode?: 'xy' | 'axis-lock';
+  /**
+   * Smallest allowed X domain span (data units), the tightest zoom-in.
+   * Prevents zooming past a meaningful resolution. Unset: no lower limit.
+   */
   minRange?: number;
+  /**
+   * Largest allowed X domain span (data units), the widest zoom-out.
+   * Independent of `bounds`, which constrains position rather than span.
+   */
   maxRange?: number;
   /**
    * Constrains pan + zoom so the viewport cannot escape the data (or a
@@ -376,6 +499,11 @@ export interface ZoomConfig {
    * Axes not mentioned fall back to the top-level default.
    */
   bounds?: boolean | ZoomBoundsSpec | { x?: ZoomBoundsSpec; y?: ZoomBoundsSpec };
+  /**
+   * Called after the X viewport changes from a zoom or pan, with the new
+   * data-space bounds. Fires per settled change, not per animation frame.
+   * For non-X changes use the `viewport:change` event.
+   */
   onZoom?: (xMin: number, xMax: number) => void;
   /**
    * Sync key for cross-chart zoom coordination. Charts sharing the same
@@ -389,8 +517,11 @@ export interface ZoomConfig {
 }
 
 export interface PanConfig {
+  /** Master switch for pan (shift+drag on mouse, one-finger on touch when `touch.drag: 'pan'`). Default: `true`. */
   enabled?: boolean;
+  /** Allow panning along X. Default: `true`. */
   x?: boolean;
+  /** Allow panning along Y. Default: `false`, matching the zoom Y default. */
   y?: boolean;
   /** Enable drag-to-pan gestures that start over axis gutters. Default: `false`. */
   axis?: boolean;
@@ -405,28 +536,51 @@ export interface SelectionConfig {
   onSelect?: (selection: SelectionResult) => void;
 }
 
+/** A single scatter point captured inside a box selection. */
 export interface SelectedPoint<TMeta = unknown> {
+  /** Index of the owning series in `ChartConfig.series`. */
   seriesIndex: number;
+  /** Row index into the series' columns. */
   dataIndex: number;
+  /** The owning series' `label`. */
   label: string;
+  /** Data-space X value of the point. */
   x: number;
+  /** Data-space Y value of the point. */
   y: number;
+  /** Resolved mark color, ready to paint (respects `colorBy`). */
   color: string;
+  /** The owning series' `meta`, passed through for app-level lookups. */
   meta?: TMeta;
 }
 
 export interface SelectionResult<TMeta = unknown> {
+  /** Selected X domain. Always present. */
   x: ScaleRange;
+  /** Selected Y domain. Present only when the gesture tracked both axes. */
   y?: ScaleRange;
   /** Populated for visible scatter series when the selection spans both axes. */
   points?: SelectedPoint<TMeta>[];
 }
 
 export interface TooltipConfig {
+  /** Whether to show the tooltip on hover. Default: `true`. */
   show?: boolean;
+  /**
+   * Which points to include. `index` (default) shows every series at the
+   * snapped X index; `nearest` shows only the single closest point (best for
+   * scatter); `x` matches `index` for shared-X series. `index` and `x` are
+   * equivalent for line/area/bar data.
+   */
   mode?: 'nearest' | 'index' | 'x';
   /** Pixel offset from the cursor. Defaults to TOOLTIP_OFFSET (12 px). */
   offset?: number;
+  /**
+   * Custom renderer. Returning a string sets the tooltip's `innerHTML`
+   * verbatim, so escape any user-derived text or return an `HTMLElement`
+   * built with `textContent` to avoid an injection hole. Receives the
+   * points selected by `mode`.
+   */
   render?: (points: TooltipPoint[]) => string | HTMLElement;
 }
 
@@ -454,22 +608,37 @@ export interface TouchConfig {
   longPressMs?: number;
 }
 
+/** One row passed to a custom `tooltip.render`. */
 export interface TooltipPoint {
+  /** Index of the owning series in `ChartConfig.series`. */
   seriesIndex: number;
+  /** Row index into the series' columns. */
   dataIndex: number;
+  /** The owning series' `label`. */
   label: string;
+  /** Raw data-space X value. */
   x: number;
+  /** Raw data-space Y value. */
   y: number;
+  /** Resolved mark color for the swatch. */
   color: string;
+  /** X value pre-formatted via the x-axis `tickFormat`. */
   formattedX: string;
+  /** Y value pre-formatted via the y-axis `tickFormat`. */
   formattedY: string;
+  /** Mark radius in CSS pixels; present for scatter points only. */
   radius?: number;
+  /** Extra scatter columns requested via `series.tooltipFields`. */
   fields?: TooltipFieldValue[];
 }
 
+/** One extra scatter column value in a tooltip row. */
 export interface TooltipFieldValue {
+  /** Field label from `ScatterTooltipField.label` (or `column N`). */
   label: string;
+  /** Raw value at the point's row. */
   value: number;
+  /** Value run through the field's `format`. */
   formatted: string;
 }
 
@@ -482,9 +651,13 @@ export interface TooltipFieldValue {
  * at a given X index, plus everything the legend table needs to render it.
  */
 export interface CursorSeriesPoint<TMeta = unknown> {
+  /** Index of this series in `ChartConfig.series` (stable across cursor moves). */
   seriesIndex: number;
+  /** X-column index this row was sampled at (same for every row in a snapshot). */
   dataIndex: number;
+  /** The series' `label`, for the row's name cell. */
   label: string;
+  /** Resolved series color, for the row's swatch. */
   color: string;
   /** Raw y value, NaN when missing at this index */
   value: number;
@@ -536,8 +709,18 @@ export interface CursorSnapshotOptions {
 // HIGHLIGHT (cross-chart series highlight + dim)
 // ============================================================
 
+/**
+ * Stable cross-chart identity for a series, returned by `highlight.getKey`.
+ * Lets linked charts with different series order highlight the same logical
+ * run/metric.
+ */
 export type HighlightSyncKey = string | number;
 
+/**
+ * Wire format broadcast over a highlight sync group. `index` carries a raw
+ * `seriesIndex` (identical-order charts); `key` carries a `getKey` identity
+ * that each receiver maps to its own local series. `null` clears.
+ */
 export type HighlightSyncPayload =
   | { type: 'index'; seriesIndex: number | null }
   | { type: 'key'; key: HighlightSyncKey | null };
@@ -612,14 +795,22 @@ export interface DebugConfig {
 }
 
 export interface ChartStats {
+  /** Monotonic counter bumped on every data change; useful as a cache key. */
   dataVersion: number;
+  /** Number of `setData` calls since creation. */
   setDataCount: number;
+  /** Number of `appendData` calls since creation. */
   appendDataCount: number;
+  /** Per-layer paint counts. A layer that never changes stays flat, which is the point of the layer split. */
   renderCount: {
     grid: number;
     data: number;
     overlay: number;
   };
+  /**
+   * Per-layer duration of the most recent paint, in milliseconds. Stays `0`
+   * unless `debug.stats` is enabled, since timing each layer has a cost.
+   */
   lastRenderMs: {
     grid: number;
     data: number;
@@ -645,10 +836,21 @@ export interface StreamingConfig {
 // ============================================================
 
 export interface ChartConfig<TMeta = unknown> {
+  /** Fixed CSS-pixel width. Omit and set `autoResize` to fill the container. */
   width?: number;
+  /** Fixed CSS-pixel height. Omit and set `autoResize` to fill the container. */
   height?: number;
+  /**
+   * Track the container's size with a ResizeObserver and repaint on change.
+   * Default: `true`. Set `false` and provide `width`/`height` for a fixed size.
+   */
   autoResize?: boolean;
 
+  /**
+   * Plot-area inset in CSS pixels. Any side omitted falls back to the
+   * defaults (top 24, right 24, bottom 44, left 56); `left` is a floor and
+   * grows automatically to fit measured y-axis labels.
+   */
   padding?: {
     top?: number;
     right?: number;
@@ -656,27 +858,54 @@ export interface ChartConfig<TMeta = unknown> {
     left?: number;
   };
 
+  /**
+   * Axis definitions keyed by axis key. `'x'`/`'y'` are conventional; extra
+   * keys (e.g. `'y2'`) create additional axes that series bind to via
+   * `xAxisKey`/`yAxisKey`. Omitted axes default to a linear scale.
+   */
   axes?: Record<string, AxisConfig>;
+  /** Series to draw, in paint order (later series draw on top). Required. */
   series: SeriesConfig<TMeta>[];
 
-  /** Interaction mode preset, sets default gesture mappings */
+  /** Interaction mode preset, sets default gesture mappings. Default: `'timeseries'`. */
   interaction?: InteractionMode;
 
+  /** Crosshair + indicator config. Merged over the mode preset. */
   cursor?: CursorConfig;
+  /** Zoom gesture config. Merged over the mode preset. */
   zoom?: ZoomConfig;
+  /** Pan gesture config. Merged over the mode preset. */
   pan?: PanConfig;
+  /** Box-selection callback config. */
   selection?: SelectionConfig;
+  /** Tooltip config. Merged over the mode preset. */
   tooltip?: TooltipConfig;
+  /** Touch-specific gesture overrides layered on top of the mode preset. */
   touch?: TouchConfig;
+  /** Series highlight + dim config, including cross-chart sync. */
   highlight?: HighlightConfig<TMeta>;
+  /** Ring-buffer window for `appendData` streaming. */
   streaming?: StreamingConfig;
+  /** Large-dataset interaction tuning. */
   performance?: PerformanceConfig;
+  /** Timing diagnostics. Off by default. */
   debug?: DebugConfig;
 
+  /**
+   * Theme overrides. Any field omitted resolves from CSS variables on the
+   * container, then the built-in light/dark default. Pass a full exported
+   * theme object to pin colors regardless of the page.
+   */
   theme?: Partial<ThemeConfig>;
+  /** Plugins installed at creation. Also addable later via `chart.use()`. */
   plugins?: Plugin[];
 }
 
+/**
+ * Recursively optional version of `T`, with arrays replaced wholesale rather
+ * than merged element-wise. This is the shape `setOptions()` accepts, so a
+ * `series` array in a partial update replaces the existing series list.
+ */
 export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends (infer U)[]
     ? DeepPartial<U>[]
@@ -690,11 +919,17 @@ export type DeepPartial<T> = {
 // ============================================================
 
 export interface ThemeConfig {
+  /** Plot background fill. The grid canvas is opaque, so this must be a solid color. */
   backgroundColor: string;
+  /** Axis label / tick text color. Themes keep this off pure black/white for contrast comfort. */
   textColor: string;
+  /** CSS font stack for all axis and tooltip text. */
   fontFamily: string;
+  /** Base text size in CSS pixels. Built-in themes use 11. */
   fontSize: number;
+  /** Gridline hue. Combined with `gridOpacity`; the border shares this hue at a higher opacity. */
   gridColor: string;
+  /** Gridline opacity, 0 to 1. Kept low so lines sit beneath the data. */
   gridOpacity: number;
   /**
    * Legacy and fallback series colour cycle. Kept as the primary API for
@@ -716,6 +951,7 @@ export interface ThemeConfig {
   divergingPalette?: string[];
   /** Optional default density ramp for heatmap scatter series. */
   heatmapGradient?: string[];
+  /** Color of the axis baseline strokes (distinct from gridlines). */
   axisLineColor: string;
   /**
    * Plot-area frame. Kept separate from `axisLineColor` so you can tune
@@ -729,10 +965,15 @@ export interface ThemeConfig {
    * while sharing its hue.
    */
   borderOpacity: number;
+  /** Color of the short tick marks along each axis. */
   tickColor: string;
+  /** Default crosshair line color, overridable per chart via `cursor.color`. */
   crosshairColor: string;
+  /** Tooltip surface fill. Dark themes use a translucent value for a glass look. */
   tooltipBackground: string;
+  /** Tooltip text color. */
   tooltipTextColor: string;
+  /** Tooltip border color. */
   tooltipBorderColor: string;
 }
 
@@ -741,29 +982,47 @@ export interface ThemeConfig {
 // ============================================================
 
 export interface Plugin {
+  /** Unique id. Registering a second plugin with the same id is rejected. */
   id: string;
+  /** Called once when the plugin is added. Set up DOM / listeners here. */
   install?(chart: ChartInstance): void;
+  /** Called once when the plugin is removed or the chart is destroyed. Tear down here. */
   destroy?(chart: ChartInstance): void;
 
+  /** Runs before layout is computed; adjust reserved space here. */
   beforeLayout?(chart: ChartInstance): void;
+  /** Runs after layout, with the resolved plot/axis rects. */
   afterLayout?(chart: ChartInstance, layout: Layout): void;
 
+  /** Before gridlines/axes paint. Return `false` to suppress the default grid draw. */
   beforeDrawGrid?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
+  /** After gridlines/axes paint. Draw under the data here. */
   afterDrawGrid?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
 
+  /** Before series marks paint. Return `false` to suppress the default data draw. */
   beforeDrawData?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
+  /** After series marks paint. Annotations that sit above data go here (see `createReferenceLinesPlugin`). */
   afterDrawData?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
 
+  /** Before the overlay (crosshair, selection) paints. Return `false` to suppress it. */
   beforeDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
+  /** After the overlay paints, the topmost draw layer. */
   afterDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
 
+  /**
+   * Cursor moved. `dataX`/`dataIdx` are `null` when the cursor left the plot.
+   * `origin` distinguishes local pointer input from sync/programmatic moves,
+   * use it to avoid echoing sync-driven updates back out.
+   */
   onCursorMove?(
     chart: ChartInstance,
     dataX: number | null,
     dataIdx: number | null,
     origin: CursorEventOrigin,
   ): void;
+  /** A scale's viewport changed via zoom/pan, with the affected axis key and new range. */
   onZoom?(chart: ChartInstance, scaleKey: string, range: ScaleRange): void;
+  /** Reserved click hook. Not currently invoked by the core (see the DX audit). */
   onClick?(chart: ChartInstance, dataX: number, dataIdx: number): void;
   /** Fires after chart data changes through `setData()` or `appendData()`. */
   onSetData?(chart: ChartInstance, data: ColumnarData): void;
@@ -893,22 +1152,38 @@ export interface ChartInstance {
 // CHART EVENTS
 // ============================================================
 
+/**
+ * What produced a cursor change. `local` is this chart's own pointer;
+ * `sync` came from a peer over a sync group; `programmatic` came from
+ * `setCursorDataX`. Handlers use it to break sync feedback loops.
+ */
 export type CursorEventOrigin = 'local' | 'sync' | 'programmatic';
 
+/** Event name to handler-signature map for `chart.on()`. */
 export interface ChartEventMap {
+  /** Cursor moved or left (null args on leave). Fires on the cursor hot path. */
   'cursor:move': (
     dataX: number | null,
     dataIdx: number | null,
     origin: CursorEventOrigin,
   ) => void;
+  /** Highlighted series changed, `null` when cleared. */
   'highlight:change': (seriesIndex: number | null) => void;
+  /** An axis viewport changed via zoom/pan, with the axis key and new range. */
   'viewport:change': (scaleKey: string, range: ScaleRange) => void;
+  /** Data replaced or appended. The payload is the live store, do not mutate it. */
   'data:update': (data: ColumnarData) => void;
+  /** Config changed via `setOptions`/`replaceOptions`, with the resolved config. */
   'options:update': (config: ChartConfig) => void;
+  /** Chart resized, with the new CSS-pixel dimensions. */
   'resize': (width: number, height: number) => void;
+  /** Reserved click event. Not currently emitted by the core (see the DX audit). */
   'click': (dataX: number, dataIdx: number) => void;
+  /** Box selection resolved. Mirror of `selection.onSelect`. */
   'select': (selection: SelectionResult) => void;
+  /** Emitted while the data layer paints, for canvas-level custom drawing without a plugin. */
   'drawData': (ctx: CanvasRenderingContext2D, layout: Layout) => void;
+  /** Emitted while the overlay layer paints, above the data. */
   'drawOverlay': (ctx: CanvasRenderingContext2D, layout: Layout) => void;
 }
 
@@ -916,18 +1191,33 @@ export interface ChartEventMap {
 // RENDER PIPELINE
 // ============================================================
 
+/**
+ * Bitmask of layers needing repaint. OR flags together to invalidate
+ * several layers at once; the scheduler coalesces to one animation frame.
+ */
 export enum DirtyFlag {
+  /** Nothing to repaint. */
   NONE    = 0,
+  /** Gridlines, axes, border (the opaque background layer). */
   GRID    = 1 << 0,
+  /** Series marks. */
   DATA    = 1 << 1,
+  /** Crosshair, indicators, selection box, tap ring. */
   OVERLAY = 1 << 2,
+  /** GRID | DATA | OVERLAY, a full repaint. */
   ALL     = 0b111,
 }
 
+/** The resolved state handed to renderers for one paint. Read-only per frame. */
 export interface RenderContext {
+  /** Fully resolved config (defaults + user overrides applied). */
   config: ChartConfig;
+  /** The current data snapshot. */
   data: ColumnarData;
+  /** Scales keyed by axis key. */
   scales: Map<string, Scale>;
+  /** Plot and axis rects plus dpr for this paint. */
   layout: Layout;
+  /** The resolved theme (defaults + CSS vars + overrides). */
   theme: ThemeConfig;
 }

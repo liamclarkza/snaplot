@@ -292,15 +292,4 @@ pre code {
   .docs-sidebar-open {
     transform: translateX(0) !important;
   }
-
-  /* Custom-theme split on /demos collapses to a stack on narrow screens
-     so the editor doesn't squeeze the dashboard into a thin strip. The
-     sticky aside stops sticking when there's no room beside it. */
-  .themed-split {
-    grid-template-columns: 1fr !important;
-  }
-  .themed-split > aside {
-    position: static !important;
-    max-height: none !important;
-  }
 }

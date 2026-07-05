@@ -7,4 +7,5 @@ export { default as Tooltips } from './Tooltips';
 export { default as Theming } from './Theming';
 export { default as Data } from './Data';
 export { default as Plugins } from './Plugins';
+export { default as Recipes } from './Recipes';
 export { default as ApiReference } from './ApiReference';

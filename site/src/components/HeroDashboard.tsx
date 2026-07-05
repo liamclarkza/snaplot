@@ -1,11 +1,14 @@
 import {
   For,
+  Show,
   batch,
   createEffect,
   createMemo,
   createSignal,
   onCleanup,
+  onMount,
   untrack,
+  type Accessor,
   type JSX,
 } from 'solid-js';
 import {
@@ -365,7 +368,10 @@ export default function HeroDashboard() {
   const streamData = streamSeed(STREAM_WINDOW_POINTS);
   const runsData = experimentData(RUN_NAMES.length, 220);
   const sweepData = sweepScatterData(2600);
-  const heatData = heatmapData(110_000);
+  // Heat cloud data is the single most expensive generator on the page
+  // (110K points plus a full sort). It lives below the fold, so its
+  // generation and chart mount are deferred until the panel scrolls near
+  // the viewport (see the <Deferred> wrapper in the markup).
   const endpoints = endpointData();
   const responseTimes = responseHistogramData();
   const latencyBand = latencyBandData();
@@ -463,8 +469,13 @@ export default function HeroDashboard() {
       label: 'Density',
       yDataIndex: 1,
       type: 'scatter',
-      heatmap: true,
+      renderMode: 'density',
       heatmapBinSize: 1,
+      // `renderMode: 'density'` renders the same 2D histogram as the legacy
+      // `heatmap: true` flag, but only that flag makes Chart inject the
+      // theme's density ramp. Pass the resolved ramp explicitly so the
+      // heatmap stays on-theme (not the Viridis fallback) across theme swaps.
+      heatmapGradient: activeTheme().heatmapGradient ?? activeTheme().sequentialPalette,
     }],
     cursor: { show: false },
     zoom: { enabled: true, x: true, y: true, bounds: 'data' },
@@ -480,10 +491,11 @@ export default function HeroDashboard() {
     axes: {
       x: {
         type: 'log',
+        label: 'Learning rate',
         padding: 0.05,
         tickFormat: (value) => value >= 0.001 ? value.toFixed(3) : value.toExponential(0),
       },
-      y: { type: 'linear', padding: 0.08 },
+      y: { type: 'linear', label: 'Validation loss', padding: 0.08 },
     },
     series: [{
       label: 'Sweep runs',
@@ -741,9 +753,13 @@ export default function HeroDashboard() {
             class="demos-two-col-grid"
           >
             <Panel title="Dense Event Cloud" meta="110K points - heatmap renderer">
-              <div style={{ height: '260px' }}>
-                <Chart config={heatConfig()} data={heatData} />
-              </div>
+              <Deferred minHeight="260px" load={() => heatmapData(110_000)}>
+                {(heatData) => (
+                  <div style={{ height: '260px' }}>
+                    <Chart config={heatConfig()} data={heatData()} />
+                  </div>
+                )}
+              </Deferred>
             </Panel>
 
             <Panel title="Latency Envelope" meta="band series">
@@ -904,6 +920,52 @@ function Panel(props: {
       </div>
       {props.children}
     </section>
+  );
+}
+
+/**
+ * Holds a placeholder of fixed height until it scrolls near the viewport,
+ * then runs `load` exactly once and renders `children` with the result.
+ * Keeps the page's heaviest synchronous data generation (and the chart it
+ * feeds) off the initial-load path. `load` is imperative so it never re-runs
+ * on unrelated reactive updates such as a theme swap; the result is handed to
+ * `children` as an accessor so the chart's reactive `data` prop reads a stable
+ * reference. Falls back to mounting immediately without IntersectionObserver.
+ */
+function Deferred<T>(props: {
+  minHeight: string;
+  load: () => T;
+  children: (value: Accessor<T>) => JSX.Element;
+}) {
+  const [value, setValue] = createSignal<T>();
+  let ref: HTMLDivElement | undefined;
+  const load = () => setValue(() => props.load());
+  onMount(() => {
+    if (!ref || typeof IntersectionObserver === 'undefined') {
+      load();
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          load();
+          io.disconnect();
+        }
+      },
+      { rootMargin: '300px 0px' },
+    );
+    io.observe(ref);
+    onCleanup(() => io.disconnect());
+  });
+  return (
+    <div ref={ref}>
+      <Show
+        when={value() !== undefined}
+        fallback={<div aria-hidden="true" style={{ height: props.minHeight }} />}
+      >
+        {props.children(value as Accessor<T>)}
+      </Show>
+    </div>
   );
 }
 

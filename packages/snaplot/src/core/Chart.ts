@@ -28,6 +28,7 @@ import { CanvasManager } from './CanvasManager';
 import { RenderScheduler } from './RenderScheduler';
 import { EventBus, SyncGroup } from './EventBus';
 import { computeLayout, inferPosition } from './Layout';
+import { shouldValidateConfig, validateChartConfig } from './validateConfig';
 
 import type { ColumnarSegment, DataStore } from '../data/DataStore';
 import { validateMaxLen } from '../data/DataStore';
@@ -239,6 +240,9 @@ export class ChartCore implements ChartInstance {
     // 1b. Apply interaction mode presets (if zoom/pan not explicitly configured)
     this.applyModePresets(config);
 
+    // 1c. Validate the merged config against any initial data (dev only).
+    if (shouldValidateConfig()) validateChartConfig(this.config, data);
+
     // 2. Create canvas layers
     this.canvasManager = new CanvasManager(parent, (w, h) => {
       this.onResize(w, h);
@@ -317,6 +321,7 @@ export class ChartCore implements ChartInstance {
 
   setData(data: ColumnarData): void {
     if (this.destroyed) return;
+    if (shouldValidateConfig()) validateChartConfig(this.config, data);
     this.setStoreData(data);
     this.stats.dataVersion++;
     this.stats.setDataCount++;
@@ -446,6 +451,9 @@ export class ChartCore implements ChartInstance {
       ) as unknown as ChartConfig;
     }
 
+    if (shouldValidateConfig()) {
+      validateChartConfig(this.config, this.store.length > 0 ? this.store.getData() : undefined);
+    }
     this.applyConfigSideEffects(partial, false);
   }
 
@@ -475,6 +483,9 @@ export class ChartCore implements ChartInstance {
       this.pluginManager.installAll(this);
     }
 
+    if (shouldValidateConfig()) {
+      validateChartConfig(this.config, this.store.length > 0 ? this.store.getData() : undefined);
+    }
     this.applyConfigSideEffects(config, true);
   }
 

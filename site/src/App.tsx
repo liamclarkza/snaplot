@@ -5,11 +5,15 @@ import Footer from './components/Footer';
 import Home from './pages/Home';
 import Docs from './pages/Docs';
 import Demos from './pages/Demos';
+import VisualRegressionHarness from './components/VisualRegressionHarness';
 
 function getPage() {
   const hash = window.location.hash.slice(1) || '/';
   if (hash.startsWith('/docs')) return 'docs';
   if (hash.startsWith('/demos')) return 'demos';
+  // Secondary route, deliberately absent from the nav: deterministic
+  // renderer fixtures for manual and scripted screenshot review.
+  if (hash.startsWith('/visual')) return 'visual';
   return 'home';
 }
 
@@ -41,6 +45,7 @@ export default function App() {
         <Show when={page() === 'home'}><Home /></Show>
         <Show when={page() === 'docs'}><Docs /></Show>
         <Show when={page() === 'demos'}><Demos /></Show>
+        <Show when={page() === 'visual'}><VisualRegressionHarness /></Show>
       </main>
       <Footer />
     </ThemeProvider>

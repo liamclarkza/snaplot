@@ -67,6 +67,17 @@ export const NAV: NavItem[] = [
   { type: 'link', id: 'cursor-snapshot', label: 'Cursor Snapshot' },
   { type: 'link', id: 'custom-plugins', label: 'Custom Plugins' },
 
+  { type: 'divider', label: 'Recipes' },
+  { type: 'link', id: 'recipe-streaming', label: 'Streaming Dashboard' },
+  { type: 'link', id: 'recipe-linked', label: 'Linked Charts' },
+  { type: 'link', id: 'recipe-scatter-encoding', label: 'Encoded Scatter' },
+  { type: 'link', id: 'recipe-custom-tooltip', label: 'Custom Tooltip' },
+  { type: 'link', id: 'recipe-custom-plugin', label: 'Custom Plugin' },
+  { type: 'link', id: 'recipe-theming', label: 'Theming' },
+  { type: 'link', id: 'recipe-downsampling', label: 'Downsampling' },
+  { type: 'link', id: 'recipe-gaps', label: 'Gaps & spanGaps' },
+  { type: 'link', id: 'recipe-axis-titles', label: 'Axis Titles' },
+
   { type: 'divider', label: 'API Reference' },
   { type: 'link', id: 'api-methods', label: 'ChartInstance Methods' },
   { type: 'link', id: 'api-events', label: 'Events' },

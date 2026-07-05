@@ -1,4 +1,5 @@
 import type { Layout, CursorConfig } from '../types';
+import { prefersReducedMotion } from '../utils/motion';
 
 /**
  * Renders crosshair and selection box on the overlay canvas.
@@ -62,11 +63,19 @@ export function renderTapRing(
   progress: number,
   color: string,
 ): void {
-  // Ease-out cubic, rapid initial growth, soft settle.
-  const eased = 1 - (1 - progress) ** 3;
   const minRadius = 8;
   const maxRadius = 26;
-  const radius = minRadius + (maxRadius - minRadius) * eased;
+  let radius: number;
+  if (prefersReducedMotion()) {
+    // Reduced motion: no expanding-ring animation. Hold a fixed radius and
+    // let only the opacity fade out, an opacity crossfade is the accessible
+    // stand-in the WCAG reduced-motion guidance recommends over movement.
+    radius = maxRadius;
+  } else {
+    // Ease-out cubic, rapid initial growth, soft settle.
+    const eased = 1 - (1 - progress) ** 3;
+    radius = minRadius + (maxRadius - minRadius) * eased;
+  }
   const alpha = 0.45 * (1 - progress);
 
   ctx.save();
@@ -95,14 +104,21 @@ export function renderSelectionBox(
   const y1 = Math.max(plot.top, Math.min(startY, endY));
   const y2 = Math.min(plot.top + plot.height, Math.max(startY, endY));
 
-  const w = x2 - x1;
-  const h = y2 - y1;
+  // Snap to the pixel grid so the 1px outline stays crisp during the drag.
+  const offset = layout.dpr === 1 ? 0.5 : 0;
+  const rx = Math.round(x1);
+  const ry = Math.round(y1);
+  const rw = Math.round(x2) - rx;
+  const rh = Math.round(y2) - ry;
 
   ctx.save();
-  ctx.fillStyle = 'rgba(100, 150, 255, 0.15)';
-  ctx.fillRect(x1, y1, w, h);
-  ctx.strokeStyle = 'rgba(100, 150, 255, 0.5)';
+  // A mid-blue accent reads as a light tint on dark surfaces and a light
+  // wash on light ones, so a single hue works across every theme; the higher
+  // stroke alpha gives the edge definition the soft fill lacks.
+  ctx.fillStyle = 'rgba(99, 148, 255, 0.16)';
+  ctx.fillRect(rx, ry, rw, rh);
+  ctx.strokeStyle = 'rgba(99, 148, 255, 0.9)';
   ctx.lineWidth = 1;
-  ctx.strokeRect(x1, y1, w, h);
+  ctx.strokeRect(rx + offset, ry + offset, rw, rh);
   ctx.restore();
 }

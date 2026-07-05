@@ -1,7 +1,7 @@
 import { createSignal, createMemo, onCleanup } from 'solid-js';
 import { createLegendPlugin, darkTheme, lightTheme } from 'snaplot';
 import { Chart } from 'snaplot/solid';
-import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
+import type { ColumnarData, ChartConfig } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
 import { Button } from '../components/ui';
 import { useTheme } from '../ThemeContext';
@@ -26,8 +26,8 @@ function stepCores(prev: CoreState): CoreState {
   const next: CoreState = [0, 0, 0, 0];
   for (let i = 0; i < 4; i++) {
     // Lazy random walk, drift toward the core's idle baseline
-    // (15–30 %), with occasional brief workloads that push one
-    // core up to 70–90 % for a few seconds.
+    // (15-30 %), with occasional brief workloads that push one
+    // core up to 70-90 % for a few seconds.
     const baseline = 18 + i * 4;
     let v = prev[i] + (Math.random() - 0.5) * 3;
     // Mean reversion toward baseline keeps long-term shape calm.
@@ -90,7 +90,6 @@ export default function Home() {
   const initial = generateCores();
   const [chartData, setChartData] = createSignal<ColumnarData>(initial.data);
   let tail: CoreState = initial.tail;
-  let heroChart: ChartInstance | undefined;
   const { theme } = useTheme();
 
   // Per-mode hero palette. Light mode uses Observable/Tableau-10's
@@ -131,9 +130,11 @@ export default function Home() {
   });
 
   // 50 Hz tick. Each step shifts the window forward by one sample and
-  // appends a fresh one, setData on the full column every 20 ms so the
-  // page actually demonstrates sustained repaint throughput, not just
-  // an append-to-tail optimisation.
+  // appends a fresh one, rebuilding the full column so the page
+  // demonstrates sustained repaint throughput, not just an append-to-tail
+  // optimisation. Writing the signal is enough: the <Chart> data prop is
+  // reactive and pushes the new column to the canvas on its own, so we do
+  // not (and must not) also call chart.setData here.
   const interval = setInterval(() => {
     setChartData((prev) => {
       const [x, c0, c1, c2, c3] = prev;
@@ -156,16 +157,18 @@ export default function Home() {
       n3[len - 1] = tail[3];
       return [nx, n0, n1, n2, n3];
     });
-    heroChart?.setData(chartData());
   }, TICK_MS);
   onCleanup(() => clearInterval(interval));
 
   return (
-    <main>
+    // App renders the page-level <main> landmark; Home is its content, so
+    // it must not open a second <main> (nested landmarks confuse assistive
+    // tech). A fragment keeps the section flow without a wrapper element.
+    <>
       {/* Hero */}
       <section
         style={{
-          padding: 'var(--space-9) var(--space-5) var(--space-6)',
+          padding: 'var(--space-9) var(--space-5) var(--space-7)',
           'max-width': 'var(--max-width)',
           margin: '0 auto',
           'text-align': 'center',
@@ -173,10 +176,10 @@ export default function Home() {
       >
         <h1
           style={{
-            'font-size': 'clamp(36px, 5.5vw, 60px)',
+            'font-size': 'clamp(38px, 5.5vw, 62px)',
             'font-weight': 700,
-            'letter-spacing': '-0.03em',
-            'line-height': 1.08,
+            'letter-spacing': '-0.035em',
+            'line-height': 1.05,
             'margin-bottom': 'var(--space-4)',
           }}
         >
@@ -186,9 +189,9 @@ export default function Home() {
           style={{
             'font-size': 'var(--fs-md)',
             color: 'var(--text-secondary)',
-            'max-width': '620px',
-            margin: '0 auto var(--space-5)',
-            'line-height': 1.55,
+            'max-width': '600px',
+            margin: '0 auto var(--space-6)',
+            'line-height': 1.6,
           }}
         >
           A canvas chart library built for streaming data. Columnar typed arrays,
@@ -267,7 +270,7 @@ export default function Home() {
             </div>
           </div>
           <div style={{ height: 'clamp(280px, 44vh, 380px)', padding: '8px 0 var(--space-2)' }}>
-            <Chart config={heroConfig()} data={chartData()} onReady={(c) => { heroChart = c; }} />
+            <Chart config={heroConfig()} data={chartData()} />
           </div>
         </ChartPanel>
       </section>
@@ -373,7 +376,7 @@ export default function Home() {
             'margin-bottom': 'var(--space-4)',
           }}
         >
-          Six hand-tuned themes. Line, area, scatter, bar, histogram, band, density heatmap.
+          Eleven hand-tuned themes. Line, area, scatter, bar, histogram, band, density heatmap.
           All reactive, all interactive.
         </div>
         <div
@@ -388,7 +391,7 @@ export default function Home() {
           <Button href="#/docs" variant="secondary">Read the docs</Button>
         </div>
       </section>
-    </main>
+    </>
   );
 }
 

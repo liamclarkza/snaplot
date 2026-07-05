@@ -10,6 +10,14 @@ import { inferPosition } from '../core/Layout';
  * offset coordinates by 0.5 to avoid blurry sub-pixel rendering.
  */
 
+/**
+ * Fraction of `theme.gridOpacity` used for the now-solid gridlines. A solid
+ * 1px line carries roughly 4x the ink of the old half-width 50%-duty dash, so
+ * scaling the alpha down keeps the grid quiet and preserves the frame-over-grid
+ * hierarchy without retuning every theme's `gridOpacity`.
+ */
+const GRID_SOLID_ALPHA_SCALE = 0.55;
+
 export interface AxisLabel {
   text: string;
   x: number;
@@ -79,9 +87,17 @@ export function renderAxes(
       gridDrawn.add(pos);
 
       ctx.strokeStyle = theme.gridColor;
-      ctx.globalAlpha = theme.gridOpacity;
-      ctx.lineWidth = 0.5;
-      ctx.setLineDash([4, 4]);
+      // Solid 1px hairlines rather than 0.5px [4,4] dashes: the dash phase
+      // is anchored in device space, so panning slid the pattern along each
+      // line and made the whole grid shimmer, and a 0.5px stroke straddles a
+      // physical pixel (50% coverage) so it read as a blurry grey even at
+      // rest. A crisp 1px line is calmer in motion. Solid carries far more
+      // ink than a half-width 50%-duty dash, so it is scaled well below the
+      // theme's grid opacity to keep the grid receding beneath the (solid,
+      // full-opacity) plot frame in every theme, including those where
+      // gridOpacity equals borderOpacity.
+      ctx.globalAlpha = theme.gridOpacity * GRID_SOLID_ALPHA_SCALE;
+      ctx.lineWidth = 1;
       ctx.beginPath();
 
       if (isHorizontal) {
@@ -103,7 +119,6 @@ export function renderAxes(
       }
 
       ctx.stroke();
-      ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
 
@@ -178,11 +193,18 @@ export function renderAxes(
   ctx.strokeStyle = theme.borderColor ?? theme.axisLineColor;
   ctx.lineWidth = 1;
   ctx.globalAlpha = theme.borderOpacity ?? theme.gridOpacity;
+  // Round all four edges independently, then derive width/height from the
+  // snapped corners. Rounding only the origin and adding an unrounded
+  // (possibly fractional) plot.width/height left the right and bottom strokes
+  // off the pixel grid, so they blurred at dpr 1 while the top/left stayed
+  // crisp. `offset` is the standard half-pixel nudge for 1px strokes at dpr 1.
   const bx = Math.round(plot.left) + offset;
   const by = Math.round(plot.top) + offset;
+  const bRight = Math.round(plot.left + plot.width) + offset;
+  const bBottom = Math.round(plot.top + plot.height) + offset;
   const r = 4; // corner radius in CSS pixels
   ctx.beginPath();
-  ctx.roundRect(bx, by, plot.width, plot.height, r);
+  ctx.roundRect(bx, by, bRight - bx, bBottom - by, r);
   ctx.stroke();
   ctx.globalAlpha = 1;
 
