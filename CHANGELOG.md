@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-07
+
 ### Added
 - Added chart-group fleet config: `createChartGroup({ defaults })` gives
   every chart in the group a shared base config (deep-merged under each
