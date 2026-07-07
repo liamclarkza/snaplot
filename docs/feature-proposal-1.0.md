@@ -15,39 +15,40 @@ out-of-scope list; 1.0 should ship one (see "Explicit non-goals").
 
 ## Tier 1: recommended for 1.0
 
-Small items marked "built" were implemented during this pass; they are
-additive, non-breaking, and were top-quartile in all three lenses. The
-medium items need your sign-off before they are built.
+All eight tier-1 items are built (0.10). They are additive,
+non-breaking, and were top-quartile in all three lenses.
 
 | # | Feature | Score | Cost | Status |
 | --: | :-- | --: | :-- | :-- |
-| 1 | Live-follow viewport: explicit follow-latest window, `scrollToLatest()`, live/paused state | 8.8 | medium | needs sign-off |
+| 1 | Live-follow viewport: explicit follow-latest window, `scrollToLatest()`, live/paused state | 8.8 | medium | built (`streaming.follow`) |
 | 2 | `appendData` tail update (`{ updateLast: true }`) for in-progress buckets | 8.2 | small | built |
-| 3 | Render-time auto-decimation for line/area (default-on, cursor stays on raw columns) | 8.0 | medium | needs sign-off (hot path; coordinate with perf budget) |
-| 4 | Persistent brush selection as first-class chart state | 7.8 | medium | needs sign-off |
-| 5 | Chart-group fleet config: shared defaults, shared Y domains, aligned gutters | 7.8 | medium | needs sign-off |
+| 3 | Render-time auto-decimation for line/area on the interaction path | 8.0 | medium | built (M4 during gestures, full-fidelity settle) |
+| 4 | Persistent brush selection as first-class chart state | 7.8 | medium | built (`selection.mode: 'brush'`) |
+| 5 | Chart-group fleet config: shared defaults, shared Y domains, aligned gutters | 7.8 | medium | built (`createChartGroup({ defaults })` + `group.link()`) |
 | 6 | `series.spanGaps`: bridge NaN gaps per series | 7.7 | small | built |
 | 7 | Cursor proximity auto-highlight (`highlight.proximity`) | 7.5 | small | built |
 | 8 | Axis titles (`AxisConfig.label`) with layout margin reservation | 7.2 | small | built |
 
-Notes on the sign-off items:
+Implementation notes on the medium items as landed:
 
 - **Live-follow viewport** formalizes the state machine that already half
-  exists (`userZoomedAxes` suppressing auto-range). All three lenses put
-  it at or near the top: streams yanking the viewport mid-inspection is
-  the most common streaming complaint. Risk is in zoom-sync propagation
-  and ring-buffer edge cases.
-- **Auto-decimation** turns the exported `lttb`/`m4` utilities into a
-  render-pipeline guarantee. It belongs with the perf workstream since it
-  changes the hottest path and needs the benchmark suite to prove no
-  fidelity or perf regressions.
-- **Persistent selection** extends the existing selection gesture,
-  `SelectionResult`, and sync machinery; it is also the prerequisite for
-  cross-chart crossfilter dimming (tier 2).
-- **Fleet config** prevents the config-drift failures that silently break
-  sync groups; shared-domain broadcast needs care to avoid auto-range
-  feedback loops, and `createChartGroup` needs a framework-free home
-  first (it currently lives in the Solid layer).
+  existed (`userZoomedAxes` suppressing auto-range). Pan/zoom pauses
+  following, `scrollToLatest()` resumes it, `follow:change` drives a
+  live/paused badge, and follow state coordinates with zoom sync.
+- **Auto-decimation** landed on the interaction path only: while a
+  gesture moves the viewport, line/area series above four points per plot
+  pixel decimate with shape-preserving, gap-aware M4, then repaint at
+  full fidelity on settle. Hit-testing always uses full data. Resting
+  charts render every point, so no fidelity trade-off at rest.
+- **Persistent selection** extends the existing selection gesture and
+  overlay: a data-anchored X band with move/resize handles,
+  serializable via `getSelection()`/`setSelection()`. It is the
+  prerequisite for cross-chart crossfilter dimming (tier 2).
+- **Fleet config** shares group defaults through config merge and
+  coordinates live instances (union Y domain, aligned gutters) through
+  the public axis/options APIs. It currently lives in the Solid layer
+  with the rest of `createChartGroup`; a framework-free home remains a
+  1.0 consideration if a second adapter lands.
 
 ## Tier 2: worth doing after tier 1
 
