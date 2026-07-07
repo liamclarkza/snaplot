@@ -2,7 +2,7 @@
 
 Repeatable performance measurements for the render and interaction hot
 paths, with a mobile-representative profile. This is the harness behind
-`PERF.md` and the CI regression guard.
+the CI regression guard and the tracked baseline.
 
 ## Quick start
 
@@ -58,6 +58,27 @@ over the 60fps and 30fps budgets, per-layer render costs from
 signal. Scenarios self-validate (`valid: false` means the run measured
 nothing real, for example a gesture that failed to move the viewport) and
 data generation is seeded, so runs are deterministic.
+
+## Reference results
+
+Median milliseconds per frame during a scripted viewport sweep on one
+Apple Silicon machine, mobile profile (4x CPU throttle, DPR 3), before
+and after the 0.10 interaction-path work. Machine-specific; read the
+ratios, not the absolutes.
+
+| scenario | 0.9 | 0.10 |
+| :-- | --: | --: |
+| scatter-zoom-200k | 1068 | 92 |
+| scatter-pan-200k | 783 | 92 |
+| scatter-encoded-pan-50k | 791 | 126 |
+| line-pan-200k | 400 | 17 |
+| scatter-offaxis-pan-50k | 350 | 66 |
+| two-heatmaps-highlight-150k | 42 | 17 |
+
+On the desktop profile every pan/zoom scenario is rAF-bound at 16.7ms;
+the display refresh sets the frame budget, not the render work. The main
+remaining cost is the cold first paint of a resting 200K scatter, which
+this work deliberately did not target.
 
 ## Methodology notes
 

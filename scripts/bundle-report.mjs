@@ -18,16 +18,16 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { dirname, join, normalize, relative } from 'node:path';
+import { dirname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = join(root, 'packages', 'snaplot', 'dist');
 
-// Per-entry gzip budgets in bytes. Set ~10% above the sizes measured on
-// the revamp/v1-prep branch (see docs/dx-audit.md for the recorded
-// baseline). Bumping these is a deliberate act: it means the published
-// download got bigger, and the number in the audit should move with it.
+// Per-entry gzip budgets in bytes, set ~10% above the measured baseline
+// recorded inline next to each budget. Bumping a budget is a deliberate
+// act: it means the published download got bigger, so re-measure and move
+// the baseline comment with it.
 const GZIP_BUDGETS = {
   'index.js': 62_000, // baseline 56_511
   'core.js': 62_000, // baseline 56_160
@@ -118,15 +118,11 @@ for (const r of rows) {
   }
 }
 
-const reportPath = relative(process.cwd(), join(root, 'docs', 'dx-audit.md'));
-console.log('');
-console.log(`Baseline recorded in ${reportPath}.`);
-
 if (overBudget) {
   console.error('');
   console.error('Bundle budget exceeded. Either trim the entry or, if the');
-  console.error('growth is intended, raise the budget in scripts/bundle-report.mjs');
-  console.error('and update the baseline in docs/dx-audit.md.');
+  console.error('growth is intended, raise the budget and its baseline');
+  console.error('comment in scripts/bundle-report.mjs.');
   process.exit(1);
 }
 

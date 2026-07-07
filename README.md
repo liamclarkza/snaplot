@@ -80,13 +80,19 @@ Simple lifecycle hooks: `install`, `destroy`, `before`/`after` each canvas layer
 
 Strict types throughout, generic column helpers, no `any` in the public API.
 
+## Non-goals
+
+snaplot stays a small library for streaming data and interactive dashboards. Out of scope, by policy: stacked series, animations and transitions beyond hover and highlight feedback, OHLC/candlestick chart types, ordinal/equi-spaced X distributions, a scale plugin system, and data munging beyond the exported utilities. Plugins and userland code can build these; keeping them out of core is what keeps the core fast and the API stable.
+
 ## Performance notes
 
 - 200K+ point charts render well under one frame on a modern laptop.
-- Grid, data, and overlay are separate canvases. A cursor move repaints the overlay only. A data update skips the grid layer.
+- Grid, data, and overlay are separate canvases. A cursor move repaints the overlay only. A data update skips the grid layer when the scales are unchanged.
 - Viewport culling is a binary search on the X column for sorted series; scatter nearest-hit testing uses a cached screen-space grid for dense clouds and arbitrary X columns.
+- While a pan or zoom gesture is in motion, very large series draw a reduced-fidelity pass (stride-sampled scatter, shape-preserving M4 for lines) and repaint at full fidelity on settle; see `performance.interactionSampling`.
 - snaplot never mutates input arrays. Downsampling helpers (`lttb`, `m4`) are exported as opt-in utilities.
 - Legend table updates use `textContent` swaps in the cursor hot path, not `innerHTML` rebuilds.
+- The `bench/` workspace reproduces all of this under a CPU-throttled mobile profile; see [bench/README.md](bench/README.md) for reference numbers and the CI regression guard.
 
 ## Development
 
