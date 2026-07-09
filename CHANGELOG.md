@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-09
+
 ### Added
 - CSS-variable theming is now first class: every `ThemeConfig` color
   accepts `var(--token)` references and any CSS color the browser can
