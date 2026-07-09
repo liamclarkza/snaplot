@@ -10,6 +10,7 @@ import {
   Theming,
   Data,
   Plugins,
+  Recipes,
   ApiReference,
 } from './docs/sections';
 // In dev/build the site aliases `snaplot` → src/index.ts, so we import the CSS
@@ -48,6 +49,7 @@ export default function Docs() {
         <Theming />
         <Data />
         <Plugins />
+        <Recipes />
         <ApiReference />
       </div>
     </div>
