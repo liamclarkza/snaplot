@@ -30,12 +30,34 @@ to [Semantic Versioning](https://semver.org/).
   date, add units" case no longer needs a custom `tooltip.render`.
 
 ### Changed
+- Time-axis ticks land on calendar boundaries in the viewer's local time
+  zone: local midnights for day steps (Mondays for week steps), the 1st
+  for month steps, and January 1 for year steps, instead of raw epoch
+  multiples that drifted through the month ("Mar 8, Apr 7, May 7") and
+  picked up the UTC offset as a stray time of day. Hour-level ticks
+  anchor to local midnight so 6-hour ticks read 00:00 / 06:00 / 12:00.
+- The time interval ladder is denser (2d, 2w, 2-, 3-, and 6-month steps,
+  and nice year steps beyond that), the interval is picked by closest
+  fit rather than next-largest, and the axis `tickCount` is honored as a
+  cap, so charts get an appropriate number of labels instead of two
+  sparse ones. When an interval only straddles the domain (narrow charts),
+  the scale steps down the ladder rather than falling back to arbitrary
+  evenly spaced dates.
+- Axis labels are now width-fitted: horizontal tick labels measure their
+  rendered width and thin (preserving calendar alignment) when they would
+  collide, and vertical labels thin when rows would overlap.
 - Bar charts no longer tick and gridline every category: category ticks
   thin automatically to what the plot width can label legibly (histograms
   already did), so a year of daily bars gets readable date labels instead
   of a smeared band.
 
 ### Fixed
+- Time-axis labels no longer carry a junk time suffix at day boundaries
+  ("May 28 02:00 AM" now reads "May 28"); month boundaries in day-level
+  domains read as the bare month name and January 1 as the bare year.
+- The first and last horizontal axis labels clamp to the plot edges
+  instead of overhanging the container, which read as broken padding on
+  tight layouts.
 - `series.fill` is honored by bar series as documented; bars previously
   always used the series stroke/palette color.
 

@@ -1,5 +1,5 @@
 import type { AxisConfig, Layout, Scale, ThemeConfig, AxisPosition, ChartConfig } from '../types';
-import { DEFAULT_TICK_COUNT } from '../constants';
+import { DEFAULT_TICK_COUNT, LABEL_MIN_GAP } from '../constants';
 import { inferPosition } from '../core/Layout';
 
 /**
@@ -121,12 +121,42 @@ export function renderAxes(
     const isHorizontal = pos === 'bottom' || pos === 'top';
     const hasExplicitTicks = !!ac.ticks && ac.ticks.length > 0;
     const useCustomTicks = isHorizontal && customXTicks && !hasExplicitTicks;
-    const ticks = useCustomTicks ? customXTicks!.values : axisTickValues(scale, ac);
+    let ticks = useCustomTicks ? customXTicks!.values : axisTickValues(scale, ac);
     // Formatter precedence: custom-tick formatter (bar/histogram path) ->
     // user's axes.x.tickFormat -> the scale's built-in tickFormat.
     const formatTick = useCustomTicks && customXTicks!.format
       ? customXTicks!.format
       : ac.tickFormat ?? ((v: number) => scale.tickFormat(v));
+
+    // Width fit pass: generated tick counts are density targets that know
+    // nothing about the rendered strings, so measure the actual labels and
+    // thin until the widest fits the spacing. Thinning every nth entry
+    // preserves calendar/nice alignment (every second Monday is still a
+    // Monday). Explicit ac.ticks are the user's exact choice and are
+    // exempt. Canvas measureText matches the DOM labels' font closely
+    // enough for spacing and forces no reflow.
+    ctx.font = `${theme.fontSize}px ${theme.fontFamily}`;
+    let widestLabel = 0;
+    if (isHorizontal && ticks.length > 1) {
+      for (const t of ticks) {
+        const w = ctx.measureText(formatTick(t)).width;
+        if (w > widestLabel) widestLabel = w;
+      }
+      const spacing = plot.width / (ticks.length - 1);
+      if (!hasExplicitTicks && widestLabel + LABEL_MIN_GAP > spacing) {
+        ticks = thinTicks(
+          ticks,
+          Math.max(2, Math.floor(plot.width / (widestLabel + LABEL_MIN_GAP)) + 1),
+        );
+      }
+    } else if (!isHorizontal && !hasExplicitTicks && ticks.length > 1) {
+      // Vertical labels collide when tick spacing drops below a line height.
+      const minSpacing = theme.fontSize * 1.4;
+      const spacing = plot.height / (ticks.length - 1);
+      if (spacing < minSpacing) {
+        ticks = thinTicks(ticks, Math.max(2, Math.floor(plot.height / minSpacing) + 1));
+      }
+    }
 
     // The first axis at each position decides that position's gridlines
     // (draw styled by its grid config, or hide them entirely); later axes
@@ -193,21 +223,24 @@ export function renderAxes(
         }
         break;
       case 'bottom':
+      case 'top': {
+        // Centered labels near the plot edges overhang: the last one can
+        // spill past the container (clipped by the host card) and the first
+        // into the left gutter. Clamp the label center so the text box stays
+        // inside the container; only the edge labels ever shift, and by at
+        // most half their own width.
+        const labelY = pos === 'bottom' ? plot.top + plot.height + 4 : plot.top - 4;
         for (const t of ticks) {
           const px = scale.dataToPixel(t);
           if (px >= plot.left - 10 && px <= plot.left + plot.width + 10) {
-            labels.push({ text: formatTick(t), x: px, y: plot.top + plot.height + 4, anchor: 'middle' });
+            const text = formatTick(t);
+            const half = ctx.measureText(text).width / 2;
+            const x = Math.max(half + 2, Math.min(layout.width - half - 2, px));
+            labels.push({ text, x, y: labelY, anchor: 'middle' });
           }
         }
         break;
-      case 'top':
-        for (const t of ticks) {
-          const px = scale.dataToPixel(t);
-          if (px >= plot.left - 10 && px <= plot.left + plot.width + 10) {
-            labels.push({ text: formatTick(t), x: px, y: plot.top - 4, anchor: 'middle' });
-          }
-        }
-        break;
+      }
     }
 
     if (ac.label) {
