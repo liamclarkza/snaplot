@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderBars } from './BarRenderer';
+import { renderBars, renderBarsSegments } from './BarRenderer';
 import type { Layout, Scale, SeriesConfig } from '../types';
 
 const f = (xs: number[]) => Float64Array.from(xs);
@@ -81,5 +81,90 @@ describe('renderBars width', () => {
     // Data spacing is 10px; the bar sits well under the old plot*0.5 fallback.
     expect(width).toBeGreaterThan(0);
     expect(width).toBeLessThan(10);
+  });
+});
+
+describe('renderBars per-datum fill', () => {
+  it('honors a static series.fill string over the series color', () => {
+    const { ctx, fillRect } = context();
+    renderBars(
+      ctx,
+      f([10, 20, 30]),
+      f([5, 6, 7]),
+      0,
+      2,
+      linearScale('x'),
+      linearScale('y'),
+      layout(),
+      { ...series, fill: '#ff0000' },
+      '#4e79a7',
+      0,
+      1,
+    );
+    expect(fillRect).toHaveBeenCalledTimes(3);
+    expect(ctx.fillStyle).toBe('#ff0000');
+  });
+
+  it('calls a fill callback per bar with value and logical index', () => {
+    const { ctx, fillRect } = context();
+    const seen: Array<[number, number]> = [];
+    const styles: string[] = [];
+    // Capture the fillStyle active at each fillRect call.
+    (fillRect as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      styles.push(ctx.fillStyle as string);
+    });
+
+    renderBars(
+      ctx,
+      f([10, 20, 30]),
+      f([5, 6, 7]),
+      0,
+      2,
+      linearScale('x'),
+      linearScale('y'),
+      layout(),
+      {
+        ...series,
+        fill: (value, index) => {
+          seen.push([value, index]);
+          return index === 2 ? '#e8590c' : '#4f8fea';
+        },
+      },
+      '#4e79a7',
+      0,
+      1,
+    );
+
+    expect(seen).toEqual([
+      [5, 0],
+      [6, 1],
+      [7, 2],
+    ]);
+    expect(styles).toEqual(['#4f8fea', '#4f8fea', '#e8590c']);
+  });
+
+  it('offsets callback indices to logical positions for wrapped ring segments', () => {
+    const { ctx } = context();
+    const seen: number[] = [];
+    const barSeries: SeriesConfig = {
+      ...series,
+      fill: (_v, index) => {
+        seen.push(index);
+        return '#4f8fea';
+      },
+    };
+    // A physical run starting at slot 0 whose logical origin is 4 (ring wrap).
+    renderBarsSegments(
+      ctx,
+      [{ xData: f([10, 20]), yData: f([5, 6]), startIdx: 0, endIdx: 1, logicalStartIdx: 4 }],
+      linearScale('x'),
+      linearScale('y'),
+      layout(),
+      barSeries,
+      '#4e79a7',
+      0,
+      1,
+    );
+    expect(seen).toEqual([4, 5]);
   });
 });

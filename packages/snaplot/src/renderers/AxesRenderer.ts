@@ -1,4 +1,4 @@
-import type { Layout, Scale, ThemeConfig, AxisPosition, ChartConfig } from '../types';
+import type { AxisConfig, Layout, Scale, ThemeConfig, AxisPosition, ChartConfig } from '../types';
 import { DEFAULT_TICK_COUNT } from '../constants';
 import { inferPosition } from '../core/Layout';
 
@@ -30,6 +30,51 @@ export interface AxisLabel {
 export interface AxesRenderResult {
   /** Labels keyed by axis config key */
   labels: Map<string, AxisLabel[]>;
+}
+
+/**
+ * Tick values for an axis: explicit `ac.ticks` (clamped to the visible
+ * domain) beat generated ticks at the `ac.tickCount` density. Shared by
+ * the renderer and layout measurement so gutters match the labels drawn.
+ */
+export function axisTickValues(scale: Scale, ac: AxisConfig): number[] {
+  if (ac.ticks && ac.ticks.length > 0) {
+    const lo = Math.min(scale.min, scale.max);
+    const hi = Math.max(scale.min, scale.max);
+    return ac.ticks.filter((t) => Number.isFinite(t) && t >= lo && t <= hi);
+  }
+  return scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT);
+}
+
+/**
+ * Evenly thin a category tick list to at most `maxCount` entries. Bar and
+ * histogram charts tick every category by default, which smears into an
+ * unreadable band once categories outnumber the pixels available for
+ * labels (a year of daily bars). Keeps the first entry and every nth after.
+ */
+export function thinTicks(values: number[], maxCount: number): number[] {
+  const max = Math.max(2, Math.floor(maxCount));
+  if (values.length <= max) return values;
+  const step = Math.ceil(values.length / max);
+  return values.filter((_, i) => i % step === 0);
+}
+
+/** Resolve an axis's grid config to concrete draw values, or null when hidden. */
+function resolveGrid(
+  ac: AxisConfig,
+  theme: ThemeConfig,
+): { color: string; opacity: number; dash: number[] } | null {
+  const grid = ac.grid;
+  if (grid === false) return null;
+  const cfg = typeof grid === 'object' ? grid : {};
+  if (cfg.show === false) return null;
+  return {
+    color: cfg.color ?? theme.gridColor,
+    // The default derives from the theme with the solid-hairline scale (see
+    // GRID_SOLID_ALPHA_SCALE); an explicit opacity is used as given.
+    opacity: cfg.opacity ?? theme.gridOpacity * GRID_SOLID_ALPHA_SCALE,
+    dash: cfg.dash ?? [],
+  };
 }
 
 export function renderAxes(
@@ -71,33 +116,39 @@ export function renderAxes(
     const pos = inferPosition(key, ac.position);
     const labels: AxisLabel[] = [];
 
-    // Determine if this axis uses custom ticks (only for bottom/top X-like axes)
+    // Tick precedence: explicit ac.ticks -> bar/histogram category ticks ->
+    // generated at the ac.tickCount density.
     const isHorizontal = pos === 'bottom' || pos === 'top';
-    const useCustomTicks = isHorizontal && customXTicks;
-    const ticks = useCustomTicks ? customXTicks!.values : scale.ticks(DEFAULT_TICK_COUNT);
-    // Precedence: custom-tick formatter (bar/histogram path) → user's
-    // axes.x.tickFormat → the scale's built-in tickFormat.
+    const hasExplicitTicks = !!ac.ticks && ac.ticks.length > 0;
+    const useCustomTicks = isHorizontal && customXTicks && !hasExplicitTicks;
+    const ticks = useCustomTicks ? customXTicks!.values : axisTickValues(scale, ac);
+    // Formatter precedence: custom-tick formatter (bar/histogram path) ->
+    // user's axes.x.tickFormat -> the scale's built-in tickFormat.
     const formatTick = useCustomTicks && customXTicks!.format
       ? customXTicks!.format
       : ac.tickFormat ?? ((v: number) => scale.tickFormat(v));
 
-    // Draw gridlines only for the first axis at each position
+    // The first axis at each position decides that position's gridlines
+    // (draw styled by its grid config, or hide them entirely); later axes
+    // at the same position never add a second grid on top.
+    const grid = resolveGrid(ac, theme);
     const shouldDrawGrid = !gridDrawn.has(pos);
-    if (shouldDrawGrid) {
-      gridDrawn.add(pos);
-
-      ctx.strokeStyle = theme.gridColor;
-      // Solid 1px hairlines rather than 0.5px [4,4] dashes: the dash phase
-      // is anchored in device space, so panning slid the pattern along each
-      // line and made the whole grid shimmer, and a 0.5px stroke straddles a
-      // physical pixel (50% coverage) so it read as a blurry grey even at
-      // rest. A crisp 1px line is calmer in motion. Solid carries far more
-      // ink than a half-width 50%-duty dash, so it is scaled well below the
-      // theme's grid opacity to keep the grid receding beneath the (solid,
-      // full-opacity) plot frame in every theme, including those where
-      // gridOpacity equals borderOpacity.
-      ctx.globalAlpha = theme.gridOpacity * GRID_SOLID_ALPHA_SCALE;
+    if (shouldDrawGrid) gridDrawn.add(pos);
+    if (shouldDrawGrid && grid !== null) {
+      ctx.strokeStyle = grid.color;
+      // Default is a solid 1px hairline rather than the old 0.5px [4,4]
+      // dash: the dash phase is anchored in device space, so panning slid
+      // the pattern along each line and made the whole grid shimmer, and a
+      // 0.5px stroke straddles a physical pixel so it read as a blurry
+      // grey even at rest. Solid carries far more ink than a half-width
+      // 50%-duty dash, so the default alpha is scaled well below the
+      // theme's grid opacity (GRID_SOLID_ALPHA_SCALE) to keep the grid
+      // receding beneath the solid, full-opacity plot frame. An explicit
+      // ac.grid.dash opts back into dashes for design languages built on
+      // them.
+      ctx.globalAlpha = grid.opacity;
       ctx.lineWidth = 1;
+      if (grid.dash.length > 0) ctx.setLineDash(grid.dash);
       ctx.beginPath();
 
       if (isHorizontal) {
@@ -119,6 +170,7 @@ export function renderAxes(
       }
 
       ctx.stroke();
+      if (grid.dash.length > 0) ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
 

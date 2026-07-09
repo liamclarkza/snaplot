@@ -311,7 +311,8 @@ export function renderBandSegments(
   // ── 1. Fill contiguous bound segments ─────────────────────
   // NaN in either bound breaks the band. Render each segment separately so
   // missing data does not create a filled bridge across the gap.
-  const fillColor = series.fill ?? color;
+  // Per-datum fill callbacks are a bar-series feature; a band uses one fill.
+  const fillColor = typeof series.fill === 'string' ? series.fill : color;
   const fillOpacity = series.opacity ?? 0.15;
   ctx.fillStyle = fillColor;
   ctx.globalAlpha = fillOpacity * opacityMultiplier;

@@ -29,9 +29,9 @@ const distDir = join(root, 'packages', 'snaplot', 'dist');
 // act: it means the published download got bigger, so re-measure and move
 // the baseline comment with it.
 const GZIP_BUDGETS = {
-  'index.js': 62_000, // baseline 56_511
-  'core.js': 62_000, // baseline 56_160
-  'solid.js': 59_000, // baseline 53_279 (excludes external solid-js)
+  'index.js': 68_000, // baseline 62_054 (0.10 features + live CSS-var theming)
+  'core.js': 68_000, // baseline 61_747
+  'solid.js': 66_000, // baseline 59_802 (excludes external solid-js)
   'legend-table.css': 1_850, // baseline 1_635
 };
 

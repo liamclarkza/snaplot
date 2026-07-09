@@ -6,6 +6,13 @@ export interface BarRenderSegment {
   yData: Float64Array;
   startIdx: number;
   endIdx: number;
+  /**
+   * Logical index of startIdx's datum. Ring-buffer stores wrap, so the
+   * physical position differs from the index the user's data was appended
+   * at; per-datum fill callbacks receive the logical index. Defaults to
+   * startIdx (contiguous stores).
+   */
+  logicalStartIdx?: number;
 }
 
 /**
@@ -75,7 +82,11 @@ export function renderBarsSegments(
   ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
   ctx.clip();
 
-  ctx.fillStyle = color;
+  // Fill precedence: series.fill (string, or a per-datum callback for
+  // emphasis patterns like "highlight the latest bar"), then the series
+  // color. `fill: null` keeps the series color; bars cannot be fill-less.
+  const fillFn = typeof series.fill === 'function' ? series.fill : null;
+  ctx.fillStyle = typeof series.fill === 'string' ? series.fill : color;
   ctx.globalAlpha = (series.opacity ?? 0.85) * opacityMultiplier;
 
   const centers: number[] = [];
@@ -116,6 +127,7 @@ export function renderBarsSegments(
   let ordinal = 0;
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
+    const logicalOffset = (segment.logicalStartIdx ?? startIdx) - startIdx;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
       const centerX = centers[ordinal++];
@@ -141,6 +153,7 @@ export function renderBarsSegments(
       const y = Math.min(barTop, baselinePixel);
       const h = Math.abs(barTop - baselinePixel);
 
+      if (fillFn) ctx.fillStyle = fillFn(yVal, i + logicalOffset);
       ctx.fillRect(rect.left, y, rect.width, h);
     }
   }

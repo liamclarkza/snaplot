@@ -140,3 +140,55 @@ describe('HitTester', () => {
     ]);
   });
 });
+
+describe('HitTester tooltip formatters', () => {
+  it('formats formattedX/formattedY through tooltip.xFormat/yFormat in index mode', () => {
+    const store = new ColumnarStore([f([0, 50, 100]), f([10, 20, 30])]);
+    const scales = new Map<string, Scale>([
+      ['x', scale('x', 0, 100)],
+      ['y', scale('y', 0, 100)],
+    ]);
+    const series: SeriesConfig[] = [{ label: 'v', dataIndex: 1 }];
+
+    const points = new HitTester(1_000).findPoints(
+      store,
+      scales,
+      series,
+      50,
+      50,
+      'index',
+      ['#111'],
+      'mouse',
+      undefined,
+      0,
+      undefined,
+      { x: (x) => `day ${x}`, y: (y, si) => `${y} req/s (s${si})` },
+    );
+
+    expect(points[0].formattedX).toBe('day 50');
+    expect(points[0].formattedY).toBe('20 req/s (s0)');
+  });
+
+  it('falls back to axis tick formatting when no formatters are set', () => {
+    const store = new ColumnarStore([f([0, 50, 100]), f([10, 20, 30])]);
+    const scales = new Map<string, Scale>([
+      ['x', scale('x', 0, 100)],
+      ['y', scale('y', 0, 100)],
+    ]);
+    const series: SeriesConfig[] = [{ label: 'v', dataIndex: 1 }];
+
+    const points = new HitTester(1_000).findPoints(
+      store,
+      scales,
+      series,
+      50,
+      50,
+      'index',
+      ['#111'],
+      'mouse',
+    );
+
+    expect(points[0].formattedX).toBe('x:50');
+    expect(points[0].formattedY).toBe('y:20');
+  });
+});

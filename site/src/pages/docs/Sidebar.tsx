@@ -77,6 +77,7 @@ export const NAV: NavItem[] = [
   { type: 'link', id: 'recipe-theming', label: 'Theming' },
   { type: 'link', id: 'recipe-downsampling', label: 'Downsampling' },
   { type: 'link', id: 'recipe-gaps', label: 'Gaps & spanGaps' },
+  { type: 'link', id: 'recipe-ticks', label: 'Ticks & Gridlines' },
   { type: 'link', id: 'recipe-axis-titles', label: 'Axis Titles' },
 
   { type: 'divider', label: 'API Reference' },

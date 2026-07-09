@@ -5,7 +5,7 @@ import type { ChartInstance, ColumnarData } from 'snaplot';
 import CodeBlock from '../../../components/CodeBlock';
 import { Section, Prose, Demo } from '../../../components/ui';
 import { useTheme } from '../../../ThemeContext';
-import { encodedScatterData, gappedData, largeTimeSeries, timeSeries } from '../fixtures';
+import { dailyBarData, encodedScatterData, gappedData, largeTimeSeries, timeSeries } from '../fixtures';
 
 /**
  * Task-oriented cookbook. Where a recipe is a single config, it uses the
@@ -20,6 +20,7 @@ export default function Recipes() {
   const [d_theme] = createSignal(timeSeries(200, 2));
   const [d_gaps] = createSignal(gappedData());
   const [d_axis] = createSignal(timeSeries(180, 1));
+  const [d_dailyBars] = createSignal(dailyBarData(30));
 
   // Downsample once at module scope, same pattern as the Data section.
   const orig = largeTimeSeries(25_000);
@@ -293,13 +294,36 @@ if (q.has('from')) {
 
       <Section id="recipe-theming" title="Recipe: Theming">
         <Prose>
-          Two ways to theme. Pass a full <code>ThemeConfig</code> to pin colors
-          regardless of the page. Or set none, and the chart reads
-          <code>--chart-*</code> CSS variables from its container on every
-          redraw, so it tracks your site's light/dark toggle with no per-chart
-          config. Anything omitted from a partial theme falls back to CSS
-          variables, then the built-in light/dark default.
+          Three ways to theme. Pass a full <code>ThemeConfig</code> to pin
+          colors regardless of the page. Reference your design tokens directly
+          with <code>var(--token)</code> values in any theme field. Or set no
+          theme at all and define <code>--chart-*</code> CSS variables on the
+          container (or an ancestor). In every case, values may be any CSS
+          color the browser understands, including <code>oklch(...)</code>.
+          snaplot resolves them to concrete colors against the container, and
+          re-resolves automatically when your <code>[data-theme]</code>
+          attribute or the OS color scheme flips, so charts re-theme live with
+          no remount. Call <code>chart.refreshTheme()</code> if tokens change
+          through some other mechanism.
         </Prose>
+        <CodeBlock code={`/* design-system tokens, oklch and all */
+:root { --surface: oklch(0.98 0.005 260); --ink: oklch(0.25 0.01 260); }
+[data-theme='dark'] { --surface: oklch(0.18 0.015 260); --ink: oklch(0.93 0.005 260); }
+
+/* option A: reference your own tokens from the theme */
+new ChartCore(el, {
+  theme: {
+    backgroundColor: 'var(--surface)',
+    textColor: 'var(--ink)',
+  },
+  series: [{ label: 'v', dataIndex: 1 }],
+}, data);
+
+/* option B: alias tokens to the --chart-* names and pass no theme.
+   Full list: --chart-bg, --chart-text, --chart-tick, --chart-grid,
+   --chart-axis, --chart-border, --chart-crosshair, --chart-tooltip-bg,
+   --chart-tooltip-text, --chart-tooltip-border (see CHART_CSS_VARS). */
+.panel { --chart-bg: var(--surface); --chart-text: var(--ink); }`} />
         <Demo
           title="Full ThemeConfig"
           desc="Every color pinned; palettes are role-aware (categorical for series, sequential for density)"
@@ -343,6 +367,52 @@ if (q.has('from')) {
   tooltip: { show: true, mode: 'index' },
 }`}
         />
+      </Section>
+
+      <Section id="recipe-ticks" title="Recipe: Ticks and Gridlines">
+        <Prose>
+          <code>tickCount</code> sets the target label density (a hard cap for
+          bar and histogram category ticks, which also auto-thin to the plot
+          width), <code>ticks</code> pins exact values, and per-axis
+          <code>grid</code> styles or removes the gridlines independently of
+          the labels. A daily bar chart usually wants sparse date labels, no
+          vertical grid, and dashed horizontal guides:
+        </Prose>
+        <Demo
+          title="Daily bars: sparse labels, horizontal dashed grid only"
+          desc="tickCount caps date labels, grid:false kills vertical clutter, dash restores the hairline style"
+          data={d_dailyBars()}
+          code={`{
+  axes: {
+    x: {
+      type: 'time',
+      tickCount: 6,          // at most 6 date labels across the range
+      grid: false,           // no vertical gridlines
+      tickFormat: (t) => new Date(t).toLocaleDateString(undefined,
+        { month: 'short', day: 'numeric' }),
+    },
+    y: {
+      tickCount: 4,
+      grid: { dash: [4, 4], opacity: 0.5 },   // dashed horizontal guides
+    },
+  },
+  series: [{
+    label: 'active users', dataIndex: 1, type: 'bar',
+    // per-datum fill: emphasize the most recent day
+    fill: (v, i) => i === 29 ? '#e8590c' : '#4f8fea',
+  }],
+  tooltip: {
+    xFormat: (t) => new Date(t).toLocaleDateString(undefined,
+      { weekday: 'short', month: 'long', day: 'numeric' }),
+    yFormat: (y) => \`\${Math.round(y)} users\`,
+  },
+}`}
+        />
+        <Prose>
+          For full control, pass explicit values: <code>ticks: [0, 25, 50,
+          75, 100]</code> renders exactly those (clamped to the visible
+          domain), and gridlines follow the ticks, so both declutter together.
+        </Prose>
       </Section>
 
       <Section id="recipe-downsampling" title="Recipe: Downsampling (LTTB vs M4)">

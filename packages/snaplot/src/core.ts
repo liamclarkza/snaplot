@@ -33,6 +33,7 @@ export {
   studioTheme,
   tokyoTheme,
   resolveTheme,
+  CHART_CSS_VARS,
 } from './config/theme';
 
 // Plugins
@@ -80,6 +81,7 @@ export type {
   ScatterSizeEncoding,
   ScatterTooltipField,
   AxisConfig,
+  AxisGridConfig,
   AxisPosition,
   ThemeConfig,
   Layout,

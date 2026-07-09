@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   PALETTE_SEQUENTIAL_DARK,
   PALETTE_SEQUENTIAL_LIGHT,
@@ -147,4 +147,135 @@ describe('named theme guard', () => {
       expect(theme.heatmapGradient?.length ?? 0).toBeGreaterThan(0);
     });
   }
+});
+
+describe('CSS variable and color-space resolution', () => {
+  // A controllable DOM: the container carries custom properties, the probe
+  // "computes" colors from a lookup table standing in for the browser's
+  // color engine (var() resolution, oklch to rgb conversion).
+  const COMPUTED: Record<string, string> = {
+    'var(--surface)': 'rgb(20, 22, 31)',
+    'var(--accent)': 'rgb(122, 162, 247)',
+    'oklch(0.32 0.02 260)': 'rgb(40, 44, 60)',
+  };
+
+  // sRGB bytes the fake 1x1 canvas "paints" for colors the small parser
+  // cannot read, standing in for the browser's color engine.
+  const CANVAS_BYTES: Record<string, [number, number, number, number]> = {
+    'oklch(0.32 0.02 260)': [40, 44, 60, 255],
+  };
+
+  function stubDom(containerVars: Record<string, string>) {
+    const probes: Array<{ style: { display: string; _color: string } }> = [];
+    const makeProbe = () => {
+      const probe = {
+        style: {
+          display: '',
+          _color: '',
+          get color() {
+            return this._color;
+          },
+          set color(v: string) {
+            // The CSSOM keeps the previous value for unparseable input; our
+            // stub accepts anything the lookup or a plain parser knows.
+            this._color = v;
+          },
+        },
+        remove: vi.fn(),
+      };
+      probes.push(probe as never);
+      return probe;
+    };
+    const makeCanvas = () => {
+      let fillStyle = '';
+      return {
+        getContext: () => ({
+          canvas: { width: 0, height: 0 },
+          get fillStyle() {
+            return fillStyle;
+          },
+          set fillStyle(v: string) {
+            // Mirror the canvas keeping its previous fillStyle for values
+            // the (stub) color engine does not know.
+            if (CANVAS_BYTES[v] || v === '#010203') fillStyle = v;
+          },
+          clearRect: () => {},
+          fillRect: () => {},
+          getImageData: () => ({ data: CANVAS_BYTES[fillStyle] ?? [0, 0, 0, 0] }),
+        }),
+      };
+    };
+    const container = {
+      appendChild: vi.fn(),
+      style: {},
+    } as unknown as HTMLElement;
+
+    vi.stubGlobal('document', {
+      createElement: (tag: string) => (tag === 'canvas' ? makeCanvas() : makeProbe()),
+    });
+    vi.stubGlobal('getComputedStyle', (el: unknown) => {
+      const probe = probes.find((p) => p === el);
+      if (probe) {
+        return { color: COMPUTED[probe.style._color] ?? probe.style._color };
+      }
+      // The container: expose custom properties.
+      return {
+        color: '',
+        getPropertyValue: (name: string) => containerVars[name] ?? '',
+      };
+    });
+    return container;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('resolves var() references in user theme fields to computed colors', () => {
+    const container = stubDom({});
+    const theme = resolveTheme(container, {
+      backgroundColor: 'var(--surface)',
+      crosshairColor: 'var(--accent)',
+    });
+    expect(theme.backgroundColor).toBe('rgb(20, 22, 31)');
+    expect(theme.crosshairColor).toBe('rgb(122, 162, 247)');
+  });
+
+  it('normalizes oklch backgrounds so dark detection picks dark role palettes', () => {
+    const container = stubDom({});
+    const theme = resolveTheme(container, {
+      backgroundColor: 'oklch(0.32 0.02 260)',
+    });
+    expect(theme.backgroundColor).toBe('rgb(40, 44, 60)');
+    // rgb(40,44,60) is dark: the sequential ramp must be the dark-anchored one.
+    const darkDefault = resolveTheme(container, { backgroundColor: '#14161f' });
+    expect(theme.sequentialPalette).toEqual(darkDefault.sequentialPalette);
+  });
+
+  it('reads --chart-* custom properties from the container', () => {
+    const container = stubDom({
+      '--chart-bg': '#101216',
+      '--chart-text': '#e8eaed',
+      '--chart-crosshair': 'var(--accent)',
+    });
+    const theme = resolveTheme(container);
+    expect(theme.backgroundColor).toBe('#101216');
+    expect(theme.textColor).toBe('#e8eaed');
+    expect(theme.crosshairColor).toBe('rgb(122, 162, 247)');
+  });
+
+  it('normalizes palette entries to hex so gradient interpolation works', () => {
+    const container = stubDom({});
+    const theme = resolveTheme(container, {
+      heatmapGradient: ['var(--surface)', 'var(--accent)'],
+    });
+    expect(theme.heatmapGradient).toEqual(['#14161f', '#7aa2f7']);
+  });
+
+  it('leaves plain parseable colors untouched without touching the DOM', () => {
+    const container = stubDom({});
+    const theme = resolveTheme(container, { backgroundColor: '#123456' });
+    expect(theme.backgroundColor).toBe('#123456');
+    expect((container.appendChild as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+  });
 });

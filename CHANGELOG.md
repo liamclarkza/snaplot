@@ -6,6 +6,39 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- CSS-variable theming is now first class: every `ThemeConfig` color
+  accepts `var(--token)` references and any CSS color the browser can
+  compute (including `oklch`), resolved against the chart container.
+  Charts re-resolve automatically when an attribute changes on
+  `<html>`/`<body>` (the `[data-theme]` pattern) or the OS color scheme
+  flips, so token-driven apps re-theme live with no remount.
+  `chart.refreshTheme()` covers exotic cases, and the `--chart-*`
+  custom-property names are documented and exported as `CHART_CSS_VARS`
+  (with new `--chart-tick`, `--chart-crosshair`, and
+  `--chart-tooltip-border` entries).
+- Added `axis.tickCount` (target label density; a hard cap for bar and
+  histogram category ticks) and `axis.ticks` (explicit tick values,
+  clamped to the visible domain). Gridlines follow the ticks.
+- Added per-axis gridline control: `axis.grid: false` removes one axis's
+  gridlines while keeping its labels, and `axis.grid: { color, opacity,
+  dash }` styles them, including dashed hairlines.
+- Bar series accept a per-datum fill callback,
+  `fill: (value, index) => color`, for emphasis patterns like
+  highlighting the most recent bar without a second series.
+- Added `tooltip.xFormat` and `tooltip.yFormat` so the common "format the
+  date, add units" case no longer needs a custom `tooltip.render`.
+
+### Changed
+- Bar charts no longer tick and gridline every category: category ticks
+  thin automatically to what the plot width can label legibly (histograms
+  already did), so a year of daily bars gets readable date labels instead
+  of a smeared band.
+
+### Fixed
+- `series.fill` is honored by bar series as documented; bars previously
+  always used the series stroke/palette color.
+
 ## [0.10.0] - 2026-07-07
 
 ### Added

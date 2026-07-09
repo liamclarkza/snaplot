@@ -50,7 +50,7 @@ import { deepMerge } from '../config/merge';
 import { DEFAULT_CONFIG } from '../config/defaults';
 import { resolveTheme } from '../config/theme';
 
-import { renderAxes, updateDOMLabels } from '../renderers/AxesRenderer';
+import { renderAxes, thinTicks, updateDOMLabels } from '../renderers/AxesRenderer';
 import { renderLineSegments, renderAreaSegments, renderBandSegments, type LineRenderSegment } from '../renderers/LineRenderer';
 import { m4 } from '../data/downsampling/m4';
 import { isDensityScatterSeries, renderScatterSegments, ScatterSeriesCache } from '../renderers/ScatterRenderer';
@@ -185,6 +185,16 @@ export class ChartCore implements ChartInstance {
   private lastPointerType: 'mouse' | 'touch' | 'pen' = 'mouse';
   private pendingTouchCursor: { x: number; y: number; pointerType: 'touch' | 'pen'; publishSync: boolean } | null = null;
   private touchCursorFrame: number | null = null;
+  /**
+   * Re-resolves the theme when the document's theming context changes: an
+   * attribute flip on <html>/<body> (the [data-theme] pattern) or an OS
+   * color-scheme change. Only repaints when the resolved theme actually
+   * differs, so the observer is effectively free outside real theme flips.
+   */
+  private themeObserver: MutationObserver | null = null;
+  private colorSchemeQuery: MediaQueryList | null = null;
+  private themeRefreshQueued = false;
+  private boundSchemeChange = () => this.queueThemeRefresh();
   /** Active selection box (shift+drag) */
   private selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
   /** Persistent brush selection in data space (selection.mode: 'brush'). */
@@ -266,8 +276,19 @@ export class ChartCore implements ChartInstance {
       this.onResize(w, h);
     });
 
-    // 3. Resolve theme
+    // 3. Resolve theme, and keep it live: token-driven apps flip themes by
+    // swapping an attribute on <html>/<body> or via the OS color scheme,
+    // and a canvas cannot track CSS variables by itself the way SVG can.
     this.theme = resolveTheme(parent, this.config.theme);
+    if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+      this.themeObserver = new MutationObserver(() => this.queueThemeRefresh());
+      this.themeObserver.observe(document.documentElement, { attributes: true });
+      if (document.body) this.themeObserver.observe(document.body, { attributes: true });
+    }
+    if (typeof matchMedia !== 'undefined') {
+      this.colorSchemeQuery = matchMedia('(prefers-color-scheme: dark)');
+      this.colorSchemeQuery.addEventListener?.('change', this.boundSchemeChange);
+    }
 
     // 4. Create data store
     const initialData = data ?? [new Float64Array(0)];
@@ -613,6 +634,27 @@ export class ChartCore implements ChartInstance {
     return this.theme;
   }
 
+  refreshTheme(): void {
+    if (this.destroyed) return;
+    const next = resolveTheme(this.container, this.config.theme);
+    // Attribute churn on <html> is far more common than actual theme
+    // flips; a value-level compare keeps the no-op case paint-free.
+    if (JSON.stringify(next) === JSON.stringify(this.theme)) return;
+    this.theme = next;
+    this.tooltipManager.applyTheme(next);
+    this.scheduler.markDirty(DirtyFlag.ALL);
+  }
+
+  /** Collapse observer bursts (class + style + data-theme often flip together). */
+  private queueThemeRefresh(): void {
+    if (this.themeRefreshQueued || this.destroyed) return;
+    this.themeRefreshQueued = true;
+    setTimeout(() => {
+      this.themeRefreshQueued = false;
+      this.refreshTheme();
+    }, 0);
+  }
+
   getLayout(): Layout {
     return this.layout;
   }
@@ -796,6 +838,11 @@ export class ChartCore implements ChartInstance {
       clearTimeout(this.refineTimer);
       this.refineTimer = null;
     }
+    this.themeObserver?.disconnect();
+    this.themeObserver = null;
+    this.colorSchemeQuery?.removeEventListener?.('change', this.boundSchemeChange);
+    this.colorSchemeQuery = null;
+
     this.scheduler.destroy();
     this.gestureManager.detach();
     this.tooltipManager.destroy();
@@ -1734,6 +1781,9 @@ export class ChartCore implements ChartInstance {
         scale.max,
         tickFormatId(ac?.tickFormat),
         ac?.label ?? '',
+        // Tick config changes what layout measures for the gutter.
+        ac?.tickCount ?? '',
+        ac?.ticks ? ac.ticks.join(',') : '',
       ].join(':');
     }).join('|');
     const padding = this.config.padding ?? {};
@@ -2409,6 +2459,9 @@ export class ChartCore implements ChartInstance {
       sizeData,
       startIdx: segment.physicalStart,
       endIdx: segment.physicalEnd,
+      // Ring stores wrap: per-datum callbacks (bar fill) receive logical
+      // indices, so carry the logical origin of each physical run.
+      logicalStartIdx: segment.logicalStart,
     }));
   }
 
@@ -2954,8 +3007,16 @@ export class ChartCore implements ChartInstance {
           const fallback = series.stroke ?? palette[si % palette.length];
           return this.scatterResolvers(si, series, fallback).logicalResolver;
         },
+        this.tooltipFormatters(),
       );
     }
+  }
+
+  /** tooltip.xFormat / tooltip.yFormat, when configured. */
+  private tooltipFormatters(): { x?: (x: number) => string; y?: (y: number, seriesIndex: number) => string } | undefined {
+    const t = this.config.tooltip;
+    if (!t?.xFormat && !t?.yFormat) return undefined;
+    return { x: t.xFormat, y: t.yFormat };
   }
 
   /**
@@ -2991,6 +3052,7 @@ export class ChartCore implements ChartInstance {
       const binMax = this.store.xAt(b + 1);
       const count = this.store.yAt(colIdx - 1, b);
 
+      const fmt = this.tooltipFormatters();
       points.push({
         seriesIndex: si,
         dataIndex: b,
@@ -2998,8 +3060,10 @@ export class ChartCore implements ChartInstance {
         x: (binMin + binMax) / 2,
         y: count,
         color,
-        formattedX: this.formatHistogramBinRange(binMin, binMax),
-        formattedY: String(count),
+        formattedX: fmt?.x
+          ? fmt.x((binMin + binMax) / 2)
+          : this.formatHistogramBinRange(binMin, binMax),
+        formattedY: fmt?.y ? fmt.y(count, si) : String(count),
       });
     }
 
@@ -3040,6 +3104,7 @@ export class ChartCore implements ChartInstance {
 
       const color = series.stroke ?? palette[si % palette.length];
       const yScale = this.scales.get(series.yAxisKey ?? 'y');
+      const fmt = this.tooltipFormatters();
 
       points.push({
         seriesIndex: si,
@@ -3048,8 +3113,16 @@ export class ChartCore implements ChartInstance {
         x: xVal,
         y: yVal,
         color,
-        formattedX: Number.isInteger(xVal) ? String(xVal) : xVal.toFixed(1),
-        formattedY: yScale ? yScale.tickFormat(yVal) : String(Math.round(yVal)),
+        formattedX: fmt?.x
+          ? fmt.x(xVal)
+          : Number.isInteger(xVal)
+            ? String(xVal)
+            : xVal.toFixed(1),
+        formattedY: fmt?.y
+          ? fmt.y(yVal, si)
+          : yScale
+            ? yScale.tickFormat(yVal)
+            : String(Math.round(yVal)),
       });
     }
 
@@ -3294,25 +3367,26 @@ export class ChartCore implements ChartInstance {
     const defaultFormat = (v: number) =>
       Number.isInteger(v) ? String(v) : v.toFixed(1);
 
+    // Category ticks are capped to what the plot width can label legibly
+    // (and to an explicit axes.x.tickCount when set): a year of daily bars
+    // used to tick every day, smearing labels and gridlines into a band.
+    const maxCategoryTicks = Math.min(
+      Math.max(2, Math.floor(this.layout.plot.width / 65)),
+      xAxisCfg?.tickCount ?? Number.POSITIVE_INFINITY,
+    );
+
     // Histogram: X data = bin edges, use them as tick values
     const histSeries = visibleSeries.find(s => s.type === 'histogram');
     if (histSeries && this.store.length > 0) {
       // X column contains bin edges directly (pre-computed by user)
-      let edgeValues = Array.from(this.store.x);
-      const plotWidth = this.layout.plot.width;
-      const maxLabels = Math.max(2, Math.floor(plotWidth / 65));
-      if (edgeValues.length > maxLabels) {
-        const step = Math.ceil(edgeValues.length / maxLabels);
-        edgeValues = edgeValues.filter((_, i) => i % step === 0);
-      }
-
+      const edgeValues = thinTicks(Array.from(this.store.x), maxCategoryTicks);
       return { values: edgeValues, format: userFormat ?? defaultFormat };
     }
 
     // Bar chart: tick at each category X value
     const barSeries = visibleSeries.find(s => s.type === 'bar');
     if (barSeries && this.store.length > 0) {
-      const values = Array.from(this.store.x);
+      const values = thinTicks(Array.from(this.store.x), maxCategoryTicks);
       return { values, format: userFormat ?? defaultFormat };
     }
 

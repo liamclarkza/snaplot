@@ -22,6 +22,17 @@ import {
 
 export type PointerKind = 'mouse' | 'touch' | 'pen';
 
+/**
+ * Value formatters from `tooltip.xFormat`/`tooltip.yFormat`. When set they
+ * populate TooltipPoint.formattedX/formattedY in place of the axes' tick
+ * formatting, covering the common "date header, unit suffix" case without
+ * a custom tooltip renderer.
+ */
+export interface TooltipFormatters {
+  x?: (x: number) => string;
+  y?: (y: number, seriesIndex: number) => string;
+}
+
 export class HitTester {
   /** Optional override, takes precedence over the pointer-type default. */
   private proximityOverride: number | null;
@@ -70,6 +81,7 @@ export class HitTester {
      * per scatter hit, which re-scans the encoded columns.
      */
     getResolver?: (seriesIndex: number) => ScatterStyleResolver,
+    formatters?: TooltipFormatters,
   ): TooltipPoint[] {
     const xScale = scales.get('x');
     if (!xScale || store.length === 0) return [];
@@ -77,7 +89,16 @@ export class HitTester {
     const proximity = this.proximityFor(pointerType);
 
     if (mode === 'index' || mode === 'x') {
-      return this.pointsAtIndex(store, scales, seriesConfigs, pixelX, pixelY, palette, proximity);
+      return this.pointsAtIndex(
+        store,
+        scales,
+        seriesConfigs,
+        pixelX,
+        pixelY,
+        palette,
+        proximity,
+        formatters,
+      );
     }
 
     return this.nearestPoint(
@@ -91,6 +112,7 @@ export class HitTester {
       scatterPalettes ?? { categorical: palette },
       dataVersion,
       getResolver,
+      formatters,
     );
   }
 
@@ -102,6 +124,7 @@ export class HitTester {
     pixelY: number,
     palette: string[],
     proximity: number,
+    formatters?: TooltipFormatters,
   ): TooltipPoint[] {
     const points: TooltipPoint[] = [];
 
@@ -139,8 +162,12 @@ export class HitTester {
         x: xVal,
         y: yVal,
         color: sc.stroke ?? palette[si % palette.length],
-        formattedX: xScale.tickFormat(xVal),
-        formattedY: yScale ? yScale.tickFormat(yVal) : String(yVal),
+        formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
+        formattedY: formatters?.y
+          ? formatters.y(yVal, si)
+          : yScale
+            ? yScale.tickFormat(yVal)
+            : String(yVal),
       });
     }
 
@@ -161,6 +188,7 @@ export class HitTester {
     scatterPalettes: ScatterPalettes,
     dataVersion: number,
     getResolver?: (seriesIndex: number) => ScatterStyleResolver,
+    formatters?: TooltipFormatters,
   ): TooltipPoint[] {
     let bestDist = Infinity;
     let bestPoint: TooltipPoint | null = null;
@@ -182,6 +210,7 @@ export class HitTester {
           scatterPalettes,
           dataVersion,
           getResolver,
+          formatters,
         );
         if (scatterPoint) {
           const dist = (scatterPoint.pixelX - pixelX) ** 2 + (scatterPoint.pixelY - pixelY) ** 2;
@@ -229,8 +258,8 @@ export class HitTester {
             x: xVal,
             y: yVal,
             color: sc.stroke ?? palette[si % palette.length],
-            formattedX: xScale.tickFormat(xVal),
-            formattedY: yScale.tickFormat(yVal),
+            formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
+            formattedY: formatters?.y ? formatters.y(yVal, si) : yScale.tickFormat(yVal),
           };
         }
       }
@@ -255,6 +284,7 @@ export class HitTester {
     palettes: ScatterPalettes,
     dataVersion: number,
     getResolver?: (seriesIndex: number) => ScatterStyleResolver,
+    formatters?: TooltipFormatters,
   ): { point: TooltipPoint; pixelX: number; pixelY: number } | null {
     const xScale = scales.get(sc.xAxisKey ?? 'x');
     const yScale = scales.get(sc.yAxisKey ?? 'y');
@@ -321,8 +351,8 @@ export class HitTester {
         y: yVal,
         color: style.colorAt(bestIdx),
         radius: style.radiusAt(bestIdx),
-        formattedX: xScale.tickFormat(xVal),
-        formattedY: yScale.tickFormat(yVal),
+        formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
+        formattedY: formatters?.y ? formatters.y(yVal, seriesIndex) : yScale.tickFormat(yVal),
         fields: scatterTooltipFields(
           sc,
           bestIdx,

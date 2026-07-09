@@ -195,9 +195,20 @@ export interface SeriesConfig<TMeta = unknown> {
   stroke?: string;
   /**
    * Area / bar fill color. `null` forces no fill (useful to draw an
-   * `area` series as a bare outline). Defaults to a translucent `stroke`.
+   * `area` series as a bare outline). Defaults to a translucent `stroke`
+   * for areas and the series color for bars.
+   *
+   * Bar series also accept a per-datum callback `(value, index) => color`
+   * for emphasis patterns like highlighting the most recent bar:
+   *
+   * ```ts
+   * fill: (v, i) => i === data[0].length - 1 ? '#e8590c' : '#4f8fea'
+   * ```
+   *
+   * Callbacks are honored by bar series only; other series types fall
+   * back to their default fill.
    */
-  fill?: string | null;
+  fill?: string | null | ((value: number, index: number) => string);
   /** Stroke width in CSS pixels. Default: 1.5. Applies to line and area outlines. */
   lineWidth?: number;
   /**
@@ -337,6 +348,28 @@ export interface SeriesConfig<TMeta = unknown> {
 
 export type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
 
+/**
+ * Per-axis gridline styling, independent of tick labels. `false` (or
+ * `show: false`) removes this axis's gridlines while its labels stay; a
+ * time-bar chart often wants horizontal guides only, so set
+ * `axes.x.grid: false`. Colors here are concrete CSS color strings; theme
+ * `var()` references are resolved only in `ThemeConfig` fields.
+ */
+export interface AxisGridConfig {
+  /** Draw gridlines for this axis's ticks. Default: `true`. */
+  show?: boolean;
+  /** Gridline color. Default: the theme's `gridColor`. */
+  color?: string;
+  /** Gridline opacity. Default: derived from the theme's `gridOpacity`. */
+  opacity?: number;
+  /**
+   * Canvas `setLineDash` pattern, e.g. `[4, 4]` for a dashed hairline.
+   * Default: solid. Dashes shimmer slightly during pan (the pattern is
+   * anchored in screen space), which is why solid is the default.
+   */
+  dash?: number[];
+}
+
 /** Configuration for an axis entry in ChartConfig.axes */
 export interface AxisConfig {
   /** Scale kind for this axis. Default: `'linear'`. */
@@ -383,6 +416,27 @@ export interface AxisConfig {
    * the label as a string; return `''` to hide a specific tick.
    */
   tickFormat?: (value: number) => string;
+  /**
+   * Target tick density. Scales treat it as a hint (nice-number rounding
+   * still applies on linear axes); bar and histogram category ticks treat
+   * it as a hard cap and thin evenly to stay under it. Default: 6, and
+   * bar/histogram X ticks additionally auto-thin to the plot width so a
+   * year of daily bars does not label every day.
+   */
+  tickCount?: number;
+  /**
+   * Explicit tick values in data space. Overrides `tickCount` and the
+   * scale's own generation; values outside the current domain are not
+   * rendered. Gridlines follow these ticks, so this also controls the
+   * grid density. Format labels with `tickFormat`.
+   */
+  ticks?: number[];
+  /**
+   * Gridline control for this axis. `false` hides this axis's gridlines
+   * entirely; an object styles them. Default: solid hairlines in the
+   * theme's grid color.
+   */
+  grid?: boolean | AxisGridConfig;
 }
 
 // ============================================================
@@ -600,6 +654,19 @@ export interface TooltipConfig {
   mode?: 'nearest' | 'index' | 'x';
   /** Pixel offset from the cursor. Defaults to TOOLTIP_OFFSET (12 px). */
   offset?: number;
+  /**
+   * Format the X value shown in the default tooltip (the header in
+   * multi-series mode, the `x` readout in nearest mode). Covers the
+   * common "nice date, no custom renderer" case; defaults to the X
+   * axis's tick formatting. Populates `TooltipPoint.formattedX`.
+   */
+  xFormat?: (x: number) => string;
+  /**
+   * Format each Y value shown in the default tooltip, e.g. to append
+   * units. Receives the series index for mixed-unit charts. Defaults to
+   * the Y axis's tick formatting. Populates `TooltipPoint.formattedY`.
+   */
+  yFormat?: (y: number, seriesIndex: number) => string;
   /**
    * Custom renderer. Returning a string sets the tooltip's `innerHTML`
    * verbatim, so escape any user-derived text or return an `HTMLElement`
@@ -954,6 +1021,18 @@ export type DeepPartial<T> = {
 // THEME
 // ============================================================
 
+/**
+ * Chart color and typography tokens.
+ *
+ * Every color field accepts any CSS color the browser can compute,
+ * including `var(--token)` references and `oklch(...)`: values are
+ * resolved against the chart container when the theme is applied, and
+ * re-resolved automatically when the document theme changes (an attribute
+ * flip on `<html>`/`<body>` or an OS color-scheme change), so charts in a
+ * CSS-variable design system re-theme live with no remount. Alternatively
+ * define the `--chart-*` custom properties (see `CHART_CSS_VARS`) on the
+ * container and omit `theme` entirely.
+ */
 export interface ThemeConfig {
   /** Plot background fill. The grid canvas is opaque, so this must be a solid color. */
   backgroundColor: string;
@@ -1120,6 +1199,17 @@ export interface ChartInstance {
    * partial overrides.
    */
   getTheme(): ThemeConfig;
+
+  /**
+   * Re-resolve the theme against the container's current CSS cascade and
+   * repaint if anything changed. Charts already call this automatically
+   * when an attribute changes on `<html>`/`<body>` (the `[data-theme]`
+   * pattern) or the OS color scheme flips; call it manually only when
+   * tokens change through some other mechanism (for example a variable
+   * swapped on a mid-tree ancestor). No-ops when the resolved theme is
+   * value-identical.
+   */
+  refreshTheme(): void;
 
   /** Get current layout */
   getLayout(): Layout;

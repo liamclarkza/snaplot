@@ -195,3 +195,19 @@ export function legendData(): ColumnarData {
   }
   return [x, y1, y2, y3];
 }
+
+/** One bar per day for the last `days` days: a dashboard daily-metric shape. */
+export function dailyBarData(days: number): ColumnarData {
+  const x = new Float64Array(days);
+  const y = new Float64Array(days);
+  const dayMs = 86_400_000;
+  const today = Date.now() - (Date.now() % dayMs);
+  for (let i = 0; i < days; i++) {
+    x[i] = today - (days - 1 - i) * dayMs;
+    // Weekly rhythm plus noise so the bars read as real activity data.
+    const weekday = new Date(x[i]).getDay();
+    const weekend = weekday === 0 || weekday === 6 ? 0.55 : 1;
+    y[i] = Math.round((140 + Math.sin(i / 3.1) * 35 + Math.random() * 40) * weekend);
+  }
+  return [x, y];
+}

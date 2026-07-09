@@ -1345,6 +1345,58 @@ describe('ChartCore lifecycle + config integrity', () => {
   });
 });
 
+describe('ChartCore live theme refresh', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', new MockDocument());
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('refreshTheme picks up changed --chart-* tokens without a remount', () => {
+    const tokens: Record<string, string> = { '--chart-bg': '#ffffff', '--chart-text': '#111111' };
+    vi.stubGlobal('getComputedStyle', () => ({
+      color: '',
+      getPropertyValue: (name: string) => tokens[name] ?? '',
+    }));
+
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[] },
+      [f([1, 2]), f([10, 20])],
+    );
+    expect(chart.getTheme().backgroundColor).toBe('#ffffff');
+
+    // The app flips its dark theme: same chart instance, new token values.
+    tokens['--chart-bg'] = '#14161f';
+    tokens['--chart-text'] = '#e2e2e5';
+    chart.refreshTheme();
+
+    expect(chart.getTheme().backgroundColor).toBe('#14161f');
+    expect(chart.getTheme().textColor).toBe('#e2e2e5');
+    chart.destroy();
+  });
+
+  it('refreshTheme is a no-op when the resolved theme is unchanged', () => {
+    vi.stubGlobal('getComputedStyle', () => ({
+      color: '',
+      getPropertyValue: () => '',
+    }));
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[] },
+      [f([1, 2]), f([10, 20])],
+    );
+    const before = chart.getTheme();
+    chart.refreshTheme();
+    // Identity preserved: no repaint-triggering theme swap happened.
+    expect(chart.getTheme()).toBe(before);
+    chart.destroy();
+  });
+});
+
 describe('ChartCore live-follow viewport', () => {
   beforeEach(() => {
     vi.stubGlobal('document', new MockDocument());
