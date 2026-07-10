@@ -1,5 +1,5 @@
 import type { AxisConfig, Layout, Scale, ThemeConfig, AxisPosition, ChartConfig } from '../types';
-import { DEFAULT_TICK_COUNT, LABEL_MIN_GAP } from '../constants';
+import { DEFAULT_TICK_COUNT, EDGE_MARGIN, LABEL_MIN_GAP } from '../constants';
 import { inferPosition } from '../core/Layout';
 
 /**
@@ -246,19 +246,22 @@ export function renderAxes(
     if (ac.label) {
       const area = layout.axes[key]?.area;
       if (area) {
-        const strip = (theme.fontSize + 8) / 2;
+        // Center of the title glyph sits EDGE_MARGIN + half a line in from
+        // the outer edge, mirroring the titleStrip Layout reserves, so the
+        // glyph never touches the canvas edge (or the host's card border).
+        const inset = EDGE_MARGIN + theme.fontSize / 2;
         switch (pos) {
           case 'left':
-            labels.push({ text: ac.label, x: area.left + strip, y: plot.top + plot.height / 2, anchor: 'middle', kind: 'title' });
+            labels.push({ text: ac.label, x: area.left + inset, y: plot.top + plot.height / 2, anchor: 'middle', kind: 'title' });
             break;
           case 'right':
-            labels.push({ text: ac.label, x: area.left + area.width - strip, y: plot.top + plot.height / 2, anchor: 'middle', kind: 'title' });
+            labels.push({ text: ac.label, x: area.left + area.width - inset, y: plot.top + plot.height / 2, anchor: 'middle', kind: 'title' });
             break;
           case 'bottom':
-            labels.push({ text: ac.label, x: plot.left + plot.width / 2, y: area.top + area.height - strip, anchor: 'middle', kind: 'title' });
+            labels.push({ text: ac.label, x: plot.left + plot.width / 2, y: area.top + area.height - inset, anchor: 'middle', kind: 'title' });
             break;
           case 'top':
-            labels.push({ text: ac.label, x: plot.left + plot.width / 2, y: area.top + strip, anchor: 'middle', kind: 'title' });
+            labels.push({ text: ac.label, x: plot.left + plot.width / 2, y: area.top + inset, anchor: 'middle', kind: 'title' });
             break;
         }
       }

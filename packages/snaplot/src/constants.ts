@@ -590,6 +590,14 @@ export const DEFAULT_PADDING = {
 /** Minimum gap between axis labels (CSS pixels) */
 export const LABEL_MIN_GAP = 12;
 
+/**
+ * Minimum clearance between the outermost glyph (axis title, tick label)
+ * and the canvas edge (CSS pixels). Hosts routinely place the canvas flush
+ * against a card border, so text drawn at the very edge reads as touching
+ * the frame of the surrounding UI.
+ */
+export const EDGE_MARGIN = 8;
+
 /** Default tick count target */
 export const DEFAULT_TICK_COUNT = 6;
 

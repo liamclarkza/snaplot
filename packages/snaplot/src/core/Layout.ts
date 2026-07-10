@@ -1,5 +1,5 @@
 import type { Layout, ChartConfig, Scale, AxisPosition } from '../types';
-import { DEFAULT_PADDING, DEFAULT_TICK_COUNT } from '../constants';
+import { DEFAULT_PADDING, DEFAULT_TICK_COUNT, EDGE_MARGIN } from '../constants';
 
 /**
  * Computes layout regions using the outside-in algorithm:
@@ -70,8 +70,11 @@ export function computeLayout(
   let bottomAxisHeight = padding.bottom;
   let topAxisHeight = padding.top;
 
-  // Axis titles get their own strip along the outer edge of the gutter.
-  const titleStrip = fontSize + 8;
+  // Axis titles get their own strip along the outer edge of the gutter:
+  // EDGE_MARGIN of clearance to the canvas edge, the glyph, and a 4px gap
+  // to the tick labels. The renderer places the title EDGE_MARGIN in from
+  // the edge to match.
+  const titleStrip = EDGE_MARGIN + fontSize + 4;
 
   // Build a map of axis key → position for later use
   const axisPositions = new Map<string, AxisPosition>();
@@ -101,12 +104,12 @@ export function computeLayout(
         const width = measureTextWidth(format(t), fontFamily, fontSize);
         if (width > maxWidth) maxWidth = width;
       }
-      // Tick mark (4px) + gap (8px) + label width + margin (4px), rounded
+      // Tick mark (4px) + gap (8px) + label width + EDGE_MARGIN, rounded
       // up to an 8px step. Quantizing keeps the gutter stable while tick
       // labels shift by a character during pan/zoom, so the plot rect does
       // not jitter and the layout stays reusable across gesture frames.
       const titleSpace = ac.label ? titleStrip : 0;
-      const needed = Math.ceil((maxWidth + 16 + titleSpace) / 8) * 8;
+      const needed = Math.ceil((maxWidth + 12 + EDGE_MARGIN + titleSpace) / 8) * 8;
       if (pos === 'left') {
         leftAxisWidth = Math.max(leftAxisWidth, needed);
       } else {

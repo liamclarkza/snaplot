@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- The layout now guarantees at least 8px of clearance between the
+  outermost glyph and the canvas edge. Axis titles were pinned about 4px
+  from the edge and wide tick labels could land as close, so charts
+  rendered flush inside a card showed text touching the card border.
+
 ## [0.11.0] - 2026-07-09
 
 ### Added

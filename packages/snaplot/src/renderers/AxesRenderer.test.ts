@@ -145,3 +145,46 @@ describe('per-axis grid config', () => {
     expect(ctx.moveTo).toHaveBeenCalled();
   });
 });
+
+describe('axis title placement', () => {
+  it('keeps title glyphs EDGE_MARGIN clear of the canvas edge on all sides', () => {
+    const yScale = linearScale(0, 100, [50]);
+    const xScale = { ...linearScale(0, 100, [50]), key: 'x' };
+    const scales = new Map<string, Scale>([
+      ['x', xScale],
+      ['y', yScale],
+    ]);
+    const config = {
+      series: [],
+      axes: {
+        x: { position: 'bottom', label: 'Learning rate' },
+        y: { position: 'left', label: 'Validation loss' },
+      },
+    } as unknown as ChartConfig;
+    const fullLayout: Layout = {
+      width: 200,
+      height: 140,
+      plot: { left: 44, top: 10, width: 140, height: 90 },
+      axes: {
+        x: { position: 'bottom', area: { left: 44, top: 100, width: 140, height: 40 } },
+        y: { position: 'left', area: { left: 0, top: 10, width: 44, height: 90 } },
+      },
+      dpr: 1,
+    };
+    const ctx = context();
+    (ctx as unknown as { measureText: (t: string) => TextMetrics }).measureText = (t: string) =>
+      ({ width: t.length * 7 }) as TextMetrics;
+
+    const result = renderAxes(ctx, fullLayout, scales, theme, config);
+
+    const yTitle = (result.labels.get('y') ?? []).find((l) => l.kind === 'title');
+    const xTitle = (result.labels.get('x') ?? []).find((l) => l.kind === 'title');
+    const fontSize = 12;
+    // Rotated left title: glyph left edge = x - fontSize / 2.
+    expect(yTitle).toBeDefined();
+    expect((yTitle?.x ?? 0) - fontSize / 2).toBeGreaterThanOrEqual(8);
+    // Bottom title: glyph bottom edge = y + fontSize / 2, inside the canvas.
+    expect(xTitle).toBeDefined();
+    expect(fullLayout.height - ((xTitle?.y ?? 0) + fontSize / 2)).toBeGreaterThanOrEqual(8);
+  });
+});
