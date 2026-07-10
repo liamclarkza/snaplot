@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 import CodeBlock from '../../../components/CodeBlock';
+import DocsLink from '../DocsLink';
 import { Section, Prose, Demo } from '../../../components/ui';
 import { linearData, logData, timeScaleData } from '../fixtures';
 
@@ -70,14 +71,11 @@ export default function Scales() {
         </Prose>
         <CodeBlock code={`// In your chart config
 axes: {
-  bottom: {
-    position: 'bottom',
-    scaleKey: 'x',
+  x: {
+    type: 'time',
     tickFormat: (value) => new Date(value).toLocaleDateString(),
   },
-  left: {
-    position: 'left',
-    scaleKey: 'y',
+  y: {
     tickFormat: (value) => \`\${value.toFixed(1)}%\`,
   },
 }`} />
@@ -85,6 +83,13 @@ axes: {
         <Prose>
           The <code>tickFormat</code> function is called for every visible tick label on each redraw.
           Keep it fast, avoid heavy date parsing or string operations in tight loops.
+        </Prose>
+        <Prose>
+          Worked examples: the{' '}
+          <DocsLink slug="recipes" id="recipe-axis-titles">Axis Titles recipe</DocsLink>{' '}
+          pairs <code>tickFormat</code> with axis labels, and the{' '}
+          <DocsLink slug="recipes" id="recipe-ticks">Ticks and Gridlines recipe</DocsLink>{' '}
+          covers <code>tickCount</code>, explicit <code>ticks</code>, and per-axis grid styling.
         </Prose>
       </Section>
     </>

@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js';
+import DocsLink from '../DocsLink';
 import { Section, Prose, Demo } from '../../../components/ui';
 import {
   timeSeries,
@@ -73,6 +74,8 @@ export default function SeriesOptions() {
         <Prose>
           <code>NaN</code> values in Y arrays create gaps in the line. The library detects gaps with <code>value !== value</code> (the fastest NaN check).
           Combined with step interpolation, this is ideal for sensor data with dropouts or event streams with missing intervals.
+          To bridge gaps instead of breaking the line, see the{' '}
+          <DocsLink slug="recipes" id="recipe-gaps">Gaps and spanGaps recipe</DocsLink>.
         </Prose>
         <Demo title="Sensor data with dropouts" desc="Step interpolation with NaN gaps at indices 12-16, 30-33, and 48-50"
           data={d_gap()}

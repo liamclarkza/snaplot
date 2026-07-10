@@ -81,6 +81,10 @@ export default function Interactions() {
           For scatter plots (<code>zoom.y: true</code>), you get a free rectangle selecting both axes. Drag endpoints are clamped to the plot rectangle, so releasing far outside the chart still zooms to within the data.
         </Prose>
         <Prose>
+          To keep a drag as a persistent, movable X-range selection instead of zooming, see the{' '}
+          <DocsLink slug="recipes" id="recipe-brush">Persistent Brush Selection recipe</DocsLink>.
+        </Prose>
+        <Prose>
           <b>Double-click</b> (or double-tap) resets zoom to the full data extent.
           Use <code>minRange</code> and <code>maxRange</code> to set zoom limits. <code>wheelStep</code> controls the zoom fraction per max wheel / pinch tick (default <code>0.1</code>; <code>0</code> disables wheel zoom).
           When both axes are zoomable, touch pinch uses a uniform map/image-style 2D zoom by default; use <code>pinchMode: 'axis-lock'</code> for direction-based locking.

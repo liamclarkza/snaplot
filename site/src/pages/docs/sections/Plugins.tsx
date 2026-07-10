@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 import CodeBlock from '../../../components/CodeBlock';
+import DocsLink from '../DocsLink';
 import { Section, Prose, Demo } from '../../../components/ui';
 import { timeSeries, legendData } from '../fixtures';
 import {
@@ -183,6 +184,11 @@ const config: ChartConfig<RunMeta> = {
   Run #42
 </button>`} />
         <div style={{ height: '12px' }} />
+        <Prose>
+          For stable series identity across charts (<code>highlight.getKey</code>), shared
+          config defaults, and linked Y domains with aligned gutters, see the{' '}
+          <DocsLink slug="recipes" id="recipe-linked">Linked Charts recipe</DocsLink>.
+        </Prose>
         <CrossChartSyncDemo />
 
         <div style={{ height: '24px' }} />
@@ -295,6 +301,8 @@ plugins: [thresholdPlugin(75, '#e74c3c')]`} />
         <div style={{ height: '8px' }} />
         <Prose>
           Return <code>false</code> from any <code>before*</code> hook to skip the default rendering for that layer, giving you full control over what gets drawn.
+          The <DocsLink slug="recipes" id="recipe-custom-plugin">Custom Plugin recipe</DocsLink>{' '}
+          has a live-editable plugin combining a cursor hook with an overlay hook.
         </Prose>
       </Section>
     </>

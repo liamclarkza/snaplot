@@ -1,6 +1,7 @@
 import { createSignal, onCleanup } from 'solid-js';
 import type { ColumnarData, ChartInstance } from 'snaplot';
 import CodeBlock from '../../../components/CodeBlock';
+import DocsLink from '../DocsLink';
 import { Section, Prose, Demo } from '../../../components/ui';
 import {
   timeSeries,
@@ -92,6 +93,10 @@ export default function ChartTypes() {
           Tooltip mode <code>'nearest'</code> uses euclidean (pixel-space) distance to find the closest point, with a cached screen-space grid for dense clouds.
           For tabular datasets, set <code>xDataIndex</code> to use a column other than column 0 for X, then use <code>colorBy</code>, <code>sizeBy</code>, and <code>tooltipFields</code> for additional encodings.
         </Prose>
+        <Prose>
+    For value-driven color and size encodings (<code>colorBy</code>, <code>sizeBy</code>), see the{' '}
+    <DocsLink slug="recipes" id="recipe-scatter-encoding">Encoded Scatter recipe</DocsLink>.
+  </Prose>
         <Demo title="Encoded cohort scatter (1.2K points)" desc="X/Y from tabular columns, colour by cohort, size by volume, score in the tooltip"
           data={d_scatter()}
           code={`{

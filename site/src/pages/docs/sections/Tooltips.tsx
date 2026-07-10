@@ -1,10 +1,10 @@
 import { createSignal } from 'solid-js';
+import DocsLink from '../DocsLink';
 import { Section, Prose, Demo } from '../../../components/ui';
 import { timeSeries, scatterData } from '../fixtures';
 
 export default function Tooltips() {
   const [d_tooltip_mode] = createSignal(timeSeries(200, 3));
-  const [d_tooltip_custom] = createSignal(timeSeries(200, 2));
   const [d_tooltip_snap] = createSignal(scatterData(500));
 
   return (
@@ -35,44 +35,10 @@ export default function Tooltips() {
           Pass a <code>tooltip.render</code> function for full control over tooltip content.
           It receives an array of <code>TooltipPoint</code> objects and can return an <code>HTMLElement</code>. Prefer DOM nodes with <code>textContent</code> when values may contain user-controlled text.
         </Prose>
-        <Demo title="Custom tooltip renderer" desc="Edit the render function to change tooltip formatting"
-          data={d_tooltip_custom()}
-          code={`{
-  axes: { x: { type: 'time' } },
-  series: [
-    { label: 'Revenue', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Cost', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-  ],
-  tooltip: {
-    show: true,
-    mode: 'index',
-    render: (points) => {
-      const root = document.createElement('div');
-      root.style.fontSize = '12px';
-      for (const p of points) {
-        const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.gap = '8px';
-        row.style.alignItems = 'center';
-
-        const swatch = document.createElement('span');
-        swatch.style.cssText = 'width:8px;height:8px;border-radius:50%';
-        swatch.style.background = p.color;
-
-        const label = document.createElement('span');
-        label.textContent = p.label;
-
-        const value = document.createElement('b');
-        value.style.marginLeft = 'auto';
-        value.textContent = '$' + Number(p.formattedY).toFixed(1);
-
-        row.append(swatch, label, value);
-        root.append(row);
-      }
-      return root;
-    },
-  },
-}`} />
+        <Prose>
+          The <DocsLink slug="recipes" id="recipe-custom-tooltip">Custom Tooltip recipe</DocsLink>{' '}
+          builds a complete swatch + label + value layout you can edit live.
+        </Prose>
         <Prose>Each <code>TooltipPoint</code> contains: <code>seriesIndex</code>, <code>dataIndex</code>, <code>label</code>, <code>x</code>, <code>y</code>, <code>color</code>, <code>formattedX</code>, <code>formattedY</code>.</Prose>
       </Section>
 
