@@ -1,8 +1,8 @@
 import { createSignal } from 'solid-js';
 import CodeBlock from '../../../components/CodeBlock';
+import DocsLink from '../DocsLink';
 import { Section, Prose, Demo } from '../../../components/ui';
 import { timeSeries } from '../fixtures';
-import { scrollTo } from '../Sidebar';
 
 export default function Interactions() {
   const [d_interaction] = createSignal(timeSeries(400, 2));
@@ -136,14 +136,7 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         </Prose>
         <Prose>
           <b>Cross-chart cursor sync:</b> set the same <code>cursor.syncKey</code> on multiple charts to synchronize their crosshair positions. See also{' '}
-          <button
-            type="button"
-            onClick={() => scrollTo('cross-chart-sync')}
-            style={{
-              background: 'none', border: 'none', padding: '0',
-              color: 'var(--accent)', cursor: 'pointer', font: 'inherit',
-            }}
-          >Cross-chart Sync</button>{' '}
+          <DocsLink slug="plugins" id="cross-chart-sync">Cross-chart Sync</DocsLink>{' '}
           for a more ergonomic one-line helper that bundles cursor + highlight sync together.
         </Prose>
         <Demo title="Crosshair config" desc="Try disabling indicators, or enabling yLine"

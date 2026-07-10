@@ -3,9 +3,9 @@ import { lttb, m4 } from 'snaplot';
 import { Chart } from 'snaplot/solid';
 import type { ChartInstance, ColumnarData } from 'snaplot';
 import CodeBlock from '../../../components/CodeBlock';
+import DocsLink from '../DocsLink';
 import { Section, Prose, Demo } from '../../../components/ui';
 import { largeTimeSeries } from '../fixtures';
-import { scrollTo } from '../Sidebar';
 
 export default function Data() {
   // LTTB downsampled data
@@ -48,15 +48,8 @@ setInterval(() => {
         <div style={{ height: '12px' }} />
         <Prose>
           The streaming line chart in the{' '}
-          <button
-            type="button"
-            onClick={() => scrollTo('line')}
-            style={{
-              background: 'none', border: 'none', padding: '0',
-              color: 'var(--accent)', cursor: 'pointer', font: 'inherit',
-            }}
-          >Line</button>{' '}
-          section above demonstrates this pattern live.
+          <DocsLink slug="chart-types" id="line">Line</DocsLink>{' '}
+          section demonstrates this pattern live.
         </Prose>
         <StreamingDiagnosticsDemo />
       </Section>

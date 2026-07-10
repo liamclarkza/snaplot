@@ -1,91 +1,159 @@
 import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js';
 import type { Accessor } from 'solid-js';
 
-export type NavItem =
-  | { type: 'link'; id: string; label: string }
-  | { type: 'divider'; label: string };
+export interface DocsNavItem {
+  id: string;
+  label: string;
+}
+
+export interface DocsGroup {
+  slug: string;
+  label: string;
+  items: DocsNavItem[];
+}
 
 /**
- * Ordered navigation for the docs sidebar. Adding a section here also adds
- * it to the mobile drawer. Paired with anchor IDs inside Docs.tsx, the
- * `scrollTo` helper jumps to the matching `<Section id="…">`.
+ * Ordered navigation for the docs. Each group is its own routed page at
+ * `#/docs/<slug>`; items are section anchors within that page, addressable
+ * as `#/docs/<slug>/<id>`. The slug → component mapping lives in Docs.tsx.
  */
-export const NAV: NavItem[] = [
-  { type: 'divider', label: 'Getting Started' },
-  { type: 'link', id: 'install', label: 'Installation' },
-  { type: 'link', id: 'quick-start', label: 'Quick Start' },
-  { type: 'link', id: 'data-model', label: 'Data Model' },
-
-  { type: 'divider', label: 'Chart Types' },
-  { type: 'link', id: 'line', label: 'Line' },
-  { type: 'link', id: 'area', label: 'Area' },
-  { type: 'link', id: 'band', label: 'Band (Fill Between)' },
-  { type: 'link', id: 'scatter', label: 'Scatter' },
-  { type: 'link', id: 'heatmap', label: 'Density Heatmap' },
-  { type: 'link', id: 'bar', label: 'Bar' },
-  { type: 'link', id: 'histogram', label: 'Histogram' },
-
-  { type: 'divider', label: 'Series Options' },
-  { type: 'link', id: 'interpolation', label: 'Interpolation' },
-  { type: 'link', id: 'styling', label: 'Styling' },
-  { type: 'link', id: 'line-dash', label: 'Line Dash' },
-  { type: 'link', id: 'nan-gaps', label: 'NaN Gaps' },
-  { type: 'link', id: 'dual-axis', label: 'Dual Y-Axis' },
-
-  { type: 'divider', label: 'Scales & Axes' },
-  { type: 'link', id: 'linear-scale', label: 'Linear Scale' },
-  { type: 'link', id: 'log-scale', label: 'Log Scale' },
-  { type: 'link', id: 'time-scale', label: 'Time Scale' },
-  { type: 'link', id: 'tick-format', label: 'Custom Tick Formatting' },
-
-  { type: 'divider', label: 'Interactions' },
-  { type: 'link', id: 'interaction-modes', label: 'Interaction Modes' },
-  { type: 'link', id: 'zoom', label: 'Zoom & Selection' },
-  { type: 'link', id: 'pan', label: 'Pan' },
-  { type: 'link', id: 'cursor', label: 'Cursor & Crosshair' },
-  { type: 'link', id: 'touch', label: 'Touch Gestures' },
-
-  { type: 'divider', label: 'Tooltips' },
-  { type: 'link', id: 'tooltip-modes', label: 'Tooltip Modes' },
-  { type: 'link', id: 'tooltip-custom', label: 'Custom Tooltip Renderer' },
-  { type: 'link', id: 'tooltip-snap', label: 'Proximity & Snap' },
-
-  { type: 'divider', label: 'Theming' },
-  { type: 'link', id: 'themes-builtin', label: 'Built-in Themes' },
-  { type: 'link', id: 'themes-custom', label: 'Custom Theme' },
-  { type: 'link', id: 'css-vars', label: 'CSS Variables' },
-
-  { type: 'divider', label: 'Data' },
-  { type: 'link', id: 'streaming', label: 'Streaming' },
-  { type: 'link', id: 'downsampling', label: 'Downsampling' },
-
-  { type: 'divider', label: 'Plugins' },
-  { type: 'link', id: 'reference-lines', label: 'Reference Lines' },
-  { type: 'link', id: 'legend-plugin', label: 'Legend Plugin' },
-  { type: 'link', id: 'legend-table', label: 'Legend Table' },
-  { type: 'link', id: 'cross-chart-sync', label: 'Cross-chart Sync' },
-  { type: 'link', id: 'cursor-snapshot', label: 'Cursor Snapshot' },
-  { type: 'link', id: 'custom-plugins', label: 'Custom Plugins' },
-
-  { type: 'divider', label: 'Recipes' },
-  { type: 'link', id: 'recipe-streaming', label: 'Streaming Dashboard' },
-  { type: 'link', id: 'recipe-linked', label: 'Linked Charts' },
-  { type: 'link', id: 'recipe-brush', label: 'Brush Selection' },
-  { type: 'link', id: 'recipe-scatter-encoding', label: 'Encoded Scatter' },
-  { type: 'link', id: 'recipe-custom-tooltip', label: 'Custom Tooltip' },
-  { type: 'link', id: 'recipe-custom-plugin', label: 'Custom Plugin' },
-  { type: 'link', id: 'recipe-theming', label: 'Theming' },
-  { type: 'link', id: 'recipe-downsampling', label: 'Downsampling' },
-  { type: 'link', id: 'recipe-gaps', label: 'Gaps & spanGaps' },
-  { type: 'link', id: 'recipe-ticks', label: 'Ticks & Gridlines' },
-  { type: 'link', id: 'recipe-axis-titles', label: 'Axis Titles' },
-
-  { type: 'divider', label: 'API Reference' },
-  { type: 'link', id: 'api-methods', label: 'ChartInstance Methods' },
-  { type: 'link', id: 'api-events', label: 'Events' },
-  { type: 'link', id: 'api-scatter-options', label: 'Scatter Options' },
-  { type: 'link', id: 'api-types', label: 'Types' },
+export const GROUPS: DocsGroup[] = [
+  {
+    slug: 'getting-started',
+    label: 'Getting Started',
+    items: [
+      { id: 'install', label: 'Installation' },
+      { id: 'quick-start', label: 'Quick Start' },
+      { id: 'data-model', label: 'Data Model' },
+    ],
+  },
+  {
+    slug: 'chart-types',
+    label: 'Chart Types',
+    items: [
+      { id: 'line', label: 'Line' },
+      { id: 'area', label: 'Area' },
+      { id: 'band', label: 'Band (Fill Between)' },
+      { id: 'scatter', label: 'Scatter' },
+      { id: 'heatmap', label: 'Density Heatmap' },
+      { id: 'bar', label: 'Bar' },
+      { id: 'histogram', label: 'Histogram' },
+    ],
+  },
+  {
+    slug: 'series-options',
+    label: 'Series Options',
+    items: [
+      { id: 'interpolation', label: 'Interpolation' },
+      { id: 'styling', label: 'Styling' },
+      { id: 'line-dash', label: 'Line Dash' },
+      { id: 'nan-gaps', label: 'NaN Gaps' },
+      { id: 'dual-axis', label: 'Dual Y-Axis' },
+    ],
+  },
+  {
+    slug: 'scales-axes',
+    label: 'Scales & Axes',
+    items: [
+      { id: 'linear-scale', label: 'Linear Scale' },
+      { id: 'log-scale', label: 'Log Scale' },
+      { id: 'time-scale', label: 'Time Scale' },
+      { id: 'tick-format', label: 'Custom Tick Formatting' },
+    ],
+  },
+  {
+    slug: 'interactions',
+    label: 'Interactions',
+    items: [
+      { id: 'interaction-modes', label: 'Interaction Modes' },
+      { id: 'zoom', label: 'Zoom & Selection' },
+      { id: 'pan', label: 'Pan' },
+      { id: 'cursor', label: 'Cursor & Crosshair' },
+      { id: 'touch', label: 'Touch Gestures' },
+    ],
+  },
+  {
+    slug: 'tooltips',
+    label: 'Tooltips',
+    items: [
+      { id: 'tooltip-modes', label: 'Tooltip Modes' },
+      { id: 'tooltip-custom', label: 'Custom Tooltip Renderer' },
+      { id: 'tooltip-snap', label: 'Proximity & Snap' },
+    ],
+  },
+  {
+    slug: 'theming',
+    label: 'Theming',
+    items: [
+      { id: 'themes-builtin', label: 'Built-in Themes' },
+      { id: 'themes-custom', label: 'Custom Theme' },
+      { id: 'css-vars', label: 'CSS Variables' },
+    ],
+  },
+  {
+    slug: 'data',
+    label: 'Data',
+    items: [
+      { id: 'streaming', label: 'Streaming' },
+      { id: 'downsampling', label: 'Downsampling' },
+    ],
+  },
+  {
+    slug: 'plugins',
+    label: 'Plugins',
+    items: [
+      { id: 'reference-lines', label: 'Reference Lines' },
+      { id: 'legend-plugin', label: 'Legend Plugin' },
+      { id: 'legend-table', label: 'Legend Table' },
+      { id: 'cross-chart-sync', label: 'Cross-chart Sync' },
+      { id: 'cursor-snapshot', label: 'Cursor Snapshot' },
+      { id: 'custom-plugins', label: 'Custom Plugins' },
+    ],
+  },
+  {
+    slug: 'recipes',
+    label: 'Recipes',
+    items: [
+      { id: 'recipe-streaming', label: 'Streaming Dashboard' },
+      { id: 'recipe-linked', label: 'Linked Charts' },
+      { id: 'recipe-brush', label: 'Brush Selection' },
+      { id: 'recipe-scatter-encoding', label: 'Encoded Scatter' },
+      { id: 'recipe-custom-tooltip', label: 'Custom Tooltip' },
+      { id: 'recipe-custom-plugin', label: 'Custom Plugin' },
+      { id: 'recipe-theming', label: 'Theming' },
+      { id: 'recipe-downsampling', label: 'Downsampling' },
+      { id: 'recipe-gaps', label: 'Gaps & spanGaps' },
+      { id: 'recipe-ticks', label: 'Ticks & Gridlines' },
+      { id: 'recipe-axis-titles', label: 'Axis Titles' },
+    ],
+  },
+  {
+    slug: 'api',
+    label: 'API Reference',
+    items: [
+      { id: 'api-methods', label: 'ChartInstance Methods' },
+      { id: 'api-events', label: 'Events' },
+      { id: 'api-scatter-options', label: 'Scatter Options' },
+      { id: 'api-types', label: 'Types' },
+    ],
+  },
 ];
+
+export const DEFAULT_SLUG = GROUPS[0].slug;
+
+/** Hash fragment for a docs page (`#/docs/<slug>`) or section within it. */
+export function docsHash(slug: string, id?: string): string {
+  return id ? `#/docs/${slug}/${id}` : `#/docs/${slug}`;
+}
+
+/** Parse `#/docs[/<slug>[/<id>]]` out of a location hash. */
+export function parseDocsRoute(hash: string): { slug: string; anchor: string | null } {
+  const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  // parts[0] is 'docs'.
+  const slug = parts[1] && GROUPS.some((g) => g.slug === parts[1]) ? parts[1] : DEFAULT_SLUG;
+  const anchor = parts[2] ?? null;
+  return { slug, anchor };
+}
 
 /** Scroll to a section anchor, offset by the sticky top nav height. */
 export function scrollTo(id: string) {
@@ -101,17 +169,27 @@ export function scrollTo(id: string) {
  * with a floating hamburger trigger (styled via .docs-menu-btn /
  * .docs-sidebar classes in global.css).
  *
- * Returns the rendered JSX plus the signal pair so the parent can react
- * to open/close state if it needs to (currently the parent doesn't).
+ * Links are real anchors (`#/docs/<slug>/<id>`), so middle-click and
+ * copy-link work; the Docs shell reacts to the hashchange and handles
+ * page swaps and anchor scrolling.
  */
-export function Sidebar() {
+export function Sidebar(props: { activeSlug: string; activeId?: string | null }) {
   const [sidebarOpen, setSidebarOpen] = createSignal(false);
-  return <SidebarUI sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />;
+  return (
+    <SidebarUI
+      sidebarOpen={sidebarOpen}
+      setSidebarOpen={setSidebarOpen}
+      activeSlug={props.activeSlug}
+      activeId={props.activeId ?? null}
+    />
+  );
 }
 
 export function SidebarUI(props: {
   sidebarOpen: Accessor<boolean>;
   setSidebarOpen: (v: boolean) => void;
+  activeSlug: string;
+  activeId: string | null;
 }) {
   let navTarget: string | null = null;
   let triggerRef!: HTMLButtonElement;
@@ -131,7 +209,7 @@ export function SidebarUI(props: {
     if (open) {
       html.style.overflow = 'hidden';
       requestAnimationFrame(() => {
-        const first = drawerRef?.querySelector<HTMLButtonElement>('button');
+        const first = drawerRef?.querySelector<HTMLAnchorElement>('a');
         first?.focus();
       });
     } else {
@@ -140,7 +218,11 @@ export function SidebarUI(props: {
       if (navTarget) {
         const target = navTarget;
         navTarget = null;
-        requestAnimationFrame(() => scrollTo(target));
+        // Deferred navigation: the hash change happens only after the
+        // drawer has released its scroll lock, so the anchor scroll works.
+        requestAnimationFrame(() => {
+          window.location.hash = target;
+        });
       }
     }
     wasOpen = open;
@@ -158,14 +240,24 @@ export function SidebarUI(props: {
     onCleanup(() => document.removeEventListener('keydown', onKeyDown));
   });
 
-  function navClick(id: string) {
+  function navClick(event: MouseEvent, hash: string) {
     if (props.sidebarOpen()) {
-      navTarget = id;
+      // In the drawer, defer the hash change until the scroll lock lifts.
+      event.preventDefault();
+      navTarget = hash;
       props.setSidebarOpen(false);
-    } else {
-      scrollTo(id);
     }
+    // Desktop: let the anchor set the hash; Docs reacts to hashchange.
   }
+
+  const itemStyle = (active: boolean) => ({
+    color: active ? 'var(--accent)' : 'var(--text-secondary)',
+    'font-size': 'var(--fs-sm)',
+    padding: '3px 0 3px 8px',
+    'border-left': active ? '2px solid var(--accent)' : '2px solid transparent',
+    'text-decoration': 'none',
+    display: 'block',
+  });
 
   return (
     <>
@@ -247,42 +339,42 @@ export function SidebarUI(props: {
           'overflow-y': 'auto',
         }}
       >
-        <For each={NAV}>
-          {(item) =>
-            item.type === 'divider' ? (
-              <div
+        <For each={GROUPS}>
+          {(group) => (
+            <>
+              <a
+                href={docsHash(group.slug)}
+                onClick={(e) => navClick(e, docsHash(group.slug))}
+                aria-current={group.slug === props.activeSlug ? 'page' : undefined}
                 style={{
                   'font-size': '10.5px',
                   'font-weight': '600',
                   'text-transform': 'uppercase',
                   'letter-spacing': '0.08em',
-                  color: 'var(--text-secondary)',
-                  opacity: '0.5',
+                  color: group.slug === props.activeSlug ? 'var(--accent)' : 'var(--text-secondary)',
+                  opacity: group.slug === props.activeSlug ? '1' : '0.5',
                   padding: 'var(--space-3) 0 var(--space-1)',
-                  'user-select': 'none',
+                  'text-decoration': 'none',
+                  display: 'block',
                 }}
               >
-                {item.label}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => navClick(item.id)}
-                style={{
-                  color: 'var(--text-secondary)',
-                  'font-size': 'var(--fs-sm)',
-                  padding: '3px 0 3px 8px',
-                  cursor: 'pointer',
-                  background: 'transparent',
-                  border: 'none',
-                  'text-align': 'left',
-                  font: 'inherit',
-                }}
-              >
-                {item.label}
-              </button>
-            )
-          }
+                {group.label}
+              </a>
+              <Show when={group.slug === props.activeSlug}>
+                <For each={group.items}>
+                  {(item) => (
+                    <a
+                      href={docsHash(group.slug, item.id)}
+                      onClick={(e) => navClick(e, docsHash(group.slug, item.id))}
+                      style={itemStyle(item.id === props.activeId)}
+                    >
+                      {item.label}
+                    </a>
+                  )}
+                </For>
+              </Show>
+            </>
+          )}
         </For>
       </aside>
     </>
