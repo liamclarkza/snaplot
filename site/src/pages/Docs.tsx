@@ -1,7 +1,8 @@
 import { createSignal, createEffect, onCleanup, Show, For } from 'solid-js';
 import type { Component } from 'solid-js';
 import { Prose } from '../components/ui';
-import { Sidebar, GROUPS, parseDocsRoute, docsHash, scrollTo } from './docs/Sidebar';
+import { Sidebar } from './docs/Sidebar';
+import { GROUPS, parseDocsRoute, docsHash, scrollTo } from './docs/nav';
 import {
   GettingStarted,
   ChartTypes,
@@ -35,6 +36,29 @@ const PAGE_COMPONENTS: Record<string, Component> = {
 
 export default function Docs() {
   const [route, setRoute] = createSignal(parseDocsRoute(window.location.hash));
+  const [activeId, setActiveId] = createSignal<string | null>(null);
+
+  // Scroll spy: the active section is the last one whose top has passed
+  // the sticky nav. Reads live positions on each (rAF-throttled) scroll,
+  // so it stays correct as lazy-mounted demos change section heights.
+  let spyScheduled = false;
+  const updateActive = () => {
+    spyScheduled = false;
+    const sections = document.querySelectorAll<HTMLElement>('main section[id]');
+    let current: string | null = null;
+    for (const el of sections) {
+      if (el.getBoundingClientRect().top <= 120) current = el.id;
+      else break;
+    }
+    setActiveId(current ?? sections[0]?.id ?? null);
+  };
+  const onScroll = () => {
+    if (spyScheduled) return;
+    spyScheduled = true;
+    requestAnimationFrame(updateActive);
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onCleanup(() => window.removeEventListener('scroll', onScroll));
 
   const onHash = () => {
     const prev = route();
@@ -57,6 +81,12 @@ export default function Docs() {
   createEffect(() => {
     const anchor = route().anchor;
     if (anchor) requestAnimationFrame(() => scrollTo(anchor));
+  });
+
+  // Re-derive the highlight when the page (and its sections) swap.
+  createEffect(() => {
+    route();
+    requestAnimationFrame(updateActive);
   });
 
   const group = () => GROUPS.find((g) => g.slug === route().slug) ?? GROUPS[0];
@@ -90,7 +120,7 @@ export default function Docs() {
 
   return (
     <div style={{ display: 'flex', 'max-width': 'var(--max-width)', margin: '0 auto', padding: '48px 24px 80px', gap: '48px' }}>
-      <Sidebar activeSlug={route().slug} />
+      <Sidebar activeSlug={route().slug} activeId={activeId()} />
 
       {/* Content */}
       <div style={{ flex: '1', 'min-width': '0' }}>

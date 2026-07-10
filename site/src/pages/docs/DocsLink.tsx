@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { docsHash } from './Sidebar';
+import { docsHash } from './nav';
 
 /**
  * Cross-reference between docs pages: renders a route link to
