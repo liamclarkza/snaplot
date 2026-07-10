@@ -10,7 +10,7 @@
     "dev": "npm run dev -w site --",
     "dev:host": "npm run dev -w site -- --host",
     "dev:lib": "npm run dev -w packages/snaplot",
-    "build:site": "npm run build -w site",
+    "build:site": "node scripts/generate-api-docs.mjs && npm run build -w site",
     "preview": "npm run build && npm run build:site && npm run preview -w site",
     "typecheck": "npm run typecheck -w packages/snaplot && npm run typecheck -w site && npm run typecheck -w bench",
     "bench": "node bench/run.mjs",

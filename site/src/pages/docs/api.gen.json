@@ -1,0 +1,644 @@
+{
+  "methods": [
+    {
+      "name": "setData",
+      "signature": "setData(data: ColumnarData): void",
+      "doc": "Replace all data",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "appendData",
+      "signature": "appendData(data: ColumnarData, opts?: AppendDataOptions): void",
+      "doc": "Append data for streaming",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "getData",
+      "signature": "getData(): ColumnarData",
+      "doc": "Get current data",
+      "optional": false,
+      "type": "ColumnarData"
+    },
+    {
+      "name": "setAxis",
+      "signature": "setAxis(key: string, range: Partial<ScaleRange>): void",
+      "doc": "Update axis domain",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "getAxis",
+      "signature": "getAxis(key: string): Scale | undefined",
+      "doc": "Get a scale by axis key",
+      "optional": false,
+      "type": "Scale | undefined"
+    },
+    {
+      "name": "setOptions",
+      "signature": "setOptions(config: DeepPartial<ChartConfig>): void",
+      "doc": "Merge config updates. Arrays such as `series` replace by value.",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "replaceOptions",
+      "signature": "replaceOptions(config: ChartConfig): void",
+      "doc": "Replace the chart config declaratively, resolving defaults again and dropping keys omitted from the new config. Solid wrappers use this for full `config` signal updates.",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "getOptions",
+      "signature": "getOptions(): ChartConfig",
+      "doc": "Get resolved config",
+      "optional": false,
+      "type": "ChartConfig"
+    },
+    {
+      "name": "getTheme",
+      "signature": "getTheme(): ThemeConfig",
+      "doc": "Resolved theme after defaults, light/dark detection, and CSS variable overrides. Plugins should color against this rather than re-deriving palettes from `getOptions().theme`, which holds only the caller's partial overrides.",
+      "optional": false,
+      "type": "ThemeConfig"
+    },
+    {
+      "name": "refreshTheme",
+      "signature": "refreshTheme(): void",
+      "doc": "Re-resolve the theme against the container's current CSS cascade and repaint if anything changed. Charts already call this automatically when an attribute changes on `<html>`/`<body>` (the `[data-theme]` pattern) or the OS color scheme flips; call it manually only when tokens change through some other mechanism (for example a variable swapped on a mid-tree ancestor). No-ops when the resolved theme is value-identical.",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "getLayout",
+      "signature": "getLayout(): Layout",
+      "doc": "Get current layout",
+      "optional": false,
+      "type": "Layout"
+    },
+    {
+      "name": "redraw",
+      "signature": "redraw(): void",
+      "doc": "Force full redraw",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "resize",
+      "signature": "resize(width: number, height: number): void",
+      "doc": "Resize chart",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "getSelection",
+      "signature": "getSelection(): SelectionRange | null",
+      "doc": "The current persistent brush selection in data space, or `null`. Set by a `selection.mode: 'brush'` gesture or `setSelection()`. Safe to serialize; feed it back to `setSelection()` to restore.",
+      "optional": false,
+      "type": "SelectionRange | null"
+    },
+    {
+      "name": "setSelection",
+      "signature": "setSelection(selection: SelectionRange | null): void",
+      "doc": "Set or clear the persistent brush selection programmatically (`null` clears). Fires `selection:change` / `selection.onBrush` on a real change. Independent of `selection.mode`, so a zoom-mode chart can still carry a brush set from code.",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "scrollToLatest",
+      "signature": "scrollToLatest(): void",
+      "doc": "Resume live-follow and snap the X viewport to the newest data. With `streaming.follow` set this jumps to the trailing window; otherwise it resets X to the full data extent. Re-enables following after the user paused it by panning or zooming, and fires `follow:change`.",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "isFollowing",
+      "signature": "isFollowing(): boolean",
+      "doc": "Whether the X viewport is tracking new data (live) rather than pinned by a user pan/zoom (paused). Starts `true`; a horizontal pan or zoom sets it `false`; `scrollToLatest()` and a double-click reset set it `true`.",
+      "optional": false,
+      "type": "boolean"
+    },
+    {
+      "name": "destroy",
+      "signature": "destroy(): void",
+      "doc": "Destroy and clean up all resources",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "use",
+      "signature": "use(plugin: Plugin): boolean",
+      "doc": "Register a plugin. Returns false when a plugin with the same id is already registered.",
+      "optional": false,
+      "type": "boolean"
+    },
+    {
+      "name": "on",
+      "signature": "on<K extends keyof ChartEventMap>(event: K, handler: ChartEventMap[K]): () => void",
+      "doc": "Subscribe to chart events",
+      "optional": false,
+      "type": "() => void"
+    },
+    {
+      "name": "setCursorDataX",
+      "signature": "setCursorDataX(dataX: number | null, origin?: CursorEventOrigin): void",
+      "doc": "Set cursor position from external source (sync/programmatic)",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "getCursorSnapshot",
+      "signature": "getCursorSnapshot(opts?: CursorSnapshotOptions): CursorSnapshot",
+      "doc": "Snapshot of all visible series at the current cursor position (or fallback). Allocates a fresh snapshot, use `getCursorSnapshotInto()` in the cursor hot path to reuse buffers.",
+      "optional": false,
+      "type": "CursorSnapshot"
+    },
+    {
+      "name": "getCursorSnapshotInto",
+      "signature": "getCursorSnapshotInto(target: CursorSnapshot, opts?: CursorSnapshotOptions): CursorSnapshot",
+      "doc": "Zero-allocation variant of `getCursorSnapshot`. Mutates and returns `target`. The `target.points` array is grown but never shrunk; use `target.points.length` (after this call) as the row count.",
+      "optional": false,
+      "type": "CursorSnapshot"
+    },
+    {
+      "name": "setHighlight",
+      "signature": "setHighlight(seriesIndex: number | null): void",
+      "doc": "Set the highlighted series. Pass `null` to clear. Triggers a data-layer redraw (non-highlighted series dim per `highlight.dimOpacity`) and publishes to the sync group when `highlight.syncKey` is set. No-op when the value is unchanged.",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "getHighlight",
+      "signature": "getHighlight(): number | null",
+      "doc": "Currently highlighted series index, or `null`.",
+      "optional": false,
+      "type": "number | null"
+    },
+    {
+      "name": "setHighlightKey",
+      "signature": "setHighlightKey(key: HighlightSyncKey | null): void",
+      "doc": "Highlight by stable identity. Requires `highlight.getKey`; when no visible series resolves to the key the highlight is cleared.",
+      "optional": false,
+      "type": "void"
+    },
+    {
+      "name": "getHighlightKey",
+      "signature": "getHighlightKey(): HighlightSyncKey | null",
+      "doc": "Currently highlighted stable identity key, or `null`.",
+      "optional": false,
+      "type": "HighlightSyncKey | null"
+    },
+    {
+      "name": "getStats",
+      "signature": "getStats(): ChartStats",
+      "doc": "Lightweight diagnostics for benchmark demos and local debugging. Returns a copy so callers cannot mutate internal counters.",
+      "optional": false,
+      "type": "ChartStats"
+    },
+    {
+      "name": "container",
+      "signature": "readonly container: HTMLElement",
+      "doc": "The root DOM container",
+      "optional": false,
+      "type": "HTMLElement"
+    }
+  ],
+  "events": [
+    {
+      "name": "cursor:move",
+      "signature": "'cursor:move': ( dataX: number | null, dataIdx: number | null, origin: CursorEventOrigin, ) => void",
+      "doc": "Cursor moved or left (null args on leave). Fires on the cursor hot path.",
+      "optional": false,
+      "type": "( dataX: number | null, dataIdx: number | null, origin: CursorEventOrigin, ) => void"
+    },
+    {
+      "name": "highlight:change",
+      "signature": "'highlight:change': (seriesIndex: number | null) => void",
+      "doc": "Highlighted series changed, `null` when cleared.",
+      "optional": false,
+      "type": "(seriesIndex: number | null) => void"
+    },
+    {
+      "name": "viewport:change",
+      "signature": "'viewport:change': (scaleKey: string, range: ScaleRange) => void",
+      "doc": "An axis viewport changed via zoom/pan, with the axis key and new range.",
+      "optional": false,
+      "type": "(scaleKey: string, range: ScaleRange) => void"
+    },
+    {
+      "name": "data:update",
+      "signature": "'data:update': (data: ColumnarData) => void",
+      "doc": "Data replaced or appended. The payload is the live store, do not mutate it.",
+      "optional": false,
+      "type": "(data: ColumnarData) => void"
+    },
+    {
+      "name": "options:update",
+      "signature": "'options:update': (config: ChartConfig) => void",
+      "doc": "Config changed via `setOptions`/`replaceOptions`, with the resolved config.",
+      "optional": false,
+      "type": "(config: ChartConfig) => void"
+    },
+    {
+      "name": "follow:change",
+      "signature": "'follow:change': (following: boolean) => void",
+      "doc": "Live-follow state toggled: `true` when the X viewport resumed tracking new data, `false` when a pan/zoom paused it. Drive a live/paused badge from this. See `isFollowing()` / `scrollToLatest()`.",
+      "optional": false,
+      "type": "(following: boolean) => void"
+    },
+    {
+      "name": "resize",
+      "signature": "'resize': (width: number, height: number) => void",
+      "doc": "Chart resized, with the new CSS-pixel dimensions.",
+      "optional": false,
+      "type": "(width: number, height: number) => void"
+    },
+    {
+      "name": "click",
+      "signature": "'click': (dataX: number, dataIdx: number) => void",
+      "doc": "Reserved click event. Not currently emitted by the core (see the DX audit).",
+      "optional": false,
+      "type": "(dataX: number, dataIdx: number) => void"
+    },
+    {
+      "name": "select",
+      "signature": "'select': (selection: SelectionResult) => void",
+      "doc": "Box selection resolved. Mirror of `selection.onSelect`.",
+      "optional": false,
+      "type": "(selection: SelectionResult) => void"
+    },
+    {
+      "name": "selection:change",
+      "signature": "'selection:change': (selection: SelectionRange | null) => void",
+      "doc": "Persistent brush selection changed (`null` when cleared). Mirror of `selection.onBrush`.",
+      "optional": false,
+      "type": "(selection: SelectionRange | null) => void"
+    },
+    {
+      "name": "drawData",
+      "signature": "'drawData': (ctx: CanvasRenderingContext2D, layout: Layout) => void",
+      "doc": "Emitted while the data layer paints, for canvas-level custom drawing without a plugin.",
+      "optional": false,
+      "type": "(ctx: CanvasRenderingContext2D, layout: Layout) => void"
+    },
+    {
+      "name": "drawOverlay",
+      "signature": "'drawOverlay': (ctx: CanvasRenderingContext2D, layout: Layout) => void",
+      "doc": "Emitted while the overlay layer paints, above the data.",
+      "optional": false,
+      "type": "(ctx: CanvasRenderingContext2D, layout: Layout) => void"
+    }
+  ],
+  "scatter": [
+    {
+      "name": "xDataIndex",
+      "signature": "xDataIndex?: number",
+      "doc": "Absolute column index for scatter X values. Defaults to column 0. Useful for tabular datasets where several scatter views share the same row identity but use different X/Y metric columns.",
+      "optional": true,
+      "type": "number"
+    },
+    {
+      "name": "yDataIndex",
+      "signature": "yDataIndex?: number",
+      "doc": "Absolute column index for scatter Y values. Preferred over `dataIndex`.",
+      "optional": true,
+      "type": "number"
+    },
+    {
+      "name": "renderMode",
+      "signature": "renderMode?: ScatterRenderMode",
+      "doc": "Preferred scatter render path. `auto` uses points until the density threshold.",
+      "optional": true,
+      "type": "ScatterRenderMode"
+    },
+    {
+      "name": "pointShape",
+      "signature": "pointShape?: ScatterPointShape",
+      "doc": "Point shape for non-density scatter rendering. Default: 'circle'.",
+      "optional": true,
+      "type": "ScatterPointShape"
+    },
+    {
+      "name": "colorBy",
+      "signature": "colorBy?: number | ScatterColorEncoding",
+      "doc": "Colour points by a categorical or numeric column.",
+      "optional": true,
+      "type": "number | ScatterColorEncoding"
+    },
+    {
+      "name": "sizeBy",
+      "signature": "sizeBy?: number | ScatterSizeEncoding",
+      "doc": "Size points by a numeric column.",
+      "optional": true,
+      "type": "number | ScatterSizeEncoding"
+    },
+    {
+      "name": "tooltipFields",
+      "signature": "tooltipFields?: Array<number | ScatterTooltipField>",
+      "doc": "Extra columns to show in the default nearest-point tooltip.",
+      "optional": true,
+      "type": "Array<number | ScatterTooltipField>"
+    },
+    {
+      "name": "heatmap",
+      "signature": "heatmap?: boolean",
+      "doc": "Force heatmap (density) rendering for scatter plots regardless of point count",
+      "optional": true,
+      "type": "boolean"
+    },
+    {
+      "name": "heatmapBinSize",
+      "signature": "heatmapBinSize?: number",
+      "doc": "Heatmap bin size in CSS pixels (default: 1 = one bin per physical pixel)",
+      "optional": true,
+      "type": "number"
+    },
+    {
+      "name": "heatmapGradient",
+      "signature": "heatmapGradient?: string[]",
+      "doc": "Density-to-colour ramp for heatmap rendering. Array of 2+ hex colours interpolated linearly in sRGB; `t = 0` → first stop, `t = 1` → last. Overrides `theme.heatmapGradient`, then `theme.sequentialPalette`.",
+      "optional": true,
+      "type": "string[]"
+    }
+  ],
+  "types": [
+    {
+      "name": "ColumnarData",
+      "kind": "type",
+      "doc": "Columnar data format: index 0 is always X values, indices 1..N are Y series. All arrays must have identical length. X values (index 0) MUST be sorted monotonically non-decreasing. This constraint enables O(log n) binary search for viewport culling, hit-testing, and cursor snapping."
+    },
+    {
+      "name": "ScaleType",
+      "kind": "type",
+      "doc": "Scale kind for an axis. `time` treats X values as epoch milliseconds and formats ticks in the viewer's local timezone; `log` requires strictly positive domains. Defaults to `linear` when omitted on an axis."
+    },
+    {
+      "name": "ScaleRange",
+      "kind": "interface",
+      "doc": "A closed data-space interval. `min` and `max` are in data units, not pixels."
+    },
+    {
+      "name": "Scale",
+      "kind": "interface",
+      "doc": "A Scale is a pure function pair: dataToPixel and pixelToData. Scales own a data domain and a pixel range, and convert between them."
+    },
+    {
+      "name": "Layout",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "ChartType",
+      "kind": "type",
+      "doc": "Mark type for a series. `band` needs `upperDataIndex`/`lowerDataIndex`; `histogram` expects pre-binned N+1 edges data. Defaults to `line`."
+    },
+    {
+      "name": "ScatterRenderMode",
+      "kind": "type",
+      "doc": "Scatter draw path. `points` always draws individual marks; `density` always draws a binned heatmap; `auto` (the default) draws points until the visible count crosses the internal density threshold, then switches."
+    },
+    {
+      "name": "ScatterPointShape",
+      "kind": "type",
+      "doc": "Mark glyph for non-density scatter rendering. Defaults to `circle`."
+    },
+    {
+      "name": "ScatterColorEncodingType",
+      "kind": "type",
+      "doc": "How a `colorBy` column is interpreted. `auto` treats low-cardinality integer columns as categories and everything else as a continuous ramp."
+    },
+    {
+      "name": "ScatterColorEncoding",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "ScatterSizeEncoding",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "ScatterTooltipField",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "InterpolationMode",
+      "kind": "type",
+      "doc": "Line/area path interpolation. `monotone` is a shape-preserving cubic that never overshoots between points; the three `step-*` variants place the riser before, after, or centered on each point. Defaults to `linear`."
+    },
+    {
+      "name": "SeriesConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "AxisPosition",
+      "kind": "type",
+      "doc": ""
+    },
+    {
+      "name": "AxisGridConfig",
+      "kind": "interface",
+      "doc": "Per-axis gridline styling, independent of tick labels. `false` (or `show: false`) removes this axis's gridlines while its labels stay; a time-bar chart often wants horizontal guides only, so set `axes.x.grid: false`. Colors here are concrete CSS color strings; theme `var()` references are resolved only in `ThemeConfig` fields."
+    },
+    {
+      "name": "AxisConfig",
+      "kind": "interface",
+      "doc": "Configuration for an axis entry in ChartConfig.axes"
+    },
+    {
+      "name": "InteractionMode",
+      "kind": "type",
+      "doc": "Interaction modes define default gesture→action mappings: - timeseries: mouse drag=box-zoom, shift+drag=pan, pinch=zoom-x - analytical: mouse drag=box-zoom, shift+drag=pan, pinch=zoom-xy - readonly: tooltip only, all navigation disabled (reports, embeds) Touch defaults are cursor-first: one-finger drag moves the cursor, double-tap+drag selects, and two-finger pinch zooms."
+    },
+    {
+      "name": "CursorConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "ZoomBoundsSpec",
+      "kind": "type",
+      "doc": "Per-axis bounds for zoom and pan. `'data'` tracks the current data extent; an explicit `{ min?, max? }` pins custom limits (use `undefined` on one side for half-open bounds)."
+    },
+    {
+      "name": "ZoomConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "PanConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "SelectionConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "SelectedPoint",
+      "kind": "interface",
+      "doc": "A single scatter point captured inside a box selection."
+    },
+    {
+      "name": "SelectionResult",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "TooltipConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "TouchConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "TooltipPoint",
+      "kind": "interface",
+      "doc": "One row passed to a custom `tooltip.render`."
+    },
+    {
+      "name": "TooltipFieldValue",
+      "kind": "interface",
+      "doc": "One extra scatter column value in a tooltip row."
+    },
+    {
+      "name": "CursorSeriesPoint",
+      "kind": "interface",
+      "doc": "One row of a cursor snapshot, the value of a single visible series at a given X index, plus everything the legend table needs to render it."
+    },
+    {
+      "name": "CursorSnapshot",
+      "kind": "interface",
+      "doc": "Snapshot of all visible series at a given cursor (or fallback) index. Returned by `chart.getCursorSnapshot()` and consumed by the legend table. Safe to read on every `cursor:move`: the `points` array is reused across calls (mutated in place) when you use `getCursorSnapshotInto()`."
+    },
+    {
+      "name": "CursorSnapshotOptions",
+      "kind": "interface",
+      "doc": "Options accepted by `getCursorSnapshot()` and the reactive primitive."
+    },
+    {
+      "name": "HighlightSyncKey",
+      "kind": "type",
+      "doc": "Stable cross-chart identity for a series, returned by `highlight.getKey`. Lets linked charts with different series order highlight the same logical run/metric."
+    },
+    {
+      "name": "HighlightSyncPayload",
+      "kind": "type",
+      "doc": "Wire format broadcast over a highlight sync group. `index` carries a raw `seriesIndex` (identical-order charts); `key` carries a `getKey` identity that each receiver maps to its own local series. `null` clears."
+    },
+    {
+      "name": "HighlightConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "DebugConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "ChartStats",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "StreamingConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "ChartConfig",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "DeepPartial",
+      "kind": "type",
+      "doc": "Recursively optional version of `T`, with arrays replaced wholesale rather than merged element-wise. This is the shape `setOptions()` accepts, so a `series` array in a partial update replaces the existing series list."
+    },
+    {
+      "name": "ThemeConfig",
+      "kind": "interface",
+      "doc": "Chart color and typography tokens. Every color field accepts any CSS color the browser can compute, including `var(--token)` references and `oklch(...)`: values are resolved against the chart container when the theme is applied, and re-resolved automatically when the document theme changes (an attribute flip on `<html>`/`<body>` or an OS color-scheme change), so charts in a CSS-variable design system re-theme live with no remount. Alternatively define the `--chart-*` custom properties (see `CHART_CSS_VARS`) on the container and omit `theme` entirely."
+    },
+    {
+      "name": "Plugin",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "AppendDataOptions",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "ChartInstance",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "CursorEventOrigin",
+      "kind": "type",
+      "doc": "What produced a cursor change. `local` is this chart's own pointer; `sync` came from a peer over a sync group; `programmatic` came from `setCursorDataX`. Handlers use it to break sync feedback loops."
+    },
+    {
+      "name": "ChartEventMap",
+      "kind": "interface",
+      "doc": "Event name to handler-signature map for `chart.on()`."
+    },
+    {
+      "name": "RenderContext",
+      "kind": "interface",
+      "doc": "The resolved state handed to renderers for one paint. Read-only per frame."
+    }
+  ],
+  "solidTypes": [
+    {
+      "name": "LegendTableFallback",
+      "kind": "type",
+      "doc": "Mirrors the plugin's fallback union (re-exported for ergonomics)."
+    },
+    {
+      "name": "LegendTableSolidColumn",
+      "kind": "interface",
+      "doc": "Solid-flavored column definition. The cell receives the snapshot row, the series config, and (optionally) the highlight setter so a row's cell can drive cross-chart highlighting from a button or link. If you don't need JSX in cells, the same `LegendTableColumn` from the plugin works fine and is forwarded through `columns`."
+    },
+    {
+      "name": "LegendTableProps",
+      "kind": "interface",
+      "doc": ""
+    },
+    {
+      "name": "ChartGroupOptions",
+      "kind": "interface",
+      "doc": "Options for `createChartGroup`."
+    },
+    {
+      "name": "ChartGroupLinkOptions",
+      "kind": "interface",
+      "doc": "Per-chart coordination toggles for `group.link()`."
+    },
+    {
+      "name": "ChartGroupBindings",
+      "kind": "interface",
+      "doc": "Bindings spread into each chart in the group. Always sets matching `cursor.syncKey` and `highlight.syncKey`; `zoom.syncKey` is only included when zoom sync is opted into (`bind({ zoom: true })`), so grouping does not silently link every chart's zoom."
+    },
+    {
+      "name": "ChartGroupBindOptions",
+      "kind": "interface",
+      "doc": "Options controlling which channels a group binding links."
+    },
+    {
+      "name": "ChartGroup",
+      "kind": "interface",
+      "doc": "A handle to a coordinated set of charts that share cursor + highlight state. Spread `group.bind()` into each chart's config, that is the entire wiring step. ```tsx const group = createChartGroup(); <Chart config={{ ...group.bind(), series, axes }} data={a} /> <Chart config={{ ...group.bind(), series, axes }} data={b} /> <button onMouseEnter={() => group.highlight(2)}>Run #2</button> ``` `group.highlight()` and `group.cursor()` push state to every chart via the existing SyncGroup registry. Reads (`group.highlightedSeries`) reflect the last broadcast originating from the group itself, * peer-originated changes still flow through each chart's own `'highlight:change'` event (use `createHighlight` to track those)."
+    }
+  ]
+}
