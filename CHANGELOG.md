@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-07-10
+
 ### Fixed
 - The layout now guarantees at least 8px of clearance between the
   outermost glyph and the canvas edge. Axis titles were pinned about 4px
