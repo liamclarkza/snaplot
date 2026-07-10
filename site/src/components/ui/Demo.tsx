@@ -1,5 +1,6 @@
 import type { ColumnarData, ChartInstance } from 'snaplot';
 import LiveEditor from '../LiveEditor';
+import LazyMount from './LazyMount';
 
 /**
  * Demo section on the Docs page, a titled block with an editable live
@@ -35,12 +36,25 @@ export default function Demo(props: {
           {props.desc}
         </p>
       )}
-      <LiveEditor
-        defaultCode={props.code}
-        data={props.data}
-        height={props.height}
-        onReady={props.onReady}
-      />
+      <LazyMount estHeight={demoEstHeight(props.code, props.height)}>
+        <LiveEditor
+          defaultCode={props.code}
+          data={props.data}
+          height={props.height}
+          onReady={props.onReady}
+        />
+      </LazyMount>
     </div>
   );
+}
+
+/**
+ * Approximate rendered height of chart + editor so the lazy placeholder
+ * holds roughly the right space: exactness doesn't matter, the swap
+ * happens 800px before the demo is visible.
+ */
+function demoEstHeight(code: string, chartHeight?: string): string {
+  const chart = Number.parseInt(chartHeight ?? '280', 10) || 280;
+  const editorLines = code.split('\n').length;
+  return `${chart + editorLines * 22 + 60}px`;
 }

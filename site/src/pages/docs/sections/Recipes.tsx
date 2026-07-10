@@ -3,7 +3,7 @@ import { lttb, m4, lightTheme, darkTheme } from 'snaplot';
 import { Chart, createChartGroup } from 'snaplot/solid';
 import type { ChartInstance, ColumnarData } from 'snaplot';
 import CodeBlock from '../../../components/CodeBlock';
-import { Section, Prose, Demo } from '../../../components/ui';
+import { Section, Prose, Demo, LazyMount, createInViewport } from '../../../components/ui';
 import { useTheme } from '../../../ThemeContext';
 import { dailyBarData, encodedScatterData, gappedData, largeTimeSeries, timeSeries } from '../fixtures';
 
@@ -87,7 +87,7 @@ chart.on('follow:change', (live) => {
 // resume live scrolling after the user zoomed in to inspect
 goLiveButton.onclick = () => chart.scrollToLatest();`} />
         <div style={{ height: '12px' }} />
-        <StreamingDashboardDemo />
+        <LazyMount estHeight="290px"><StreamingDashboardDemo /></LazyMount>
       </Section>
 
       <Section id="recipe-linked" title="Recipe: Linked Charts">
@@ -125,7 +125,7 @@ const config = group.apply({
   Focus run-b
 </button>`} />
         <div style={{ height: '12px' }} />
-        <LinkedChartsDemo />
+        <LazyMount estHeight="560px"><LinkedChartsDemo /></LazyMount>
         <Prose>
           For a wall of many charts, pass <code>defaults</code> once so every
           chart inherits the same axes, theme, and interaction instead of
@@ -526,10 +526,14 @@ function StreamingDashboardDemo() {
   const [chart, setChart] = createSignal<ChartInstance>();
   const [label, setLabel] = createSignal('waiting for chart');
   const seed = seedSeries(80);
+  let rootRef!: HTMLDivElement;
+  const inView = createInViewport(() => rootRef);
 
   createEffect(() => {
     const c = chart();
-    if (!c) return;
+    // Pause the append timer while scrolled out of view; the effect
+    // re-runs and restarts it when the demo scrolls back in.
+    if (!c || !inView()) return;
 
     let bucketX = seed[0][seed[0].length - 1];
     let acc = 0;
@@ -561,7 +565,7 @@ function StreamingDashboardDemo() {
   });
 
   return (
-    <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
+    <div ref={rootRef!} style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '240px' }}>
         <Chart
           data={seed}

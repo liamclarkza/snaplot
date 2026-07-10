@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js';
 import CodeBlock from '../../../components/CodeBlock';
 import DocsLink from '../DocsLink';
-import { Section, Prose, Demo } from '../../../components/ui';
+import { Section, Prose, Demo, LazyMount } from '../../../components/ui';
 import { timeSeries, legendData } from '../fixtures';
 import {
   DefaultLegendTableDemo,
@@ -89,7 +89,7 @@ import 'snaplot/legend-table.css';
 
 <LegendTable chart={chart} />`} />
         <div style={{ height: '12px' }} />
-        <DefaultLegendTableDemo />
+        <LazyMount estHeight="340px"><DefaultLegendTableDemo /></LazyMount>
 
         <div style={{ height: '24px' }} />
         <Prose>
@@ -118,7 +118,7 @@ const config: ChartConfig<RunMeta> = {
   ]}
 />`} />
         <div style={{ height: '12px' }} />
-        <CustomColumnsDemo />
+        <LazyMount estHeight="380px"><CustomColumnsDemo /></LazyMount>
 
         <div style={{ height: '24px' }} />
         <Prose>
@@ -189,19 +189,19 @@ const config: ChartConfig<RunMeta> = {
           config defaults, and linked Y domains with aligned gutters, see the{' '}
           <DocsLink slug="recipes" id="recipe-linked">Linked Charts recipe</DocsLink>.
         </Prose>
-        <CrossChartSyncDemo />
+        <LazyMount estHeight="540px"><CrossChartSyncDemo /></LazyMount>
 
         <div style={{ height: '24px' }} />
         <Prose>
           Pair the group with an external "runs" panel, hover a run and every chart dims everything else:
         </Prose>
-        <SidepanelHighlightDemo />
+        <LazyMount estHeight="420px"><SidepanelHighlightDemo /></LazyMount>
 
         <div style={{ height: '24px' }} />
         <Prose>
           <b>Performance check</b>, many series + a value-cell update per cursor frame. The legend table reuses row DOM (text-content swaps only on cursor moves), highlight redraws only the data canvas, and the snapshot is read into a single reused buffer.
         </Prose>
-        <BenchmarkDemo />
+        <LazyMount estHeight="420px"><BenchmarkDemo /></LazyMount>
       </Section>
 
       <Section id="cursor-snapshot" title="Cursor Snapshot (Headless)">
@@ -232,7 +232,7 @@ chart.on('cursor:move', () => {
   // mutate the same buf each frame
 });`} />
         <div style={{ height: '12px' }} />
-        <HeadlessSnapshotDemo />
+        <LazyMount estHeight="360px"><HeadlessSnapshotDemo /></LazyMount>
       </Section>
 
       <Section id="custom-plugins" title="Custom Plugins">
