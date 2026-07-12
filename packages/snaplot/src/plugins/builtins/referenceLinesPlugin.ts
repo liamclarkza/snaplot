@@ -67,6 +67,7 @@ export function createReferenceLinesPlugin(options: {
     afterDrawData(chart: ChartInstance, ctx: CanvasRenderingContext2D) {
       const layout = chart.getLayout();
       const { left, top, width, height } = layout.plot;
+      const theme = chart.getTheme();
 
       ctx.save();
       ctx.beginPath();
@@ -79,7 +80,7 @@ export function createReferenceLinesPlugin(options: {
         if (!scale) continue;
 
         const px = scale.dataToPixel(line.value);
-        const color = line.color ?? '#888';
+        const color = line.color ?? theme.tickColor;
         const lw = line.lineWidth ?? 1;
 
         ctx.strokeStyle = color;
@@ -103,7 +104,7 @@ export function createReferenceLinesPlugin(options: {
 
         // Label
         if (line.label) {
-          ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.font = `11px ${theme.fontFamily}`;
           ctx.fillStyle = color;
           ctx.globalAlpha = 0.9;
 

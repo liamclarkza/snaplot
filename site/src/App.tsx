@@ -6,11 +6,17 @@ import Home from './pages/Home';
 import Docs from './pages/Docs';
 import Demos from './pages/Demos';
 import VisualRegressionHarness from './components/VisualRegressionHarness';
+import PulseOps from './dogfood/PulseOps';
+import CohortLab from './dogfood/CohortLab';
+import GridScope from './dogfood/GridScope';
 
 function getPage() {
   const hash = window.location.hash.slice(1) || '/';
   if (hash.startsWith('/docs')) return 'docs';
   if (hash.startsWith('/demos')) return 'demos';
+  if (hash.startsWith('/pulseops')) return 'pulseops';
+  if (hash.startsWith('/cohortlab')) return 'cohortlab';
+  if (hash.startsWith('/gridscope')) return 'gridscope';
   // Secondary route, deliberately absent from the nav: deterministic
   // renderer fixtures for manual and scripted screenshot review.
   if (hash.startsWith('/visual')) return 'visual';
@@ -38,16 +44,21 @@ export default function App() {
   window.addEventListener('hashchange', onHash);
   onCleanup(() => window.removeEventListener('hashchange', onHash));
 
+  const isDogfood = () => ['pulseops', 'cohortlab', 'gridscope'].includes(page());
+
   return (
     <ThemeProvider>
-      <Nav page={page()} />
+      <Show when={!isDogfood()}><Nav page={page()} /></Show>
       <main ref={mainRef!} tabIndex={-1} style={{ outline: 'none' }}>
         <Show when={page() === 'home'}><Home /></Show>
         <Show when={page() === 'docs'}><Docs /></Show>
         <Show when={page() === 'demos'}><Demos /></Show>
         <Show when={page() === 'visual'}><VisualRegressionHarness /></Show>
+        <Show when={page() === 'pulseops'}><PulseOps /></Show>
+        <Show when={page() === 'cohortlab'}><CohortLab /></Show>
+        <Show when={page() === 'gridscope'}><GridScope /></Show>
       </main>
-      <Footer />
+      <Show when={!isDogfood()}><Footer /></Show>
     </ThemeProvider>
   );
 }

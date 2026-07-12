@@ -165,6 +165,8 @@ export function renderScatterSegments(
    * 1 = full fidelity. Ignored by density rendering.
    */
   sampleStride: number = 1,
+  /** Use Safari-friendly batched vector marks during an active viewport gesture. */
+  interactionFastPath: boolean = false,
 ): void {
   const count = segmentPointCount(segments);
   if (count <= 0) return;
@@ -201,6 +203,7 @@ export function renderScatterSegments(
       cache,
       resolver,
       sampleStride,
+      interactionFastPath,
     );
   }
 
@@ -221,6 +224,7 @@ function drawStampedSegments(
   cache?: ScatterSeriesCache,
   chartResolver?: ScatterStyleResolver,
   sampleStride: number = 1,
+  interactionFastPath: boolean = false,
 ): void {
   const count = segmentPointCount(segments);
   const radius = series.pointRadius ?? (count > 10_000 ? 1.5 : 3);
@@ -262,6 +266,33 @@ function drawStampedSegments(
 
   const stride = Math.max(1, Math.floor(sampleStride));
 
+  // Safari performs poorly when a pan frame issues hundreds of tiny,
+  // translucent canvas-to-canvas drawImage calls. For fixed-radius marks,
+  // batch geometry by the resolver's colour bins during the gesture. A
+  // constant-colour series becomes one fill; a continuous colour encoding is
+  // capped at its small bin count. The settled repaint returns to stamps,
+  // preserving exact per-point alpha accumulation at rest.
+  if (interactionFastPath && !resolver.variableRadius) {
+    drawBatchedInteractionPoints(
+      ctx,
+      segments,
+      scaleX,
+      scaleY,
+      resolver,
+      constantRadius,
+      alpha,
+      shape,
+      stride,
+      pxMin,
+      pxMax,
+      pyMin,
+      pyMax,
+      ax,
+      ay,
+    );
+    return;
+  }
+
   // drawImage with a canvas source is a fast GPU blit, no path overhead
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
@@ -302,6 +333,73 @@ function drawStampedSegments(
       ctx.drawImage(stamp, px - offset, py - offset, stampSize, stampSize);
     }
   }
+}
+
+function drawBatchedInteractionPoints(
+  ctx: CanvasRenderingContext2D,
+  segments: ScatterRenderSegment[],
+  scaleX: Scale,
+  scaleY: Scale,
+  resolver: ScatterStyleResolver,
+  radius: number,
+  alpha: number,
+  shape: string,
+  stride: number,
+  pxMin: number,
+  pxMax: number,
+  pyMin: number,
+  pyMax: number,
+  ax: ReturnType<typeof affineParams>,
+  ay: ReturnType<typeof affineParams>,
+): void {
+  const buckets = new Map<number, number[]>();
+  const kx = ax?.[0] ?? 0;
+  const bx = ax?.[1] ?? 0;
+  const ky = ay?.[0] ?? 0;
+  const by = ay?.[1] ?? 0;
+
+  for (const segment of segments) {
+    const { xData, yData, startIdx, endIdx } = segment;
+    for (let i = startIdx; i <= endIdx; i += stride) {
+      const y = yData[i];
+      if (!Number.isFinite(y)) continue;
+      const px = ax ? xData[i] * kx + bx : scaleX.dataToPixel(xData[i]);
+      const py = ay ? y * ky + by : scaleY.dataToPixel(y);
+      if (px < pxMin || px > pxMax || py < pyMin || py > pyMax) continue;
+      const bin = resolver.colorBinAt(i);
+      let coordinates = buckets.get(bin);
+      if (!coordinates) {
+        coordinates = [];
+        buckets.set(bin, coordinates);
+      }
+      coordinates.push(px, py);
+    }
+  }
+
+  const parentAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = parentAlpha * alpha;
+  for (const [bin, coordinates] of buckets) {
+    ctx.beginPath();
+    for (let i = 0; i < coordinates.length; i += 2) {
+      const px = coordinates[i];
+      const py = coordinates[i + 1];
+      if (shape === 'square') {
+        ctx.rect(px - radius, py - radius, radius * 2, radius * 2);
+      } else if (shape === 'diamond') {
+        ctx.moveTo(px, py - radius);
+        ctx.lineTo(px + radius, py);
+        ctx.lineTo(px, py + radius);
+        ctx.lineTo(px - radius, py);
+        ctx.closePath();
+      } else {
+        ctx.moveTo(px + radius, py);
+        ctx.arc(px, py, radius, 0, Math.PI * 2);
+      }
+    }
+    ctx.fillStyle = resolver.colorForBin(bin);
+    ctx.fill();
+  }
+  ctx.globalAlpha = parentAlpha;
 }
 
 /**

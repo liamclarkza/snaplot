@@ -348,6 +348,10 @@ export class GestureManager {
     const area = this.getAxisArea(x, y);
     if (area.type === 'outside') return;
 
+    // Pointer interaction should not paint the browser's keyboard-focus ring.
+    // The element remains tabbable, so keyboard users retain the focus cue.
+    if (!this.isTouchLike(e)) e.preventDefault();
+
     if (this.isTouchLike(e) && area.type === 'plot') {
       if (mode !== 'readonly') e.preventDefault();
       this.eventBus.emit('action:cursor', { x, y, pointerType: e.pointerType });

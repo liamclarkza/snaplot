@@ -23,6 +23,7 @@ interface LegendState {
   prevParentFlexDirection: string;
   prevCanvasFlex: string;
   prevCanvasMinHeight: string;
+  offTheme: () => void;
 }
 
 export function createLegendPlugin(options?: {
@@ -66,7 +67,7 @@ export function createLegendPlugin(options?: {
         parent.appendChild(container);
       }
 
-      states.set(chart, {
+      const state: LegendState = {
         container,
         styledParent: parent,
         styledCanvas: canvasContainer,
@@ -74,7 +75,10 @@ export function createLegendPlugin(options?: {
         prevParentFlexDirection,
         prevCanvasFlex,
         prevCanvasMinHeight,
-      });
+        offTheme: () => {},
+      };
+      state.offTheme = chart.on('theme:update', () => renderItems(chart, container));
+      states.set(chart, state);
 
       renderItems(chart, container);
     },
@@ -91,6 +95,7 @@ export function createLegendPlugin(options?: {
     destroy(chart: ChartInstance) {
       const state = states.get(chart);
       if (!state) return;
+      state.offTheme();
       state.container.remove();
       state.styledParent.style.display = state.prevParentDisplay;
       state.styledParent.style.flexDirection = state.prevParentFlexDirection;
@@ -121,9 +126,10 @@ function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
   // returns.
   container.innerHTML = '';
 
-  config.series.forEach((series, idx) => {
-    const color = series.stroke ?? palette[idx % palette.length];
-    const hidden = series.visible === false;
+  chart.getLegendItems().forEach((legendItem, idx) => {
+    const series = config.series[idx];
+    const color = legendItem.color ?? palette[idx % palette.length];
+    const hidden = !legendItem.visible;
 
     // <button> (not <div>) so the toggle is keyboard-reachable and
     // screen-reader-announced. Styling comes from legend-table.css.
@@ -138,7 +144,12 @@ function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
 
     const dot = document.createElement('span');
     dot.className = 'snaplot-legend-dot';
-    dot.style.background = color;
+    dot.dataset.mark = legendItem.type;
+    dot.style.color = color;
+    dot.style.opacity = String(legendItem.opacity);
+    dot.style.borderColor = color;
+    if (legendItem.fill) dot.style.backgroundColor = legendItem.fill;
+    if (legendItem.lineDash.length > 0) dot.dataset.dashed = 'true';
 
     const label = document.createElement('span');
     label.className = 'snaplot-legend-label';

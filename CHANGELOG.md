@@ -6,6 +6,79 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-12
+
+### Added
+- Added semantic theme authoring with `createTheme()` and `ThemeTokens`, plus
+  `backgroundColor: 'container'` for copying the nearest opaque application
+  surface into the canvas. Resolved theme roles are also exposed to DOM
+  companions through exported `--snaplot-theme-*` variables and
+  `applyThemeToElement()`.
+- Added outward axis tick marks by default, configurable with
+  `axis.tickMarks`, so labels are visibly anchored even when gridlines are
+  disabled.
+- Added a headless `chart.getLegendItems()` model with resolved mark geometry
+  and a compact Solid `<SeriesLegend>` for application-owned card headers.
+  The built-in legend now distinguishes lines, dashed lines, areas, bands,
+  bars, histograms, and scatter points instead of showing every series as a
+  circular color dot.
+- Added `createReferenceRegionsPlugin()` for labelled X/Y intervals and the
+  reactive Solid `createReferenceRegions()` adapter.
+- Added `selection.dataChange` (`clear-if-outside`, `clamp`, `clear`, or
+  `preserve`) for explicit persistent-brush behavior across data changes.
+- Added `tooltip.rangeFormat` and raw `TooltipPoint.xRange` metadata for
+  semantic histogram tooltips.
+
+### Changed
+- Fixed-radius scatter plots use colour-binned vector batches while a viewport
+  gesture is active instead of hundreds or thousands of translucent
+  canvas-to-canvas blits. A constant-colour series needs only one fill. This
+  specifically avoids Safari's slow small-`drawImage` path; the settled frame
+  returns to exact point stamps.
+- The default scatter interaction budget is adaptive for touch/pen
+  (`max(400, 1.5 × plot CSS width)`) and remains 10,000 for mouse/keyboard.
+  Explicit `performance.interactionSampling` values keep exact precedence.
+- Axis gutter calculation now treats configured padding as a minimum total
+  gutter, measures title/tick space independently, reserves room for the
+  outer halves of horizontal endpoint labels, and resolves corner collisions
+  without moving their tick anchors.
+- Bar tooltips inherit the X axis formatter by default, so categorical axis
+  labels automatically appear in tooltips. Histogram tooltips now present
+  labelled `Range` and `Count` rows using axis-consistent units and precision.
+- Cursor defaults are mark-aware: bar- and histogram-only charts omit the
+  vertical crosshair because the active group/bin already supplies a stronger
+  positional cue. Set `cursor.xLine` explicitly to override this.
+- Persistent brushes now default to `clear-if-outside` on replacement or
+  rolling-window data updates, preventing stale selections with no overlap.
+- Reference line defaults now inherit the chart's resolved theme font and
+  muted color.
+
+### Fixed
+- Resetting or scrolling an X-synchronized chart no longer broadcasts its Y
+  and Y2 domains to peers whose vertical zoom synchronization is disabled.
+- Touch-follow tooltips no longer force synchronous width/height layout on
+  every changed scatter point. Structurally equal content reuses its measured
+  geometry, and pointer following uses compositor transforms instead of
+  repeatedly changing layout coordinates.
+- Nice linear ticks are quantized to their decimal step before custom
+  formatters run, preventing zoom labels such as `1.4000000000000001 kW`.
+- Horizontal endpoint labels now reserve only the portion that would actually
+  escape the plot. Inset bar categories and histogram-bin ticks no longer
+  create wider right gutters than adjacent charts.
+- Tooltips now flip horizontally and vertically, then clamp to an 8px
+  viewport safe area, so charts near the right or bottom page edge cannot
+  render unreadable off-screen content.
+- Horizontal endpoint clearance no longer masquerades as a right-side Y axis
+  and trigger dual-axis gutter symmetry, which made some single-axis bar plots
+  substantially narrower than adjacent charts.
+- Mouse/pen presses no longer paint the browser keyboard focus ring while
+  shift-dragging or selecting; `:focus-visible` remains available to keyboard
+  users.
+- Top-axis labels use the correct upward transform, and X/Y tick labels at a
+  shared corner no longer crowd each other.
+- Theme changes now propagate coherently to DOM legends and companion
+  components without requiring palette duplication.
+
 ## [0.11.1] - 2026-07-10
 
 ### Fixed

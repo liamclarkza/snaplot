@@ -64,6 +64,13 @@
       "type": "ThemeConfig"
     },
     {
+      "name": "getLegendItems",
+      "signature": "getLegendItems(): LegendItem[]",
+      "doc": "Resolved series legend model for application-owned headers, sidebars, or custom renderers. Colors follow the active theme and mark fields retain enough geometry to distinguish lines, areas, bands, bars, and points.",
+      "optional": false,
+      "type": "LegendItem[]"
+    },
+    {
       "name": "refreshTheme",
       "signature": "refreshTheme(): void",
       "doc": "Re-resolve the theme against the container's current CSS cascade and repaint if anything changed. Charts already call this automatically when an attribute changes on `<html>`/`<body>` (the `[data-theme]` pattern) or the OS color scheme flips; call it manually only when tokens change through some other mechanism (for example a variable swapped on a mid-tree ancestor). No-ops when the resolved theme is value-identical.",
@@ -239,6 +246,13 @@
       "doc": "Config changed via `setOptions`/`replaceOptions`, with the resolved config.",
       "optional": false,
       "type": "(config: ChartConfig) => void"
+    },
+    {
+      "name": "theme:update",
+      "signature": "'theme:update': (theme: ThemeConfig) => void",
+      "doc": "The resolved theme changed through config, CSS variables, or color scheme.",
+      "optional": false,
+      "type": "(theme: ThemeConfig) => void"
     },
     {
       "name": "follow:change",
@@ -444,6 +458,11 @@
       "doc": "Per-axis gridline styling, independent of tick labels. `false` (or `show: false`) removes this axis's gridlines while its labels stay; a time-bar chart often wants horizontal guides only, so set `axes.x.grid: false`. Colors here are concrete CSS color strings; theme `var()` references are resolved only in `ThemeConfig` fields."
     },
     {
+      "name": "AxisTickMarksConfig",
+      "kind": "interface",
+      "doc": "Styling for the short marks that anchor tick labels to exact scale positions."
+    },
+    {
       "name": "AxisConfig",
       "kind": "interface",
       "doc": "Configuration for an axis entry in ChartConfig.axes"
@@ -507,6 +526,11 @@
       "name": "TooltipFieldValue",
       "kind": "interface",
       "doc": "One extra scatter column value in a tooltip row."
+    },
+    {
+      "name": "LegendItem",
+      "kind": "interface",
+      "doc": "Resolved, renderer-independent description of one series legend entry."
     },
     {
       "name": "CursorSeriesPoint",

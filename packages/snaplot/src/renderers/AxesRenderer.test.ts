@@ -28,6 +28,7 @@ function context(): CanvasRenderingContext2D {
     lineTo: vi.fn(),
     stroke: vi.fn(),
     fillRect: vi.fn(),
+    measureText: vi.fn((text: string) => ({ width: text.length * 7 }) as TextMetrics),
     setLineDash: vi.fn(),
     fillStyle: '',
     strokeStyle: '',
@@ -41,6 +42,7 @@ const theme = {
   gridColor: '#eee',
   gridOpacity: 1,
   axisLineColor: '#ccc',
+  tickColor: '#777',
   borderColor: '#ccc',
   borderOpacity: 1,
   textColor: '#000',
@@ -125,8 +127,22 @@ describe('per-axis grid config', () => {
 
     const result = renderAxes(ctx, layout(), scales, theme, gridConfig(false));
 
-    // No gridline path segments were emitted (the only moveTo calls for a
-    // left axis come from its horizontal gridlines).
+    // Gridlines are absent, but the short tick anchors still paint.
+    expect(ctx.moveTo).toHaveBeenCalledTimes(3);
+    expect((result.labels.get('y') ?? []).length).toBe(3);
+  });
+
+  it('can hide tick marks independently of gridlines and labels', () => {
+    const scale = linearScale(0, 100, [25, 50, 75]);
+    const scales = new Map<string, Scale>([['y', scale]]);
+    const ctx = context();
+    const config = {
+      series: [],
+      axes: { y: { position: 'left', grid: false, tickMarks: false } },
+    } as unknown as ChartConfig;
+
+    const result = renderAxes(ctx, layout(), scales, theme, config);
+
     expect(ctx.moveTo).not.toHaveBeenCalled();
     expect((result.labels.get('y') ?? []).length).toBe(3);
   });
@@ -186,5 +202,39 @@ describe('axis title placement', () => {
     // Bottom title: glyph bottom edge = y + fontSize / 2, inside the canvas.
     expect(xTitle).toBeDefined();
     expect(fullLayout.height - ((xTitle?.y ?? 0) + fontSize / 2)).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('axis corner collision handling', () => {
+  it('moves a colliding first bottom label away from the left-axis label', () => {
+    const xScale = { ...linearScale(20, 100, [20]), key: 'x' };
+    const yScale = linearScale(0, 100, [100]);
+    const scales = new Map<string, Scale>([
+      ['x', xScale],
+      ['y', yScale],
+    ]);
+    const fullLayout: Layout = {
+      width: 140,
+      height: 120,
+      plot: { left: 20, top: 0, width: 100, height: 100 },
+      axes: {
+        x: { position: 'bottom', area: { left: 20, top: 100, width: 100, height: 20 } },
+        y: { position: 'left', area: { left: 0, top: 0, width: 20, height: 100 } },
+      },
+      dpr: 1,
+    };
+
+    const result = renderAxes(
+      context(),
+      fullLayout,
+      scales,
+      theme,
+      {
+        series: [],
+        axes: { x: { position: 'bottom' }, y: { position: 'left' } },
+      } as ChartConfig,
+    );
+
+    expect(result.labels.get('x')?.[0].x).toBeGreaterThan(20);
   });
 });

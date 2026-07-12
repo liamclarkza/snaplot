@@ -113,8 +113,13 @@ export function niceTicks(
   }
 
   const ticks: number[] = new Array(n);
+  const decimals = Math.max(0, -Math.floor(Math.log10(Math.abs(step))));
+  const factor = 10 ** Math.min(decimals, 12);
   for (let i = 0; i < n; i++) {
-    ticks[i] = nMin + i * step;
+    // Multiplication still exposes binary noise (1.2 + 0.2 ->
+    // 1.4000000000000001). Quantize to the nice step's decimal precision so
+    // custom unit formatters receive the semantic tick value too.
+    ticks[i] = Math.round((nMin + i * step) * factor) / factor;
   }
 
   return ticks;

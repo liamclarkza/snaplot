@@ -32,7 +32,7 @@ const GZIP_BUDGETS = {
   'index.js': 68_000, // baseline 62_054 (0.10 features + live CSS-var theming)
   'core.js': 68_000, // baseline 61_747
   'solid.js': 66_000, // baseline 59_802 (excludes external solid-js)
-  'legend-table.css': 1_850, // baseline 1_635
+  'legend-table.css': 2_150, // baseline 1_956 (0.12 geometry-aware legend marks)
 };
 
 const ENTRIES = Object.keys(GZIP_BUDGETS);

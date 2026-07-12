@@ -20,6 +20,7 @@ import {
   midnightTheme,
   marsTheme,
   refinedDarkTheme,
+  createTheme,
 } from './theme';
 
 describe('resolveTheme palette roles', () => {
@@ -67,6 +68,31 @@ describe('resolveTheme palette roles', () => {
 
     expect(theme.sequentialPalette).toEqual(['#111111', '#222222']);
     expect(theme.heatmapGradient).toEqual(['#333333', '#444444']);
+  });
+});
+
+describe('createTheme semantic tokens', () => {
+  it('maps product tokens onto the detailed theme roles', () => {
+    const theme = createTheme({
+      base: ivoryTheme,
+      surface: 'container',
+      text: 'var(--product-text)',
+      muted: 'var(--product-muted)',
+      accent: 'var(--product-accent)',
+      categorical: ['#123456', '#abcdef'],
+      tooltip: { surface: '#111', text: '#fff', border: '#333' },
+    });
+
+    expect(theme.backgroundColor).toBe('container');
+    expect(theme.textColor).toBe('var(--product-text)');
+    expect(theme.tickColor).toBe('var(--product-muted)');
+    expect(theme.gridColor).toBe('var(--product-muted)');
+    expect(theme.axisLineColor).toBe('var(--product-muted)');
+    expect(theme.borderColor).toBe('var(--product-muted)');
+    expect(theme.crosshairColor).toBe('var(--product-accent)');
+    expect(theme.palette).toEqual(['#123456', '#abcdef']);
+    expect(theme.categoricalPalette).toEqual(['#123456', '#abcdef']);
+    expect(theme.tooltipBackground).toBe('#111');
   });
 });
 
@@ -262,6 +288,19 @@ describe('CSS variable and color-space resolution', () => {
     expect(theme.backgroundColor).toBe('#101216');
     expect(theme.textColor).toBe('#e8eaed');
     expect(theme.crosshairColor).toBe('rgb(122, 162, 247)');
+  });
+
+  it('copies the nearest opaque ancestor surface for backgroundColor: container', () => {
+    const parent = { parentElement: null } as unknown as HTMLElement;
+    const container = { parentElement: parent } as unknown as HTMLElement;
+    vi.stubGlobal('getComputedStyle', (el: HTMLElement) => ({
+      backgroundColor: el === parent ? 'rgb(250, 248, 242)' : 'rgba(0, 0, 0, 0)',
+      getPropertyValue: () => '',
+    }));
+
+    const theme = resolveTheme(container, { backgroundColor: 'container' });
+
+    expect(theme.backgroundColor).toBe('rgb(250, 248, 242)');
   });
 
   it('normalizes palette entries to hex so gradient interpolation works', () => {

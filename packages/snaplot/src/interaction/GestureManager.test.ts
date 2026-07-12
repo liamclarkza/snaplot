@@ -125,6 +125,12 @@ function createGesture(
 }
 
 describe('GestureManager cursor emission', () => {
+  it('prevents pointer presses from painting a mouse focus ring', () => {
+    const { target } = createGesture();
+    const down = target.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+    expect(down.preventDefault).toHaveBeenCalledOnce();
+  });
+
   it('emits hover cursor moves when no pointer is pressed', () => {
     const { target, eventBus, manager } = createGesture();
     const cursor = vi.fn();

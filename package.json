@@ -16,7 +16,7 @@
     "bench": "node bench/run.mjs",
     "size": "node scripts/bundle-report.mjs",
     "bench:compare": "node bench/compare.mjs",
-    "test": "npm run test -w packages/snaplot",
+    "test": "npm run test -w packages/snaplot && npm run test -w site",
     "test:watch": "npm run test:watch -w packages/snaplot",
     "lint": "biome lint",
     "lint:fix": "biome lint --write",

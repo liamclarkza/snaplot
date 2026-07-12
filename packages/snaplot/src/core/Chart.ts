@@ -13,6 +13,7 @@ import type {
   HighlightSyncKey,
   HighlightSyncPayload,
   Layout,
+  LegendItem,
   Plugin,
   Scale,
   ScaleRange,
@@ -43,12 +44,14 @@ import {
   DEFAULT_INTERACTION_SAMPLING,
   DEFAULT_TICK_COUNT,
   INTERACTION_REFINE_MS,
+  MIN_TOUCH_INTERACTION_SAMPLING,
   MIN_DRAG_DISTANCE,
+  TOUCH_INTERACTION_POINTS_PER_PIXEL,
 } from '../constants';
 
 import { deepMerge } from '../config/merge';
 import { DEFAULT_CONFIG } from '../config/defaults';
-import { resolveTheme } from '../config/theme';
+import { applyThemeToElement, resolveTheme } from '../config/theme';
 
 import { renderAxes, thinTicks, updateDOMLabels } from '../renderers/AxesRenderer';
 import { renderLineSegments, renderAreaSegments, renderBandSegments, type LineRenderSegment } from '../renderers/LineRenderer';
@@ -280,6 +283,7 @@ export class ChartCore implements ChartInstance {
     // swapping an attribute on <html>/<body> or via the OS color scheme,
     // and a canvas cannot track CSS variables by itself the way SVG can.
     this.theme = resolveTheme(parent, this.config.theme);
+    applyThemeToElement(parent, this.theme);
     if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
       this.themeObserver = new MutationObserver(() => this.queueThemeRefresh());
       this.themeObserver.observe(document.documentElement, { attributes: true });
@@ -365,6 +369,7 @@ export class ChartCore implements ChartInstance {
     this.stats.dataVersion++;
     this.stats.setDataCount++;
     const gridDirty = this.rangeForDataChange();
+    this.reconcileSelectionForDataChange();
     this.refreshCursor();
     this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
     this.dispatchDataUpdate();
@@ -389,6 +394,7 @@ export class ChartCore implements ChartInstance {
     this.stats.dataVersion++;
     this.stats.appendDataCount++;
     const gridDirty = this.rangeForDataChange();
+    this.reconcileSelectionForDataChange();
     this.refreshCursor();
     this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
     this.dispatchDataUpdate();
@@ -601,13 +607,17 @@ export class ChartCore implements ChartInstance {
   }
 
   private applyConfigSideEffects(partial: DeepPartial<ChartConfig>, fullReplace: boolean): void {
+    let themeChanged = false;
     if (fullReplace || partial.interaction) {
       this.applyModePresets(partial);
       this.gestureManager.updateTouchAction();
     }
 
     if (fullReplace || partial.theme) {
+      const previousTheme = this.theme;
       this.theme = resolveTheme(this.container, this.config.theme);
+      themeChanged = JSON.stringify(previousTheme) !== JSON.stringify(this.theme);
+      applyThemeToElement(this.container, this.theme);
       this.tooltipManager.applyTheme(this.theme);
     }
 
@@ -623,6 +633,7 @@ export class ChartCore implements ChartInstance {
     if (this.following) this.applyFollowWindow();
     this.scheduler.markDirty(DirtyFlag.ALL);
     this.emitEvent('options:update', this.config);
+    if (themeChanged) this.emitEvent('theme:update', this.theme);
     this.pluginManager.dispatch('onSetOptions', this);
   }
 
@@ -634,6 +645,30 @@ export class ChartCore implements ChartInstance {
     return this.theme;
   }
 
+  getLegendItems(): LegendItem[] {
+    const palette = this.categoricalPalette();
+    return this.config.series.map((series, seriesIndex) => {
+      const type = series.type ?? 'line';
+      const color = series.stroke ?? palette[seriesIndex % palette.length];
+      const configuredFill = typeof series.fill === 'string' ? series.fill : null;
+      const fill = series.fill === null
+        ? null
+        : configuredFill ?? (type === 'line' || type === 'scatter' ? null : color);
+      return {
+        seriesIndex,
+        label: series.label,
+        type,
+        visible: series.visible !== false,
+        color,
+        fill,
+        lineWidth: series.lineWidth ?? 1.5,
+        lineDash: series.lineDash ? [...series.lineDash] : [],
+        opacity: series.opacity ?? 1,
+        meta: series.meta,
+      };
+    });
+  }
+
   refreshTheme(): void {
     if (this.destroyed) return;
     const next = resolveTheme(this.container, this.config.theme);
@@ -641,8 +676,10 @@ export class ChartCore implements ChartInstance {
     // flips; a value-level compare keeps the no-op case paint-free.
     if (JSON.stringify(next) === JSON.stringify(this.theme)) return;
     this.theme = next;
+    applyThemeToElement(this.container, next);
     this.tooltipManager.applyTheme(next);
     this.scheduler.markDirty(DirtyFlag.ALL);
+    this.emitEvent('theme:update', next);
   }
 
   /** Collapse observer bursts (class + style + data-theme often flip together). */
@@ -673,11 +710,7 @@ export class ChartCore implements ChartInstance {
     this.autoRangeVertical();
     this.scheduler.markDirty(DirtyFlag.ALL);
 
-    if (this.zoomSyncKey && !this.suppressZoomSync) {
-      for (const [scaleKey, scale] of this.scales) {
-        SyncGroup.publishScale(this.zoomSyncKey, this, scaleKey, { min: scale.min, max: scale.max });
-      }
-    }
+    this.publishResetViewport();
   }
 
   scrollToLatest(): void {
@@ -692,8 +725,22 @@ export class ChartCore implements ChartInstance {
     }
     this.refreshCursor();
     this.scheduler.markDirty(DirtyFlag.ALL);
-    if (this.zoomSyncKey && !this.suppressZoomSync) {
-      for (const [scaleKey, scale] of this.scales) {
+    this.publishResetViewport();
+  }
+
+  /**
+   * Reset actions recompute every local scale, but only axes opted into zoom
+   * synchronisation belong in the broadcast. Publishing all scales made an
+   * X-linked dashboard copy unrelated Y/Y2 ranges between charts.
+   */
+  private publishResetViewport(): void {
+    if (!this.zoomSyncKey || this.suppressZoomSync) return;
+    const axes = this.config.axes ?? {};
+    for (const [scaleKey, scale] of this.scales) {
+      const position = inferPosition(scaleKey, axes[scaleKey]?.position);
+      const horizontal = position === 'bottom' || position === 'top';
+      const syncEnabled = horizontal ? this.config.zoom?.x !== false : this.config.zoom?.y === true;
+      if (syncEnabled) {
         SyncGroup.publishScale(this.zoomSyncKey, this, scaleKey, { min: scale.min, max: scale.max });
       }
     }
@@ -724,6 +771,27 @@ export class ChartCore implements ChartInstance {
     }
     this.scheduler.markDirty(DirtyFlag.OVERLAY);
     this.emitSelectionChange();
+  }
+
+  private reconcileSelectionForDataChange(): void {
+    if (!this.selection) return;
+    const policy = this.config.selection?.dataChange ?? 'clear-if-outside';
+    if (policy === 'preserve') return;
+    if (policy === 'clear' || this.store.length === 0) {
+      this.setSelection(null);
+      return;
+    }
+
+    const first = this.store.xAt(0);
+    const last = this.store.xAt(this.store.length - 1);
+    const dataMin = Math.min(first, last);
+    const dataMax = Math.max(first, last);
+    const { min, max } = this.selection.x;
+    if (max < dataMin || min > dataMax) {
+      this.setSelection(null);
+    } else if (policy === 'clamp') {
+      this.setSelection({ x: { min: Math.max(min, dataMin), max: Math.min(max, dataMax) } });
+    }
   }
 
   private isBrushMode(): boolean {
@@ -1565,6 +1633,15 @@ export class ChartCore implements ChartInstance {
     const configured = this.config.performance?.interactionSampling;
     if (configured === false) return null;
     if (typeof configured === 'number') return configured > 0 ? configured : null;
+    if (this.lastPointerType === 'touch' || this.lastPointerType === 'pen') {
+      return Math.min(
+        DEFAULT_INTERACTION_SAMPLING,
+        Math.max(
+          MIN_TOUCH_INTERACTION_SAMPLING,
+          Math.round(this.layout.plot.width * TOUCH_INTERACTION_POINTS_PER_PIXEL),
+        ),
+      );
+    }
     return DEFAULT_INTERACTION_SAMPLING;
   }
 
@@ -2625,6 +2702,7 @@ export class ChartCore implements ChartInstance {
             cache,
             this.scatterResolvers(si, series, color).renderResolver,
             sampleStride,
+            this.interactionActive(),
           );
           break;
         }
@@ -2661,7 +2739,16 @@ export class ChartCore implements ChartInstance {
         s => s.visible === false || s.type === 'scatter',
       );
       if (!isScatterOnly) {
-        const cursorCfg = this.config.cursor ?? { show: true };
+        const visibleSeries = this.config.series.filter(s => s.visible !== false);
+        const hasOnlyDiscreteMarks = visibleSeries.length > 0 && visibleSeries.every(
+          s => s.type === 'bar' || s.type === 'histogram',
+        );
+        const cursorCfg = {
+          ...this.config.cursor,
+          // A vertical line reads as an extra mark on grouped bars. The
+          // highlighted group already supplies a stronger positional cue.
+          xLine: this.config.cursor?.xLine ?? !hasOnlyDiscreteMarks,
+        };
         renderCrosshair(
           ctx,
           this.cursorX,
@@ -3058,12 +3145,13 @@ export class ChartCore implements ChartInstance {
         dataIndex: b,
         label: series.label,
         x: (binMin + binMax) / 2,
+        xRange: { min: binMin, max: binMax },
         y: count,
         color,
-        formattedX: fmt?.x
-          ? fmt.x((binMin + binMax) / 2)
-          : this.formatHistogramBinRange(binMin, binMax),
-        formattedY: fmt?.y ? fmt.y(count, si) : String(count),
+        formattedX: this.formatHistogramBinRange(binMin, binMax, si),
+        formattedY: fmt?.y
+          ? fmt.y(count, si)
+          : this.formatAxisValue(series.yAxisKey ?? 'y', count),
       });
     }
 
@@ -3115,9 +3203,7 @@ export class ChartCore implements ChartInstance {
         color,
         formattedX: fmt?.x
           ? fmt.x(xVal)
-          : Number.isInteger(xVal)
-            ? String(xVal)
-            : xVal.toFixed(1),
+          : this.formatAxisValue(series.xAxisKey ?? 'x', xVal),
         formattedY: fmt?.y
           ? fmt.y(yVal, si)
           : yScale
@@ -3439,8 +3525,32 @@ export class ChartCore implements ChartInstance {
     };
   }
 
-  private formatHistogramBinRange(min: number, max: number): string {
-    return `${min.toFixed(1)} \u2013 ${max.toFixed(1)}`;
+  private formatAxisValue(axisKey: string, value: number): string {
+    const axisFormat = this.config.axes?.[axisKey]?.tickFormat;
+    if (axisFormat) return axisFormat(value);
+    return this.scales.get(axisKey)?.tickFormat(value) ?? String(value);
+  }
+
+  private formatHistogramBinRange(min: number, max: number, seriesIndex = 0): string {
+    const tooltip = this.config.tooltip;
+    if (tooltip?.rangeFormat) return tooltip.rangeFormat(min, max, seriesIndex);
+
+    const series = this.config.series[seriesIndex];
+    const axisKey = series?.xAxisKey ?? 'x';
+    const format = tooltip?.xFormat ?? ((value: number) => this.formatAxisValue(axisKey, value));
+    let formattedMin = format(min);
+    let formattedMax = format(max);
+
+    // Coarse axis formatters can collapse two different bin edges to the same
+    // label. Preserve an intelligible interval without forcing app code to
+    // supply a histogram-only formatter.
+    if (min !== max && formattedMin === formattedMax && !tooltip?.xFormat) {
+      const width = Math.abs(max - min);
+      const decimals = width > 0 ? Math.max(0, Math.min(6, Math.ceil(-Math.log10(width)))) : 0;
+      formattedMin = min.toFixed(decimals);
+      formattedMax = max.toFixed(decimals);
+    }
+    return `${formattedMin} \u2013 ${formattedMax}`;
   }
 
   private isInPlotArea(x: number, y: number): boolean {

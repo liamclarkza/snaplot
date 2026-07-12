@@ -5,6 +5,7 @@ import type { ColumnarData, ChartConfig } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
 import { Button } from '../components/ui';
 import { useTheme } from '../ThemeContext';
+import './home.css';
 
 /**
  * Four-core CPU usage. Each core is a bounded random walk with
@@ -80,10 +81,10 @@ import { Chart } from 'snaplot/solid';
 
 type Stat = { value: string; label: string };
 const stats: Stat[] = [
-  { value: '200K+', label: 'points at 60 fps' },
-  { value: '< 20 kB', label: 'gzipped bundle' },
-  { value: '0',      label: 'runtime dependencies' },
-  { value: '5',      label: 'lines to a working chart' },
+  { value: '7', label: 'chart types' },
+  { value: '3', label: 'complete demo applications' },
+  { value: '0', label: 'runtime dependencies' },
+  { value: 'Typed', label: 'columnar data arrays' },
 ];
 
 export default function Home() {
@@ -164,9 +165,10 @@ export default function Home() {
     // App renders the page-level <main> landmark; Home is its content, so
     // it must not open a second <main> (nested landmarks confuse assistive
     // tech). A fragment keeps the section flow without a wrapper element.
-    <>
+    <div class="home-page">
       {/* Hero */}
       <section
+        class="home-hero"
         style={{
           padding: 'var(--space-9) var(--space-5) var(--space-7)',
           'max-width': 'var(--max-width)',
@@ -183,7 +185,7 @@ export default function Home() {
             'margin-bottom': 'var(--space-4)',
           }}
         >
-          Charts that <span style={{ color: 'var(--accent)' }}>keep up</span>.
+          High-performance charts<br />for <span style={{ color: 'var(--accent)' }}>SolidJS applications</span>.
         </h1>
         <p
           style={{
@@ -194,9 +196,8 @@ export default function Home() {
             'line-height': 1.6,
           }}
         >
-          A canvas chart library built for streaming data. Columnar typed arrays,
-          layered rendering, and a minimal reactive API that ensures your dashboards stay
-          responsive as data keeps arriving.
+          Snaplot is a canvas plotting library for interactive dashboards and streaming data,
+          with columnar typed arrays, layered rendering, and a focused reactive API.
         </p>
         <div
           style={{
@@ -207,7 +208,7 @@ export default function Home() {
           }}
         >
           <Button href="#/docs" variant="primary">Get started</Button>
-          <Button href="#/demos" variant="secondary">Explore themes</Button>
+          <Button href="#/demos" variant="secondary">Explore demos</Button>
           <Button
             href="https://github.com/liamclarkza/snaplot"
             target="_blank"
@@ -221,6 +222,7 @@ export default function Home() {
 
       {/* Hero chart, streaming latency dashboard */}
       <section
+        class="home-chart-showcase"
         style={{
           padding: '0 var(--space-5)',
           'max-width': 'var(--max-width)',
@@ -277,6 +279,7 @@ export default function Home() {
 
       {/* Stats strip */}
       <section
+        class="home-stats"
         style={{
           padding: '0 var(--space-5) var(--space-8)',
           'max-width': 'var(--max-width)',
@@ -323,6 +326,7 @@ export default function Home() {
 
       {/* Code, "here's the chart above" */}
       <section
+        class="home-code"
         style={{
           padding: '0 var(--space-5) var(--space-8)',
           'max-width': 'var(--max-width)',
@@ -353,8 +357,7 @@ export default function Home() {
               margin: '0 auto',
             }}
           >
-            No wrapper components. No config trees. Pass Float64Arrays, describe
-            series, done.
+            Provide columnar data, configure the axes and series, and mount the Solid component.
           </p>
         </div>
         <CodeBlock code={heroCode} lang="tsx" />
@@ -362,6 +365,7 @@ export default function Home() {
 
       {/* CTA strip */}
       <section
+        class="home-cta"
         style={{
           padding: '0 var(--space-5) var(--space-9)',
           'max-width': 'var(--max-width)',
@@ -376,8 +380,7 @@ export default function Home() {
             'margin-bottom': 'var(--space-4)',
           }}
         >
-          Eleven hand-tuned themes. Line, area, scatter, bar, histogram, band, density heatmap.
-          All reactive, all interactive.
+          Configure line, area, scatter, bar, histogram, band, and density charts with the same API.
         </div>
         <div
           style={{
@@ -391,7 +394,7 @@ export default function Home() {
           <Button href="#/docs" variant="secondary">Read the docs</Button>
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
@@ -403,6 +406,7 @@ export default function Home() {
 function ChartPanel(props: { children: any }) {
   return (
     <div
+      class="home-chart-panel"
       style={{
         background: 'var(--chart-bg)',
         'border-radius': 'var(--radius-lg)',

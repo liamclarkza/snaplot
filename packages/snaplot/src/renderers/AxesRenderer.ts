@@ -1,5 +1,12 @@
 import type { AxisConfig, Layout, Scale, ThemeConfig, AxisPosition, ChartConfig } from '../types';
-import { DEFAULT_TICK_COUNT, EDGE_MARGIN, LABEL_MIN_GAP } from '../constants';
+import {
+  AXIS_CORNER_GAP,
+  AXIS_LABEL_GAP,
+  AXIS_TICK_LENGTH,
+  DEFAULT_TICK_COUNT,
+  EDGE_MARGIN,
+  LABEL_MIN_GAP,
+} from '../constants';
 import { inferPosition } from '../core/Layout';
 
 /**
@@ -92,6 +99,13 @@ export function renderAxes(
   const result: AxesRenderResult = {
     labels: new Map(),
   };
+  const tickMarks: Array<{
+    position: AxisPosition;
+    pixels: number[];
+    length: number;
+    direction: 'out' | 'in' | 'both';
+    color: string;
+  }> = [];
 
   // Fill background on grid canvas (opaque, alpha:false)
   ctx.fillStyle = theme.backgroundColor;
@@ -158,6 +172,17 @@ export function renderAxes(
       }
     }
 
+    if (ac.tickMarks !== false) {
+      const mark = typeof ac.tickMarks === 'object' ? ac.tickMarks : undefined;
+      tickMarks.push({
+        position: pos,
+        pixels: ticks.map((tick) => scale.dataToPixel(tick)),
+        length: Math.max(0, mark?.length ?? AXIS_TICK_LENGTH),
+        direction: mark?.direction ?? 'out',
+        color: mark?.color ?? theme.tickColor,
+      });
+    }
+
     // The first axis at each position decides that position's gridlines
     // (draw styled by its grid config, or hide them entirely); later axes
     // at the same position never add a second grid on top.
@@ -210,7 +235,7 @@ export function renderAxes(
         for (const t of ticks) {
           const py = scale.dataToPixel(t);
           if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
-            labels.push({ text: formatTick(t), x: plot.left - 6, y: py, anchor: 'end' });
+            labels.push({ text: formatTick(t), x: plot.left - AXIS_TICK_LENGTH - AXIS_LABEL_GAP, y: py, anchor: 'end' });
           }
         }
         break;
@@ -218,7 +243,7 @@ export function renderAxes(
         for (const t of ticks) {
           const py = scale.dataToPixel(t);
           if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
-            labels.push({ text: formatTick(t), x: plot.left + plot.width + 6, y: py, anchor: 'start' });
+            labels.push({ text: formatTick(t), x: plot.left + plot.width + AXIS_TICK_LENGTH + AXIS_LABEL_GAP, y: py, anchor: 'start' });
           }
         }
         break;
@@ -229,7 +254,9 @@ export function renderAxes(
         // into the left gutter. Clamp the label center so the text box stays
         // inside the container; only the edge labels ever shift, and by at
         // most half their own width.
-        const labelY = pos === 'bottom' ? plot.top + plot.height + 4 : plot.top - 4;
+        const labelY = pos === 'bottom'
+          ? plot.top + plot.height + AXIS_TICK_LENGTH + AXIS_LABEL_GAP
+          : plot.top - AXIS_TICK_LENGTH - AXIS_LABEL_GAP;
         for (const t of ticks) {
           const px = scale.dataToPixel(t);
           if (px >= plot.left - 10 && px <= plot.left + plot.width + 10) {
@@ -273,6 +300,50 @@ export function renderAxes(
   // Release the rounded clip used for gridlines.
   ctx.restore();
 
+  resolveAxisCornerCollisions(result, layout, theme, ctx);
+
+  // Tick marks deliberately paint outside the plot clip. They share the
+  // final thinned tick set with labels, so no orphan marks are produced.
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1;
+  for (const marks of tickMarks) {
+    if (marks.length <= 0 || marks.pixels.length === 0) continue;
+    ctx.strokeStyle = marks.color;
+    ctx.beginPath();
+    for (const pixel of marks.pixels) {
+      const p = Math.round(pixel) + offset;
+      const inward = marks.direction === 'in' || marks.direction === 'both';
+      const outward = marks.direction === 'out' || marks.direction === 'both';
+      switch (marks.position) {
+        case 'bottom': {
+          const edge = Math.round(plot.top + plot.height) + offset;
+          ctx.moveTo(p, edge - (inward ? marks.length : 0));
+          ctx.lineTo(p, edge + (outward ? marks.length : 0));
+          break;
+        }
+        case 'top': {
+          const edge = Math.round(plot.top) + offset;
+          ctx.moveTo(p, edge + (inward ? marks.length : 0));
+          ctx.lineTo(p, edge - (outward ? marks.length : 0));
+          break;
+        }
+        case 'left': {
+          const edge = Math.round(plot.left) + offset;
+          ctx.moveTo(edge + (inward ? marks.length : 0), p);
+          ctx.lineTo(edge - (outward ? marks.length : 0), p);
+          break;
+        }
+        case 'right': {
+          const edge = Math.round(plot.left + plot.width) + offset;
+          ctx.moveTo(edge - (inward ? marks.length : 0), p);
+          ctx.lineTo(edge + (outward ? marks.length : 0), p);
+          break;
+        }
+      }
+    }
+    ctx.stroke();
+  }
+
   // ─── Plot area border (rounded corners) ──────────────────────
   // `borderColor` / `borderOpacity` are their own knobs so the frame
   // can sit one visual step above the grid while sharing its hue.
@@ -297,6 +368,56 @@ export function renderAxes(
   ctx.globalAlpha = 1;
 
   return result;
+}
+
+function resolveAxisCornerCollisions(
+  result: AxesRenderResult,
+  layout: Layout,
+  theme: ThemeConfig,
+  ctx: CanvasRenderingContext2D,
+): void {
+  const lineHeight = theme.fontSize * 1.4;
+  const horizontal: Array<{ label: AxisLabel; position: 'top' | 'bottom' }> = [];
+  const vertical: Array<{ label: AxisLabel; position: 'left' | 'right' }> = [];
+
+  ctx.font = `${theme.fontSize}px ${theme.fontFamily}`;
+  for (const [key, labels] of result.labels) {
+    const position = layout.axes[key]?.position;
+    if (!position) continue;
+    for (const label of labels) {
+      if (label.kind === 'title') continue;
+      if (position === 'top' || position === 'bottom') horizontal.push({ label, position });
+      else vertical.push({ label, position });
+    }
+  }
+
+  for (const h of horizontal) {
+    const hWidth = ctx.measureText(h.label.text).width;
+    for (const v of vertical) {
+      const sameCorner =
+        (v.position === 'left' && h.label.x <= layout.plot.left + hWidth) ||
+        (v.position === 'right' && h.label.x >= layout.plot.left + layout.plot.width - hWidth);
+      if (!sameCorner) continue;
+
+      const hTop = h.position === 'bottom' ? h.label.y : h.label.y - lineHeight;
+      const hBottom = hTop + lineHeight;
+      const vTop = v.label.y - lineHeight / 2;
+      const vBottom = v.label.y + lineHeight / 2;
+      if (Math.min(hBottom, vBottom) <= Math.max(hTop, vTop)) continue;
+
+      if (v.position === 'left') {
+        const vRight = v.label.x;
+        const hLeft = h.label.x - hWidth / 2;
+        const overlap = vRight + AXIS_CORNER_GAP - hLeft;
+        if (overlap > 0) h.label.x += overlap;
+      } else {
+        const vLeft = v.label.x;
+        const hRight = h.label.x + hWidth / 2;
+        const overlap = hRight + AXIS_CORNER_GAP - vLeft;
+        if (overlap > 0) h.label.x -= overlap;
+      }
+    }
+  }
 }
 
 /**
@@ -333,7 +454,7 @@ export function updateDOMLabels(
         posStyle = 'transform:translateY(-50%);';
         break;
       case 'top':
-        posStyle = 'text-align:center;transform:translateX(-50%);';
+        posStyle = 'text-align:center;transform:translate(-50%, -100%);';
         break;
       default:
         posStyle = 'transform:translateX(-50%);';

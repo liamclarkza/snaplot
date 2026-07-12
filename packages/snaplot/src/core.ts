@@ -33,16 +33,25 @@ export {
   studioTheme,
   tokyoTheme,
   resolveTheme,
+  createTheme,
+  applyThemeToElement,
   CHART_CSS_VARS,
+  SNAPLOT_THEME_CSS_VARS,
 } from './config/theme';
+export type { ThemeTokens } from './config/theme';
 
 // Plugins
 export { createLegendPlugin } from './plugins/builtins/legendPlugin';
 export { createLegendTablePlugin } from './plugins/builtins/legendTablePlugin';
 export { createReferenceLinesPlugin } from './plugins/builtins/referenceLinesPlugin';
+export { createReferenceRegionsPlugin } from './plugins/builtins/referenceRegionsPlugin';
 export { tooltipPlugin } from './plugins/builtins/tooltipPlugin';
 export { crosshairPlugin } from './plugins/builtins/crosshairPlugin';
 export type { ReferenceLine } from './plugins/builtins/referenceLinesPlugin';
+export type {
+  ReferenceRegion,
+  ReferenceRegionsPlugin,
+} from './plugins/builtins/referenceRegionsPlugin';
 export type {
   LegendTableOptions,
 } from './plugins/builtins/legendTablePlugin';
@@ -82,6 +91,7 @@ export type {
   ScatterTooltipField,
   AxisConfig,
   AxisGridConfig,
+  AxisTickMarksConfig,
   AxisPosition,
   ThemeConfig,
   Layout,
@@ -89,6 +99,7 @@ export type {
   TooltipPoint,
   TooltipFieldValue,
   TooltipConfig,
+  LegendItem,
   CursorConfig,
   CursorEventOrigin,
   ZoomConfig,

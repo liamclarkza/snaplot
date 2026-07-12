@@ -12,12 +12,18 @@
  */
 
 :root {
+  --snaplot-theme-text: inherit;
+  --snaplot-theme-muted: rgba(127, 127, 127, 0.7);
+  --snaplot-theme-border: rgba(127, 127, 127, 0.18);
+  --snaplot-theme-hover: rgba(127, 127, 127, 0.08);
+  --snaplot-theme-highlight: rgba(127, 127, 127, 0.14);
+  --snaplot-theme-font-family: inherit;
   --snaplot-legend-bg: transparent;
-  --snaplot-legend-border: rgba(127, 127, 127, 0.18);
-  --snaplot-legend-text: inherit;
-  --snaplot-legend-muted: rgba(127, 127, 127, 0.7);
-  --snaplot-legend-row-hover: rgba(127, 127, 127, 0.08);
-  --snaplot-legend-row-highlight: rgba(127, 127, 127, 0.14);
+  --snaplot-legend-border: var(--snaplot-theme-border);
+  --snaplot-legend-text: var(--snaplot-theme-text);
+  --snaplot-legend-muted: var(--snaplot-theme-muted);
+  --snaplot-legend-row-hover: var(--snaplot-theme-hover);
+  --snaplot-legend-row-highlight: var(--snaplot-theme-highlight);
   --snaplot-legend-row-dim-opacity: 0.4;
   --snaplot-legend-row-radius: 6px;
   --snaplot-legend-step-color: var(--snaplot-legend-muted);
@@ -31,6 +37,7 @@
   background: var(--snaplot-legend-bg);
   border-top: 1px solid var(--snaplot-legend-border);
   color: var(--snaplot-legend-text);
+  font-family: var(--snaplot-theme-font-family);
 }
 
 .snaplot-legend-step {
@@ -127,8 +134,14 @@
   font-size: 12px;
   justify-content: center;
   color: var(--snaplot-legend-text);
+  font-family: var(--snaplot-theme-font-family);
   pointer-events: auto;
   flex-shrink: 0;
+}
+
+.snaplot-series-legend {
+  justify-content: flex-start;
+  padding: 0;
 }
 
 .snaplot-legend-item {
@@ -162,10 +175,54 @@
 }
 
 .snaplot-legend-dot {
-  width: 10px;
+  display: inline-block;
+  position: relative;
+  width: 14px;
   height: 10px;
-  border-radius: 50%;
   flex-shrink: 0;
+}
+
+.snaplot-legend-dot[data-mark='line']::after,
+.snaplot-legend-dot[data-mark='area']::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4px;
+  border-top: 2px solid currentColor;
+}
+
+.snaplot-legend-dot[data-dashed='true']::after {
+  border-top-style: dashed;
+}
+
+.snaplot-legend-dot[data-mark='area'] {
+  height: 8px;
+  margin-top: 2px;
+  background: color-mix(in srgb, currentColor 28%, transparent);
+}
+
+.snaplot-legend-dot[data-mark='band'] {
+  height: 8px;
+  margin-top: 1px;
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.snaplot-legend-dot[data-mark='bar'],
+.snaplot-legend-dot[data-mark='histogram'] {
+  width: 11px;
+  height: 10px;
+  border-radius: 2px 2px 0 0;
+  background: currentColor;
+}
+
+.snaplot-legend-dot[data-mark='scatter'] {
+  width: 9px;
+  height: 9px;
+  margin-inline: 2px 3px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .snaplot-legend-label {

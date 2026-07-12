@@ -10,7 +10,6 @@ export const DEFAULT_CONFIG: ChartConfig = {
   cursor: {
     show: true,
     snap: true,
-    xLine: true,
     yLine: false,
   },
   zoom: {

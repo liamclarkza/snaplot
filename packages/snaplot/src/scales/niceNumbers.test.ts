@@ -94,6 +94,11 @@ describe('niceTicks', () => {
     }
   });
 
+  it('passes clean decimal values to custom axis formatters after zoom', () => {
+    expect(niceTicks(0.74, 2.23, 7)).toEqual([0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.2]);
+    expect(niceTicks(0.74, 2.23, 7).map(value => `${value} kW`)).toContain('1.4 kW');
+  });
+
   it('covers the requested range', () => {
     const ticks = niceTicks(17, 83, 6);
     expect(ticks.length).toBeGreaterThanOrEqual(2);

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChartCore } from './Chart';
 import type { EventBus } from './EventBus';
-import type { ChartInstance, ColumnarData, Plugin, SeriesConfig } from '../types';
+import type { ChartInstance, ColumnarData, Plugin, SeriesConfig, TooltipPoint } from '../types';
 
 const f = (xs: number[]) => Float64Array.from(xs);
 
@@ -265,6 +265,26 @@ describe('ChartCore appendData', () => {
 });
 
 describe('ChartCore runtime options', () => {
+  it('exposes resolved geometry-aware legend items', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        series: [
+          { label: 'Forecast', type: 'band', dataIndex: 1, upperDataIndex: 2, lowerDataIndex: 3, stroke: '#f90', lineDash: [4, 2] },
+          { label: 'Observed', type: 'line', dataIndex: 1, visible: false },
+        ],
+      },
+      [f([0, 1]), f([2, 3]), f([3, 4]), f([1, 2])],
+    );
+
+    expect(chart.getLegendItems()).toMatchObject([
+      { label: 'Forecast', type: 'band', color: '#f90', fill: '#f90', lineDash: [4, 2], visible: true },
+      { label: 'Observed', type: 'line', fill: null, visible: false },
+    ]);
+    chart.destroy();
+  });
+
   beforeEach(() => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
@@ -597,7 +617,7 @@ describe('ChartCore histogram cursor', () => {
     expect(chart.getCursorSnapshot({ fallback: 'hide' })).toMatchObject({
       dataIndex: 1,
       dataX: 1.5,
-      formattedX: '1.0 \u2013 2.0',
+      formattedX: '1 \u2013 2',
       source: 'cursor',
     });
     expect(chart.getCursorSnapshot({ fallback: 'hide' }).points[0]).toMatchObject({
@@ -629,9 +649,35 @@ describe('ChartCore histogram cursor', () => {
     expect(chart.getCursorSnapshot({ fallback: 'hide' })).toMatchObject({
       dataIndex: 2,
       dataX: 2.5,
-      formattedX: '2.0 \u2013 3.0',
+      formattedX: '2 \u2013 3',
     });
 
+    chart.destroy();
+  });
+
+  it('uses axis category labels in bar tooltip points', () => {
+    const labels = ['Accuracy', 'Recall', 'Speed'];
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: {
+          x: { type: 'linear', nice: false, tickFormat: value => labels[value] ?? '' },
+          y: { type: 'linear' },
+        },
+        series: [{ label: 'score', dataIndex: 1, type: 'bar' }],
+      },
+      [f([0, 1, 2]), f([0.8, 0.7, 0.9])],
+    );
+    const xScale = chart.getAxis('x')!;
+    const { plot } = chart.getLayout();
+    chartEventBus(chart).emit('action:tap', {
+      x: xScale.dataToPixel(1),
+      y: plot.top + plot.height / 2,
+      pointerType: 'mouse',
+    });
+
+    const points = (chart as unknown as { tooltipPoints: TooltipPoint[] }).tooltipPoints;
+    expect(points[0]?.formattedX).toBe('Recall');
     chart.destroy();
   });
 
@@ -1240,6 +1286,35 @@ describe('ChartCore lifecycle + config integrity', () => {
     chartB.destroy();
   });
 
+  it('does not broadcast unrelated Y ranges when resetting an X-synced chart', () => {
+    const syncKey = 'x-only-reset-sync';
+    const config = {
+      zoom: { syncKey, x: true, y: false, enabled: true },
+      axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
+      series: [{ label: 'v', dataIndex: 1 }],
+    };
+    const chartA = new ChartCore(
+      document.createElement('div'),
+      config,
+      [f([0, 50, 100]), f([10, 20, 15])],
+    );
+    const chartB = new ChartCore(
+      document.createElement('div'),
+      config,
+      [f([0, 50, 100]), f([1_000, 2_000, 1_500])],
+    );
+    const originalY = { min: chartB.getAxis('y')!.min, max: chartB.getAxis('y')!.max };
+
+    chartA.resetZoom();
+    expect(chartB.getAxis('y')).toMatchObject(originalY);
+
+    chartA.scrollToLatest();
+    expect(chartB.getAxis('y')).toMatchObject(originalY);
+
+    chartA.destroy();
+    chartB.destroy();
+  });
+
   it('ignores mutating public calls after destroy()', () => {
     const chart = new ChartCore(
       document.createElement('div'),
@@ -1557,6 +1632,30 @@ describe('ChartCore live-follow viewport', () => {
     chart.destroy();
   });
 
+  it('uses a CSS-pixel-scaled interaction budget for touch gestures', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        series: [{ label: 'points', type: 'scatter', xDataIndex: 0, yDataIndex: 1 }],
+      },
+      [f([0, 1]), f([1, 2])],
+    );
+    const internal = chart as unknown as {
+      lastPointerType: string;
+      layout: { plot: { width: number } };
+      interactionSamplingBudget: () => number | null;
+    };
+
+    internal.layout.plot.width = 320;
+    internal.lastPointerType = 'touch';
+    expect(internal.interactionSamplingBudget()).toBe(480);
+
+    internal.lastPointerType = 'mouse';
+    expect(internal.interactionSamplingBudget()).toBe(10_000);
+    chart.destroy();
+  });
+
   it('brush mode creates a persistent data-anchored selection without zooming', () => {
     const changes: (unknown)[] = [];
     const xs = new Float64Array(101);
@@ -1644,6 +1743,42 @@ describe('ChartCore live-follow viewport', () => {
     expect(chart.getSelection()).toBeNull();
 
     expect(changes).toEqual([{ x: { min: 10, max: 30 } }, null]);
+    chart.destroy();
+  });
+
+  it('clears a brush that no longer overlaps replaced data by default', () => {
+    const onBrush = vi.fn();
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        series: [{ label: 'v', dataIndex: 1 }],
+        selection: { mode: 'brush', onBrush },
+      },
+      [f([0, 1, 2]), f([1, 2, 3])],
+    );
+    chart.setSelection({ x: { min: 0.5, max: 1.5 } });
+    chart.setData([f([10, 11, 12]), f([4, 5, 6])]);
+
+    expect(chart.getSelection()).toBeNull();
+    expect(onBrush).toHaveBeenLastCalledWith(null);
+    chart.destroy();
+  });
+
+  it('can clamp a brush to the extent of replaced data', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        series: [{ label: 'v', dataIndex: 1 }],
+        selection: { mode: 'brush', dataChange: 'clamp' },
+      },
+      [f([0, 5, 10]), f([1, 2, 3])],
+    );
+    chart.setSelection({ x: { min: 2, max: 8 } });
+    chart.setData([f([6, 8, 10]), f([4, 5, 6])]);
+
+    expect(chart.getSelection()).toEqual({ x: { min: 6, max: 8 } });
     chart.destroy();
   });
 

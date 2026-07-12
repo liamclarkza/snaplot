@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderScatter, ScatterSeriesCache } from './ScatterRenderer';
+import { renderScatter, renderScatterSegments, ScatterSeriesCache } from './ScatterRenderer';
+import type { ScatterStyleResolver } from './scatterEncoding';
 import type { Layout, Scale, SeriesConfig } from '../types';
 
 let createImageDataCalls = 0;
@@ -43,6 +44,10 @@ function createContext() {
     drawImage: vi.fn(),
     scale: vi.fn(),
     arc: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    rect: vi.fn(),
+    closePath: vi.fn(),
     fill: vi.fn(),
     putImageData: vi.fn(),
     createImageData: vi.fn((w: number, h: number) => {
@@ -165,5 +170,68 @@ describe('renderScatter cache keys', () => {
     const secondStamp = vi.mocked(ctx.drawImage).mock.calls[1][0];
 
     expect(secondStamp).not.toBe(firstStamp);
+  });
+
+  it('batches fixed-radius variable colours during viewport gestures', () => {
+    const ctx = createContext();
+    const xData = Float64Array.from([1, 2, 3, 4]);
+    const yData = Float64Array.from([1, 2, 3, 4]);
+    const scale = createScale(0, 5, 0, 20);
+    const resolver: ScatterStyleResolver = {
+      variableColor: true,
+      variableRadius: false,
+      maxRadius: 3,
+      colorBinAt: index => index % 2,
+      colorForBin: bin => bin === 0 ? '#f00' : '#00f',
+      colorAt: index => index % 2 === 0 ? '#f00' : '#00f',
+      radiusAt: () => 3,
+    };
+
+    renderScatterSegments(
+      ctx,
+      [{ xData, yData, startIdx: 0, endIdx: 3 }],
+      scale,
+      scale,
+      createLayout(),
+      { label: 'variable', type: 'scatter', yDataIndex: 1, opacity: 0.5 },
+      '#f00',
+      1,
+      { categorical: [] },
+      undefined,
+      resolver,
+      1,
+      true,
+    );
+
+    expect(ctx.drawImage).not.toHaveBeenCalled();
+    expect(ctx.fill).toHaveBeenCalledTimes(2);
+    expect(ctx.arc).toHaveBeenCalledTimes(4);
+  });
+
+  it('batches a fixed-radius constant colour into one fill during viewport gestures', () => {
+    const ctx = createContext();
+    const xData = Float64Array.from([1, 2, 3, 4]);
+    const yData = Float64Array.from([1, 2, 3, 4]);
+    const scale = createScale(0, 5, 0, 20);
+
+    renderScatterSegments(
+      ctx,
+      [{ xData, yData, startIdx: 0, endIdx: 3 }],
+      scale,
+      scale,
+      createLayout(),
+      { label: 'constant', type: 'scatter', yDataIndex: 1, opacity: 0.5 },
+      '#f00',
+      1,
+      { categorical: [] },
+      undefined,
+      undefined,
+      1,
+      true,
+    );
+
+    expect(ctx.drawImage).not.toHaveBeenCalled();
+    expect(ctx.fill).toHaveBeenCalledTimes(1);
+    expect(ctx.arc).toHaveBeenCalledTimes(4);
   });
 });

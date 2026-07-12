@@ -370,6 +370,16 @@ export interface AxisGridConfig {
   dash?: number[];
 }
 
+/** Styling for the short marks that anchor tick labels to exact scale positions. */
+export interface AxisTickMarksConfig {
+  /** Mark length in CSS pixels. Default: `4`. */
+  length?: number;
+  /** Which side of the plot border the mark extends toward. Default: `'out'`. */
+  direction?: 'out' | 'in' | 'both';
+  /** Mark color. Default: `theme.tickColor`. */
+  color?: string;
+}
+
 /** Configuration for an axis entry in ChartConfig.axes */
 export interface AxisConfig {
   /** Scale kind for this axis. Default: `'linear'`. */
@@ -437,6 +447,11 @@ export interface AxisConfig {
    * theme's grid color.
    */
   grid?: boolean | AxisGridConfig;
+  /**
+   * Short marks connecting visible tick labels to their exact axis positions.
+   * Uses the same final, thinned tick set as labels. Default: `true`.
+   */
+  tickMarks?: boolean | AxisTickMarksConfig;
 }
 
 // ============================================================
@@ -599,6 +614,14 @@ export interface SelectionConfig {
    */
   mode?: 'zoom' | 'brush';
   /**
+   * How a persistent brush reacts when data is replaced or a rolling stream
+   * evicts its range. Default: `'clear-if-outside'`, which preserves useful
+   * selections but clears stale state with no overlap. `'clamp'` intersects
+   * the selection with the new X extent; `'clear'` always resets it;
+   * `'preserve'` retains the previous behavior.
+   */
+  dataChange?: 'clear-if-outside' | 'clamp' | 'clear' | 'preserve';
+  /**
    * Callback fired whenever the persistent brush selection changes (create,
    * move, resize, programmatic set, or clear). `null` means the selection
    * was cleared. Mirrors the `selection:change` event.
@@ -662,6 +685,12 @@ export interface TooltipConfig {
    */
   xFormat?: (x: number) => string;
   /**
+   * Format a histogram interval. When omitted, each edge uses `xFormat` or
+   * the X axis tick formatter, so tooltip ranges use the same units and
+   * precision as the axis. Populates `TooltipPoint.formattedX`.
+   */
+  rangeFormat?: (min: number, max: number, seriesIndex: number) => string;
+  /**
    * Format each Y value shown in the default tooltip, e.g. to append
    * units. Receives the series index for mixed-unit charts. Defaults to
    * the Y axis's tick formatting. Populates `TooltipPoint.formattedY`.
@@ -710,6 +739,8 @@ export interface TooltipPoint {
   label: string;
   /** Raw data-space X value. */
   x: number;
+  /** Raw X interval represented by the mark; present for histogram bins. */
+  xRange?: ScaleRange;
   /** Raw data-space Y value. */
   y: number;
   /** Resolved mark color for the swatch. */
@@ -732,6 +763,20 @@ export interface TooltipFieldValue {
   value: number;
   /** Value run through the field's `format`. */
   formatted: string;
+}
+
+/** Resolved, renderer-independent description of one series legend entry. */
+export interface LegendItem<TMeta = unknown> {
+  seriesIndex: number;
+  label: string;
+  type: ChartType;
+  visible: boolean;
+  color: string;
+  fill: string | null;
+  lineWidth: number;
+  lineDash: number[];
+  opacity: number;
+  meta?: TMeta;
 }
 
 // ============================================================
@@ -865,7 +910,9 @@ export interface PerformanceConfig {
    * stride-sampled for the duration of the gesture and a full-fidelity
    * repaint follows as soon as the viewport settles. Keeps pan and zoom
    * responsive on large point clouds without giving up crisp rendering
-   * at rest. `false` disables sampling. Default: 10000.
+   * at rest. `false` disables sampling. Explicit numeric values are exact.
+   * The automatic default is 10000 for mouse/keyboard interaction and an
+   * adaptive `max(400, 1.5 × plot CSS width)` for touch/pen gestures.
    *
    * Density (heatmap) scatter ignores the budget, its cost is already
    * bounded by pixels, not points. Hit-testing and tooltips always use
@@ -1034,7 +1081,11 @@ export type DeepPartial<T> = {
  * container and omit `theme` entirely.
  */
 export interface ThemeConfig {
-  /** Plot background fill. The grid canvas is opaque, so this must be a solid color. */
+  /**
+   * Plot background fill. The grid canvas is opaque, so this must resolve to
+   * a solid color. Theme overrides may use the special value `'container'`
+   * to copy the nearest non-transparent ancestor background color.
+   */
   backgroundColor: string;
   /** Axis label / tick text color. Themes keep this off pure black/white for contrast comfort. */
   textColor: string;
@@ -1201,6 +1252,13 @@ export interface ChartInstance {
   getTheme(): ThemeConfig;
 
   /**
+   * Resolved series legend model for application-owned headers, sidebars, or
+   * custom renderers. Colors follow the active theme and mark fields retain
+   * enough geometry to distinguish lines, areas, bands, bars, and points.
+   */
+  getLegendItems(): LegendItem[];
+
+  /**
    * Re-resolve the theme against the container's current CSS cascade and
    * repaint if anything changed. Charts already call this automatically
    * when an attribute changes on `<html>`/`<body>` (the `[data-theme]`
@@ -1330,6 +1388,8 @@ export interface ChartEventMap {
   'data:update': (data: ColumnarData) => void;
   /** Config changed via `setOptions`/`replaceOptions`, with the resolved config. */
   'options:update': (config: ChartConfig) => void;
+  /** The resolved theme changed through config, CSS variables, or color scheme. */
+  'theme:update': (theme: ThemeConfig) => void;
   /**
    * Live-follow state toggled: `true` when the X viewport resumed tracking
    * new data, `false` when a pan/zoom paused it. Drive a live/paused badge

@@ -598,6 +598,18 @@ export const LABEL_MIN_GAP = 12;
  */
 export const EDGE_MARGIN = 8;
 
+/** Default length of the short marks that connect tick labels to axis positions. */
+export const AXIS_TICK_LENGTH = 4;
+
+/** Clear space between the end of a tick mark and its label. */
+export const AXIS_LABEL_GAP = 4;
+
+/** Clear space between the tick-label strip and an axis title. */
+export const AXIS_TITLE_GAP = 8;
+
+/** Minimum clear space between labels belonging to perpendicular axes. */
+export const AXIS_CORNER_GAP = 4;
+
 /** Default tick count target */
 export const DEFAULT_TICK_COUNT = 6;
 
@@ -624,6 +636,9 @@ export const TAP_TIMEOUT = 300;
 
 /** Default scatter point budget while the viewport is changing */
 export const DEFAULT_INTERACTION_SAMPLING = 10_000;
+/** Touch gesture budget scales with CSS width; settled rendering stays full fidelity. */
+export const TOUCH_INTERACTION_POINTS_PER_PIXEL = 1.5;
+export const MIN_TOUCH_INTERACTION_SAMPLING = 400;
 
 /** Quiet period (ms) after the last viewport change before the crisp repaint */
 export const INTERACTION_REFINE_MS = 150;

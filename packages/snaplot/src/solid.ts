@@ -7,6 +7,7 @@ export { createChart } from './solid/createChart';
 export { createCursorSnapshot } from './solid/createCursorSnapshot';
 export { createHighlight, createHighlightKey } from './solid/createHighlight';
 export { createChartGroup } from './solid/createChartGroup';
+export { createReferenceRegions } from './solid/createReferenceRegions';
 export type {
   ChartGroup,
   ChartGroupBindings,
@@ -22,6 +23,9 @@ export type {
   LegendTableFallback,
 } from './solid/LegendTable';
 
+export { SeriesLegend } from './solid/SeriesLegend';
+export type { SeriesLegendProps } from './solid/SeriesLegend';
+
 export type {
   ChartInstance,
   ChartConfig,
@@ -29,4 +33,5 @@ export type {
   CursorSnapshot,
   CursorSnapshotOptions,
   HighlightSyncKey,
+  LegendItem,
 } from './core';

@@ -10,6 +10,60 @@ import { prefersReducedMotion } from '../utils/motion';
  * renderer only; a caller's `render` override is free to show every row.
  */
 const MAX_TOOLTIP_ROWS = 12;
+const TOOLTIP_VIEWPORT_MARGIN = 8;
+
+interface TooltipPositionInput {
+  clientX: number;
+  clientY: number;
+  width: number;
+  height: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  offset: number;
+  pointerType?: 'mouse' | 'touch' | 'pen';
+}
+
+/** Pure placement helper kept exported for deterministic edge-collision tests. */
+export function computeTooltipPosition(input: TooltipPositionInput): { left: number; top: number } {
+  const {
+    clientX, clientY, width, height, viewportWidth, viewportHeight, offset, pointerType,
+  } = input;
+  const margin = TOOLTIP_VIEWPORT_MARGIN;
+  const maxLeft = Math.max(margin, viewportWidth - width - margin);
+  const maxTop = Math.max(margin, viewportHeight - height - margin);
+  const clampLeft = (value: number) => Math.max(margin, Math.min(maxLeft, value));
+  const clampTop = (value: number) => Math.max(margin, Math.min(maxTop, value));
+
+  if (pointerType === 'touch' || pointerType === 'pen') {
+    const clearance = Math.max(offset, 72);
+    const above = clientY - height - clearance;
+    const below = clientY + clearance;
+    const top = above >= margin || below + height > viewportHeight - margin ? above : below;
+    return { left: clampLeft(clientX - width / 2), top: clampTop(top) };
+  }
+
+  const right = clientX + offset;
+  const left = right + width <= viewportWidth - margin
+    ? right
+    : clientX - offset - width;
+  const below = clientY + offset;
+  const top = below + height <= viewportHeight - margin
+    ? below
+    : clientY - offset - height;
+  return { left: clampLeft(left), top: clampTop(top) };
+}
+
+/** Structural width key: changing numeric values of the same width is layout-stable. */
+export function tooltipMeasurementKey(points: TooltipPoint[]): string {
+  const widths = (value: string) => value.length;
+  return points.map(point => [
+    point.xRange ? 'range' : 'point',
+    widths(point.label),
+    widths(point.formattedX),
+    widths(point.formattedY),
+    ...(point.fields ?? []).flatMap(field => [widths(field.label), widths(field.formatted)]),
+  ].join(':')).join('|');
+}
 
 /** Escape the five characters that matter for HTML attribute + text contexts. */
 function escapeHtml(raw: string): string {
@@ -35,6 +89,7 @@ export class TooltipManager {
   private lastHtml: string | null = null;
   private lastWidth = 0;
   private lastHeight = 0;
+  private lastMeasurementKey: string | null = null;
 
   constructor(theme: ThemeConfig) {
     this.el = document.createElement('div');
@@ -44,6 +99,8 @@ export class TooltipManager {
     const transition = prefersReducedMotion() ? 'none' : 'opacity 0.1s ease';
     this.el.style.cssText = `
       position: fixed;
+      left: 0;
+      top: 0;
       z-index: 10000;
       pointer-events: none;
       opacity: 0;
@@ -55,6 +112,8 @@ export class TooltipManager {
       line-height: 1.45;
       max-width: 280px;
       white-space: nowrap;
+      contain: layout style paint;
+      will-change: transform;
     `;
     this.applyTheme(theme);
     document.body.appendChild(this.el);
@@ -65,6 +124,9 @@ export class TooltipManager {
     this.el.style.color = theme.tooltipTextColor;
     this.el.style.border = `1px solid ${theme.tooltipBorderColor}`;
     this.el.style.fontFamily = theme.fontFamily;
+    this.lastWidth = 0;
+    this.lastHeight = 0;
+    this.lastMeasurementKey = null;
     // Elevation is a two-layer shadow (ambient + contact) whose strength is
     // derived from the background darkness: a dark surface needs a deeper cast
     // to separate from a dark page, a light surface only a soft lift.
@@ -102,6 +164,7 @@ export class TooltipManager {
     // and re-assigning innerHTML would re-parse the subtree and invalidate
     // the cached measurement below.
     let contentChanged = true;
+    let measurementKey: string | null = null;
     if (config?.render) {
       const content = config.render(points);
       if (typeof content === 'string') {
@@ -117,6 +180,7 @@ export class TooltipManager {
         this.lastHtml = null;
       }
     } else {
+      measurementKey = tooltipMeasurementKey(points);
       const html = this.defaultRender(points);
       if (html === this.lastHtml) {
         contentChanged = false;
@@ -130,26 +194,31 @@ export class TooltipManager {
     this.visible = true;
 
     const offset = config?.offset ?? TOOLTIP_OFFSET;
-    if (pointerType === 'touch' || pointerType === 'pen') {
-      const margin = 8;
-      const touchClearance = Math.max(offset, 72);
-      // Reading offset* forces layout; reuse the last measurement when the
-      // content (and therefore the box size) has not changed.
-      if (contentChanged) {
-        this.lastWidth = this.el.offsetWidth;
-        this.lastHeight = this.el.offsetHeight;
-      }
-      const width = this.lastWidth;
-      const height = this.lastHeight;
-      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || width + margin * 2;
-      const left = Math.max(margin, Math.min(viewportWidth - width - margin, clientX - width / 2));
-      const top = Math.max(margin, clientY - height - touchClearance);
-      this.el.style.left = left + 'px';
-      this.el.style.top = top + 'px';
-    } else {
-      this.el.style.left = (clientX + offset) + 'px';
-      this.el.style.top = (clientY + offset) + 'px';
+    // Reading offset* forces layout; reuse the last measurement when the
+    // content (and therefore the box size) has not changed.
+    const geometryChanged = measurementKey === null || measurementKey !== this.lastMeasurementKey;
+    if (
+      this.lastWidth === 0 ||
+      this.lastHeight === 0 ||
+      (contentChanged && geometryChanged)
+    ) {
+      this.lastWidth = this.el.offsetWidth;
+      this.lastHeight = this.el.offsetHeight;
+      this.lastMeasurementKey = measurementKey;
     }
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || this.lastWidth + TOOLTIP_VIEWPORT_MARGIN * 2;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || this.lastHeight + TOOLTIP_VIEWPORT_MARGIN * 2;
+    const position = computeTooltipPosition({
+      clientX,
+      clientY,
+      width: this.lastWidth,
+      height: this.lastHeight,
+      viewportWidth,
+      viewportHeight,
+      offset,
+      pointerType,
+    });
+    this.el.style.transform = `translate3d(${position.left}px, ${position.top}px, 0)`;
   }
 
   hide(): void {
@@ -173,6 +242,16 @@ export class TooltipManager {
   private defaultRender(points: TooltipPoint[]): string {
     const dot = (color: string) =>
       `<span style="display:inline-block;flex-shrink:0;width:8px;height:8px;border-radius:50%;background:${escapeHtml(color)};margin-right:6px;vertical-align:middle"></span>`;
+
+    // A histogram point represents an interval, not an arbitrary coordinate.
+    if (points.length === 1 && points[0].xRange) {
+      const p = points[0];
+      return `<div style="display:flex;align-items:center;margin-bottom:5px">${dot(p.color)}<span style="font-weight:600">${escapeHtml(p.label)}</span></div>
+        <div style="display:grid;grid-template-columns:auto auto;gap:2px 12px;font-variant-numeric:tabular-nums">
+          <span style="opacity:0.7">Range</span><span style="font-weight:600;text-align:right">${escapeHtml(p.formattedX)}</span>
+          <span style="opacity:0.7">Count</span><span style="font-weight:600;text-align:right">${escapeHtml(p.formattedY)}</span>
+        </div>`;
+    }
 
     // Single point (nearest mode, e.g. scatter): show x, y as coordinate pair
     if (points.length === 1) {

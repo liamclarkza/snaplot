@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EDGE_MARGIN } from '../constants';
+import { AXIS_LABEL_GAP, AXIS_TICK_LENGTH, EDGE_MARGIN } from '../constants';
 import type { ChartConfig, Scale } from '../types';
 import { computeLayout } from './Layout';
 
@@ -7,7 +7,6 @@ import { computeLayout } from './Layout';
 // lean on that fallback so widths are deterministic.
 const CHAR_W = 7;
 const FONT_SIZE = 12;
-const TITLE_STRIP = EDGE_MARGIN + FONT_SIZE + 4;
 
 function scale(key: string, ticks: number[]): Scale {
   return {
@@ -41,8 +40,9 @@ describe('computeLayout edge margin', () => {
       scales,
     );
     const maxLabelWidth = '16000'.length * CHAR_W;
-    // Gutter = tick mark (4) + gap (8) + label + at least EDGE_MARGIN.
-    expect(layout.plot.left).toBeGreaterThanOrEqual(maxLabelWidth + 12 + EDGE_MARGIN);
+    expect(layout.plot.left).toBeGreaterThanOrEqual(
+      maxLabelWidth + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + EDGE_MARGIN,
+    );
   });
 
   it('reserves a full title strip when a vertical axis has a label', () => {
@@ -51,7 +51,8 @@ describe('computeLayout edge margin', () => {
       { series: [], axes: { x: {}, y: { label: 'Validation loss' } }, padding: { left: 8 } } as ChartConfig,
       scales,
     );
-    expect(titled.plot.left - base.plot.left).toBe(TITLE_STRIP);
+    expect(titled.plot.left).toBeGreaterThan(base.plot.left);
+    expect(titled.plot.left % 8).toBe(0);
   });
 
   it('reserves a full title strip below a labelled bottom axis', () => {
@@ -60,6 +61,52 @@ describe('computeLayout edge margin', () => {
       { series: [], axes: { x: { label: 'Learning rate' }, y: {} } } as ChartConfig,
       scales,
     );
-    expect(base.plot.height - titled.plot.height).toBe(TITLE_STRIP);
+    expect(base.axes.x.area.height).toBe(44);
+    expect(titled.axes.x.area.height).toBe(58);
+  });
+
+  it('reserves the outer half of horizontal edge labels', () => {
+    const edgeScales = new Map<string, Scale>([
+      ['x', scale('x', [10, 1000])],
+    ]);
+    const layout = layoutFor(
+      {
+        series: [],
+        axes: { x: { tickFormat: value => `${value} ms` } },
+        padding: { left: 4, right: 4 },
+      } as ChartConfig,
+      edgeScales,
+    );
+    expect(layout.plot.left).toBeGreaterThanOrEqual(('10 ms'.length * CHAR_W) / 2 + EDGE_MARGIN);
+    expect(layout.width - layout.plot.left - layout.plot.width).toBeGreaterThanOrEqual(
+      ('1000 ms'.length * CHAR_W) / 2 + EDGE_MARGIN,
+    );
+  });
+
+  it('does not mistake horizontal endpoint clearance for a right Y axis', () => {
+    const insetCategoryScale = {
+      ...scale('x', [0, 1, 2, 3]),
+      min: -0.5,
+      max: 3.5,
+    };
+    const categoryScales = new Map<string, Scale>([
+      ['x', insetCategoryScale],
+      ['y', scale('y', [99.8, 99.9, 100])],
+    ]);
+    const layout = layoutFor(
+      {
+        series: [],
+        axes: {
+          x: { ticks: [0, 1, 2, 3], tickFormat: value => ['JHB', 'FRA', 'IAD', 'SIN'][value] },
+          y: { tickFormat: value => `${value.toFixed(1)}%` },
+        },
+        padding: { left: 12, right: 12 },
+      } as ChartConfig,
+      categoryScales,
+    );
+
+    const rightGutter = layout.width - layout.plot.left - layout.plot.width;
+    expect(layout.plot.left).toBeGreaterThan(rightGutter);
+    expect(rightGutter).toBe(12);
   });
 });

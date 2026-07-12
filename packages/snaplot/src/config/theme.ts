@@ -22,7 +22,7 @@ import {
   PALETTE_DIVERGING_DARK,
 } from '../constants';
 import { deepMerge } from './merge';
-import { isDarkColor, parseColor } from '../utils/color';
+import { isDarkColor, parseColor, withAlpha } from '../utils/color';
 
 export {
   DEFAULT_THEME as lightTheme,
@@ -64,6 +64,96 @@ export const CHART_CSS_VARS: Partial<Record<keyof ThemeConfig, string>> = {
   tooltipTextColor: '--chart-tooltip-text',
   tooltipBorderColor: '--chart-tooltip-border',
 };
+
+/** Semantic product tokens for the common “make the chart match my app” path. */
+export interface ThemeTokens {
+  /** Optional named/full theme to extend before semantic tokens are applied. */
+  base?: Partial<ThemeConfig>;
+  /** Plot surface color, or `'container'` to copy the nearest opaque ancestor. */
+  surface?: string;
+  /** Primary chart text color. */
+  text?: string;
+  /** Shared quiet color for ticks, gridlines, axes, and the plot frame. */
+  muted?: string;
+  /** Interaction accent, currently used by the crosshair. */
+  accent?: string;
+  /** Categorical series cycle. Also populates the legacy `palette` role. */
+  categorical?: string[];
+  /** Ordered magnitude ramp. */
+  sequential?: string[];
+  /** Signed/centered-data ramp. */
+  diverging?: string[];
+  /** Density/heatmap ramp; defaults through the normal role cascade. */
+  heatmap?: string[];
+  fontFamily?: string;
+  fontSize?: number;
+  gridOpacity?: number;
+  borderOpacity?: number;
+  tooltip?: {
+    surface?: string;
+    text?: string;
+    border?: string;
+  };
+}
+
+/**
+ * Build a theme override from a small set of product-level tokens.
+ *
+ * This intentionally returns a partial theme: roles not supplied continue
+ * through the normal CSS-variable and light/dark default resolution path.
+ */
+export function createTheme(tokens: ThemeTokens): Partial<ThemeConfig> {
+  const theme: Partial<ThemeConfig> = { ...(tokens.base ?? {}) };
+  if (tokens.surface !== undefined) theme.backgroundColor = tokens.surface;
+  if (tokens.text !== undefined) theme.textColor = tokens.text;
+  if (tokens.muted !== undefined) {
+    theme.tickColor = tokens.muted;
+    theme.gridColor = tokens.muted;
+    theme.axisLineColor = tokens.muted;
+    theme.borderColor = tokens.muted;
+  }
+  if (tokens.accent !== undefined) theme.crosshairColor = tokens.accent;
+  if (tokens.categorical !== undefined) {
+    theme.palette = [...tokens.categorical];
+    theme.categoricalPalette = [...tokens.categorical];
+  }
+  if (tokens.sequential !== undefined) theme.sequentialPalette = [...tokens.sequential];
+  if (tokens.diverging !== undefined) theme.divergingPalette = [...tokens.diverging];
+  if (tokens.heatmap !== undefined) theme.heatmapGradient = [...tokens.heatmap];
+  if (tokens.fontFamily !== undefined) theme.fontFamily = tokens.fontFamily;
+  if (tokens.fontSize !== undefined) theme.fontSize = tokens.fontSize;
+  if (tokens.gridOpacity !== undefined) theme.gridOpacity = tokens.gridOpacity;
+  if (tokens.borderOpacity !== undefined) theme.borderOpacity = tokens.borderOpacity;
+  if (tokens.tooltip?.surface !== undefined) theme.tooltipBackground = tokens.tooltip.surface;
+  if (tokens.tooltip?.text !== undefined) theme.tooltipTextColor = tokens.tooltip.text;
+  if (tokens.tooltip?.border !== undefined) theme.tooltipBorderColor = tokens.tooltip.border;
+  return theme;
+}
+
+/** CSS variables consumed by Snaplot's DOM companion components. */
+export const SNAPLOT_THEME_CSS_VARS = {
+  text: '--snaplot-theme-text',
+  muted: '--snaplot-theme-muted',
+  border: '--snaplot-theme-border',
+  hover: '--snaplot-theme-hover',
+  highlight: '--snaplot-theme-highlight',
+  fontFamily: '--snaplot-theme-font-family',
+} as const;
+
+/** Apply a resolved canvas theme to a DOM companion's inheritable tokens. */
+export function applyThemeToElement(element: HTMLElement, theme: ThemeConfig): void {
+  const style = element.style as CSSStyleDeclaration & Record<string, string>;
+  const set = (name: string, value: string) => {
+    if (typeof style.setProperty === 'function') style.setProperty(name, value);
+    else style[name] = value;
+  };
+  set(SNAPLOT_THEME_CSS_VARS.text, theme.textColor);
+  set(SNAPLOT_THEME_CSS_VARS.muted, theme.tickColor);
+  set(SNAPLOT_THEME_CSS_VARS.border, withAlpha(theme.borderColor, theme.borderOpacity));
+  set(SNAPLOT_THEME_CSS_VARS.hover, withAlpha(theme.textColor, 0.08));
+  set(SNAPLOT_THEME_CSS_VARS.highlight, withAlpha(theme.textColor, 0.14));
+  set(SNAPLOT_THEME_CSS_VARS.fontFamily, theme.fontFamily);
+}
 
 /** Theme fields that hold a single CSS color and participate in resolution. */
 const COLOR_FIELDS: (keyof ThemeConfig)[] = [
@@ -296,6 +386,10 @@ export function resolveTheme(
     (userTheme ?? {}) as unknown as Record<string, unknown>,
   ) as unknown as ThemeConfig;
 
+  if (merged.backgroundColor === 'container') {
+    merged.backgroundColor = findContainerSurface(container, baseTheme.backgroundColor);
+  }
+
   const { resolve, dispose } = createCssColorResolver(container);
   try {
     // Scalars resolve before normalization so the light/dark detection that
@@ -310,4 +404,31 @@ export function resolveTheme(
   } finally {
     dispose();
   }
+}
+
+function findContainerSurface(container: HTMLElement, fallback: string): string {
+  if (typeof getComputedStyle === 'undefined') return fallback;
+  let current: HTMLElement | null = container;
+  while (current) {
+    const color = getComputedStyle(current).backgroundColor?.trim();
+    if (color && isOpaqueColor(color)) return color;
+    current = current.parentElement;
+  }
+  return fallback;
+}
+
+function isOpaqueColor(color: string): boolean {
+  const normalized = color.trim().toLowerCase();
+  if (!normalized || normalized === 'transparent') return false;
+  const rgba = normalized.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\s*\)$/);
+  if (rgba) return Number(rgba[1]) >= 1;
+  const slashAlpha = normalized.match(/\/\s*([\d.]+%?)\s*\)$/);
+  if (slashAlpha) {
+    const raw = slashAlpha[1];
+    const alpha = raw.endsWith('%') ? Number(raw.slice(0, -1)) / 100 : Number(raw);
+    return alpha >= 1;
+  }
+  if (/^#[\da-f]{4}$/i.test(normalized)) return normalized[4] === 'f';
+  if (/^#[\da-f]{8}$/i.test(normalized)) return normalized.slice(7, 9) === 'ff';
+  return true;
 }

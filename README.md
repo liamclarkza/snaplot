@@ -64,17 +64,22 @@ Drag-to-zoom, wheel and pinch zoom at the cursor, pan on shift-drag, opt-in axis
 
 A table that shows the value of every visible series at the cursor position. Available as a DOM plugin (`createLegendTablePlugin`) or a SolidJS component (`LegendTable`) with typed column helpers (`nameColumn`, `valueColumn`, `metricColumn`, `swatchColumn`).
 
+For compact card headers, Solid also exports `<SeriesLegend chart={chart} />`.
+It inherits the resolved chart theme, toggles/highlights series accessibly, and
+uses geometry-aware marks. Framework-free renderers can consume the same
+resolved model through `chart.getLegendItems()`.
+
 ### Cross-chart sync
 
 `createChartGroup()` keeps cursor and highlight state in sync across any number of charts. External controls can drive the highlight too, for UIs like sidebars or experiment lists. Index-based highlight sync is safe only when peer charts share identical series order; for experiment dashboards with subsets or reordered runs, configure `highlight.getKey` and drive focus with `chart.setHighlightKey()` or `group.highlightKey()`.
 
 ### Themes
 
-Built-in themes include `lightTheme`, `darkTheme`, `studioTheme`, `tokyoTheme`, `oceanTheme`, `forestTheme`, `violetTheme`, `fogTheme`, `ivoryTheme`, `mintTheme`, `sunsetTheme`, `midnightTheme`, `marsTheme`, and `refinedDarkTheme`. Themes support role-aware palettes: `palette` remains the fallback series cycle, `categoricalPalette` drives unordered series, and `sequentialPalette`/`heatmapGradient` drive density heatmaps. CSS variable overrides and full custom `ThemeConfig` objects are supported.
+Built-in themes include `lightTheme`, `darkTheme`, `studioTheme`, `tokyoTheme`, `oceanTheme`, `forestTheme`, `violetTheme`, `fogTheme`, `ivoryTheme`, `mintTheme`, `sunsetTheme`, `midnightTheme`, `marsTheme`, and `refinedDarkTheme`. Themes support role-aware palettes: `palette` remains the fallback series cycle, `categoricalPalette` drives unordered series, and `sequentialPalette`/`heatmapGradient` drive density heatmaps. CSS variable overrides and full custom `ThemeConfig` objects are supported. `createTheme({ base, surface, text, muted, accent, categorical })` expands semantic application tokens into the detailed canvas roles, while `backgroundColor: 'container'` copies the nearest opaque container surface into the canvas without relying on unsupported alpha compositing.
 
 ### Plugins
 
-Simple lifecycle hooks: `install`, `destroy`, `before`/`after` each canvas layer, `onCursorMove`, `onZoom`, `onClick`, `onSetData`, `onSetOptions`. The built-in legend, legend-table, and reference-line plugins use the same surface, and custom plugins can register at construction or via `chart.use(plugin)`.
+Simple lifecycle hooks: `install`, `destroy`, `before`/`after` each canvas layer, `onCursorMove`, `onZoom`, `onClick`, `onSetData`, `onSetOptions`. The built-in legend, legend-table, reference-line, and reference-region plugins use the same surface, and custom plugins can register at construction or via `chart.use(plugin)`.
 
 ### TypeScript
 

@@ -1,0 +1,108 @@
+/* Homepage presentation shares the demos hub's visual rhythm while retaining
+   the live chart and concise getting-started flow. */
+.home-page {
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.home-hero {
+  position: relative;
+  max-width: none !important;
+  min-height: 560px;
+  padding: clamp(92px, 11vw, 140px) 24px 88px !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 50% 12%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 36%),
+    linear-gradient(color-mix(in srgb, var(--border) 25%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 25%, transparent) 1px, transparent 1px);
+  background-size: auto, 64px 64px, 64px 64px;
+}
+
+.home-hero::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 140px;
+  background: linear-gradient(transparent, var(--bg));
+  pointer-events: none;
+}
+
+.home-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.home-hero h1 {
+  font-size: clamp(42px, 6vw, 78px) !important;
+  line-height: 1 !important;
+  letter-spacing: -.055em !important;
+}
+
+.home-chart-showcase,
+.home-stats,
+.home-code,
+.home-cta {
+  width: min(1280px, calc(100% - 48px));
+  max-width: none !important;
+  padding-inline: 0 !important;
+}
+
+.home-chart-showcase {
+  margin-top: -42px !important;
+  position: relative;
+  z-index: 2;
+}
+
+.home-chart-panel {
+  border: 1px solid var(--border);
+  border-radius: 20px !important;
+  box-shadow: var(--elev-2-shadow) !important;
+}
+
+.home-stats > div {
+  overflow: hidden;
+  gap: 0 !important;
+  padding: 0 !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px;
+  background: var(--bg-surface);
+}
+
+.home-stats > div > div {
+  min-height: 126px;
+  padding: 26px 18px;
+  display: grid;
+  align-content: center;
+  border-right: 1px solid var(--border);
+}
+
+.home-stats > div > div:last-child { border-right: 0; }
+
+.home-code > div:first-child { margin-bottom: 32px !important; }
+.home-code h2 { font-size: clamp(28px, 4vw, 46px) !important; letter-spacing: -.04em !important; }
+
+.home-cta {
+  margin-bottom: 80px !important;
+  padding: 44px !important;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 9%, var(--bg-surface)), var(--bg-surface));
+  box-shadow: var(--elev-1-shadow);
+}
+
+@media (max-width: 720px) {
+  .home-hero { min-height: 500px; padding-inline: 18px !important; }
+  .home-chart-showcase,
+  .home-stats,
+  .home-code,
+  .home-cta { width: min(100% - 28px, 620px); }
+  .home-stats > div { grid-template-columns: 1fr 1fr !important; }
+  .home-stats > div > div { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .home-stats > div > div:nth-child(2n) { border-right: 0; }
+  .home-stats > div > div:nth-last-child(-n + 2) { border-bottom: 0; }
+  .home-cta { padding: 28px !important; margin-bottom: 48px !important; }
+}
