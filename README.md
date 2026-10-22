@@ -1,117 +1,143 @@
 # snaplot
 
-A canvas chart library built for streaming data and interactive dashboards.
+A canvas chart library for streaming data and interactive dashboards.
 
 [Documentation](https://liamclarkza.github.io/snaplot/#/docs) · [Live demos](https://liamclarkza.github.io/snaplot/#/demos) · [npm](https://www.npmjs.com/package/snaplot)
 
-snaplot renders line, area, scatter, bar, histogram, and band charts from columnar Float64Arrays. It handles 200,000+ points at 60 fps through a layered canvas pipeline, binary-search viewport culling, and ring-buffer streaming updates. The library never mutates your input arrays.
-
-The root package entry is framework-free. SolidJS components and reactive primitives ship from `snaplot/solid`.
+Render line, area, scatter, bar, histogram and band charts directly from application rows or named `Float64Array` columns. The JavaScript core is framework independent. Native components and state helpers are available through `snaplot/react` (React 19) and `snaplot/solid` (Solid 1.9); neither framework is loaded by the root import.
 
 ## Install
 
-```bash
+```sh
 npm install snaplot
 ```
 
-Solid users also install `solid-js ^1.9.0`; framework-free `ChartCore` users do not need it at runtime.
+Install your framework separately when using its integration. The API below describes this working-tree overhaul; no release is published automatically.
 
 ## Quick start
 
-```tsx
-import { Chart } from 'snaplot/solid';
-import type { ColumnarData } from 'snaplot';
+```ts
+import { createChart } from 'snaplot';
 
-const data: ColumnarData = [
-  new Float64Array(timestamps), // finite X values, sorted ascending
-  new Float64Array(cpu),        // Y series 1
-  new Float64Array(memory),     // Y series 2
+const samples = [
+  { time: new Date('2026-01-01T00:00:00Z'), cpu: 32, memory: 58 },
+  { time: new Date('2026-01-01T00:01:00Z'), cpu: 37, memory: 61 },
 ];
+const chart = createChart(document.getElementById('chart')!, {
+  data: samples,
+  x: 'time',
+  series: [{ y: 'cpu', label: 'CPU' }, { y: 'memory', label: 'Memory' }],
+  axes: { y: { title: 'Utilization (%)', min: 0, max: 100 } },
+  referenceLines: [{ axis: 'y', value: 80, label: 'Warning' }],
+  ariaLabel: 'CPU and memory utilization',
+});
+
+chart.update({ data: [...samples, { time: new Date('2026-01-01T00:02:00Z'), cpu: 40, memory: 60 }] });
+// On removal:
+chart.destroy();
+```
+
+The host needs a nonzero width and height. Fields are type checked, and accessors such as `y: row => row.cpu / 100` work directly. Use an explicit `id` for accessor-based series or multiple series reading the same Y field. `rowId` optionally identifies observations across snapshots; otherwise events identify the original input index within the snapshot.
+
+Numeric X values infer a linear axis, Dates infer time, and strings infer categories. Numeric timestamps require `axes.x.type: 'time'`. Continuous row data is stably sorted on ingestion where ordered rendering needs it, without mutating input rows. Missing, `null`, `undefined` and `NaN` numeric values are gaps. Invalid X values and incompatible fields produce contextual errors.
+
+### React and Solid
+
+Both integrations accept the chart options directly:
+
+```tsx
+import { Chart } from 'snaplot/react'; // or 'snaplot/solid'
 
 <Chart
-  config={{
-    axes: { x: { type: 'time' }, y: { type: 'linear' } },
-    series: [
-      { label: 'CPU',    dataIndex: 1, type: 'line' },
-      { label: 'Memory', dataIndex: 2, type: 'area' },
-    ],
-  }}
-  data={data}
+  data={samples}
+  x="time"
+  series={[{ y: 'cpu', label: 'CPU' }]}
+  axes={{ y: { title: 'CPU (%)' } }}
+  ariaLabel="CPU utilization"
+  style={{ height: '280px' }}
 />
 ```
 
-Column 0 is the default sorted X column. X values must be finite and non-decreasing, and every column must have equal length. Columns 1+ are value columns referenced by `dataIndex`; `NaN` in Y columns creates gaps and non-finite Y values are ignored by range calculations. Scatter series can use explicit `xDataIndex` and `yDataIndex` columns for visual position, but shared cursor/viewport operations still depend on the sorted default X column unless you opt into nearest-point scatter behavior.
+React uses ref-as-prop and `useChartState`, `useCursorSnapshot`, `useHighlight`, and `useChartGroup`. Solid uses callback refs and `createChartState`, `createCursorSnapshot`, `createHighlight`, and `createChartGroup`. Both export `SeriesLegend`, `LegendTable`, and native JSX column helpers. In React, use a state-backed callback ref (`const [chart, setChart] = useState<ChartHandle<Row> | null>(null)`, then `<Chart ref={setChart} ... />` and `<SeriesLegend chart={chart} />`) so companions receive the mounted chart. A plain `useRef` does not trigger a parent render when it is assigned. Imports and server rendering are DOM-safe; chart creation happens after mount.
 
-Full API reference and runnable examples are in the [documentation](https://liamclarkza.github.io/snaplot/#/docs).
+Controlled props are `viewport`, `selectionState`, and `hiddenSeries`, with corresponding `onViewportChange`, `onSelectionChange`, and `onHiddenSeriesChange` callbacks. Their uncontrolled counterparts are `defaultViewport`, `defaultSelection`, and `defaultHiddenSeries`. `selection` configures the selection gesture; `selectionState` is its current range. Controlled interactions propose a change and wait for the owner to supply it.
 
-## Features
+### Independent datasets
 
-### Chart types
+```ts
+createChart(element, {
+  x: 'step',
+  series: [
+    { id: 'baseline', data: baselineRun, y: 'loss' },
+    { id: 'augmented', data: augmentedRun, y: 'loss' },
+  ],
+});
+```
 
-Line (linear, monotone, stepped interpolation), area with gradient fill, scatter with arbitrary X columns, colour/size encodings, box selection, and density rendering, grouped bar, histogram via the included `histogram()` utility (Freedman-Diaconis, Sturges, Scott), and band (fill between upper and lower series).
+Each series inherits chart-level `data` and `x` unless overridden. Sources can differ in length and sampling interval. Snaplot does not join or interpolate observations; cursor readouts retain each source's nearest sample and actual X value. Shared source objects share preparation and storage.
 
-Scatter series can use `xDataIndex`/`yDataIndex` for tabular coordinates, `colorBy` for categorical/continuous/diverging colour encodings, `sizeBy` for radius encodings, `tooltipFields` for extra nearest-point tooltip rows, and `renderMode: 'density'` for aggregate heatmaps.
+### Columns and streaming
 
-### Interactions
+```ts
+const chart = createChart(element, {
+  data: { columns: { time: timestamps, cpu: cpuValues } },
+  x: 'time',
+  series: [{ y: 'cpu' }],
+  axes: { x: { type: 'time' } },
+  streaming: { maxPoints: 10_000, followWindow: 60_000 },
+});
+chart.appendData({ columns: { time: nextTimes, cpu: nextValues } });
+chart.resumeFollow();
+```
 
-Drag-to-zoom, wheel and pinch zoom at the cursor, pan on shift-drag, opt-in axis-gutter controls, double-click reset, proximity tooltips in three modes (`index`, `nearest`, `x`), keyboard pan and zoom, and touch gestures tuned for cursor-first mobile use.
+Named columns are equal-length `Float64Array`s. Ordered marks require finite, non-decreasing X; scatter coordinates may be unordered and retain arrival order. Buffers are reused without row conversion or sorting. Streaming batches for ordered marks must preserve order and are never automatically sorted. `appendData(batch, { seriesId: 'baseline' })` targets an independent source. `{ updateLast: true }` corrects the last observation before appending the remaining batch. Retention uses bounded ring storage. Keep high-frequency appends imperative through the chart ref; framework renders are unnecessary for each sample.
 
-### Streaming
+### Ranges, categories and formatting
 
-`setData` replaces the current window. `appendData` extends it, and `config.streaming.maxLen` enables fixed-window ring-buffer retention. Both update at 60 fps on realistic dashboard datasets.
+Automatic axes use `roundBounds` to extend to regular tick boundaries according to the scale. Set `roundBounds: false` for tight data bounds or specify `min`/`max` for exact configured bounds. `rangePadding` controls data-range padding; chart `padding` controls layout. `setViewport({ x: { min, max } })` selects an exact numeric viewport without rounding; `resetViewport()` restores configured bounds and `resumeFollow()` resumes live navigation.
 
-### Cursor-synced legend table
+Categories retain first-appearance order for the chart lifetime. `axes.x.categories` supplies an authoritative order, including empty slots, and rejects unknown labels. Bars require one observation per category per series. Repeated observations can be scatter points or aggregated by the caller. Category viewports use numeric slot indices.
 
-A table that shows the value of every visible series at the cursor position. Available as a DOM plugin (`createLegendTablePlugin`) or a SolidJS component (`LegendTable`) with typed column helpers (`nameColumn`, `valueColumn`, `metricColumn`, `swatchColumn`).
+`axes.y.format` formats ticks, tooltips and cursor values; time callbacks receive epoch milliseconds and category callbacks receive labels. Series `format` overrides metric values in tooltips and legends; tooltip-specific overrides remain available.
 
-For compact card headers, Solid also exports `<SeriesLegend chart={chart} />`.
-It inherits the resolved chart theme, toggles/highlights series accessibly, and
-uses geometry-aware marks. Framework-free renderers can consume the same
-resolved model through `chart.getLegendItems()`.
+### Advanced marks and annotations
 
-### Cross-chart sync
+Band series use named `y`, `lower`, and `upper` fields. Scatter accepts named `x`, `y`, `colorBy`, `sizeBy`, and `tooltipFields`, including accessors. Histogram series consume `histogram(values)` directly as their `data`; no sentinel counts are required. Histogram binning is always explicit.
 
-`createChartGroup()` keeps cursor and highlight state in sync across any number of charts. External controls can drive the highlight too, for UIs like sidebars or experiment lists. Index-based highlight sync is safe only when peer charts share identical series order; for experiment dashboards with subsets or reordered runs, configure `highlight.getKey` and drive focus with `chart.setHighlightKey()` or `group.highlightKey()`.
+`referenceLines` and `referenceRegions` are declarative options. Their `axis` is the actual axis ID, such as `y2`; series bind with `xAxis` and `yAxis`. Custom plugins remain available through `plugins`, with chart lifecycle, drawing and update hooks. Subscribe to typed interaction events through `chart.on(...)`. Custom tooltip renderers receive the same series IDs and source-row context. Exceptions from custom plugin hooks are reported and isolated; invalid data or options fail before committing.
 
-### Themes
+### Updates and chart groups
 
-Built-in themes include `lightTheme`, `darkTheme`, `studioTheme`, `tokyoTheme`, `oceanTheme`, `forestTheme`, `violetTheme`, `fogTheme`, `ivoryTheme`, `mintTheme`, `sunsetTheme`, `midnightTheme`, `marsTheme`, and `refinedDarkTheme`. Themes support role-aware palettes: `palette` remains the fallback series cycle, `categoricalPalette` drives unordered series, and `sequentialPalette`/`heatmapGradient` drive density heatmaps. CSS variable overrides and full custom `ThemeConfig` objects are supported. `createTheme({ base, surface, text, muted, accent, categorical })` expands semantic application tokens into the detailed canvas roles, while `backgroundColor: 'container'` copies the nearest opaque container surface into the canvas without relying on unsupported alpha compositing.
+`chart.update(patch)` merges nested option objects, replaces arrays and datasets, and resets settings explicitly assigned `undefined`. It prepares and validates the next state before committing. Frameworks reconcile complete prop snapshots, including removed props. Unrelated option changes preserve viewport, visibility, selection and stable series identities.
 
-### Plugins
+`createChartGroup()` is available in plain JavaScript. Pass its result through each chart's `group` option for automatic membership. Cursor and ID-based highlight synchronization default on. Viewport synchronization (`viewport`), shared Y ranges (`yRange`), and plot-edge alignment (`alignPlots`) are opt-in. Destroying a group disconnects its members without destroying their charts.
 
-Simple lifecycle hooks: `install`, `destroy`, `before`/`after` each canvas layer, `onCursorMove`, `onZoom`, `onClick`, `onSetData`, `onSetOptions`. The built-in legend, legend-table, reference-line, and reference-region plugins use the same surface, and custom plugins can register at construction or via `chart.use(plugin)`.
-
-### TypeScript
-
-Strict types throughout, generic column helpers, no `any` in the public API.
+Optional framework-free legend companions are `createLegendPlugin` and `createLegendTablePlugin`. Framework components supply native custom cells. Themes, legend appearance and existing renderer styling remain unchanged by this API overhaul.
 
 ## Non-goals
 
-snaplot stays a small library for streaming data and interactive dashboards. Out of scope, by policy: stacked series, animations and transitions beyond hover and highlight feedback, OHLC/candlestick chart types, ordinal/equi-spaced X distributions, a scale plugin system, and data munging beyond the exported utilities. Plugins and userland code can build these; keeping them out of core is what keeps the core fast and the API stable.
+Stacking, animations, OHLC/candlestick charts, a scale plugin system, automatic aggregation, and timezone behavior are outside this overhaul. Category axes are supported.
 
-## Performance notes
+## Performance and development
 
-- 200K+ point charts render well under one frame on a modern laptop.
-- Grid, data, and overlay are separate canvases. A cursor move repaints the overlay only. A data update skips the grid layer when the scales are unchanged.
-- Viewport culling is a binary search on the X column for sorted series; scatter nearest-hit testing uses a cached screen-space grid for dense clouds and arbitrary X columns.
-- While a pan or zoom gesture is in motion, very large series draw a reduced-fidelity pass (stride-sampled scatter, shape-preserving M4 for lines) and repaint at full fidelity on settle; see `performance.interactionSampling`.
-- snaplot never mutates input arrays. Downsampling helpers (`lttb`, `m4`) are exported as opt-in utilities.
-- Legend table updates use `textContent` swaps in the cursor hot path, not `innerHTML` rebuilds.
-- The `bench/` workspace reproduces all of this under a CPU-throttled mobile profile; see [bench/README.md](bench/README.md) for reference numbers and the CI regression guard.
+Layered canvases separate grids, data and interaction overlays. Sorted series use binary-search culling; dense scatter uses cached hit testing. Typed columns stay on the optimized rendering path. The same-machine benchmark gate and independent-source workload live in [bench/](bench/README.md).
 
-## Development
+The [comparison lab](experiments/chart-lab/README.md) exercises UAV, F1, ML, airport and biological dashboards using Snaplot, Chart.js, Recharts and ECharts. Chart.js is the visual comparison reference; further visual changes require separate direction.
 
-```bash
-npm install          # installs all workspaces plus git hooks
-npm run dev          # docs site dev server with live HMR against the library
-npm run build        # library production build
-npm run build:site   # docs site production build
-npm test             # vitest
-npm run check        # biome lint/config checks
-npm run typecheck    # library + site tsc --noEmit
+```sh
+npm install
+npm run dev
+npm run dev:lab
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run build:site
+npm run build:lab
+npm run test:consumers -w packages/snaplot
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, conventions, and release process.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions and release instructions.
 
 ## License
 

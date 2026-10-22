@@ -174,7 +174,7 @@ export function renderScatterSegments(
   // Clip to plot area
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
+  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
   ctx.clip();
   // Multiplies cumulatively with the stamp's baked-in alpha during drawImage.
   ctx.globalAlpha = opacityMultiplier;

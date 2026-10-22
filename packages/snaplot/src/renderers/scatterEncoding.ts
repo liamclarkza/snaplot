@@ -280,7 +280,7 @@ function buildColorState(
   palettes: ScatterPalettes,
   fallbackColor: string,
 ): ColorState {
-  const stats = scanColumn(colorBy.dataIndex, ranges, valueAt);
+  const stats = scanColumn(colorBy.dataIndex, ranges, valueAt, colorBy.type === 'category');
   const requestedType = colorBy.type ?? 'auto';
   const type = requestedType === 'auto'
     ? (stats.categoryValues.length > 0 && stats.categoryValues.length <= 12 && stats.allIntegers
@@ -292,8 +292,7 @@ function buildColorState(
     const rawPalette = colorBy.palette ?? palettes.categorical;
     const palette = rawPalette.length > 0 ? rawPalette : [fallbackColor];
     const categoryIndex = new Map<number, number>();
-    const values = stats.categoryValues.length > 0 ? stats.categoryValues : [0];
-    values.sort((a, b) => a - b);
+    const values = colorBy.categoryValues ?? (stats.categoryValues.length > 0 ? stats.categoryValues.sort((a, b) => a - b) : [0]);
     values.forEach((value, idx) => {
       categoryIndex.set(value, idx);
     });
@@ -342,6 +341,7 @@ function scanColumn(
   columnIdx: number,
   ranges: IndexRange[],
   valueAt: (columnIdx: number, index: number) => number,
+  collectAllCategories = false,
 ): {
   min: number;
   max: number;
@@ -361,9 +361,9 @@ function scanColumn(
       if (value < min) min = value;
       if (value > max) max = value;
       if (!Number.isInteger(value)) allIntegers = false;
-      if (!categoryOverflow && seen.size <= 12) {
+      if (collectAllCategories || (!categoryOverflow && seen.size <= 12)) {
         seen.add(value);
-        if (seen.size > 12) categoryOverflow = true;
+        if (!collectAllCategories && seen.size > 12) categoryOverflow = true;
       }
     }
   }

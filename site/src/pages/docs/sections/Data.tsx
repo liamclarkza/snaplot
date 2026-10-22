@@ -1,35 +1,50 @@
+import { createSignal } from 'solid-js';
 import CodeBlock from '../../../components/CodeBlock';
 import DocsLink from '../DocsLink';
-import { Section, Prose } from '../../../components/ui';
+import { Section, Prose, Demo } from '../../../components/ui';
 
 export default function Data() {
+  const [categories] = createSignal([{ treatment: 'Control', response: 18 }, { treatment: 'Low dose', response: 26 }, { treatment: 'High dose', response: 31 }]);
   return (
     <>
+      <Section id="categories" title="Category data">
+        <Prose>String X values infer categories. Their first-appearance order persists across updates. An explicit category list defines authoritative order and retains empty slots; unknown labels are rejected. Each bar series needs one observation per category, while scatter can represent repeated observations.</Prose>
+        <Demo title="Treatment response" desc="Named categories with an intentionally empty treatment slot" data={categories()} height="240px" code={`{
+  x: 'treatment',
+  series: [{ type: 'bar', y: 'response', label: 'Response' }],
+  axes: { x: { categories: ['Control', 'Low dose', 'Medium dose', 'High dose'] }, y: { title: 'Response (%)' } },
+}`} />
+      </Section>
       <Section id="streaming" title="Streaming">
         <Prose>
           Use <code>appendData()</code> for real-time data. It appends new points without replacing the existing dataset.
           The user's zoom state is preserved, new data appears but the viewport stays where the user left it until they double-click to reset.
         </Prose>
         <Prose>
-          Set <code>streaming.maxLen</code> on the chart config to cap the retained window. When the buffer overflows, the oldest points are dropped through an internal ring buffer.
+          Set <code>streaming.maxPoints</code> on the chart config to cap the retained window. When the buffer overflows, the oldest points are dropped through an internal ring buffer.
         </Prose>
         <Prose>
-          Appended chunks must use the same column count and equal column lengths as the current dataset. New X values must be finite and continue in non-decreasing order from the existing tail.
+          Appended chunks use the same named fields as their source. Named-column batches require equal column lengths. For ordered marks, new X values must be finite and continue in non-decreasing order from the existing tail. Scatter coordinates may be unordered and retain arrival order.
         </Prose>
-        <CodeBlock code={`const chart = new ChartCore(container, {
-  streaming: { maxLen: 1000 }, // keep max 1000 points
-  series: [{ label: 'value', dataIndex: 1, type: 'line' }],
-}, initialData);
+        <CodeBlock code={`const chart = createChart(container, {
+  data: initialData, x: 'time',
+  streaming: { maxPoints: 1000 }, // keep max 1000 points
+  series: [{ y: 'value' }],
+});
 
 // Example: append one point per second
-setInterval(() => {
+const timer = setInterval(() => {
   const now = Date.now();
   const value = Math.random() * 100;
-  chart.appendData([
-    new Float64Array([now]),
-    new Float64Array([value]),
-  ]);
-}, 1000);`} />
+  chart.appendData({ columns: {
+    time: new Float64Array([now]),
+    value: new Float64Array([value]),
+  } });
+}, 1000);
+
+// When removing the chart:
+clearInterval(timer);
+chart.destroy();`} />
         <div style={{ height: '12px' }} />
         <Prose>
           For the full pattern, ring buffer, in-place tail refinement with{' '}

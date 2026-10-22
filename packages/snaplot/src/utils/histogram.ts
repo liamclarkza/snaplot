@@ -10,8 +10,8 @@
  * - Sturges: ceil(log2(n) + 1), simple, good for normal distributions
  * - Scott: 3.5 * sigma / n^(1/3), optimized for Gaussian data
  *
- * Returns ColumnarData-compatible arrays: edges (N+1) padded to match
- * counts (N+1, last element = 0) so both columns have equal length.
+ * Returns N+1 bin edges and N counts. Pass the result directly as a
+ * histogram series dataset; callers never need to pad counts.
  */
 
 
@@ -34,15 +34,18 @@ export interface HistogramOptions {
  *
  * Usage:
  *   const bins = histogram(rawValues);
- *   const data: ColumnarData = [bins.edges, bins.counts];
- *   // Note: counts is padded with a trailing 0 to match edges length
+ *   createChart(element, { series: [{ id: 'distribution', type: 'histogram', data: bins }] });
  */
 export function histogram(
-  values: Float64Array,
+  values: Float64Array | readonly number[],
   options?: HistogramOptions,
 ): HistogramBins {
   const method = options?.method ?? 'freedman-diaconis';
   const explicitBinCount = options?.binCount;
+
+  if (explicitBinCount !== undefined && (!Number.isFinite(explicitBinCount) || explicitBinCount <= 0)) {
+    throw new Error(`histogram() binCount must be a positive finite number, received ${explicitBinCount}.`);
+  }
 
   // Filter values that cannot participate in finite bin math.
   const valid: number[] = [];
@@ -63,7 +66,7 @@ export function histogram(
   if (min === max) {
     // Single-value data: one bin centered on the value
     const edges = Float64Array.from([min - 0.5, max + 0.5]);
-    const counts = Float64Array.from([n, 0]); // padded
+    const counts = Float64Array.from([n]);
     return { edges, counts, maxCount: n };
   }
 
@@ -85,8 +88,8 @@ export function histogram(
     edges[i] = min + i * binWidth;
   }
 
-  // Count values per bin (N values, padded to N+1 with trailing 0)
-  const counts = new Float64Array(nBins + 1); // last element stays 0
+  // Count values per bin (exactly N values).
+  const counts = new Float64Array(nBins);
   let maxC = 0;
 
   for (const v of valid) {

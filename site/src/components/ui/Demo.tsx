@@ -1,4 +1,4 @@
-import type { ColumnarData, ChartInstance } from 'snaplot';
+import type { DataSource, ChartHandle } from 'snaplot';
 import LiveEditor from '../LiveEditor';
 import LazyMount from './LazyMount';
 
@@ -10,9 +10,9 @@ export default function Demo(props: {
   title: string;
   desc?: string;
   code: string;
-  data: ColumnarData;
+  data: DataSource<Record<string, unknown>>;
   height?: string;
-  onReady?: (c: ChartInstance) => void;
+  onReady?: (c: ChartHandle) => void;
 }) {
   return (
     <div style={{ 'margin-bottom': 'var(--space-6)' }}>

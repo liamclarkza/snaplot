@@ -13,26 +13,26 @@ export default function Scales() {
     <>
       <Section id="linear-scale" title="Linear Scale">
         <Prose>
-          The default scale type. Auto-range preserves the padded data extent by default, while tick generation still chooses readable intervals for labels.
+          The default scale type. Automatic linear ranges round outward to evenly spaced tick boundaries by default.
           Y axis auto-ranges to fit the visible data in the current X viewport.
         </Prose>
         <Prose>
           <b>Range control per axis</b>, three knobs combine for any behaviour you need:
         </Prose>
         <ul style={{ color: 'var(--text-secondary)', 'font-size': '14.5px', 'line-height': '1.7', 'margin-bottom': '16px', 'padding-left': '20px' }}>
-          <li><code>min</code> / <code>max</code>, pin the bounds. <code>resetZoom()</code> now restores to these values (previously a no-op).</li>
-          <li><code>padding</code>, fraction of the data range to pad each side. Default: <code>0</code> for horizontal axes, <code>0.05</code> for vertical.</li>
-          <li><code>nice</code>, whether to round bounds outward to clean tick boundaries. Default: <code>false</code>. Set to <code>true</code> when presentation-friendly bounds matter more than exact framing.</li>
+          <li><code>min</code> / <code>max</code>, pin the bounds. <code>resetViewport()</code> restores these configured bounds.</li>
+          <li><code>rangePadding</code>, fraction of the data range to pad each side. Default: <code>0</code> for horizontal axes, <code>0.05</code> for vertical.</li>
+          <li><code>roundBounds</code>, whether to round bounds outward to clean tick boundaries. Default: <code>true</code> for linear axes. Set to <code>false</code> for tight automatic bounds; explicit min/max and zoom ranges remain exact.</li>
         </ul>
         <CodeBlock code={`axes: {
-  x: { padding: 0 },                   // exact data extent
-  y: { padding: 0.1 },                 // 10% pad, exact padded bounds
-  // y: { padding: 0.1, nice: true },   // opt into rounded bounds
+  x: { rangePadding: 0, roundBounds: false }, // exact data extent
+  y: { rangePadding: 0.1 }, // 10% padding, then rounded bounds
+  // y: { min: 0, max: 100 }, // explicit bounds stay exact
 }`} />
         <div style={{ height: '12px' }} />
         <Demo title="Linear scale with readable ticks" data={d_linear()} height="240px"
           code={`{
-  series: [{ label: 'Value', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
+  series: [{ label: 'Value', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   tooltip: { show: true },
 }`} />
       </Section>
@@ -45,7 +45,7 @@ export default function Scales() {
         <Demo title="Exponential growth on log scale" data={d_log()}
           code={`{
   axes: { y: { type: 'log' } },
-  series: [{ label: 'Growth', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
+  series: [{ label: 'Growth', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 }],
 }`} />
       </Section>
 
@@ -58,36 +58,47 @@ export default function Scales() {
           data={d_time()}
           code={`{
   axes: { x: { type: 'time' } },
-  series: [{ label: 'Requests', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
+  series: [{ label: 'Requests', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   zoom: { enabled: true, x: true },
   tooltip: { show: true },
 }`} />
       </Section>
 
+      <Section id="category-scale" title="Category Scale">
+        <Prose>String X fields infer a category axis. Categories retain their first-seen order across updates, with new labels appended. Supply <code>categories</code> to pin the order and keep empty slots; unknown labels then produce an error.</Prose>
+        <CodeBlock code={`createChart(element, {
+  data: [{ airport: 'JHB', arrivals: 12 }, { airport: 'CPT', arrivals: 18 }],
+  x: 'airport',
+  series: [{ y: 'arrivals', type: 'bar' }],
+  axes: { x: { categories: ['JHB', 'CPT', 'DUR'] } },
+});`} />
+        <Prose>Bars require one observation per category per series. Aggregate repeated categories explicitly, or use scatter marks for multiple observations. Formatters, annotations and point events use category labels; programmatic viewports use numeric category-slot indices.</Prose>
+      </Section>
+
       <Section id="tick-format" title="Custom Tick Formatting">
         <Prose>
-          Override the default tick label formatting with a <code>tickFormat</code> function on an axis config.
+          Override the default tick label formatting with a <code>format</code> function on an axis config.
           This receives the raw numeric value and returns a display string.
         </Prose>
         <CodeBlock code={`// In your chart config
 axes: {
   x: {
     type: 'time',
-    tickFormat: (value) => new Date(value).toLocaleDateString(),
+    format: (value) => new Date(value).toLocaleDateString(),
   },
   y: {
-    tickFormat: (value) => \`\${value.toFixed(1)}%\`,
+    format: (value) => \`\${value.toFixed(1)}%\`,
   },
 }`} />
         <div style={{ height: '8px' }} />
         <Prose>
-          The <code>tickFormat</code> function is called for every visible tick label on each redraw.
+          The <code>format</code> function is called for every visible tick label on each redraw.
           Keep it fast, avoid heavy date parsing or string operations in tight loops.
         </Prose>
         <Prose>
           Worked examples: the{' '}
           <DocsLink slug="recipes" id="recipe-axis-titles">Axis Titles recipe</DocsLink>{' '}
-          pairs <code>tickFormat</code> with axis labels, and the{' '}
+          pairs <code>format</code> with axis labels, and the{' '}
           <DocsLink slug="recipes" id="recipe-ticks">Ticks and Gridlines recipe</DocsLink>{' '}
           covers <code>tickCount</code>, explicit <code>ticks</code>, and per-axis grid styling.
         </Prose>

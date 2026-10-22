@@ -1,3 +1,4 @@
+import { nameColumn, valueColumn, metricColumn, column } from 'snaplot/solid';
 import {
   For,
   Show,
@@ -13,12 +14,8 @@ import {
 } from 'solid-js';
 import {
   histogram,
-  column,
-  metricColumn,
-  nameColumn,
   studioTheme,
   tokyoTheme,
-  valueColumn,
 } from 'snaplot';
 import {
   Chart,
@@ -26,10 +23,11 @@ import {
   createChartGroup,
 } from 'snaplot/solid';
 import type {
-  ChartConfig,
-  ChartInstance,
+  ChartOptions,
+  ChartHandle,
   ChartStats,
-  ColumnarData,
+  ColumnData,
+  HistogramBins,
   ThemeConfig,
 } from 'snaplot';
 import { useTheme } from '../ThemeContext';
@@ -191,7 +189,7 @@ function streamValues(sampleIndex: number): [number, number, number] {
   ];
 }
 
-function streamSeed(points: number): ColumnarData {
+function streamSeed(points: number): ColumnData {
   const now = Date.now();
   const x = new Float64Array(points);
   const requests = new Float64Array(points);
@@ -208,10 +206,10 @@ function streamSeed(points: number): ColumnarData {
     errors[i] = errorValue;
   }
 
-  return [x, requests, p95, errors];
+  return { columns: { x: x, value1: requests, value2: p95, value3: errors } };
 }
 
-function experimentData(runs: number, points: number): ColumnarData {
+function experimentData(runs: number, points: number): ColumnData {
   const rand = rng(82);
   const x = new Float64Array(points);
   const cols: Float64Array[] = [];
@@ -232,10 +230,10 @@ function experimentData(runs: number, points: number): ColumnarData {
     cols.push(y);
   }
 
-  return [x, ...cols] as ColumnarData;
+  return { columns: { x: x, ...Object.fromEntries((cols).map((values, index) => [`value${index + 1}`, values])) } } as ColumnData;
 }
 
-function heatmapData(points: number): ColumnarData {
+function heatmapData(points: number): ColumnData {
   const rand = rng(123);
   const centers: Array<[number, number, number, number]> = [
     [24, 30, 13, 8],
@@ -253,13 +251,10 @@ function heatmapData(points: number): ColumnarData {
   }
 
   const idx = Array.from({ length: points }, (_, i) => i).sort((a, b) => x[a] - x[b]);
-  return [
-    Float64Array.from(idx.map((i) => x[i])),
-    Float64Array.from(idx.map((i) => y[i])),
-  ];
+  return { columns: { x: Float64Array.from(idx.map((i) => x[i])), value1: Float64Array.from(idx.map((i) => y[i])) } };
 }
 
-function sweepScatterData(points: number): ColumnarData {
+function sweepScatterData(points: number): ColumnData {
   const rand = rng(514);
   const row = new Float64Array(points);
   const learningRate = new Float64Array(points);
@@ -286,17 +281,17 @@ function sweepScatterData(points: number): ColumnarData {
     accuracy[i] = acc;
   }
 
-  return [row, learningRate, validationLoss, family, runtime, accuracy];
+  return { columns: { x: row, value1: learningRate, value2: validationLoss, value3: family, value4: runtime, value5: accuracy } };
 }
 
-function endpointData(): ColumnarData {
+function endpointData(): ColumnData {
   const x = Float64Array.from([0, 1, 2, 3, 4, 5]);
   const ok = Float64Array.from([1180, 870, 690, 520, 430, 210]);
   const err = Float64Array.from([36, 146, 58, 74, 16, 52]);
-  return [x, ok, err];
+  return { columns: { x: x, value1: ok, value2: err } };
 }
 
-function responseHistogramData(): ColumnarData {
+function responseHistogramData(): HistogramBins {
   const rand = rng(204);
   const raw = new Float64Array(9000);
   for (let i = 0; i < raw.length; i++) {
@@ -305,10 +300,10 @@ function responseHistogramData(): ColumnarData {
       : 118 + normal(rand) * 20;
   }
   const bins = histogram(raw);
-  return [bins.edges, bins.counts];
+  return bins;
 }
 
-function latencyBandData(): ColumnarData {
+function latencyBandData(): ColumnData {
   const rand = rng(301);
   const points = 180;
   const x = new Float64Array(points);
@@ -326,7 +321,7 @@ function latencyBandData(): ColumnarData {
     lower[i] = median[i] - spread * 0.75;
   }
 
-  return [x, median, upper, lower];
+  return { columns: { x: x, value1: median, value2: upper, value3: lower } };
 }
 
 function cloneTheme(theme: ThemeConfig): ThemeConfig {
@@ -376,20 +371,20 @@ export default function HeroDashboard() {
   const responseTimes = responseHistogramData();
   const latencyBand = latencyBandData();
 
-  let streamChart: ChartInstance | undefined;
-  let lastX = streamData[0][streamData[0].length - 1];
+  let streamChart: ChartHandle | undefined;
+  let lastX = streamData.columns.x[streamData.columns.x.length - 1];
   let streamStep = 1;
 
-  const streamConfig = createMemo<ChartConfig>(() => ({
+  const streamConfig = createMemo<ChartOptions>(() => ({
     theme: activeTheme(),
     interaction: 'readonly',
     debug: { stats: true },
-    streaming: { maxLen: STREAM_WINDOW_POINTS },
+    streaming: { maxPoints: STREAM_WINDOW_POINTS },
     axes: { x: { type: 'time' }, y: { type: 'linear' } },
     series: [
-      { label: 'Requests', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 1.8 },
-      { label: 'p95 latency', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.6 },
-      { label: 'Errors', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 1.6 },
+      { label: 'Requests', y: "value1", type: 'area', interpolation: 'monotone', lineWidth: 1.8 },
+      { label: 'p95 latency', y: "value2", type: 'line', interpolation: 'monotone', lineWidth: 1.6 },
+      { label: 'Errors', y: "value3", type: 'line', interpolation: 'monotone', lineWidth: 1.6 },
     ],
     cursor: { show: true, indicators: true },
     zoom: { enabled: false },
@@ -398,24 +393,24 @@ export default function HeroDashboard() {
     padding: { top: 20, right: 22, bottom: 36, left: 48 },
   }));
 
-  const group = createChartGroup();
-  const [runChartA, setRunChartA] = createSignal<ChartInstance | undefined>();
-  const [runChartB, setRunChartB] = createSignal<ChartInstance | undefined>();
+  const group = createChartGroup({ viewport: true });
+  const [runChartA, setRunChartA] = createSignal<ChartHandle | undefined>();
+  const [runChartB, setRunChartB] = createSignal<ChartHandle | undefined>();
   const [activeRunChartKey, setActiveRunChartKey] = createSignal<'a' | 'b'>('a');
   const activeRunChart = createMemo(() =>
     activeRunChartKey() === 'b' ? runChartB() : runChartA(),
   );
 
-  function runConfig(metric: string): ChartConfig<RunMeta> {
-    return group.apply({
+  function runConfig(metric: string): ChartOptions {
+    return ({ group, ...{
       theme: activeTheme(),
       axes: {
-        x: { type: 'linear', padding: 0 },
-        y: { type: 'linear', padding: 0.04 },
+        x: { type: 'linear', rangePadding: 0 },
+        y: { type: 'linear', rangePadding: 0.04 },
       },
       series: RUN_NAMES.map((label, i) => ({
         label,
-        dataIndex: i + 1,
+        y: `value${i + 1}`,
         type: 'line' as const,
         interpolation: 'monotone' as const,
         lineWidth: 2,
@@ -425,14 +420,12 @@ export default function HeroDashboard() {
           status: i === 3 ? 'failed' : i === 0 ? 'running' : 'finished',
         },
       })),
-      highlight: {
-        getKey: (series) => series.meta?.runId,
-      },
+
       cursor: { show: true, snap: true },
       tooltip: { show: false },
       zoom: { enabled: true, x: true, bounds: 'data' },
       padding: { top: 18, right: 20, bottom: 34, left: 44 },
-    });
+    } });
   }
 
   const runConfigA = createMemo(() => runConfig('eval/accuracy'));
@@ -442,10 +435,10 @@ export default function HeroDashboard() {
     const chart = runChartA();
     if (!chart) return;
 
-    const off = chart.on('cursor:move', (_dataX, _dataIdx, origin) => {
-      if (origin !== 'local') return;
+    const off = chart.on('cursor:change', () => {
+      if (!chart.container.matches(':hover')) return;
       setActiveRunChartKey('a');
-      chart.setHighlight(chart.getCursorSnapshot({ fallback: 'hide' }).activeSeriesIndex);
+      chart.setHighlight(chart.getCursorSnapshot({ fallback: 'hide' }).activeSeriesId);
     });
     onCleanup(off);
   });
@@ -453,21 +446,21 @@ export default function HeroDashboard() {
     const chart = runChartB();
     if (!chart) return;
 
-    const off = chart.on('cursor:move', (_dataX, _dataIdx, origin) => {
-      if (origin !== 'local') return;
+    const off = chart.on('cursor:change', () => {
+      if (!chart.container.matches(':hover')) return;
       setActiveRunChartKey('b');
-      chart.setHighlight(chart.getCursorSnapshot({ fallback: 'hide' }).activeSeriesIndex);
+      chart.setHighlight(chart.getCursorSnapshot({ fallback: 'hide' }).activeSeriesId);
     });
     onCleanup(off);
   });
 
-  const heatConfig = createMemo<ChartConfig>(() => ({
+  const heatConfig = createMemo<ChartOptions>(() => ({
     theme: activeTheme(),
     interaction: 'analytical',
     axes: { x: { type: 'linear' }, y: { type: 'linear' } },
     series: [{
       label: 'Density',
-      yDataIndex: 1,
+      y: "value1",
       type: 'scatter',
       renderMode: 'density',
       heatmapBinSize: 1,
@@ -485,38 +478,38 @@ export default function HeroDashboard() {
     padding: { top: 18, right: 20, bottom: 34, left: 44 },
   }));
 
-  const sweepConfig = createMemo<ChartConfig>(() => ({
+  const sweepConfig = createMemo<ChartOptions>(() => ({
     theme: activeTheme(),
     interaction: 'analytical',
     axes: {
       x: {
         type: 'log',
-        label: 'Learning rate',
-        padding: 0.05,
-        tickFormat: (value) => value >= 0.001 ? value.toFixed(3) : value.toExponential(0),
+        title: 'Learning rate',
+        rangePadding: 0.05,
+        format: (value) => Number(value) >= 0.001 ? Number(value).toFixed(3) : Number(value).toExponential(0),
       },
-      y: { type: 'linear', label: 'Validation loss', padding: 0.08 },
+      y: { type: 'linear', title: 'Validation loss', rangePadding: 0.08 },
     },
     series: [{
       label: 'Sweep runs',
       type: 'scatter',
-      xDataIndex: 1,
-      yDataIndex: 2,
+      x: "value1",
+      y: "value2",
       colorBy: {
-        dataIndex: 3,
+        field: "value3",
         type: 'category',
         label: 'Family',
         format: (value) => MODEL_FAMILIES[Math.round(value)] ?? 'Other',
       },
       sizeBy: {
-        dataIndex: 4,
+        field: "value4",
         range: [2.2, 7.5],
         scale: 'sqrt',
         label: 'Runtime',
         format: (value) => `${value.toFixed(1)} min`,
       },
       tooltipFields: [
-        { dataIndex: 5, label: 'Accuracy', format: (value) => `${(value * 100).toFixed(2)}%` },
+        { field: "value5", label: 'Accuracy', format: (value) => `${(value * 100).toFixed(2)}%` },
       ],
       pointShape: 'circle',
       opacity: 0.72,
@@ -526,52 +519,50 @@ export default function HeroDashboard() {
     zoom: { enabled: true, x: true, y: true, bounds: 'data' },
     pan: { enabled: true, x: true, y: true },
     touch: { drag: 'pan', selectionGesture: 'double-tap-drag' },
-    selection: {
-      onSelect: (selection) => setSelectedSweepPoints(selection.points?.length ?? 0),
-    },
+    onSelect: (selection) => setSelectedSweepPoints(selection.points?.length ?? 0),
     tooltip: { show: true, mode: 'nearest' },
     padding: { top: 18, right: 20, bottom: 38, left: 48 },
   }));
 
-  const endpointConfig = createMemo<ChartConfig>(() => ({
+  const endpointConfig = createMemo<ChartOptions>(() => ({
     theme: activeTheme(),
     axes: {
       x: {
         type: 'linear',
-        tickFormat: (v) => {
-          const idx = Math.round(v);
-          if (Math.abs(v - idx) > 1e-6) return '';
+        format: (v) => {
+          const idx = Math.round(Number(v));
+          if (Math.abs(Number(v) - idx) > 1e-6) return '';
           return ['/api', '/auth', '/users', '/search', '/upload', '/admin'][idx] ?? '';
         },
       },
       y: { type: 'linear' },
     },
     series: [
-      { label: '2xx', dataIndex: 1, type: 'bar' },
-      { label: '5xx', dataIndex: 2, type: 'bar' },
+      { label: '2xx', y: "value1", type: 'bar' },
+      { label: '5xx', y: "value2", type: 'bar' },
     ],
     cursor: { show: true },
     tooltip: { show: true, mode: 'index' },
     padding: { top: 18, right: 18, bottom: 34, left: 50 },
   }));
 
-  const histogramConfig = createMemo<ChartConfig>(() => ({
+  const histogramConfig = createMemo<ChartOptions>(() => ({
     theme: activeTheme(),
     axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-    series: [{ label: 'Response time', dataIndex: 1, type: 'histogram' }],
+    series: [{ id: 'response-time', label: 'Response time', type: 'histogram', data: responseTimes }],
     cursor: { show: true },
     tooltip: { show: true, mode: 'x' },
     padding: { top: 18, right: 18, bottom: 34, left: 50 },
   }));
 
-  const bandConfig = createMemo<ChartConfig>(() => ({
+  const bandConfig = createMemo<ChartOptions>(() => ({
     theme: activeTheme(),
     axes: { x: { type: 'linear' }, y: { type: 'linear' } },
     series: [{
       label: 'Latency band',
-      dataIndex: 1,
-      upperDataIndex: 2,
-      lowerDataIndex: 3,
+      y: "value1",
+      upper: "value2",
+      lower: "value3",
       type: 'band',
       opacity: 0.16,
       interpolation: 'monotone',
@@ -589,12 +580,7 @@ export default function HeroDashboard() {
     const [requestValue, p95Value, errorValue] = streamValues(streamStep);
     streamStep++;
 
-    streamChart.appendData([
-      new Float64Array([lastX]),
-      new Float64Array([requestValue]),
-      new Float64Array([p95Value]),
-      new Float64Array([errorValue]),
-    ]);
+    streamChart.appendData({ columns: { x: new Float64Array([lastX]), value1: new Float64Array([requestValue]), value2: new Float64Array([p95Value]), value3: new Float64Array([errorValue]) } });
   }
 
   let streamFrame = 0;
@@ -734,7 +720,7 @@ export default function HeroDashboard() {
           >
             <div style={{ height: '320px' }}>
               <Chart
-                config={streamConfig()}
+                x="x" {...streamConfig()}
                 data={streamData}
                 onReady={(chart) => {
                   streamChart = chart;
@@ -756,7 +742,7 @@ export default function HeroDashboard() {
               <Deferred minHeight="260px" load={() => heatmapData(110_000)}>
                 {(heatData) => (
                   <div style={{ height: '260px' }}>
-                    <Chart config={heatConfig()} data={heatData()} />
+                    <Chart x="x" {...heatConfig()} data={heatData()} />
                   </div>
                 )}
               </Deferred>
@@ -764,7 +750,7 @@ export default function HeroDashboard() {
 
             <Panel title="Latency Envelope" meta="band series">
               <div style={{ height: '260px' }}>
-                <Chart config={bandConfig()} data={latencyBand} />
+                <Chart x="x" {...bandConfig()} data={latencyBand} />
               </div>
             </Panel>
           </div>
@@ -776,7 +762,7 @@ export default function HeroDashboard() {
               : '2.6K runs - colour by model family, size by runtime'}
           >
             <div style={{ height: '320px' }}>
-              <Chart config={sweepConfig()} data={sweepData} />
+              <Chart x="x" {...sweepConfig()} data={sweepData} />
             </div>
           </Panel>
 
@@ -791,21 +777,21 @@ export default function HeroDashboard() {
               class="demos-sync-grid"
             >
               <div style={{ height: '260px', background: 'var(--chart-panel-bg, var(--bg-surface))' }}>
-                <Chart config={runConfigA()} data={runsData} onReady={setRunChartA} />
+                <Chart x="x" {...runConfigA()} data={runsData} onReady={setRunChartA} />
               </div>
               <div style={{ height: '260px', background: 'var(--chart-panel-bg, var(--bg-surface))' }}>
-                <Chart config={runConfigB()} data={runsData} onReady={setRunChartB} />
+                <Chart x="x" {...runConfigB()} data={runsData} onReady={setRunChartB} />
               </div>
             </div>
-            <LegendTable<RunMeta>
+            <LegendTable
               chart={activeRunChart}
               columns={[
                 nameColumn(),
-                metricColumn<RunMeta>((point) => point.meta!.metricKey),
-                column<RunMeta>({
+                metricColumn((point) => (point.meta as RunMeta).metricKey),
+                column({
                   key: 'status',
                   header: 'Status',
-                  cell: (point) => point.meta!.status,
+                  cell: (point) => (point.meta as RunMeta).status,
                 }),
                 valueColumn({ format: (value) => value.toFixed(4) }),
               ]}
@@ -822,13 +808,13 @@ export default function HeroDashboard() {
           >
             <Panel title="Top Endpoints" meta="grouped bar chart">
               <div style={{ height: '260px' }}>
-                <Chart config={endpointConfig()} data={endpoints} />
+                <Chart x="x" {...endpointConfig()} data={endpoints} />
               </div>
             </Panel>
 
             <Panel title="Response Time" meta="histogram - 9K samples">
               <div style={{ height: '260px' }}>
-                <Chart config={histogramConfig()} data={responseTimes} />
+                <Chart x="x" {...histogramConfig()} data={responseTimes} />
               </div>
             </Panel>
           </div>

@@ -1,63 +1,20 @@
-import { createSignal, createEffect, on, onCleanup, untrack, type Accessor } from 'solid-js';
-import { ChartCore } from '../core/Chart';
-import type { ChartConfig, ChartInstance, ColumnarData } from '../types';
-
-/**
- * createChart, lower-level reactive primitive for advanced use cases.
- *
- * Returns an accessor to the ChartInstance. The chart automatically
- * updates when data or config signals change.
- *
- * Usage:
- *   const [data, setData] = createSignal(myData);
- *   const [config] = createSignal(myConfig);
- *   let ref!: HTMLDivElement;
- *   const chart = createChart(() => ref, config, data);
- */
-export function createChart<TMeta = unknown>(
-  containerRef: Accessor<HTMLElement | undefined>,
-  config: Accessor<ChartConfig<TMeta>>,
-  data: Accessor<ColumnarData>,
-): Accessor<ChartInstance | undefined> {
-  const [chart, setChart] = createSignal<ChartInstance | undefined>();
-
+import { createSignal, createEffect, onCleanup, untrack, type Accessor } from 'solid-js';
+import { createChart as createCoreChart, reconcileChart } from '../api/createChart';
+import type { ChartOptions, ChartHandle } from '../api/types';
+/** Own a chart for a reactive host and a complete reactive options snapshot. */
+export function createChart<Row>(container: Accessor<HTMLElement | undefined>, options: Accessor<ChartOptions<Row>>): Accessor<ChartHandle<Row> | undefined> {
+  const [chart, setChart] = createSignal<ChartHandle<Row>>();
   createEffect(() => {
-    const el = containerRef();
+    const el = container();
     if (!el) return;
-
-    // Chart construction should be keyed only by the container element.
-    // Initial config/data are read untracked; later signal changes flow
-    // through the dedicated setOptions/setData effects below.
-    const instance = new ChartCore(el, untrack(config) as ChartConfig, untrack(data));
-    setChart(instance as ChartInstance);
-
-    onCleanup(() => {
-      instance.destroy();
-      setChart(undefined);
-    });
+    const instance = createCoreChart(el, untrack(options));
+    setChart(() => instance);
+    onCleanup(() => { instance.destroy(); setChart(undefined); });
   });
-
-  // React to data changes
-  createEffect(
-    on(
-      data,
-      (d) => {
-        chart()?.setData(d);
-      },
-      { defer: true },
-    ),
-  );
-
-  // React to config changes
-  createEffect(
-    on(
-      config,
-      (c) => {
-        chart()?.replaceOptions(c as ChartConfig);
-      },
-      { defer: true },
-    ),
-  );
-
+  createEffect(() => {
+    const value = options();
+    const instance = chart();
+    if (instance) reconcileChart(instance, value);
+  });
   return chart;
 }

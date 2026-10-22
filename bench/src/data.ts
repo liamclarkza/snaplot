@@ -1,4 +1,4 @@
-import type { ColumnarData } from 'snaplot/core';
+import type { ColumnData } from 'snaplot/core';
 
 /** Deterministic PRNG so every bench run sees identical data. */
 export function mulberry32(seed: number): () => number {
@@ -16,7 +16,7 @@ export function mulberry32(seed: number): () => number {
  * Y is a noisy random walk with occasional level shifts so the cloud has
  * visible structure at every zoom level.
  */
-export function genTimeSeries(n: number, seed = 1): ColumnarData {
+export function genTimeSeries(n: number, seed = 1): ColumnData {
   const rand = mulberry32(seed);
   const x = new Float64Array(n);
   const y = new Float64Array(n);
@@ -30,16 +30,15 @@ export function genTimeSeries(n: number, seed = 1): ColumnarData {
     v = v * 0.98 + (rand() - 0.5) * 3;
     y[i] = level + v + Math.sin(i / 500) * 8;
   }
-  return [x, y];
+  return { columns: { x, value: y } };
 }
 
 /**
- * Tabular scatter data: column 0 is a sorted row index (the default X),
- * columns 1-2 are two correlated metrics (unsorted in value space),
- * column 3 a small-integer category, column 4 a positive continuous size.
- * Used for xDataIndex/yDataIndex, colorBy, and sizeBy scenarios.
+ * Tabular scatter data: a sorted row key, two correlated metric fields
+ * (unsorted in value space), a small-integer category and a positive size.
+ * Used for independent X/Y fields, colorBy, and sizeBy scenarios.
  */
-export function genTabular(n: number, seed = 7): ColumnarData {
+export function genTabular(n: number, seed = 7): ColumnData {
   const rand = mulberry32(seed);
   const row = new Float64Array(n);
   const metricA = new Float64Array(n);
@@ -58,7 +57,7 @@ export function genTabular(n: number, seed = 7): ColumnarData {
     metricB[i] = cy + a * 0.35 + gauss(rand) * 5;
     size[i] = 1 + Math.abs(gauss(rand)) * 40;
   }
-  return [row, metricA, metricB, category, size];
+  return { columns: { row, metricA, metricB, category, size } };
 }
 
 /** Box-Muller-ish gaussian from a uniform PRNG. */
@@ -69,7 +68,7 @@ function gauss(rand: () => number): number {
 }
 
 /** Fresh columns extending an existing time series, for appendData ticks. */
-export function genAppendChunk(lastX: number, n: number, seed: number): ColumnarData {
+export function genAppendChunk(lastX: number, n: number, seed: number): ColumnData {
   const rand = mulberry32(seed);
   const x = new Float64Array(n);
   const y = new Float64Array(n);
@@ -79,5 +78,5 @@ export function genAppendChunk(lastX: number, n: number, seed: number): Columnar
     x[i] = t;
     y[i] = 50 + Math.sin(t / 60_000) * 20 + (rand() - 0.5) * 6;
   }
-  return [x, y];
+  return { columns: { x, value: y } };
 }

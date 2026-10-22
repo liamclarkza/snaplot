@@ -22,7 +22,7 @@ function context(): CanvasRenderingContext2D {
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
-    roundRect: vi.fn(),
+    rect: vi.fn(),
     clip: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
@@ -101,6 +101,10 @@ describe('axisTickValues', () => {
 });
 
 describe('thinTicks', () => {
+  it('keeps regular intervals and both ends when thinning an aligned continuous axis', () => {
+    expect(thinTicks([0, 10, 20, 30, 40, 50, 60], 4, true)).toEqual([0, 20, 40, 60]);
+    expect(thinTicks([0, 10, 20, 30, 40, 50], 4, true)).toEqual([0, 50]);
+  });
   it('keeps short lists intact and thins long lists evenly from the first entry', () => {
     expect(thinTicks([1, 2, 3], 6)).toEqual([1, 2, 3]);
     expect(thinTicks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 5)).toEqual([0, 2, 4, 6, 8]);
@@ -157,7 +161,7 @@ describe('per-axis grid config', () => {
     expect(ctx.setLineDash).toHaveBeenCalledWith([4, 4]);
     // Dash pattern is reset after the grid stroke so the frame stays solid.
     expect(ctx.setLineDash).toHaveBeenLastCalledWith([]);
-    expect(ctx.strokeStyle).toBe(theme.borderColor); // frame drew last
+    expect(ctx.strokeStyle).toBe('rgb(204,204,204)'); // frame drew last
     expect(ctx.moveTo).toHaveBeenCalled();
   });
 });
@@ -236,5 +240,48 @@ describe('axis corner collision handling', () => {
     );
 
     expect(result.labels.get('x')?.[0].x).toBeGreaterThan(20);
+  });
+});
+
+describe('plot furniture', () => {
+  it.each([1, 2])('joins endpoint ticks to square, pixel-aligned frame corners at DPR %s', (dpr) => {
+    const ctx = context();
+    const box = { ...layout(), dpr, plot: { left: 20.2, top: 0.2, width: 99.4, height: 99.4 } };
+    const scale = linearScale(0.2, 99.6, [0.2, 99.6]);
+    renderAxes(ctx, box, new Map([['y', scale]]), theme, { series: [], axes: { y: { position: 'left', grid: false } } });
+    const offset = dpr === 1 ? 0.5 : 0;
+    expect(ctx.rect).toHaveBeenLastCalledWith(20 + offset, offset, 100, 100);
+    expect(ctx.moveTo).toHaveBeenCalledWith(20 + offset, offset);
+    expect(ctx.moveTo).toHaveBeenCalledWith(20 + offset, 100 + offset);
+  });
+
+  it('uses theme opacity directly and gives tick marks the axis hue, preserving explicit overrides', () => {
+    const ctx = context();
+    const strokes: { color: string | CanvasGradient | CanvasPattern; alpha: number }[] = [];
+    ctx.stroke = vi.fn(() => { strokes.push({ color: ctx.strokeStyle, alpha: ctx.globalAlpha }); });
+    const quiet = { ...theme, gridOpacity: 0.18, borderOpacity: 0.18, gridColor: '#84969e', axisLineColor: '#84969e', borderColor: '#84969e' };
+    const scales = new Map([['y', linearScale(0, 100, [50])]]);
+    renderAxes(ctx, layout(), scales, quiet, { series: [], axes: { y: {} } });
+    expect(strokes).toEqual(Array.from({ length: 3 }, () => ({ color: 'rgb(233,236,238)', alpha: 1 })));
+    strokes.length = 0;
+    renderAxes(ctx, layout(), scales, quiet, { series: [], axes: { y: { grid: false, tickMarks: { color: '#ff0000' } } } });
+    expect(strokes[0]).toEqual({ color: 'rgb(255,0,0)', alpha: 1 });
+    expect(ctx.globalAlpha).toBe(1);
+  });
+});
+
+describe('bar slot grids', () => {
+  it('keeps evenly spaced slot boundaries when center labels are thinned', () => {
+    const ctx = context();
+    const scale = { ...linearScale(0, 6, []), key: 'x', dataToPixel: (v: number) => v * 10 };
+    const box: Layout = { width: 80, height: 140, plot: { left: 0, top: 0, width: 60, height: 100 }, axes: { x: { position: 'bottom', area: { left: 0, top: 100, width: 60, height: 40 } } }, dpr: 1 };
+    const result = renderAxes(ctx, box, new Map([['x', scale]]), theme, { series: [], axes: { x: {} } }, {
+      values: [1, 3, 5], gridValues: [0, 2, 4, 6], format: (v) => `Category ${v}`,
+    });
+    expect(result.labels.get('x')?.length).toBeLessThan(3);
+    // Every boundary remains, including both ends; no shortened edge cell.
+    for (const x of [0.5, 20.5, 40.5, 60.5]) expect(ctx.moveTo).toHaveBeenCalledWith(x, 100.5);
+    expect(ctx.moveTo).toHaveBeenCalledWith(20.5, 0);
+    expect(ctx.moveTo).toHaveBeenCalledWith(40.5, 0);
   });
 });

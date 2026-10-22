@@ -192,3 +192,25 @@ describe('HitTester tooltip formatters', () => {
     expect(points[0].formattedY).toBe('y:20');
   });
 });
+
+describe('HitTester independent sources', () => {
+  const stores = [
+    new ColumnarStore([f([0, 4]), f([10, 20])]),
+    new ColumnarStore([f([1, 2, 7]), f([30, 40, 50])]),
+  ];
+  const scales = new Map<string, Scale>([['x', scale('x', 0, 10)], ['y', scale('y', 0, 100)]]);
+  const series: SeriesConfig[] = [{ label: 'one', dataIndex: 1 }, { label: 'two', dataIndex: 1 }];
+
+  it('resolves grouped points independently while retaining global series indices', () => {
+    const points = new HitTester(1000).findPoints(stores[0], scales, series, 30, 40, 'index', ['red', 'blue'],
+      'mouse', undefined, 0, undefined, undefined, si => stores[si]);
+    expect(points.map(p => [p.seriesIndex, p.dataIndex, p.x, p.y])).toEqual([[0, 1, 4, 20], [1, 1, 2, 40]]);
+  });
+
+  it('finds the nearest scatter point in a different source with its local row index', () => {
+    const points = new HitTester(10).findPoints(stores[0], scales,
+      series.map(s => ({ ...s, type: 'scatter' })), 70, 50, 'nearest', ['red', 'blue'],
+      'mouse', undefined, 0, undefined, undefined, si => stores[si]);
+    expect(points.map(p => [p.seriesIndex, p.dataIndex, p.x, p.y])).toEqual([[1, 2, 7, 50]]);
+  });
+});

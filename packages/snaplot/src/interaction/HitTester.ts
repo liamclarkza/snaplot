@@ -82,9 +82,10 @@ export class HitTester {
      */
     getResolver?: (seriesIndex: number) => ScatterStyleResolver,
     formatters?: TooltipFormatters,
+    getStore?: (seriesIndex: number) => DataStore,
   ): TooltipPoint[] {
     const xScale = scales.get('x');
-    if (!xScale || store.length === 0) return [];
+    if (!xScale || (!getStore && store.length === 0)) return [];
 
     const proximity = this.proximityFor(pointerType);
 
@@ -98,6 +99,7 @@ export class HitTester {
         palette,
         proximity,
         formatters,
+        getStore,
       );
     }
 
@@ -113,11 +115,12 @@ export class HitTester {
       dataVersion,
       getResolver,
       formatters,
+      getStore,
     );
   }
 
   private pointsAtIndex(
-    store: DataStore,
+    defaultStore: DataStore,
     scales: Map<string, Scale>,
     seriesConfigs: SeriesConfig[],
     pixelX: number,
@@ -125,6 +128,7 @@ export class HitTester {
     palette: string[],
     proximity: number,
     formatters?: TooltipFormatters,
+    getStore?: (seriesIndex: number) => DataStore,
   ): TooltipPoint[] {
     const points: TooltipPoint[] = [];
 
@@ -132,6 +136,8 @@ export class HitTester {
     let closestYDist = Infinity;
 
     for (let si = 0; si < seriesConfigs.length; si++) {
+      const store = getStore?.(si) ?? defaultStore;
+      if (!store.length) continue;
       const sc = seriesConfigs[si];
       if (sc.visible === false) continue;
 
@@ -141,7 +147,16 @@ export class HitTester {
       const xScale = scales.get(sc.xAxisKey ?? 'x');
       if (!xScale) continue;
 
-      const idx = store.nearestXIndex(xScale.pixelToData(pixelX));
+      const targetX = xScale.pixelToData(pixelX);
+      const xColumn = sc.type === 'scatter' ? scatterXDataIndex(sc) : 0;
+      let idx = store.nearestXIndex(targetX);
+      if (xColumn !== 0) {
+        let closest = Infinity;
+        for (let i = 0; i < store.length; i++) {
+          const distance = Math.abs(store.valueAt(xColumn, i) - targetX);
+          if (distance < closest) { closest = distance; idx = i; }
+        }
+      }
       const yVal = store.yAt(colIdx - 1, idx);
       if (!Number.isFinite(yVal)) continue;
 
@@ -153,7 +168,7 @@ export class HitTester {
         closestYDist = Math.min(closestYDist, Math.abs(py - pixelY));
       }
 
-      const xVal = store.xAt(idx);
+      const xVal = store.valueAt(xColumn, idx);
 
       points.push({
         seriesIndex: si,
@@ -178,7 +193,7 @@ export class HitTester {
   }
 
   private nearestPoint(
-    store: DataStore,
+    defaultStore: DataStore,
     scales: Map<string, Scale>,
     seriesConfigs: SeriesConfig[],
     pixelX: number,
@@ -189,11 +204,14 @@ export class HitTester {
     dataVersion: number,
     getResolver?: (seriesIndex: number) => ScatterStyleResolver,
     formatters?: TooltipFormatters,
+    getStore?: (seriesIndex: number) => DataStore,
   ): TooltipPoint[] {
     let bestDist = Infinity;
     let bestPoint: TooltipPoint | null = null;
 
     for (let si = 0; si < seriesConfigs.length; si++) {
+      const store = getStore?.(si) ?? defaultStore;
+      if (!store.length) continue;
       const sc = seriesConfigs[si];
       if (sc.visible === false) continue;
 

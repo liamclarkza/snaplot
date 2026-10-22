@@ -34,7 +34,7 @@ function createContext(): CanvasRenderingContext2D {
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
-    roundRect: vi.fn(),
+    rect: vi.fn(),
     clip: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),

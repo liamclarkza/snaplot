@@ -36,7 +36,7 @@ describe('renderHistogram baseline', () => {
       save: vi.fn(),
       restore: vi.fn(),
       beginPath: vi.fn(),
-      roundRect: vi.fn(),
+      rect: vi.fn(),
       clip: vi.fn(),
       fillRect,
       strokeRect: vi.fn(),

@@ -30,14 +30,14 @@ describe('CohortLab comparison data flow', () => {
     const trajectories = progressColumns(selected);
     const scores = comparisonColumns(selected);
 
-    expect(series.map(item => item.dataIndex)).toEqual([1, 2, 3]);
-    expect(series.map(item => item.meta?.runId)).toEqual([18, 3, 27]);
-    expect(trajectories).toHaveLength(selected.length + 1);
-    expect(scores).toHaveLength(selected.length + 1);
+    expect(series.map(item => item.id)).toEqual(['18', '3', '27']);
+    expect(series.map(item => (item.meta as { runId: number }).runId)).toEqual([18, 3, 27]);
+    expect(Object.keys(trajectories.columns)).toHaveLength(selected.length + 1);
+    expect(Object.keys(scores.columns)).toHaveLength(selected.length + 1);
 
-    selected.forEach((run, index) => {
-      expect(trajectories[index + 1][20]).toBeCloseTo(progressValue(run, 20), 10);
-      expect(Array.from(scores[index + 1])).toEqual(comparisonScores(run));
+    selected.forEach((run) => {
+      expect(trajectories.columns[`run${run.id}`][20]).toBeCloseTo(progressValue(run, 20), 10);
+      expect(Array.from(scores.columns[`run${run.id}`])).toEqual(comparisonScores(run));
     });
   });
 

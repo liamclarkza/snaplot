@@ -77,7 +77,7 @@ export function renderLineSegments(
   // Clip to plot area
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
+  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
   ctx.clip();
 
   ctx.strokeStyle = color;
@@ -147,7 +147,7 @@ export function renderAreaSegments(
   // Clip to plot area
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
+  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
   ctx.clip();
   ctx.globalAlpha = opacityMultiplier;
 
@@ -305,7 +305,7 @@ export function renderBandSegments(
 
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
+  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
   ctx.clip();
 
   // ── 1. Fill contiguous bound segments ─────────────────────

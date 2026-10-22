@@ -86,6 +86,9 @@ describe('createTheme semantic tokens', () => {
     expect(theme.backgroundColor).toBe('container');
     expect(theme.textColor).toBe('var(--product-text)');
     expect(theme.tickColor).toBe('var(--product-muted)');
+    expect(theme.axisLabelColor).toBe('var(--product-muted)');
+    expect(theme.gridOpacity).toBe(0.18);
+    expect(theme.borderOpacity).toBe(0.18);
     expect(theme.gridColor).toBe('var(--product-muted)');
     expect(theme.axisLineColor).toBe('var(--product-muted)');
     expect(theme.borderColor).toBe('var(--product-muted)');
@@ -93,6 +96,13 @@ describe('createTheme semantic tokens', () => {
     expect(theme.palette).toEqual(['#123456', '#abcdef']);
     expect(theme.categoricalPalette).toEqual(['#123456', '#abcdef']);
     expect(theme.tooltipBackground).toBe('#111');
+  });
+
+  it('preserves explicit opacity tokens and leaves an unmodified base alone', () => {
+    expect(createTheme({ base: darkTheme })).toEqual(darkTheme);
+    const theme = createTheme({ base: darkTheme, muted: '#84969e', gridOpacity: 0.4, borderOpacity: 0.7 });
+    expect(theme.gridOpacity).toBe(0.4);
+    expect(theme.borderOpacity).toBe(0.7);
   });
 });
 
@@ -164,6 +174,7 @@ describe('named theme guard', () => {
       expect(contrastRatio(theme.tickColor, theme.backgroundColor)).toBeGreaterThanOrEqual(
         AA_SMALL_TEXT,
       );
+      expect(contrastRatio(theme.axisLabelColor ?? theme.textColor, theme.backgroundColor)).toBeGreaterThanOrEqual(AA_SMALL_TEXT);
     });
 
     it(`${name} defines the categorical, sequential, and heatmap role palettes`, () => {

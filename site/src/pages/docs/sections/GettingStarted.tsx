@@ -2,72 +2,66 @@ import { createSignal } from 'solid-js';
 import CodeBlock from '../../../components/CodeBlock';
 import { Section, Prose, Demo } from '../../../components/ui';
 import { timeSeries } from '../fixtures';
-
 export default function GettingStarted() {
-  const [d_quickstart] = createSignal(timeSeries(100, 1));
-
-  return (
-    <>
-      <Section id="install" title="Installation">
-        <CodeBlock code="npm install snaplot" />
-        <div style={{ height: '12px' }} />
-        <Prose>The core entry is framework-free. Solid components and primitives are imported from <code>snaplot/solid</code> and require <code>solid-js ^1.9.0</code>.</Prose>
-        <CodeBlock code={`import { Chart } from 'snaplot/solid';
-import type { ColumnarData, ChartConfig } from 'snaplot';`} />
-      </Section>
-
-      <Section id="quick-start" title="Quick Start">
-        <Prose>A minimal working chart: create columnar data, define a config, and render with <code>&lt;Chart&gt;</code>.</Prose>
-        <CodeBlock code={`import { Chart } from 'snaplot/solid';
-import type { ColumnarData, ChartConfig } from 'snaplot';
-
-const data: ColumnarData = [
-  new Float64Array(timestamps),  // finite X values (sorted ascending)
-  new Float64Array(values),      // Y series 1
+  const [data] = createSignal(timeSeries(100, 1));
+  return <>
+    <Section id="install" title="Installation">
+      <CodeBlock code="npm install snaplot" />
+      <div style={{ height: '12px' }} />
+      <Prose>The root import is framework-independent. Native components are available from <code>snaplot/react</code> for React 19 and <code>snaplot/solid</code> for Solid 1.9. Install only the framework you use.</Prose>
+      <CodeBlock code={`import { createChart } from 'snaplot';
+// Or: import { Chart } from 'snaplot/react';
+// Or: import { Chart } from 'snaplot/solid';`} />
+    </Section>
+    <Section id="quick-start" title="Quick Start">
+      <Prose>Pass application rows and name the fields to plot. Series default to lines, with labels inferred from field names.</Prose>
+      <CodeBlock code={`const samples = [
+  { time: new Date('2026-01-01'), cpu: 42 },
+  { time: new Date('2026-01-02'), cpu: 51 },
 ];
 
-const config: ChartConfig = {
-  series: [
-    { label: 'Metric', dataIndex: 1, type: 'line' },
-  ],
-};
+const chart = createChart(element, {
+  data: samples,
+  x: 'time',
+  series: [{ y: 'cpu', label: 'CPU' }],
+  axes: { y: { title: 'Utilization (%)', min: 0, max: 100 } },
+});
 
-<Chart config={config} data={data} />`} />
-        <div style={{ height: '16px' }} />
-        <Demo title="Live quick start" desc="A simple line chart, edit the config to experiment"
-          data={d_quickstart()} height="240px"
-          code={`{
+// React and Solid use the same direct options:
+<Chart data={samples} x="time" series={[{ y: 'cpu' }]} />
+
+// Plain JavaScript cleanup:
+chart.destroy();`} />
+      <div style={{ height: '16px' }} />
+      <Demo title="Live quick start" desc="A simple line chart, edit the options to experiment" data={data()} height="240px" code={`{
+  x: 'x',
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
-  series: [
-    { label: 'Metric', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-  ],
+  series: [{ label: 'Metric', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   tooltip: { show: true },
 }`} />
-      </Section>
-
-      <Section id="data-model" title="Data Model">
-        <Prose>
-          snaplot uses a <b>columnar data format</b> built on <code>Float64Array</code>s. Index 0 is always the X axis and must contain finite values sorted ascending.
-          Indices 1+ are Y/value columns. All arrays must be the same length. <code>NaN</code> in any Y array creates a gap in that series, and infinities are ignored by range calculations.
-        </Prose>
-        <CodeBlock code={`// Columnar format: [x, y1, y2, ...]
-const data: ColumnarData = [
-  new Float64Array([1, 2, 3, 4, 5]),     // X values (sorted)
-  new Float64Array([10, 20, NaN, 40, 50]), // Y series 1 (NaN = gap)
-  new Float64Array([5, 15, 25, 35, 45]),   // Y series 2
-];`} />
-        <Prose>
-          <b>Why typed arrays?</b> Float64Arrays are contiguous in memory, giving excellent cache locality.
-          No boxing overhead, no GC pressure from per-point objects. Combined with binary search for O(log n) viewport culling and hit-testing, this enables smooth 60fps rendering even with hundreds of thousands of points.
-        </Prose>
-        <Prose>
-          <b>Immutable contract:</b> the library never mutates your data arrays. It reads from them during render passes.
-          When you want to update data, call <code>setData()</code> with new arrays or use <code>appendData()</code> for streaming.
-        </Prose>
-        <Prose>
-          <b>Render pipeline:</b> data change or resize triggers scale recomputation and marks all 3 canvas layers dirty. Scale change (zoom) marks data + grid dirty. Pointer events only mark the overlay dirty. A single <code>requestAnimationFrame</code> fires per frame, redrawing only the dirty layers. This means cursor movement at 60fps only redraws one lightweight overlay canvas, the data canvas with 100K+ points remains untouched.
-        </Prose>
-      </Section>
-    </>
-  );
+    </Section>
+    <Section id="data-model" title="Data Model">
+      <Prose>Rows accept field names or typed accessors. Continuous row data is stably sorted on ingestion without changing your input or losing source-row identity. Dates infer a time axis; strings infer categories. Numeric timestamps use an explicit <code>type: 'time'</code>. Missing metric values create gaps.</Prose>
+      <CodeBlock code={`// Named columns reuse your Float64Array buffers.
+const data = { columns: {
+  time: new Float64Array([1, 2, 3]),
+  cpu: new Float64Array([10, NaN, 30]),
+  memory: new Float64Array([5, 15, 25]),
+} };
+const chart = createChart(element, {
+  data, x: 'time',
+  series: [{ y: 'cpu' }, { y: 'memory' }],
+});
+chart.update({ data: nextData });`} />
+      <Prose>Named columns must have equal lengths and finite X values. Ordered marks require sorted X; scatter coordinates can be unordered. Columns are not sorted or converted during rendering. Treat input buffers as immutable. Use <code>chart.update</code> to replace a snapshot or <code>chart.appendData</code> for an ordered stream.</Prose>
+      <Prose>Series can also provide independent datasets, with their own X fields and sample times. Snaplot searches each source directly and retains each sample’s actual X value; no manual joining or interpolation is required.</Prose>
+      <CodeBlock code={`createChart(element, {
+  x: 'step',
+  series: [
+    { id: 'baseline', data: baselineRun, y: 'loss' },
+    { id: 'augmented', data: augmentedRun, y: 'loss' },
+  ],
+});`} />
+    </Section>
+  </>;
 }

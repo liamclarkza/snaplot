@@ -10,6 +10,17 @@ const SQRT_2 = Math.sqrt(2);   // ~1.414
 const SQRT_10 = Math.sqrt(10); // ~3.162
 const SQRT_50 = Math.sqrt(50); // ~7.071
 
+// Division can put an aligned boundary just below its integer index
+// (0.6 / 0.2 === 2.9999999999999996). Correct only rounding-sized error,
+// so genuinely non-aligned explicit bounds still round inward for ticks.
+function boundaryIndex(value: number, step: number): number {
+  const index = value / step;
+  const nearest = Math.round(index);
+  return Math.abs(index - nearest) <= Number.EPSILON * Math.max(1, Math.abs(index)) * 4
+    ? nearest
+    : index;
+}
+
 /**
  * Compute a nice step size for the given range and target tick count.
  */
@@ -49,8 +60,8 @@ export function niceRange(
   }
 
   const step = niceStep(min, max, count);
-  const nMin = Math.floor(min / step) * step;
-  const nMax = Math.ceil(max / step) * step;
+  const nMin = Math.floor(boundaryIndex(min, step)) * step;
+  const nMax = Math.ceil(boundaryIndex(max, step)) * step;
   return [nMin, nMax];
 }
 
@@ -92,8 +103,8 @@ export function niceTicks(
   const step = niceStep(min, max, count);
   if (step === 0 || !Number.isFinite(step)) return [min];
 
-  const nMin = Math.ceil(min / step) * step;
-  const nMax = Math.floor(max / step) * step;
+  const nMin = Math.ceil(boundaryIndex(min, step)) * step;
+  const nMax = Math.floor(boundaryIndex(max, step)) * step;
 
   // Compute tick count using integer arithmetic
   const n = Math.round((nMax - nMin) / step) + 1;

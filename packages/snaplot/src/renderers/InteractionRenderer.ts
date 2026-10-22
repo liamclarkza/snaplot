@@ -21,9 +21,9 @@ export function renderCrosshair(
   if (y < plot.top || y > plot.top + plot.height) return;
 
   ctx.save();
-  // Clip to rounded plot area so crosshair lines don't poke into corners.
+  // Clip to plot area so crosshair lines don't poke into corners.
   ctx.beginPath();
-  ctx.roundRect(plot.left, plot.top, plot.width, plot.height, 4);
+  ctx.rect(plot.left, plot.top, plot.width, plot.height);
   ctx.clip();
 
   ctx.strokeStyle = color;
@@ -148,7 +148,7 @@ export function renderBrushSelection(
 
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(plot.left, plot.top, plot.width, plot.height, 4);
+  ctx.rect(plot.left, plot.top, plot.width, plot.height);
   ctx.clip();
 
   ctx.fillStyle = 'rgba(99, 148, 255, 0.14)';

@@ -1,4 +1,4 @@
-import type { ChartInstance, ChartStats } from 'snaplot/core';
+import type { ChartHandle, ChartStats } from 'snaplot/core';
 
 export interface FrameStats {
   frames: number;
@@ -70,7 +70,7 @@ export class LayerTracker {
   private totals = { grid: 0, data: 0, overlay: 0 };
   private counts = { grid: 0, data: 0, overlay: 0 };
 
-  constructor(private chart: ChartInstance) {
+  constructor(private chart: ChartHandle) {
     this.prev = chart.getStats();
   }
 

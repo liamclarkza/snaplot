@@ -22,9 +22,9 @@ export default function Tooltips() {
           code={`{
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'CPU', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Memory', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Disk', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+    { label: 'CPU', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Memory', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Disk', y: 'value3', type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
@@ -33,13 +33,13 @@ export default function Tooltips() {
       <Section id="tooltip-custom" title="Custom Tooltip Renderer">
         <Prose>
           Pass a <code>tooltip.render</code> function for full control over tooltip content.
-          It receives an array of <code>TooltipPoint</code> objects and can return an <code>HTMLElement</code>. Prefer DOM nodes with <code>textContent</code> when values may contain user-controlled text.
+          It receives an array of <code>ChartPoint</code> objects and can return an <code>HTMLElement</code>. Prefer DOM nodes with <code>textContent</code> when values may contain user-controlled text.
         </Prose>
         <Prose>
           The <DocsLink slug="recipes" id="recipe-custom-tooltip">Custom Tooltip recipe</DocsLink>{' '}
           builds a complete swatch + label + value layout you can edit live.
         </Prose>
-        <Prose>Each <code>TooltipPoint</code> contains: <code>seriesIndex</code>, <code>dataIndex</code>, <code>label</code>, <code>x</code>, <code>y</code>, <code>color</code>, <code>formattedX</code>, <code>formattedY</code>.</Prose>
+        <Prose>Each <code>ChartPoint</code> contains: <code>seriesId</code>, <code>row</code>, <code>rowIndex</code>, <code>rowId</code>, <code>label</code>, <code>x</code>, <code>y</code>, <code>color</code>, <code>formattedX</code>, <code>formattedY</code>.</Prose>
       </Section>
 
       <Section id="tooltip-snap" title="Proximity & Snap">
@@ -52,7 +52,7 @@ export default function Tooltips() {
         <Demo title="Proximity and snap" desc="Move the cursor around, tooltip only shows near points. Toggle snap to see the difference."
           data={d_tooltip_snap()}
           code={`{
-  series: [{ label: 'Points', yDataIndex: 1, type: 'scatter', pointRadius: 3 }],
+  series: [{ label: 'Points', y: 'value1', type: 'scatter', pointRadius: 3 }],
   cursor: { show: true, snap: true, xLine: true, yLine: true },
   tooltip: { show: true, mode: 'nearest' },
 }`} />

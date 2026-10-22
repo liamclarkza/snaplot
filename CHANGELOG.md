@@ -6,6 +6,47 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### API overhaul
+
+- A framework-independent `createChart(element, options)` accepts rows or named typed columns, shared or independent series datasets, stable series/row IDs, categories, named encodings and direct histogram results.
+- Atomic `update`, exact `setViewport`, `resetViewport`, `resumeFollow`, declarative reference lines/regions, typed interaction events and core chart groups replace the previous public authoring surface.
+- Native React 19 and Solid 1.9 integrations provide equivalent direct props, controlled state, state subscriptions, groups and JSX legend/table companions with isolated optional peers and SSR-safe imports.
+- Axis options use `title`, `roundBounds`, `rangePadding` and `format`; streaming uses `maxPoints` and `followWindow`. Repository examples, documentation, benchmarks and comparison adapters use the new API. No compatibility aliases are retained.
+- Existing visual defaults are preserved by the API overhaul.
+
+### Changed
+- Plot edges and clips are square; titles and tick labels share a muted color.
+  Built-in grid, frame and tick strokes have consistent strength. Grid colors
+  are composited against the opaque chart surface before painting, preventing
+  brighter intersections from accumulated opacity.
+- Bars default to a softer fill, fine outline and rounded value ends with square
+  baselines. Continuous linear axes now round automatic bounds to regular tick
+  intervals; `nice: false` retains tight bounds. Constant Y ranges receive a
+  useful span. Explicit domains remain intact.
+- Automatic linear bar axes plan their center ticks, half-interval bounds and
+  grid boundaries together, eliminating unequal first/last grid cells. Label
+  thinning keeps the full regular grid; irregular bar widths remain contained.
+- Aligned decimal bounds retain their endpoint ticks despite floating-point
+  division error (for example, -0.4 through 0.6 at 0.2 intervals).
+
+### Added
+- `chartFromRows(rows, { x, series })` converts named fields or accessors into
+  `{ data, config }` for the existing chart API. It handles missing Y values,
+  infers time axes from Dates, validates X ordering and exposes typed field names.
+  The columnar and streaming APIs remain available unchanged.
+- `theme.axisLabelColor` and `--chart-axis-label` separate quiet axis text from
+  primary companion text. `createTheme({ muted })` supplies this role and quiet
+  stroke opacities automatically.
+
+### Development
+- Added a native-defaults comparison audit with text/size/data edge cases,
+  reproduced layout failures, correction-work tracking, and API/expected-behavior
+  reviews. The audit deliberately retains the failures for reproduction.
+- Added a private React comparison lab with five dashboard scenarios rendered
+  by Snaplot, Chart.js, Recharts and ECharts, deterministic stress controls,
+  browser evaluation evidence, and React adapter lifecycle tests. The published
+  Solid adapter is unchanged; the lab now exercises the additive row helper.
+
 ## [0.12.0] - 2026-07-12
 
 ### Added

@@ -22,7 +22,7 @@ function buildIndex(): SearchEntry[] {
     }
   }
   for (const m of api.methods) {
-    entries.push({ label: `${m.name}()`, detail: 'ChartInstance', slug: 'api', id: 'api-methods' });
+    entries.push({ label: `${m.name}()`, detail: 'ChartHandle', slug: 'api', id: 'api-methods' });
   }
   for (const e of api.events) {
     entries.push({ label: e.name, detail: 'Event', slug: 'api', id: 'api-events' });

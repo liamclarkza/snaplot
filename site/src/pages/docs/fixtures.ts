@@ -1,16 +1,16 @@
 import { histogram } from 'snaplot';
-import type { ColumnarData } from 'snaplot';
+import type { ColumnData, HistogramBins } from 'snaplot';
 
 /**
- * Data generators used by the docs demos. Each returns a ColumnarData
- * (`[xValues, ...ySeries]`, all Float64Array) ready to pass into a chart.
+ * Data generators used by the docs demos. Each returns named Float64Array columns ready to pass into a chart;
+ * histogram fixtures return the binning result directly.
  *
  * Generators are deterministic in shape but randomised in values so each
  * page load produces slightly different curves, keeps the docs feeling
  * alive without committing a large static fixture set.
  */
 
-export function timeSeries(points: number, seriesCount: number): ColumnarData {
+export function timeSeries(points: number, seriesCount: number): ColumnData {
   const now = Date.now(), x = new Float64Array(points);
   const series: Float64Array[] = [];
   for (let s = 0; s < seriesCount; s++) series.push(new Float64Array(points));
@@ -21,10 +21,10 @@ export function timeSeries(points: number, seriesCount: number): ColumnarData {
       series[s][i] = 50 + 30 * Math.sin(t * Math.PI * 4 + s * 1.5) + 10 * Math.sin(t * Math.PI * 12 + s) + (Math.random() - 0.5) * 8;
     }
   }
-  return [x, ...series] as ColumnarData;
+  return { columns: { x: x, ...Object.fromEntries((series).map((values, index) => [`value${index + 1}`, values])) } } as ColumnData;
 }
 
-export function scatterData(n: number): ColumnarData {
+export function scatterData(n: number): ColumnData {
   const x = new Float64Array(n), y = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const c = Math.floor(Math.random() * 3);
@@ -32,10 +32,10 @@ export function scatterData(n: number): ColumnarData {
     y[i] = [70, 40, 75][c] + (Math.random() - 0.5) * 30;
   }
   const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => x[a] - x[b]);
-  return [Float64Array.from(idx.map(i => x[i])), Float64Array.from(idx.map(i => y[i]))];
+  return { columns: { x: Float64Array.from(idx.map(i => x[i])), value1: Float64Array.from(idx.map(i => y[i])) } };
 }
 
-export function encodedScatterData(n: number): ColumnarData {
+export function encodedScatterData(n: number): ColumnData {
   const rowId = new Float64Array(n);
   const embeddingX = new Float64Array(n);
   const embeddingY = new Float64Array(n);
@@ -68,16 +68,16 @@ export function encodedScatterData(n: number): ColumnarData {
     score[i] = Math.max(0, Math.min(1, 0.78 - distance * 0.14 + c * 0.025 + (Math.random() - 0.5) * 0.08));
   }
 
-  return [rowId, embeddingX, embeddingY, cohort, volume, score];
+  return { columns: { x: rowId, value1: embeddingX, value2: embeddingY, value3: cohort, value4: volume, value5: score } };
 }
 
-export function barData(): ColumnarData {
+export function barData(): ColumnData {
   const n = 8, x = new Float64Array(n), y1 = new Float64Array(n), y2 = new Float64Array(n);
   for (let i = 0; i < n; i++) { x[i] = i; y1[i] = 20 + Math.random() * 60; y2[i] = 15 + Math.random() * 45; }
-  return [x, y1, y2];
+  return { columns: { x: x, value1: y1, value2: y2 } };
 }
 
-export function histData(): ColumnarData {
+export function histData(): HistogramBins {
   // Generate raw bimodal data, then compute bins
   const n = 5000;
   const raw = new Float64Array(n);
@@ -85,10 +85,10 @@ export function histData(): ColumnarData {
     raw[i] = Math.random() < 0.6 ? 50 + (Math.random() + Math.random() + Math.random() - 1.5) * 20 : 80 + (Math.random() + Math.random() - 1) * 15;
   }
   const bins = histogram(raw);
-  return [bins.edges, bins.counts];
+  return bins;
 }
 
-export function bandData(): ColumnarData {
+export function bandData(): ColumnData {
   const n = 200, x = new Float64Array(n);
   const mean = new Float64Array(n), upper = new Float64Array(n), lower = new Float64Array(n);
   const now = Date.now();
@@ -101,31 +101,31 @@ export function bandData(): ColumnarData {
     upper[i] = m + spread;
     lower[i] = m - spread;
   }
-  return [x, mean, upper, lower];
+  return { columns: { x: x, value1: mean, value2: upper, value3: lower } };
 }
 
-export function interpData(): ColumnarData {
+export function interpData(): ColumnData {
   const n = 15, x = new Float64Array(n), y = new Float64Array(n);
   for (let i = 0; i < n; i++) { x[i] = i; y[i] = 30 + 25 * Math.sin(i * 0.6) + (Math.random() - 0.5) * 10; }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }
 
-export function logData(): ColumnarData {
+export function logData(): ColumnData {
   const n = 50, x = new Float64Array(n), y = new Float64Array(n);
   for (let i = 0; i < n; i++) { x[i] = i; y[i] = Math.pow(10, 0.5 + i * 0.08) + (Math.random() - 0.5) * Math.pow(10, i * 0.06); }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }
 
-export function gappedData(): ColumnarData {
+export function gappedData(): ColumnData {
   const n = 60, x = new Float64Array(n), y = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     x[i] = i;
     y[i] = (i >= 12 && i <= 16) || (i >= 30 && i <= 33) || (i >= 48 && i <= 50) ? NaN : 40 + 20 * Math.sin(i * 0.3) + (Math.random() - 0.5) * 6;
   }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }
 
-export function dualAxisData(): ColumnarData {
+export function dualAxisData(): ColumnData {
   const n = 200, now = Date.now();
   const x = new Float64Array(n), y1 = new Float64Array(n), y2 = new Float64Array(n);
   for (let i = 0; i < n; i++) {
@@ -133,10 +133,10 @@ export function dualAxisData(): ColumnarData {
     y1[i] = 18 + 8 * Math.sin(t * Math.PI * 2) + (Math.random() - 0.5) * 2;
     y2[i] = 55 + 20 * Math.cos(t * Math.PI * 2 + 1) + (Math.random() - 0.5) * 5;
   }
-  return [x, y1, y2];
+  return { columns: { x: x, value1: y1, value2: y2 } };
 }
 
-export function heatmapData(n: number): ColumnarData {
+export function heatmapData(n: number): ColumnData {
   const x = new Float64Array(n), y = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const u1 = Math.random(), u2 = Math.random();
@@ -147,33 +147,33 @@ export function heatmapData(n: number): ColumnarData {
     y[i] = [25, 75, 70, 30][c] + z1 * [12, 10, 15, 8][c];
   }
   const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => x[a] - x[b]);
-  return [Float64Array.from(idx.map(i => x[i])), Float64Array.from(idx.map(i => y[i]))];
+  return { columns: { x: Float64Array.from(idx.map(i => x[i])), value1: Float64Array.from(idx.map(i => y[i])) } };
 }
 
-export function largeTimeSeries(n: number): ColumnarData {
+export function largeTimeSeries(n: number): ColumnData {
   const now = Date.now(), x = new Float64Array(n), y = new Float64Array(n);
   let val = 50;
   for (let i = 0; i < n; i++) { x[i] = now - (n - i) * 1000; val += (Math.random() - 0.5) * 2; y[i] = val; }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }
 
-export function linearData(): ColumnarData {
+export function linearData(): ColumnData {
   const n = 80, x = new Float64Array(n), y = new Float64Array(n);
   for (let i = 0; i < n; i++) { x[i] = i; y[i] = 10 + 0.8 * i + (Math.random() - 0.5) * 12; }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }
 
-export function timeScaleData(): ColumnarData {
+export function timeScaleData(): ColumnData {
   const n = 300, now = Date.now();
   const x = new Float64Array(n), y = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     x[i] = now - (n - i) * 3_600_000;
     y[i] = 50 + 30 * Math.sin(i * 0.05) + (Math.random() - 0.5) * 10;
   }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }
 
-export function stylingData(): ColumnarData {
+export function stylingData(): ColumnData {
   const n = 60, x = new Float64Array(n), y1 = new Float64Array(n), y2 = new Float64Array(n), y3 = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     x[i] = i;
@@ -181,10 +181,10 @@ export function stylingData(): ColumnarData {
     y2[i] = 40 + 20 * Math.cos(i * 0.12 + 1);
     y3[i] = 55 + 15 * Math.sin(i * 0.1 + 2);
   }
-  return [x, y1, y2, y3];
+  return { columns: { x: x, value1: y1, value2: y2, value3: y3 } };
 }
 
-export function legendData(): ColumnarData {
+export function legendData(): ColumnData {
   const n = 100, x = new Float64Array(n);
   const y1 = new Float64Array(n), y2 = new Float64Array(n), y3 = new Float64Array(n);
   for (let i = 0; i < n; i++) {
@@ -193,11 +193,11 @@ export function legendData(): ColumnarData {
     y2[i] = 40 + 15 * Math.cos(i * 0.08 + 1);
     y3[i] = 60 + 10 * Math.sin(i * 0.12 + 2);
   }
-  return [x, y1, y2, y3];
+  return { columns: { x: x, value1: y1, value2: y2, value3: y3 } };
 }
 
 /** One bar per day for the last `days` days: a dashboard daily-metric shape. */
-export function dailyBarData(days: number): ColumnarData {
+export function dailyBarData(days: number): ColumnData {
   const x = new Float64Array(days);
   const y = new Float64Array(days);
   const dayMs = 86_400_000;
@@ -209,5 +209,5 @@ export function dailyBarData(days: number): ColumnarData {
     const weekend = weekday === 0 || weekday === 6 ? 0.55 : 1;
     y[i] = Math.round((140 + Math.sin(i / 3.1) * 35 + Math.random() * 40) * weekend);
   }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }

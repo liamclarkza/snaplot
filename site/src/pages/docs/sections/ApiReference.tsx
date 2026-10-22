@@ -7,7 +7,7 @@ import api from '../api.gen.json';
  * API reference rendered from api.gen.json, which
  * scripts/generate-api-docs.mjs extracts from the library's TypeScript
  * declarations and doc comments at build time. Edit the doc comments in
- * packages/snaplot/src/types.ts (and solid sources), not this file.
+ * packages/snaplot/src/api/types.ts (and solid sources), not this file.
  */
 
 const cellHead = {
@@ -92,9 +92,9 @@ function ApiTable(props: {
 export default function ApiReference() {
   return (
     <>
-      <Section id="api-methods" title="ChartInstance Methods">
+      <Section id="api-methods" title="ChartHandle Methods">
         <Prose>
-          The <code>ChartInstance</code> object is returned by <code>new ChartCore(...)</code> and by the{' '}
+          The <code>ChartHandle</code> object is returned by <code>createChart(element, options)</code> and by the{' '}
           <code>onReady</code> callback on <code>&lt;Chart&gt;</code>. This table is generated from the
           library's type declarations, so it always matches the installed version.
         </Prose>
@@ -115,8 +115,8 @@ export default function ApiReference() {
           rows={api.events.map((e) => [e.name, e.type, e.doc])}
         />
         <CodeBlock code={`// Example: log viewport changes
-const unsub = chart.on('viewport:change', (key, range) => {
-  console.log(\`\${key}: \${range.min.toFixed(2)} – \${range.max.toFixed(2)}\`);
+const unsub = chart.on('viewport:change', (viewport) => {
+  console.log(viewport.x);
 });
 
 // Later: unsubscribe
@@ -125,9 +125,7 @@ unsub();`} />
 
       <Section id="api-scatter-options" title="Scatter Series Options">
         <Prose>
-          Scatter series support additional encodings for tabular data. All scatter column references
-          are absolute <code>ColumnarData</code> indexes: <code>0</code> is the default X column, and{' '}
-          <code>1</code> onward are value columns.
+          Scatter series use named fields or typed accessors for coordinates, color, size and tooltip values. Source rows and stable series IDs are included in interaction payloads.
         </Prose>
         <ApiTable
           headers={['Option', 'Type', 'Description']}
@@ -135,7 +133,7 @@ unsub();`} />
           rows={api.scatter.map((s) => [s.name + (s.optional ? '?' : ''), s.type, s.doc])}
         />
         <CodeBlock code={`colorBy: {
-  dataIndex: 3,
+  field: 'value3',
   type: 'category',       // 'auto' | 'category' | 'continuous' | 'diverging'
   palette: ['#4f8fea', '#58b884', '#e6a23c'],
   label: 'Model family',
@@ -143,7 +141,7 @@ unsub();`} />
 }
 
 sizeBy: {
-  dataIndex: 4,
+  field: 'value4',
   domain: [0, 600],
   range: [2, 8],          // radius in CSS pixels
   scale: 'sqrt',
@@ -152,7 +150,7 @@ sizeBy: {
 }
 
 tooltipFields: [
-  { dataIndex: 5, label: 'Accuracy', format: (v) => \`\${(v * 100).toFixed(1)}%\` },
+  { field: 'value5', label: 'Accuracy', format: (v) => \`\${(v * 100).toFixed(1)}%\` },
 ]`} />
       </Section>
 
@@ -171,6 +169,8 @@ tooltipFields: [
           headers={['Type', 'Description']}
           rows={api.solidTypes.map((t) => [t.name, t.doc])}
         />
+        <Prose>Type exports from <code>snaplot/react</code>:</Prose>
+        <ApiTable headers={['Type', 'Description']} rows={api.reactTypes.map(t => [t.name, t.doc])} />
       </Section>
     </>
   );

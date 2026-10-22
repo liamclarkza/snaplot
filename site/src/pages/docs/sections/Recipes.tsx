@@ -1,7 +1,7 @@
 import { createSignal, createEffect, createMemo, onCleanup } from 'solid-js';
 import { lttb, m4, lightTheme, darkTheme } from 'snaplot';
 import { Chart, createChartGroup } from 'snaplot/solid';
-import type { ChartInstance, ColumnarData } from 'snaplot';
+import type { ChartHandle, ChartOptions, ColumnData } from 'snaplot';
 import CodeBlock from '../../../components/CodeBlock';
 import { Section, Prose, Demo, LazyMount, createInViewport } from '../../../components/ui';
 import { useTheme } from '../../../ThemeContext';
@@ -24,10 +24,10 @@ export default function Recipes() {
 
   // Downsample once at module scope, same pattern as the Data section.
   const orig = largeTimeSeries(25_000);
-  const [lx, ly] = lttb(orig[0], orig[1], 500);
-  const [mx, my] = m4(orig[0], orig[1], 600, orig[0][0], orig[0][orig[0].length - 1]);
-  const [d_lttb] = createSignal<ColumnarData>([lx, ly]);
-  const [d_m4] = createSignal<ColumnarData>([mx, my]);
+  const [lx, ly] = lttb(orig.columns.x, orig.columns.value1, 500);
+  const [mx, my] = m4(orig.columns.x, orig.columns.value1, 600, orig.columns.x[0], orig.columns.x[orig.columns.x.length - 1]);
+  const [d_lttb] = createSignal<ColumnData>({ columns: { x: lx, value1: ly } });
+  const [d_m4] = createSignal<ColumnData>({ columns: { x: mx, value1: my } });
 
   return (
     <>
@@ -35,19 +35,20 @@ export default function Recipes() {
         <Prose>
           A ring buffer plus <code>appendData</code> keeps a fixed window of
           live data without reallocating on every tick. Set
-          <code>streaming.maxLen</code> to cap the retained points; the oldest
+          <code>streaming.maxPoints</code> to cap the retained points; the oldest
           drop off the front automatically. Use
           <code>appendData(chunk, {'{'} updateLast: true {'}'})</code> to refine
           the in-progress tail row (a forming bucket or live aggregate) in place
           instead of appending a new point every tick.
         </Prose>
-        <CodeBlock code={`const chart = new ChartCore(container, {
-  streaming: { maxLen: 600 },   // ring buffer, keep the last 600 points
+        <CodeBlock code={`const chart = createChart(container, {
+  data: seed, x: 'x',
+  streaming: { maxPoints: 600 },   // ring buffer, keep the last 600 points
   axes: { x: { type: 'time' } },
-  series: [{ label: 'throughput', dataIndex: 1, type: 'line' }],
-}, seed);
+  series: [{ label: 'throughput', y: 'value1', type: 'line' }],
+});
 
-let acc = 0, samples = 0, bucketX = seed[0][seed[0].length - 1];
+let acc = 0, samples = 0, bucketX = seed.columns.x[seed.columns.x.length - 1];
 
 setInterval(() => {
   const value = readMetric();
@@ -55,98 +56,66 @@ setInterval(() => {
     // Open a new bucket: append a fresh point.
     bucketX += 1;
     acc = value; samples = 1;
-    chart.appendData([new Float64Array([bucketX]),
-                      new Float64Array([acc])]);
+    chart.appendData({ columns: { x: new Float64Array([bucketX]),
+    value1: new Float64Array([acc]) } });
   } else {
     // Refine the same bucket: overwrite the tail row, no new point.
     acc += value; samples += 1;
-    chart.appendData([new Float64Array([bucketX]),
-                      new Float64Array([acc / samples])],
+    chart.appendData({ columns: { x: new Float64Array([bucketX]),
+    value1: new Float64Array([acc / samples]) } },
                      { updateLast: true });
     if (samples >= 5) samples = 0;  // bucket closes, next tick opens a new one
   }
 }, 200);`} />
         <Prose>
-          For a live monitor, add <code>streaming.follow</code> to keep a fixed
+          For a live monitor, add <code>streaming.followWindow</code> to keep a fixed
           trailing window that scrolls with the newest data. The view follows
           until the user pans or zooms X (which pauses it); a
-          <code>Go live</code> button calls <code>chart.scrollToLatest()</code>
-          to resume. Read <code>chart.isFollowing()</code> or listen to
+          <code>Go live</code> button calls <code>chart.resumeFollow()</code>
+          to resume. Read <code>chart.getState().following</code> or listen to
           <code>follow:change</code> to drive a live/paused badge.
         </Prose>
-        <CodeBlock code={`const chart = new ChartCore(container, {
-  streaming: { maxLen: 5000, follow: 60_000 },  // trailing 60s window
+        <CodeBlock code={`const chart = createChart(container, {
+  data: seed, x: 'x',
+  streaming: { maxPoints: 5000, followWindow: 60_000 },  // trailing 60s window
   axes: { x: { type: 'time' } },
-  series: [{ label: 'throughput', dataIndex: 1, type: 'line' }],
-}, seed);
+  series: [{ label: 'throughput', y: 'value1', type: 'line' }],
+});
 
 chart.on('follow:change', (live) => {
   goLiveButton.hidden = live;   // show "Go live" only while paused
 });
 
 // resume live scrolling after the user zoomed in to inspect
-goLiveButton.onclick = () => chart.scrollToLatest();`} />
+goLiveButton.onclick = () => chart.resumeFollow();`} />
         <div style={{ height: '12px' }} />
         <LazyMount estHeight="290px"><StreamingDashboardDemo /></LazyMount>
       </Section>
 
       <Section id="recipe-linked" title="Recipe: Linked Charts">
         <Prose>
-          <code>createChartGroup()</code> mints one sync key and wires cursor,
-          highlight, and (opt-in) zoom across every chart you spread
-          <code>group.apply(config)</code> into. Hover or zoom one chart and the
-          peers follow. For highlight to survive charts whose series are in a
-          different order, give each series a stable identity through
-          <code>highlight.getKey</code>; external controls then call
-          <code>group.highlightKey(id)</code> and every chart maps the id back to
-          its own local series.
+          Pass a shared group to each chart. Cursor and highlight synchronize by default; viewport synchronization is opt-in. Explicit series IDs keep highlights aligned when charts show different subsets or orders of runs.
         </Prose>
-        <CodeBlock code={`const group = createChartGroup();
+        <CodeBlock code={`const group = createChartGroup({ viewport: true });
+const series = runs.map(run => ({
+  id: run.id, label: run.name, data: run.samples, y: 'loss',
+}));
 
-const runs = [{ id: 'run-a' }, { id: 'run-b' }, { id: 'run-c' }];
+<Chart x="step" series={series} group={group} />
+<Chart x="step" series={[...series].reverse()} group={group} />
 
-// apply(config, { zoom: true }) merges cursor + highlight + zoom sync keys
-// without clobbering your own cursor/highlight settings.
-const config = group.apply({
-  axes: { x: { type: 'time' } },
-  series: runs.map((r, i) => ({
-    label: r.id, dataIndex: i + 1, type: 'line',
-    meta: { runId: r.id },              // stable identity for getKey
-  })),
-  highlight: { getKey: (s) => s.meta?.runId },
-}, { zoom: true });
-
-// Chart B lists the same runs in reverse order; getKey keeps highlight aligned.
-<Chart config={config} data={a} />
-<Chart config={configReversed} data={b} />
-
-<button onMouseEnter={() => group.highlightKey('run-b')}
-        onMouseLeave={() => group.highlightKey(null)}>
+<button onMouseEnter={() => group.setHighlight('run-b')}
+        onMouseLeave={() => group.setHighlight(null)}>
   Focus run-b
 </button>`} />
         <div style={{ height: '12px' }} />
         <LazyMount estHeight="560px"><LinkedChartsDemo /></LazyMount>
         <Prose>
-          For a wall of many charts, pass <code>defaults</code> once so every
-          chart inherits the same axes, theme, and interaction instead of
-          drifting, and call <code>group.link(chart)</code> on each mounted
-          instance to share one Y domain (the union of their extents, so
-          values compare fairly) and align their left gutters.
+          Opt into shared Y ranges and plot-edge alignment for charts that should compare directly. Group membership follows chart creation and destruction automatically. Pass common options directly to each chart.
         </Prose>
-        <CodeBlock code={`const group = createChartGroup({
-  defaults: {                       // inherited by every chart in the group
-    axes: { x: { type: 'time' }, y: { type: 'linear' } },
-    theme: darkTheme,
-    tooltip: { mode: 'nearest' },
-  },
-});
-
-// createChart returns the instance accessor; link it once it exists.
-const chart = createChart(() => ref, () => group.apply(config), data);
-createEffect(() => {
-  const c = chart();
-  if (c) onCleanup(group.link(c));   // shared Y domain + aligned gutters
-});`} />
+        <CodeBlock code={`const group = createChartGroup({ yRange: true, alignPlots: true });
+const common = { axes: { x: { type: 'time' } }, theme: darkTheme };
+<Chart {...common} x="time" data={samples} series={[{ y: 'cpu' }]} group={group} />`} />
       </Section>
 
       <Section id="recipe-brush" title="Recipe: Persistent Brush Selection">
@@ -155,15 +124,16 @@ createEffect(() => {
           X-range band instead of a zoom. Drag to create it, drag inside to move
           it, drag an edge to resize it. The band is chart state in data space,
           so it stays anchored as you pan and zoom, and
-          <code>getSelection()</code> returns a value you can drop straight into
+          <code>getState().selection</code> returns a value you can drop straight into
           a URL and restore with <code>setSelection()</code>. Wheel still zooms
           and shift-drag still pans.
         </Prose>
-        <CodeBlock code={`const chart = new ChartCore(container, {
+        <CodeBlock code={`const chart = createChart(container, {
+  data: seed, x: 'x',
   selection: { mode: 'brush' },
   axes: { x: { type: 'time' } },
-  series: [{ label: 'value', dataIndex: 1, type: 'line' }],
-}, data);
+  series: [{ label: 'value', y: 'value1', type: 'line' }],
+});
 
 // Persist the window in the URL and mirror it to a summary panel.
 chart.on('selection:change', (sel) => {
@@ -187,8 +157,7 @@ if (q.has('from')) {
           categorical palette; <code>sizeBy</code> with <code>scale: 'sqrt'</code>
           encodes a count or volume by area (the perceptually honest choice);
           <code>tooltipFields</code> surfaces any other column on hover. Columns
-          are absolute indices into the data; here the data is
-          <code>[rowId, x, y, cohort, volume, score]</code>.
+          use names in the dataset; source-row identities remain available independently of coordinates.
         </Prose>
         <Demo
           title="colorBy + sizeBy + tooltipFields"
@@ -196,16 +165,16 @@ if (q.has('from')) {
           data={d_scatter()}
           height="360px"
           code={`{
-  axes: { x: { label: 'embedding x' }, y: { label: 'embedding y' } },
+  axes: { x: { title: 'embedding x' }, y: { title: 'embedding y' } },
   series: [{
     label: 'events',
     type: 'scatter',
-    xDataIndex: 1,
-    yDataIndex: 2,
-    colorBy: { dataIndex: 3, type: 'category', label: 'cohort' },
-    sizeBy: { dataIndex: 4, range: [3, 14], scale: 'sqrt',
+    x: 'value1',
+    y: 'value2',
+    colorBy: { field: 'value3', type: 'category', label: 'cohort' },
+    sizeBy: { field: 'value4', range: [3, 14], scale: 'sqrt',
               label: 'volume', format: v => v.toFixed(0) },
-    tooltipFields: [{ dataIndex: 5, label: 'score', format: v => v.toFixed(3) }],
+    tooltipFields: [{ field: 'value5', label: 'score', format: v => v.toFixed(3) }],
   }],
   tooltip: { show: true, mode: 'nearest' },
 }`}
@@ -219,7 +188,7 @@ if (q.has('from')) {
           as <code>innerHTML</code> verbatim, so escape any user-derived text (or
           return an <code>HTMLElement</code> built with <code>textContent</code>).
           The values below are numeric and pre-formatted via each axis
-          <code>tickFormat</code>, so a template string is safe here.
+          <code>format</code>, so a template string is safe here.
         </Prose>
         <Demo
           title="Custom tooltip markup"
@@ -228,8 +197,8 @@ if (q.has('from')) {
           code={`{
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'p50', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'p99', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'p50', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'p99', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
   tooltip: {
     show: true,
@@ -253,30 +222,28 @@ if (q.has('from')) {
 
       <Section id="recipe-custom-plugin" title="Recipe: Custom Plugin">
         <Prose>
-          A plugin implements any subset of the <code>Plugin</code> hooks. This
-          one pairs a data hook with a cursor hook: <code>onCursorMove</code>
-          records the snapped index (and clears it on leave, when the args are
-          <code>null</code>), and <code>afterDrawOverlay</code> paints a small
+          A plugin implements any subset of the <code>ChartPlugin</code> hooks. This
+          one reads <code>getCursorSnapshot()</code> in <code>afterDrawOverlay</code> and paints a small
           readout on the top layer. The cursor system already repaints the
           overlay on every move, so no manual <code>redraw()</code> is needed.
           Editing the config re-runs the plugin factory live.
         </Prose>
         <Demo
           title="Cursor readout plugin"
-          desc="Draws the current data index in the plot corner using onCursorMove + afterDrawOverlay"
+          desc="Draws the current data index in the plot corner using getCursorSnapshot + afterDrawOverlay"
           data={d_plugin()}
           code={`{
   axes: { x: { type: 'time' } },
-  series: [{ label: 'signal', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
+  series: [{ label: 'signal', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   cursor: { show: true, snap: true },
   plugins: [
     (() => {
-      let idx = null;
       return {
         id: 'cursor-readout',
-        onCursorMove: (_chart, _dataX, dataIdx) => { idx = dataIdx; },
         afterDrawOverlay: (chart, ctx) => {
-          if (idx == null) return;
+          const point = chart.getCursorSnapshot().points[0];
+          if (!point) return;
+          const idx = point.rowIndex;
           const { plot } = chart.getLayout();
           const theme = chart.getTheme();
           ctx.save();
@@ -311,13 +278,14 @@ if (q.has('from')) {
 [data-theme='dark'] { --surface: oklch(0.18 0.015 260); --ink: oklch(0.93 0.005 260); }
 
 /* option A: reference your own tokens from the theme */
-new ChartCore(el, {
+createChart(el, {
+  data, x: 'x',
   theme: {
     backgroundColor: 'var(--surface)',
     textColor: 'var(--ink)',
   },
-  series: [{ label: 'v', dataIndex: 1 }],
-}, data);
+  series: [{ label: 'v', y: 'value1' }],
+});
 
 /* option B: alias tokens to the --chart-* names and pass no theme.
    Full list: --chart-bg, --chart-text, --chart-tick, --chart-grid,
@@ -344,8 +312,8 @@ new ChartCore(el, {
   },
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'A', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'A', y: 'value1', type: 'area', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'B', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
   tooltip: { show: true, mode: 'index' },
 }`}
@@ -361,8 +329,8 @@ new ChartCore(el, {
           code={`{
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'A', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'A', y: 'value1', type: 'area', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'B', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
   tooltip: { show: true, mode: 'index' },
 }`}
@@ -388,7 +356,7 @@ new ChartCore(el, {
       type: 'time',
       tickCount: 6,          // at most 6 date labels across the range
       grid: false,           // no vertical gridlines
-      tickFormat: (t) => new Date(t).toLocaleDateString(undefined,
+      format: (t) => new Date(t).toLocaleDateString(undefined,
         { month: 'short', day: 'numeric' }),
     },
     y: {
@@ -397,7 +365,7 @@ new ChartCore(el, {
     },
   },
   series: [{
-    label: 'active users', dataIndex: 1, type: 'bar',
+    label: 'active users', y: 'value1', type: 'bar',
     // per-datum fill: emphasize the most recent day
     fill: (v, i) => i === 29 ? '#e8590c' : '#4f8fea',
   }],
@@ -440,7 +408,7 @@ const [mx, my] = m4(xData, yData, plotWidthPx, xMin, xMax);`} />
           data={d_lttb()}
           code={`{
   axes: { x: { type: 'time' } },
-  series: [{ label: 'LTTB 500', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
+  series: [{ label: 'LTTB 500', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   tooltip: { show: true },
 }`}
         />
@@ -450,7 +418,7 @@ const [mx, my] = m4(xData, yData, plotWidthPx, xMin, xMax);`} />
           data={d_m4()}
           code={`{
   axes: { x: { type: 'time' } },
-  series: [{ label: 'M4', dataIndex: 1, type: 'line', interpolation: 'linear', lineWidth: 1.5 }],
+  series: [{ label: 'M4', y: 'value1', type: 'line', interpolation: 'linear', lineWidth: 1.5 }],
   tooltip: { show: true },
 }`}
         />
@@ -473,7 +441,7 @@ const [mx, my] = m4(xData, yData, plotWidthPx, xMin, xMax);`} />
           code={`{
   series: [{
     label: 'sampled',
-    dataIndex: 1,
+    y: 'value1',
     type: 'line',
     interpolation: 'monotone',
     lineWidth: 2,
@@ -486,9 +454,9 @@ const [mx, my] = m4(xData, yData, plotWidthPx, xMin, xMax);`} />
 
       <Section id="recipe-axis-titles" title="Recipe: Axis Titles + Tick Format">
         <Prose>
-          <code>axis.label</code> renders a title outside the tick labels
+          <code>axis.title</code> renders a title outside the tick labels
           (below a bottom axis, rotated alongside a left axis) and layout
-          reserves the gutter space automatically. <code>axis.tickFormat</code>
+          reserves the gutter space automatically. <code>axis.format</code>
           overrides label formatting per axis; return <code>''</code> to hide a
           specific tick. Here the Y axis formats values as a percentage and the
           X axis labels only every other hour.
@@ -501,14 +469,14 @@ const [mx, my] = m4(xData, yData, plotWidthPx, xMin, xMax);`} />
   axes: {
     x: {
       type: 'time',
-      label: 'time (local)',
+      title: 'time (local)',
     },
     y: {
-      label: 'utilisation',
-      tickFormat: v => v.toFixed(0) + '%',
+      title: 'utilisation',
+      format: v => v.toFixed(0) + '%',
     },
   },
-  series: [{ label: 'gpu', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 }],
+  series: [{ label: 'gpu', y: 'value1', type: 'area', interpolation: 'monotone', lineWidth: 2 }],
   tooltip: { show: true, mode: 'index' },
 }`}
         />
@@ -523,7 +491,7 @@ const [mx, my] = m4(xData, yData, plotWidthPx, xMin, xMax);`} />
  * window at 120 points; the readout shows the append/version counters.
  */
 function StreamingDashboardDemo() {
-  const [chart, setChart] = createSignal<ChartInstance>();
+  const [chart, setChart] = createSignal<ChartHandle>();
   const [label, setLabel] = createSignal('waiting for chart');
   const seed = seedSeries(80);
   let rootRef!: HTMLDivElement;
@@ -535,7 +503,7 @@ function StreamingDashboardDemo() {
     // re-runs and restarts it when the demo scrolls back in.
     if (!c || !inView()) return;
 
-    let bucketX = seed[0][seed[0].length - 1];
+    let bucketX = seed.columns.x[seed.columns.x.length - 1];
     let acc = 0;
     let samples = 0;
 
@@ -545,11 +513,11 @@ function StreamingDashboardDemo() {
         bucketX += 1;
         acc = value;
         samples = 1;
-        c.appendData([new Float64Array([bucketX]), new Float64Array([acc])]);
+        c.appendData({ columns: { x: new Float64Array([bucketX]), value1: new Float64Array([acc]) } });
       } else {
         acc += value;
         samples += 1;
-        c.appendData([new Float64Array([bucketX]), new Float64Array([acc / samples])], {
+        c.appendData({ columns: { x: new Float64Array([bucketX]), value1: new Float64Array([acc / samples]) } }, {
           updateLast: true,
         });
         if (samples >= 5) samples = 0;
@@ -570,11 +538,12 @@ function StreamingDashboardDemo() {
         <Chart
           data={seed}
           onReady={setChart}
-          config={{
+          x="x"
+          {...{
             debug: { stats: true },
-            streaming: { maxLen: 120 },
+            streaming: { maxPoints: 120 },
             axes: { x: { type: 'linear' } },
-            series: [{ label: 'throughput', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
+            series: [{ label: 'throughput', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 }],
             tooltip: { show: true, mode: 'index' },
           }}
         />
@@ -590,67 +559,47 @@ const RUN_IDS = ['run-a', 'run-b', 'run-c'];
 
 /**
  * Two synced charts whose series are in opposite order, plus external hover
- * controls. Highlight rides on `getKey` (the run id), so hovering a button
+ * controls. Highlight uses the stable series id, so hovering a button
  * dims all-but-one in both charts even though their series order differs.
  * Zoom sync is opted in, so box-zooming either chart moves both.
  */
 function LinkedChartsDemo() {
   const { theme: siteTheme } = useTheme();
-  const group = createChartGroup();
+  const group = createChartGroup({ viewport: true });
   const data = timeSeries(200, 3);
 
   const baseSeries = RUN_IDS.map((id, i) => ({
     label: id,
-    dataIndex: i + 1,
+    id, y: `value${i + 1}`,
     type: 'line' as const,
     interpolation: 'monotone' as const,
     lineWidth: 2,
     meta: { runId: id },
   }));
 
-  const configA = createMemo(() =>
-    group.apply(
-      {
-        theme: siteTheme() === 'light' ? lightTheme : darkTheme,
-        axes: { x: { type: 'time' } },
-        series: baseSeries,
-        highlight: { getKey: (s) => (s.meta as { runId: string } | undefined)?.runId },
-        tooltip: { show: true, mode: 'index' },
-      },
-      { zoom: true },
-    ),
-  );
-
-  const configB = createMemo(() =>
-    group.apply(
-      {
-        theme: siteTheme() === 'light' ? lightTheme : darkTheme,
-        axes: { x: { type: 'time' } },
-        // Reverse order: dataIndex 3,2,1 but the same run ids in meta.
-        series: [...baseSeries].reverse().map((s, i) => ({ ...s, dataIndex: 3 - i })),
-        highlight: { getKey: (s) => (s.meta as { runId: string } | undefined)?.runId },
-        tooltip: { show: true, mode: 'index' },
-      },
-      { zoom: true },
-    ),
-  );
+  const configA = createMemo<ChartOptions>(() => ({
+    group, x: 'x', theme: siteTheme() === 'light' ? lightTheme : darkTheme,
+    axes: { x: { type: 'time' } }, series: baseSeries,
+    tooltip: { show: true, mode: 'index' },
+  }));
+  const configB = createMemo<ChartOptions>(() => ({ ...configA(), series: [...baseSeries].reverse() }));
 
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '170px' }}>
-        <Chart config={configA()} data={data} />
+        <Chart {...configA()} data={data} />
       </div>
       <div style={{ height: '170px', 'border-top': '1px solid var(--border)' }}>
-        <Chart config={configB()} data={data} />
+        <Chart {...configB()} data={data} />
       </div>
       <div style={{ display: 'flex', gap: '8px', padding: '10px 12px', 'border-top': '1px solid var(--border)', 'flex-wrap': 'wrap' }}>
         {RUN_IDS.map((id) => (
           <button
             type="button"
-            onMouseEnter={() => group.highlightKey(id)}
-            onMouseLeave={() => group.highlightKey(null)}
-            onFocus={() => group.highlightKey(id)}
-            onBlur={() => group.highlightKey(null)}
+            onMouseEnter={() => group.setHighlight(id)}
+            onMouseLeave={() => group.setHighlight(null)}
+            onFocus={() => group.setHighlight(id)}
+            onBlur={() => group.setHighlight(null)}
             style={{
               padding: '4px 12px',
               'border-radius': 'var(--radius-md)',
@@ -670,12 +619,12 @@ function LinkedChartsDemo() {
   );
 }
 
-function seedSeries(points: number): ColumnarData {
+function seedSeries(points: number): ColumnData {
   const x = new Float64Array(points);
   const y = new Float64Array(points);
   for (let i = 0; i < points; i++) {
     x[i] = i;
     y[i] = 50 + Math.sin(i / 9) * 16 + (Math.random() - 0.5) * 6;
   }
-  return [x, y];
+  return { columns: { x, value1: y } };
 }

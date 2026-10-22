@@ -1,10 +1,9 @@
+import { nameColumn, valueColumn } from 'snaplot/solid';
 import { createSignal } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { Chart, LegendTable } from 'snaplot/solid';
 import {
   histogram,
-  nameColumn,
-  valueColumn,
   studioTheme,
   lightTheme,
   tokyoTheme,
@@ -17,7 +16,7 @@ import {
   ivoryTheme,
   mintTheme,
 } from 'snaplot';
-import type { ChartConfig, ColumnarData, ChartInstance, ThemeConfig } from 'snaplot';
+import type { ChartOptions, ColumnData, HistogramBins, ChartHandle, ThemeConfig } from 'snaplot';
 // The legend-table fixture needs the plugin stylesheet the docs page also
 // pulls from source. Published consumers import 'snaplot/legend-table.css'.
 import '../../../packages/snaplot/src/styles/legendTable.css';
@@ -62,7 +61,7 @@ const NAMED_THEMES: { label: string; theme: ThemeConfig }[] = [
   { label: 'mint', theme: mintTheme },
 ];
 
-function multiLine(): ColumnarData {
+function multiLine(): ColumnData {
   const n = 80;
   const x = new Float64Array(n);
   const a = new Float64Array(n);
@@ -75,17 +74,14 @@ function multiLine(): ColumnarData {
     b[i] = 40 + Math.cos(t * Math.PI * 2) * 14;
     c[i] = 62 + Math.sin(t * Math.PI * 4 + 1) * 10;
   }
-  return [x, a, b, c];
+  return { columns: { x: x, value1: a, value2: b, value3: c } };
 }
 
-function gapLine(): ColumnarData {
-  return [
-    f([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
-    f([12, 15, 17, NaN, NaN, NaN, 22, 20, 24, 21, 25, 23]),
-  ];
+function gapLine(): ColumnData {
+  return { columns: { x: f([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]), value1: f([12, 15, 17, NaN, NaN, NaN, 22, 20, 24, 21, 25, 23]) } };
 }
 
-function axisTitleLine(): ColumnarData {
+function axisTitleLine(): ColumnData {
   const n = 60;
   const x = new Float64Array(n);
   const y = new Float64Array(n);
@@ -94,12 +90,12 @@ function axisTitleLine(): ColumnarData {
     x[i] = i;
     y[i] = 400 + Math.sin(t * Math.PI * 2) * 220 + t * 180;
   }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }
 
 // Columns: [index, x, y, category, weight]. Scatter reads x/y/color/size
 // off explicit column indices, so column 0 is a placeholder shared X.
-function scatterCloud(n = 600): ColumnarData {
+function scatterCloud(n = 600): ColumnData {
   const rand = rng(7);
   const idx = new Float64Array(n);
   const x = new Float64Array(n);
@@ -114,10 +110,10 @@ function scatterCloud(n = 600): ColumnarData {
     cat[i] = g;
     size[i] = 6 + rand() * 18;
   }
-  return [idx, x, y, cat, size];
+  return { columns: { x: idx, value1: x, value2: y, value3: cat, value4: size } };
 }
 
-function densityCloud(n = 14_000): ColumnarData {
+function densityCloud(n = 14_000): ColumnData {
   const rand = rng(11);
   const x = new Float64Array(n);
   const y = new Float64Array(n);
@@ -126,10 +122,10 @@ function densityCloud(n = 14_000): ColumnarData {
     x[i] = t * 100;
     y[i] = 50 + Math.sin(t * Math.PI * 10) * 20 + normal(rand) * 6;
   }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }
 
-function bandData(): ColumnarData {
+function bandData(): ColumnData {
   const rand = rng(3);
   const n = 60;
   const x = new Float64Array(n);
@@ -144,61 +140,61 @@ function bandData(): ColumnarData {
     up[i] = mid[i] + 8 + Math.sin(t * 5) * 2;
     lo[i] = mid[i] - 8 - Math.cos(t * 4) * 2;
   }
-  return [x, mid, up, lo];
+  return { columns: { x: x, value1: mid, value2: up, value3: lo } };
 }
 
-function barData(): ColumnarData {
-  return [f([0, 1, 2, 3, 4]), f([120, 90, 140, 70, 110]), f([40, 60, 30, 50, 20])];
+function barData(): ColumnData {
+  return { columns: { x: f([0, 1, 2, 3, 4]), value1: f([120, 90, 140, 70, 110]), value2: f([40, 60, 30, 50, 20]) } };
 }
 
-function histData(): ColumnarData {
+function histData(): HistogramBins {
   const rand = rng(9);
   const raw = new Float64Array(4000);
   for (let i = 0; i < raw.length; i++) {
     raw[i] = rand() < 0.7 ? 30 + normal(rand) * 6 : 70 + normal(rand) * 12;
   }
   const bins = histogram(raw);
-  return [bins.edges, bins.counts];
+  return bins;
 }
 
 const lineSeries = [
-  { label: 'alpha', dataIndex: 1, type: 'line' as const, interpolation: 'monotone' as const, lineWidth: 2 },
-  { label: 'beta', dataIndex: 2, type: 'line' as const, interpolation: 'monotone' as const, lineWidth: 2 },
-  { label: 'gamma', dataIndex: 3, type: 'line' as const, interpolation: 'monotone' as const, lineWidth: 2 },
+  { label: 'alpha', y: "value1", type: 'line' as const, interpolation: 'monotone' as const, lineWidth: 2 },
+  { label: 'beta', y: "value2", type: 'line' as const, interpolation: 'monotone' as const, lineWidth: 2 },
+  { label: 'gamma', y: "value3", type: 'line' as const, interpolation: 'monotone' as const, lineWidth: 2 },
 ];
 
-const axisTitleConfig: ChartConfig = {
+const axisTitleConfig: ChartOptions = {
   axes: {
-    x: { type: 'linear', label: 'Elapsed (s)' },
-    y: { type: 'linear', label: 'Throughput (req/s)' },
+    x: { type: 'linear', title: 'Elapsed (s)' },
+    y: { type: 'linear', title: 'Throughput (req/s)' },
   },
-  series: [{ label: 'req/s', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 }],
+  series: [{ label: 'req/s', y: "value1", type: 'line', interpolation: 'monotone', lineWidth: 2 }],
   tooltip: { show: false },
 };
 
-function spanGapsConfig(spanGaps: boolean): ChartConfig {
+function spanGapsConfig(spanGaps: boolean): ChartOptions {
   return {
     axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-    series: [{ label: 'series', dataIndex: 1, type: 'line', interpolation: 'linear', lineWidth: 2, spanGaps }],
+    series: [{ label: 'series', y: "value1", type: 'line', interpolation: 'linear', lineWidth: 2, spanGaps }],
     tooltip: { show: false },
   };
 }
 
-const scatterConfig: ChartConfig = {
+const scatterConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
   series: [
     {
       label: 'runs',
       type: 'scatter',
-      xDataIndex: 1,
-      yDataIndex: 2,
+      x: "value1",
+      y: "value2",
       colorBy: {
-        dataIndex: 3,
+        field: "value3",
         type: 'category',
         label: 'Group',
         format: (v) => ['A', 'B', 'C', 'D'][Math.round(v)] ?? '?',
       },
-      sizeBy: { dataIndex: 4, range: [3, 9], scale: 'sqrt', label: 'Weight' },
+      sizeBy: { field: "value4", range: [3, 9], scale: 'sqrt', label: 'Weight' },
       opacity: 0.78,
       renderMode: 'points',
     },
@@ -206,12 +202,12 @@ const scatterConfig: ChartConfig = {
   tooltip: { show: false },
 };
 
-const densityConfig: ChartConfig = {
+const densityConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
   series: [
     {
       label: 'density',
-      yDataIndex: 1,
+      y: "value1",
       type: 'scatter',
       renderMode: 'density',
       heatmapBinSize: 2,
@@ -223,14 +219,14 @@ const densityConfig: ChartConfig = {
   tooltip: { show: false },
 };
 
-const bandConfig: ChartConfig = {
+const bandConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
   series: [
     {
       label: 'band',
-      dataIndex: 1,
-      upperDataIndex: 2,
-      lowerDataIndex: 3,
+      y: "value1",
+      upper: "value2",
+      lower: "value3",
       type: 'band',
       opacity: 0.18,
       interpolation: 'monotone',
@@ -240,22 +236,22 @@ const bandConfig: ChartConfig = {
   tooltip: { show: false },
 };
 
-const barConfig: ChartConfig = {
+const barConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
   series: [
-    { label: 'ok', dataIndex: 1, type: 'bar' },
-    { label: 'error', dataIndex: 2, type: 'bar' },
+    { label: 'ok', y: "value1", type: 'bar' },
+    { label: 'error', y: "value2", type: 'bar' },
   ],
   tooltip: { show: false },
 };
 
-const histogramConfig: ChartConfig = {
+const histogramConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-  series: [{ label: 'latency', dataIndex: 1, type: 'histogram' }],
+  series: [{ id: 'latency', label: 'latency', type: 'histogram', data: histData() }],
   tooltip: { show: false },
 };
 
-const tooltipConfig: ChartConfig = {
+const tooltipConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
   series: lineSeries,
   // syncTooltip lets a programmatic cursor open the tooltip (see onReady).
@@ -263,14 +259,14 @@ const tooltipConfig: ChartConfig = {
   tooltip: { show: true, mode: 'index' },
 };
 
-const legendConfig: ChartConfig = {
+const legendConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
   series: lineSeries,
   cursor: { show: true, snap: true, syncTooltip: true },
   tooltip: { show: false },
 };
 
-const highlightConfig: ChartConfig = {
+const highlightConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
   series: lineSeries,
   highlight: { dimOpacity: 0.15 },
@@ -279,12 +275,12 @@ const highlightConfig: ChartConfig = {
 
 // Open the tooltip / populate the legend without a real pointer by parking
 // a programmatic cursor mid-plot once the first frame has painted.
-function parkCursor(chart: ChartInstance, dataX: number): void {
-  requestAnimationFrame(() => chart.setCursorDataX(dataX, 'programmatic'));
+function parkCursor(chart: ChartHandle, dataX: number): void {
+  requestAnimationFrame(() => chart.setCursor(dataX));
 }
 
 export default function VisualRegressionHarness() {
-  const [legendChart, setLegendChart] = createSignal<ChartInstance | undefined>();
+  const [legendChart, setLegendChart] = createSignal<ChartHandle | undefined>();
 
   return (
     <section style={{ padding: '32px clamp(16px, 4vw, 48px)', background: 'var(--bg)', color: 'var(--text)' }}>
@@ -309,41 +305,41 @@ export default function VisualRegressionHarness() {
           }}
         >
           <Fixture slug="axis-titles" title="Axis titles">
-            <Chart data={axisTitleLine()} config={axisTitleConfig} />
+            <Chart data={axisTitleLine()} x="x" {...axisTitleConfig} />
           </Fixture>
 
           <Fixture slug="spangaps-off" title="spanGaps off (broken path)">
-            <Chart data={gapLine()} config={spanGapsConfig(false)} />
+            <Chart data={gapLine()} x="x" {...spanGapsConfig(false)} />
           </Fixture>
 
           <Fixture slug="spangaps-on" title="spanGaps on (bridged)">
-            <Chart data={gapLine()} config={spanGapsConfig(true)} />
+            <Chart data={gapLine()} x="x" {...spanGapsConfig(true)} />
           </Fixture>
 
           <Fixture slug="scatter-color-size" title="Scatter colorBy + sizeBy">
-            <Chart data={scatterCloud()} config={scatterConfig} />
+            <Chart data={scatterCloud()} x="x" {...scatterConfig} />
           </Fixture>
 
           <Fixture slug="density-heatmap" title="Density heatmap">
-            <Chart data={densityCloud()} config={densityConfig} />
+            <Chart data={densityCloud()} x="x" {...densityConfig} />
           </Fixture>
 
           <Fixture slug="band" title="Band series">
-            <Chart data={bandData()} config={bandConfig} />
+            <Chart data={bandData()} x="x" {...bandConfig} />
           </Fixture>
 
           <Fixture slug="bar" title="Grouped bar">
-            <Chart data={barData()} config={barConfig} />
+            <Chart data={barData()} x="x" {...barConfig} />
           </Fixture>
 
           <Fixture slug="histogram" title="Histogram">
-            <Chart data={histData()} config={histogramConfig} />
+            <Chart data={histData()} x="x" {...histogramConfig} />
           </Fixture>
 
           <Fixture slug="tooltip-open" title="Open tooltip (index mode)">
             <Chart
               data={multiLine()}
-              config={tooltipConfig}
+              x="x" {...tooltipConfig}
               onReady={(chart) => parkCursor(chart, 40)}
             />
           </Fixture>
@@ -351,8 +347,8 @@ export default function VisualRegressionHarness() {
           <Fixture slug="highlight-dim" title="Highlight dim state">
             <Chart
               data={multiLine()}
-              config={highlightConfig}
-              onReady={(chart) => chart.setHighlight(1)}
+              x="x" {...highlightConfig}
+              onReady={(chart) => chart.setHighlight('value2')}
             />
           </Fixture>
         </div>
@@ -362,7 +358,7 @@ export default function VisualRegressionHarness() {
             <div style={{ height: '220px' }}>
               <Chart
                 data={multiLine()}
-                config={legendConfig}
+                x="x" {...legendConfig}
                 onReady={(chart) => {
                   setLegendChart(chart);
                   parkCursor(chart, 40);

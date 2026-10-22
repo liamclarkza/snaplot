@@ -79,7 +79,7 @@ export function renderBarsSegments(
   // Clip to plot area
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
+  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
   ctx.clip();
 
   // Fill precedence: series.fill (string, or a per-datum callback for
@@ -87,7 +87,9 @@ export function renderBarsSegments(
   // color. `fill: null` keeps the series color; bars cannot be fill-less.
   const fillFn = typeof series.fill === 'function' ? series.fill : null;
   ctx.fillStyle = typeof series.fill === 'string' ? series.fill : color;
-  ctx.globalAlpha = (series.opacity ?? 0.85) * opacityMultiplier;
+  ctx.strokeStyle = series.stroke ?? color;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = (series.opacity ?? 0.75) * opacityMultiplier;
 
   const centers: number[] = [];
   for (const segment of segments) {
@@ -154,11 +156,54 @@ export function renderBarsSegments(
       const h = Math.abs(barTop - baselinePixel);
 
       if (fillFn) ctx.fillStyle = fillFn(yVal, i + logicalOffset);
-      ctx.fillRect(rect.left, y, rect.width, h);
+      drawBar(ctx, rect.left, y, rect.width, h, barTop, baselinePixel);
     }
   }
 
   ctx.restore();
+}
+
+/**
+ * Paint one bar with a restrained value-end radius. The baseline edge stays
+ * square so adjacent positive/negative bars meet cleanly at zero.
+ */
+function drawBar(
+  ctx: CanvasRenderingContext2D,
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  valuePixel: number,
+  baselinePixel: number,
+): void {
+  const right = left + width;
+  const bottom = top + height;
+  const radius = Math.min(2, width / 2, height / 2);
+
+  ctx.beginPath();
+  if (radius <= 0) {
+    ctx.rect(left, top, width, height);
+  } else if (valuePixel < baselinePixel) {
+    // Positive bar: round the top/value edge, keep the zero edge square.
+    ctx.moveTo(left, bottom);
+    ctx.lineTo(left, top + radius);
+    ctx.quadraticCurveTo(left, top, left + radius, top);
+    ctx.lineTo(right - radius, top);
+    ctx.quadraticCurveTo(right, top, right, top + radius);
+    ctx.lineTo(right, bottom);
+    ctx.closePath();
+  } else {
+    // Negative bar: round the bottom/value edge, keep the zero edge square.
+    ctx.moveTo(left, top);
+    ctx.lineTo(right, top);
+    ctx.lineTo(right, bottom - radius);
+    ctx.quadraticCurveTo(right, bottom, right - radius, bottom);
+    ctx.lineTo(left + radius, bottom);
+    ctx.quadraticCurveTo(left, bottom, left, bottom - radius);
+    ctx.closePath();
+  }
+  ctx.fill();
+  ctx.stroke();
 }
 
 function segmentPointCount(segments: BarRenderSegment[]): number {

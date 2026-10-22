@@ -38,6 +38,7 @@ import { ColumnarStore } from '../data/ColumnarStore';
 import { ColumnRangeIndex, ScatterColumnRangeIndex } from '../data/columnRangeIndex';
 import { RingColumnarStore } from '../data/RingColumnarStore';
 import { createScale } from '../scales/createScale';
+import { niceStep } from '../scales/niceNumbers';
 import {
   AUTO_RANGE_PADDING,
   BRUSH_EDGE_GRAB_PX,
@@ -85,6 +86,19 @@ import { isDarkColor } from '../utils/color';
 const tickFormatIds = new WeakMap<(value: number) => string, number>();
 let nextTickFormatId = 1;
 
+type CustomXTicks = {
+  values: number[];
+  gridValues?: number[];
+  format?: (value: number) => string;
+};
+
+type BarXAxisPlan = {
+  values: number[];
+  gridValues: number[];
+  domainMin: number;
+  domainMax: number;
+};
+
 function tickFormatId(fn: ((value: number) => string) | undefined): number {
   if (!fn) return 0;
   let id = tickFormatIds.get(fn);
@@ -103,7 +117,19 @@ function tickFormatId(fn: ((value: number) => string) | undefined): number {
  *
  * Render pipeline follows the exact order from §2.3 of the plan.
  */
+export interface InteractionGuards {
+  viewport?: (axisKey: string, range: ScaleRange) => boolean;
+  selection?: (range: SelectionRange | null) => boolean;
+}
+
 export class ChartCore implements ChartInstance {
+  private interactionGuards: InteractionGuards = {};
+  private coordinatingAxis = false;
+
+  setInteractionGuards(guards: InteractionGuards): void {
+    this.interactionGuards = guards;
+  }
+
   // Public
   readonly container: HTMLElement;
 
@@ -112,6 +138,8 @@ export class ChartCore implements ChartInstance {
   private scheduler: RenderScheduler;
   private eventBus: EventBus;
   private store: DataStore;
+  private sourceStores: DataStore[] = [];
+  private seriesSources: readonly number[] = [];
   private scales: Map<string, Scale> = new Map();
   private layout!: Layout;
   private layoutCacheKey = '';
@@ -124,7 +152,7 @@ export class ChartCore implements ChartInstance {
    * streaming append per tick would pay an O(n) rebuild for a single query.
    */
   private rangeIndexVersion = -1;
-  private columnRangeIndexes = new Map<number, ColumnRangeIndex>();
+  private columnRangeIndexes = new Map<string, ColumnRangeIndex>();
   private scatterRangeIndexes = new Map<string, ScatterColumnRangeIndex>();
   /**
    * Per-series scatter render caches (heatmap bitmaps), keyed by series
@@ -258,8 +286,9 @@ export class ChartCore implements ChartInstance {
    * at the same range `resetZoom()` would produce.
    */
   private naturalExtent = new Map<string, [number, number]>();
+  private barXAxisPlans = new Map<string, BarXAxisPlan>();
 
-  constructor(parent: HTMLElement, config: ChartConfig, data?: ColumnarData) {
+  constructor(parent: HTMLElement, config: ChartConfig, data?: ColumnarData, sources?: { sources: readonly ColumnarData[]; seriesSources: readonly number[] }) {
     this.container = parent;
 
     // 1. Merge config with defaults
@@ -272,7 +301,8 @@ export class ChartCore implements ChartInstance {
     this.applyModePresets(config);
 
     // 1c. Validate the merged config against any initial data (dev only).
-    if (shouldValidateConfig()) validateChartConfig(this.config, data);
+    if (sources) this.validateSources(this.config, sources.sources, sources.seriesSources);
+    else if (shouldValidateConfig()) validateChartConfig(this.config, data);
 
     // 2. Create canvas layers
     this.canvasManager = new CanvasManager(parent, (w, h) => {
@@ -296,7 +326,9 @@ export class ChartCore implements ChartInstance {
 
     // 4. Create data store
     const initialData = data ?? [new Float64Array(0)];
-    this.store = this.createDataStore(initialData);
+    this.sourceStores = (sources?.sources ?? [initialData]).map(source => this.createDataStore(source));
+    this.seriesSources = sources?.seriesSources.slice() ?? [];
+    this.store = this.sourceStores[0];
 
     // 5. Create EventBus
     this.eventBus = new EventBus();
@@ -362,10 +394,85 @@ export class ChartCore implements ChartInstance {
 
   // ─── Public API (ChartInstance) ─────────────────────────────
 
+  /** Replace a prepared configuration and its independent sources as one transaction. */
+  replaceSources(config: ChartConfig, sources: readonly ColumnarData[], seriesSources: readonly number[]): void {
+    if (this.destroyed) return;
+    // Resolve and validate the complete candidate before replacing any live store.
+    const resolved = deepMerge(
+      DEFAULT_CONFIG as unknown as Record<string, unknown>,
+      config as unknown as Record<string, unknown>,
+    ) as unknown as ChartConfig;
+    this.validateSources(resolved, sources, seriesSources);
+    const maxLen = resolved.streaming?.maxLen;
+    if (maxLen !== undefined) validateMaxLen(maxLen);
+    const stores = sources.map(data => maxLen === undefined
+      ? new ColumnarStore(data) : new RingColumnarStore(data, maxLen));
+    this.sourceStores = stores;
+    this.store = stores[0];
+    this.seriesSources = seriesSources.slice();
+    this.invalidateRangeCache();
+    this.stats.dataVersion++;
+    this.stats.setDataCount++;
+    this.replaceOptions(config);
+    this.reconcileSelectionForDataChange();
+    this.refreshCursor();
+    this.dispatchDataUpdate();
+  }
+
+  getSourceData(sourceIndex: number): ColumnarData {
+    const store = this.sourceStores[sourceIndex];
+    if (!store) throw new Error(`Unknown data source ${sourceIndex}`);
+    return store.getData();
+  }
+
+  getSourceLength(sourceIndex: number): number {
+    return this.sourceStores[sourceIndex]?.length ?? 0;
+  }
+
+  getSourceValue(sourceIndex: number, columnIndex: number, rowIndex: number): number {
+    return this.sourceStores[sourceIndex]?.valueAt(columnIndex, rowIndex) ?? Number.NaN;
+  }
+
+  private validateSources(config: ChartConfig, sources: readonly ColumnarData[], indices: readonly number[]): void {
+    if (sources.length === 0) throw new Error('At least one data source is required');
+    if (indices.length !== config.series.length) throw new Error('Each series requires a data source index');
+    for (const source of sources) ColumnarStore.validate(source);
+    if (shouldValidateConfig()) validateChartConfig(config);
+    for (let si = 0; si < config.series.length; si++) {
+      const sourceIndex = indices[si];
+      if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sources.length) {
+        throw new Error(`Invalid data source for series ${si}`);
+      }
+      if (shouldValidateConfig()) validateChartConfig({ ...config, series: [config.series[si]] }, sources[sourceIndex]);
+    }
+  }
+
+  private storeForSeries(seriesIndex: number): DataStore {
+    return this.sourceStores[this.seriesSources[seriesIndex] ?? 0] ?? this.store;
+  }
+
+  private hasData(): boolean {
+    return this.sourceStores.some(store => store.length > 0);
+  }
+
+  private sourceExtent(axisKey?: string): [number, number] | null {
+    let min = Infinity;
+    let max = -Infinity;
+    const stores = axisKey === undefined ? this.sourceStores : new Set(this.config.series.flatMap((series, si) =>
+      series.visible !== false && (series.xAxisKey ?? 'x') === axisKey ? [this.storeForSeries(si)] : []));
+    for (const store of stores) {
+      if (!store.length) continue;
+      min = Math.min(min, store.xAt(0));
+      max = Math.max(max, store.xAt(store.length - 1));
+    }
+    return min === Infinity ? null : [min, max];
+  }
+
   setData(data: ColumnarData): void {
     if (this.destroyed) return;
     if (shouldValidateConfig()) validateChartConfig(this.config, data);
     this.setStoreData(data);
+    this.sourceStores[0] = this.store;
     this.stats.dataVersion++;
     this.stats.setDataCount++;
     const gridDirty = this.rangeForDataChange();
@@ -376,18 +483,30 @@ export class ChartCore implements ChartInstance {
   }
 
   appendData(data: ColumnarData, opts?: AppendDataOptions): void {
+    this.appendToSource(0, data, opts);
+  }
+
+  appendToSource(sourceIndex: number, data: ColumnarData, opts?: AppendDataOptions): void {
     if (this.destroyed) return;
+    if (!this.sourceStores[sourceIndex]) throw new Error(`Unknown data source ${sourceIndex}`);
     this.ensureStoreMatchesStreaming();
+    const store = this.sourceStores[sourceIndex];
+    ColumnarStore.validate(data);
+    if (data.length !== store.seriesCount + 1) throw new Error('Appended columns must match the source schema');
+    if (data[0].length && store.length) {
+      const previousIndex = opts?.updateLast ? store.length - 2 : store.length - 1;
+      if (previousIndex >= 0 && data[0][0] < store.xAt(previousIndex)) throw new Error('Appended X values must preserve source order');
+    }
 
     let changed: boolean;
-    if (opts?.updateLast && this.store.length > 0 && data.length > 0 && data[0].length > 0) {
-      this.store.replaceLast(Array.from(data, (col) => col[0]));
+    if (opts?.updateLast && store.length > 0 && data.length > 0 && data[0].length > 0) {
+      store.replaceLast(Array.from(data, (col) => col[0]));
       if (data[0].length > 1) {
-        this.store.append(data.map((col) => col.subarray(1)) as ColumnarData);
+        store.append(data.map((col) => col.subarray(1)) as ColumnarData);
       }
       changed = true;
     } else {
-      changed = this.store.append(data);
+      changed = store.append(data);
     }
     if (!changed) return;
 
@@ -407,7 +526,7 @@ export class ChartCore implements ChartInstance {
    * user-zoomed axes). Returns whether the grid layer needs a repaint.
    */
   private rangeForDataChange(): boolean {
-    if (this.following && this.followWindow() !== undefined && this.store.length > 0) {
+    if (this.following && this.followWindow() !== undefined && this.hasData()) {
       return this.applyFollowWindow();
     }
     return this.autoRangeTracked();
@@ -434,24 +553,23 @@ export class ChartCore implements ChartInstance {
    */
   private applyFollowWindow(): boolean {
     const window = this.followWindow();
-    if (window === undefined || this.store.length === 0) return false;
-    const lastX = this.store.xAt(this.store.length - 1);
-    const dataMin = this.store.xAt(0);
-    // A single point (or a window wider than the data) would give a zero-span
-    // domain; expand to a unit window around the point, matching how
-    // autoRangeHorizontal handles xMin === xMax.
-    const rawMin = Math.max(dataMin, lastX - window);
-    const min = rawMin === lastX ? lastX - 1 : rawMin;
-    const max = rawMin === lastX ? lastX + 1 : lastX;
-
-    // Signature over all scales so a Y-only change (follow keeps X fixed while
-    // the newest point shifts the Y extent) still reports moved=true and
-    // repaints the grid, matching autoRangeTracked.
+    if (window === undefined || !this.hasData()) return false;
     const before = this.scaleSignature();
     const axisConfigs = this.config.axes ?? {};
+    const proposals: Array<{ key: string; scale: Scale; min: number; max: number }> = [];
     for (const [key, scale] of this.scales) {
       const pos = inferPosition(key, axisConfigs[key]?.position);
       if (pos !== 'bottom' && pos !== 'top') continue;
+      const extent = this.sourceExtent(key);
+      if (!extent) continue;
+      const [dataMin, lastX] = extent;
+      const rawMin = Math.max(dataMin, lastX - window);
+      const min = rawMin === lastX ? lastX - 1 : rawMin;
+      const max = rawMin === lastX ? lastX + 1 : lastX;
+      if (this.interactionGuards.viewport?.(key, { min, max }) === false) return false;
+      proposals.push({ key, scale, min, max });
+    }
+    for (const { key, scale, min, max } of proposals) {
       scale.min = min;
       scale.max = max;
       this.naturalExtent.set(key, [min, max]);
@@ -497,6 +615,8 @@ export class ChartCore implements ChartInstance {
     const scale = this.scales.get(key);
     if (!scale) return;
 
+    const proposed = { min: range.min ?? scale.min, max: range.max ?? scale.max };
+    if (this.interactionGuards.viewport?.(key, proposed) === false) return;
     if (range.min !== undefined) scale.min = range.min;
     if (range.max !== undefined) scale.max = range.max;
 
@@ -504,7 +624,7 @@ export class ChartCore implements ChartInstance {
     // local zoom does. Without marking the axis user-zoomed, this receiving
     // chart's next setData/appendData would auto-range back to the full extent
     // and snap out of sync with the chart that drove the zoom.
-    this.userZoomedAxes.add(key);
+    if (!this.coordinatingAxis) this.userZoomedAxes.add(key);
 
     // When X axis changes (e.g. from a zoom sync peer), re-fit Y axis
     // to the new visible X range, otherwise the band/data may clip.
@@ -514,7 +634,7 @@ export class ChartCore implements ChartInstance {
     // A received horizontal viewport means a peer took manual control; pause
     // live-follow so this chart pins to the synced window instead of scrolling
     // its own follow window back over the driver on the next data tick.
-    if (isHoriz) this.setFollowing(false);
+    if (isHoriz && !this.coordinatingAxis) this.setFollowing(false);
     if (isHoriz && !this.config.zoom?.y) {
       this.autoRangeVertical(true);
     }
@@ -529,6 +649,17 @@ export class ChartCore implements ChartInstance {
     this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID | DirtyFlag.OVERLAY);
     this.emitEvent('viewport:change', key, { min: scale.min, max: scale.max });
     this.suppressZoomSync = false;
+  }
+
+  getNaturalRange(key: string): ScaleRange | undefined {
+    const range = this.naturalExtent.get(key);
+    return range ? { min: range[0], max: range[1] } : undefined;
+  }
+
+  setCoordinatedAxis(key: string, range: ScaleRange): void {
+    this.coordinatingAxis = true;
+    try { this.setAxis(key, range); }
+    finally { this.coordinatingAxis = false; }
   }
 
   getAxis(key: string): Scale | undefined {
@@ -702,6 +833,8 @@ export class ChartCore implements ChartInstance {
 
   /** Reset zoom to full data extent (double-click handler) */
   resetZoom(): void {
+    if (this.destroyed || !this.allowResetViewport()) return;
+    const previous = new Map([...this.scales].map(([key, scale]) => [key, [scale.min, scale.max] as const]));
     this.userZoomedAxes.clear();
     this.setFollowing(true);
     this.autoRangeHorizontal();
@@ -710,14 +843,15 @@ export class ChartCore implements ChartInstance {
     this.autoRangeVertical();
     this.scheduler.markDirty(DirtyFlag.ALL);
 
-    this.publishResetViewport();
+    this.publishResetViewport(previous);
   }
 
   scrollToLatest(): void {
-    if (this.destroyed) return;
+    if (this.destroyed || !this.allowResetViewport()) return;
+    const previous = new Map([...this.scales].map(([key, scale]) => [key, [scale.min, scale.max] as const]));
     this.userZoomedAxes.clear();
     this.setFollowing(true);
-    if (this.followWindow() !== undefined && this.store.length > 0) {
+    if (this.followWindow() !== undefined && this.hasData()) {
       this.applyFollowWindow();
     } else {
       this.autoRangeHorizontal();
@@ -725,7 +859,37 @@ export class ChartCore implements ChartInstance {
     }
     this.refreshCursor();
     this.scheduler.markDirty(DirtyFlag.ALL);
-    this.publishResetViewport();
+    this.publishResetViewport(previous);
+  }
+
+  private allowResetViewport(): boolean {
+    const guard = this.interactionGuards.viewport;
+    if (!guard) return true;
+    const current = [...this.scales].map(([key, scale]) => [key, scale.min, scale.max] as const);
+    const zoomed = new Set(this.userZoomedAxes);
+    const extents = new Map(this.naturalExtent);
+    const plans = new Map(this.barXAxisPlans);
+    const savedGuards = this.interactionGuards;
+    let proposed: Array<readonly [string, number, number]>;
+    try {
+      this.interactionGuards = {};
+      this.userZoomedAxes.clear();
+      this.autoRangeHorizontal();
+      this.applyFollowWindow();
+      this.autoRangeVertical();
+      proposed = [...this.scales].map(([key, scale]) => [key, scale.min, scale.max] as const);
+    } finally {
+      for (const [key, min, max] of current) { const scale = this.scales.get(key)!; scale.min = min; scale.max = max; }
+      this.userZoomedAxes = zoomed;
+      this.naturalExtent = extents;
+      this.barXAxisPlans = plans;
+      this.interactionGuards = savedGuards;
+    }
+    let allowed = true;
+    for (const [key, min, max] of proposed) {
+      if (guard(key, { min, max }) === false) allowed = false;
+    }
+    return allowed;
   }
 
   /**
@@ -733,14 +897,17 @@ export class ChartCore implements ChartInstance {
    * synchronisation belong in the broadcast. Publishing all scales made an
    * X-linked dashboard copy unrelated Y/Y2 ranges between charts.
    */
-  private publishResetViewport(): void {
-    if (!this.zoomSyncKey || this.suppressZoomSync) return;
+  private publishResetViewport(previous: ReadonlyMap<string, readonly [number, number]>): void {
     const axes = this.config.axes ?? {};
     for (const [scaleKey, scale] of this.scales) {
+      const before = previous.get(scaleKey);
+      if (!before || before[0] !== scale.min || before[1] !== scale.max) {
+        this.emitEvent('viewport:change', scaleKey, { min: scale.min, max: scale.max });
+      }
       const position = inferPosition(scaleKey, axes[scaleKey]?.position);
       const horizontal = position === 'bottom' || position === 'top';
       const syncEnabled = horizontal ? this.config.zoom?.x !== false : this.config.zoom?.y === true;
-      if (syncEnabled) {
+      if (syncEnabled && this.zoomSyncKey && !this.suppressZoomSync) {
         SyncGroup.publishScale(this.zoomSyncKey, this, scaleKey, { min: scale.min, max: scale.max });
       }
     }
@@ -761,6 +928,7 @@ export class ChartCore implements ChartInstance {
 
   setSelection(selection: SelectionRange | null): void {
     if (this.destroyed) return;
+    if (this.interactionGuards.selection?.(selection) === false) return;
     if (selection === null) {
       if (this.selection === null) return;
       this.selection = null;
@@ -777,13 +945,12 @@ export class ChartCore implements ChartInstance {
     if (!this.selection) return;
     const policy = this.config.selection?.dataChange ?? 'clear-if-outside';
     if (policy === 'preserve') return;
-    if (policy === 'clear' || this.store.length === 0) {
+    if (policy === 'clear' || !this.hasData()) {
       this.setSelection(null);
       return;
     }
 
-    const first = this.store.xAt(0);
-    const last = this.store.xAt(this.store.length - 1);
+    const [first, last] = this.sourceExtent()!;
     const dataMin = Math.min(first, last);
     const dataMax = Math.max(first, last);
     const { min, max } = this.selection.x;
@@ -851,7 +1018,8 @@ export class ChartCore implements ChartInstance {
       }
     }
     this.brushDrag = { mode: 'create', anchorDataX: dataX, orig: { min: dataX, max: dataX } };
-    this.selection = { x: { min: dataX, max: dataX } };
+    const proposed = { x: { min: dataX, max: dataX } };
+    if (this.interactionGuards.selection?.(proposed) !== false) this.selection = proposed;
   }
 
   private brushUpdate(px: number): void {
@@ -860,16 +1028,18 @@ export class ChartCore implements ChartInstance {
     const dataX = xScale.pixelToData(px);
     const { mode, anchorDataX, orig } = this.brushDrag;
 
+    let proposed: SelectionRange;
     if (mode === 'create') {
-      this.selection = { x: { min: Math.min(anchorDataX, dataX), max: Math.max(anchorDataX, dataX) } };
+      proposed = { x: { min: Math.min(anchorDataX, dataX), max: Math.max(anchorDataX, dataX) } };
     } else if (mode === 'move') {
       const delta = dataX - anchorDataX;
-      this.selection = { x: { min: orig.min + delta, max: orig.max + delta } };
+      proposed = { x: { min: orig.min + delta, max: orig.max + delta } };
     } else if (mode === 'resize-min') {
-      this.selection = { x: { min: Math.min(dataX, orig.max), max: Math.max(dataX, orig.max) } };
+      proposed = { x: { min: Math.min(dataX, orig.max), max: Math.max(dataX, orig.max) } };
     } else {
-      this.selection = { x: { min: Math.min(orig.min, dataX), max: Math.max(orig.min, dataX) } };
+      proposed = { x: { min: Math.min(orig.min, dataX), max: Math.max(orig.min, dataX) } };
     }
+    if (this.interactionGuards.selection?.(proposed) !== false) this.selection = proposed;
   }
 
   private brushEnd(): void {
@@ -879,7 +1049,7 @@ export class ChartCore implements ChartInstance {
     // A create gesture that never moved (a click) clears the selection
     // rather than leaving a zero-width band.
     if (wasCreate && this.selection && this.selection.x.min === this.selection.x.max) {
-      this.selection = null;
+      if (this.interactionGuards.selection?.(null) !== false) this.selection = null;
     }
     this.emitSelectionChange();
   }
@@ -993,17 +1163,17 @@ export class ChartCore implements ChartInstance {
 
     // Find Y position from first visible series at this index
     this.cursorY = this.layout.plot.top + this.layout.plot.height / 2; // default to plot center
-    const yScale = this.scales.get('y');
-    if (yScale && this.cursorDataIdx !== null && this.cursorDataIdx < this.store.length) {
-      for (const sc of this.config.series) {
-        if (sc.visible === false) continue;
-        const colIdx = seriesYDataIndex(sc);
-        if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
-        const yVal = this.store.yAt(colIdx - 1, this.cursorDataIdx);
-        if (yVal !== undefined && yVal === yVal) {
-          this.cursorY = yScale.dataToPixel(yVal);
-          break;
-        }
+    for (let si = 0; si < this.config.series.length; si++) {
+      const sc = this.config.series[si];
+      const store = this.storeForSeries(si);
+      if (sc.visible === false || !store.length) continue;
+      const colIdx = seriesYDataIndex(sc);
+      const yScale = this.scales.get(sc.yAxisKey ?? 'y');
+      if (!yScale || colIdx < 1 || colIdx > store.seriesCount) continue;
+      const yVal = store.yAt(colIdx - 1, store.nearestXIndex(dataX));
+      if (Number.isFinite(yVal)) {
+        this.cursorY = yScale.dataToPixel(yVal);
+        break;
       }
     }
 
@@ -1271,18 +1441,17 @@ export class ChartCore implements ChartInstance {
 
   private ensureStoreMatchesStreaming(): void {
     const maxLen = this.streamingMaxLen();
-    if (maxLen !== undefined) {
-      if (!(this.store instanceof RingColumnarStore) || this.store.maxLen !== maxLen) {
-        this.store = new RingColumnarStore(this.store.getData(), maxLen);
+    this.sourceStores = this.sourceStores.map(store => {
+      if (maxLen !== undefined) {
+        if (store instanceof RingColumnarStore && store.maxLen === maxLen) return store;
         this.invalidateRangeCache();
+        return new RingColumnarStore(store.getData(), maxLen);
       }
-      return;
-    }
-
-    if (this.store instanceof RingColumnarStore) {
-      this.store = new ColumnarStore(this.store.getData());
+      if (!(store instanceof RingColumnarStore)) return store;
       this.invalidateRangeCache();
-    }
+      return new ColumnarStore(store.getData());
+    });
+    this.store = this.sourceStores[0];
   }
 
   private streamingMaxLen(): number | undefined {
@@ -1337,7 +1506,7 @@ export class ChartCore implements ChartInstance {
     }
 
     for (const [key, ac] of Object.entries(axisConfigs)) {
-      if (!this.scales.has(key)) {
+      if (!this.scales.has(key) || this.scales.get(key)!.type !== (ac.type ?? 'linear')) {
         const scale = createScale(
           ac.type ?? 'linear',
           key,
@@ -1347,8 +1516,10 @@ export class ChartCore implements ChartInstance {
         this.scales.set(key, scale);
       } else {
         const existing = this.scales.get(key)!;
-        if (ac.min !== undefined) existing.min = ac.min;
-        if (ac.max !== undefined) existing.max = ac.max;
+        if (!this.userZoomedAxes.has(key)) {
+          if (ac.min !== undefined) existing.min = ac.min;
+          if (ac.max !== undefined) existing.max = ac.max;
+        }
       }
     }
 
@@ -1369,7 +1540,8 @@ export class ChartCore implements ChartInstance {
 
   /** Auto-range horizontal (bottom/top) axes to full data extent. Skipped per-axis when the user has actively zoomed that axis. */
   private autoRangeHorizontal(): void {
-    if (this.store.length === 0) return;
+    this.barXAxisPlans.clear();
+    if (!this.hasData()) return;
 
     const axisConfigs = this.config.axes ?? {};
     for (const [key, ac] of Object.entries(axisConfigs)) {
@@ -1402,10 +1574,15 @@ export class ChartCore implements ChartInstance {
       let xMax = -Infinity;
       let xPositiveMin = Infinity;
       let hasXValue = false;
-      const includeXColumn = (columnIdx: number) => {
-        if (!this.isValidColumn(columnIdx)) return;
-        for (let i = 0; i < this.store.length; i++) {
-          const value = this.store.valueAt(columnIdx, i);
+      const visitedColumns = new Map<DataStore, Set<number>>();
+      const includeXColumn = (columnIdx: number, store = this.store) => {
+        if (!this.isValidColumn(columnIdx, store)) return;
+        let visited = visitedColumns.get(store);
+        if (!visited) { visited = new Set(); visitedColumns.set(store, visited); }
+        if (visited.has(columnIdx)) return;
+        visited.add(columnIdx);
+        for (let i = 0; i < store.length; i++) {
+          const value = store.valueAt(columnIdx, i);
           if (!Number.isFinite(value)) continue;
           hasXValue = true;
           if (value < xMin) xMin = value;
@@ -1414,10 +1591,10 @@ export class ChartCore implements ChartInstance {
         }
       };
       let hasBoundSeries = false;
-      for (const s of this.config.series) {
+      for (const [si, s] of this.config.series.entries()) {
         if ((s.xAxisKey ?? 'x') !== key || s.visible === false) continue;
         hasBoundSeries = true;
-        includeXColumn(s.type === 'scatter' ? scatterXDataIndex(s) : 0);
+        includeXColumn(s.type === 'scatter' ? scatterXDataIndex(s) : 0, this.storeForSeries(si));
       }
       if (!hasBoundSeries) includeXColumn(0);
       if (!hasXValue) continue;
@@ -1430,9 +1607,16 @@ export class ChartCore implements ChartInstance {
           (s.xAxisKey ?? 'x') === key &&
           (s.type === 'bar' || s.type === 'histogram'),
       );
+      const hasHistogramSeries = this.config.series.some(
+        s => s.visible !== false && (s.xAxisKey ?? 'x') === key && s.type === 'histogram',
+      );
+      const barStores = [...new Set(this.config.series.flatMap((series, si) =>
+        series.visible !== false && (series.xAxisKey ?? 'x') === key &&
+        (series.type === 'bar' || series.type === 'histogram') ? [this.storeForSeries(si)] : []))];
+      const barX = barStores.length === 1 ? barStores[0].x
+        : Float64Array.from([...new Set(barStores.flatMap(store => Array.from(store.x)))].sort((a, b) => a - b));
       // Scatter/heatmap clouds default to a 5% pad so the data fills the plot
-      // with just enough breathing room. Users can still opt into rounded
-      // bounds with `nice: true`.
+      // with just enough breathing room before continuous-domain nicening.
       const isScatterOnly =
         !hasBarSeries &&
         this.config.series.length > 0 &&
@@ -1447,12 +1631,36 @@ export class ChartCore implements ChartInstance {
       } else if (xMin === xMax) {
         scale.min = xMin - 1;
         scale.max = xMax + 1;
-      } else if (hasBarSeries && this.store.length > 1) {
-        const firstPad = categoryWidthFromData((idx) => this.store.valueAt(0, idx), 0, this.store.length) * 0.5;
+      } else if (hasBarSeries && !hasHistogramSeries && barX.length > 1) {
+        const canPlanBarTicks =
+          scale.type === 'linear' &&
+          ac.nice !== false &&
+          ac.min === undefined &&
+          ac.max === undefined &&
+          (!ac.ticks || ac.ticks.length === 0);
+        const barPlan = canPlanBarTicks
+          ? this.planBarXAxis(Array.from(barX), xMin, xMax, ac.tickCount ?? DEFAULT_TICK_COUNT)
+          : null;
+        if (barPlan) {
+          scale.min = barPlan.domainMin;
+          scale.max = barPlan.domainMax;
+          this.barXAxisPlans.set(key, barPlan);
+        } else {
+          const firstPad = categoryWidthFromData((idx) => barX[idx], 0, barX.length) * 0.5;
+          const lastPad = categoryWidthFromData(
+            (idx) => barX[idx],
+            barX.length - 1,
+            barX.length,
+          ) * 0.5;
+          scale.min = xMin - firstPad;
+          scale.max = xMax + lastPad;
+        }
+      } else if (hasBarSeries && barX.length > 1) {
+        const firstPad = categoryWidthFromData((idx) => barX[idx], 0, barX.length) * 0.5;
         const lastPad = categoryWidthFromData(
-          (idx) => this.store.valueAt(0, idx),
-          this.store.length - 1,
-          this.store.length,
+          (idx) => barX[idx],
+          barX.length - 1,
+          barX.length,
         ) * 0.5;
         scale.min = xMin - firstPad;
         scale.max = xMax + lastPad;
@@ -1468,11 +1676,17 @@ export class ChartCore implements ChartInstance {
         scale.max = xMax + pad;
       }
 
-      // `nice: true` opts into rounded bounds. Bar/histogram X axes keep exact
-      // category/bin padding so rendered geometry lines up with the domain.
+      // Linear continuous domains use regular 1/2/5 tick intervals by default.
+      // Bar X axes use their own slot plan above; histogram bounds stay exact.
+      // `nice: false` opts out.
       if (this.shouldNiceAutoRange(scale, ac, hasBarSeries)) {
-        scale.nice(DEFAULT_TICK_COUNT);
+        this.niceAutoRange(scale, ac.tickCount ?? DEFAULT_TICK_COUNT);
       }
+
+      // Nicening may expand either side, but an explicitly pinned side must
+      // remain exactly where the caller put it.
+      if (ac.min !== undefined) scale.min = ac.min;
+      if (ac.max !== undefined) scale.max = ac.max;
 
       // Remember the "full" extent so zoom.bounds: 'data' knows how far
       // out reset-zoom would go.
@@ -1498,7 +1712,7 @@ export class ChartCore implements ChartInstance {
    * because their data version bump would invalidate any index anyway.
    */
   private autoRangeVertical(fromViewport = false): void {
-    if (this.store.length === 0) return;
+    if (!this.hasData()) return;
 
     const axisConfigs = this.config.axes ?? {};
     for (const [key, scale] of this.scales) {
@@ -1527,39 +1741,41 @@ export class ChartCore implements ChartInstance {
         if (range[1] > yMax) yMax = range[1];
       };
 
-      const includeColumnRange = (columnIdx: number, startIdx: number, endIdx: number) => {
-        includeRange(this.columnRange(columnIdx, startIdx, endIdx, scale.type, fromViewport));
+      const includeColumnRange = (columnIdx: number, startIdx: number, endIdx: number, store: DataStore) => {
+        includeRange(this.columnRange(columnIdx, startIdx, endIdx, scale.type, fromViewport, store));
       };
       const includeColumnForScatterViewport = (
         yColumnIdx: number,
         xColumnIdx: number,
         xScale: Scale | undefined,
+        store: DataStore,
       ) => {
         includeRange(
-          this.scatterViewportColumnRange(yColumnIdx, xColumnIdx, xScale, scale.type, fromViewport),
+          this.scatterViewportColumnRange(yColumnIdx, xColumnIdx, xScale, scale.type, fromViewport, store),
         );
       };
 
-      for (const s of this.config.series) {
+      for (const [si, s] of this.config.series.entries()) {
         if ((s.yAxisKey ?? 'y') !== key || s.visible === false) continue;
 
+        const store = this.storeForSeries(si);
         const xScale = this.scales.get(s.xAxisKey ?? 'x') ?? this.scales.get('x');
         const xColumnIdx = s.type === 'scatter' ? scatterXDataIndex(s) : 0;
         let startIdx = 0;
-        let endIdx = this.store.length - 1;
+        let endIdx = store.length - 1;
         if (xScale && xColumnIdx === 0) {
-          [startIdx, endIdx] = this.store.getViewportIndices(xScale.min, xScale.max);
+          [startIdx, endIdx] = store.getViewportIndices(xScale.min, xScale.max);
         }
 
         const yColumnIdx = seriesYDataIndex(s) - 1;
-        if (s.type === 'scatter' && xColumnIdx !== 0 && this.isValidColumn(xColumnIdx)) {
-          includeColumnForScatterViewport(yColumnIdx, xColumnIdx, xScale);
+        if (s.type === 'scatter' && xColumnIdx !== 0 && this.isValidColumn(xColumnIdx, store)) {
+          includeColumnForScatterViewport(yColumnIdx, xColumnIdx, xScale, store);
         } else {
-          includeColumnRange(yColumnIdx, startIdx, endIdx);
+          includeColumnRange(yColumnIdx, startIdx, endIdx, store);
         }
         if (s.type === 'band') {
-          if (s.upperDataIndex != null) includeColumnRange(s.upperDataIndex - 1, startIdx, endIdx);
-          if (s.lowerDataIndex != null) includeColumnRange(s.lowerDataIndex - 1, startIdx, endIdx);
+          if (s.upperDataIndex != null) includeColumnRange(s.upperDataIndex - 1, startIdx, endIdx, store);
+          if (s.lowerDataIndex != null) includeColumnRange(s.lowerDataIndex - 1, startIdx, endIdx, store);
         }
       }
 
@@ -1582,19 +1798,26 @@ export class ChartCore implements ChartInstance {
         // Vertical auto-range defaults to 5% padding so line/area charts
         // don't touch the plot edges; users can override per-axis.
         const pad = (yMax - yMin) * (ac.padding ?? AUTO_RANGE_PADDING);
+        const equalSpan = yMin === yMax ? (yMin === 0 ? 1 : Math.abs(yMin) * 0.1) : 0;
         if (ac.min === undefined) {
-          scale.min = hasBarOrHist ? Math.min(0, yMin - pad) : yMin - pad;
+          const min = yMin - (equalSpan || pad);
+          scale.min = hasBarOrHist ? Math.min(0, min) : min;
         }
         if (ac.max === undefined) {
-          scale.max = hasBarOrHist ? Math.max(0, yMax + pad) : yMax + pad;
+          const max = yMax + (equalSpan || pad);
+          scale.max = hasBarOrHist ? Math.max(0, max) : max;
         }
       }
 
       if (this.shouldNiceAutoRange(scale, ac, false)) {
-        scale.nice(DEFAULT_TICK_COUNT);
+        this.niceAutoRange(scale, ac.tickCount ?? DEFAULT_TICK_COUNT);
         // nice() can push min below 0, clamp back for bar/histogram baseline
         if (hasBarOrHist && yMin >= 0 && scale.min < 0) scale.min = 0;
       }
+
+      // Preserve one-sided explicit domains after automatic nicening.
+      if (ac.min !== undefined) scale.min = ac.min;
+      if (ac.max !== undefined) scale.max = ac.max;
 
       // Remember the "full" extent so zoom.bounds: 'data' knows how far
       // out reset-zoom would go.
@@ -1686,6 +1909,7 @@ export class ChartCore implements ChartInstance {
   }
 
   private scatterResolvers(si: number, series: SeriesConfig, fallbackColor: string) {
+    const store = this.storeForSeries(si);
     const cached = this.scatterEncodingCache.get(si);
     if (
       cached &&
@@ -1697,14 +1921,14 @@ export class ChartCore implements ChartInstance {
     }
 
     const logicalValueAt = (columnIdx: number, index: number) =>
-      this.store.valueAt(columnIdx, index);
+      store.valueAt(columnIdx, index);
     const state = buildScatterEncodingState({
       series,
       fallbackColor,
-      fallbackRadius: series.pointRadius ?? (this.store.length > 10_000 ? 1.5 : 3),
+      fallbackRadius: series.pointRadius ?? (store.length > 10_000 ? 1.5 : 3),
       palettes: this.scatterPalettes(),
-      columnCount: this.store.seriesCount + 1,
-      ranges: [{ startIdx: 0, endIdx: this.store.length - 1 }],
+      columnCount: store.seriesCount + 1,
+      ranges: [{ startIdx: 0, endIdx: store.length - 1 }],
       valueAt: logicalValueAt,
     });
 
@@ -1712,7 +1936,7 @@ export class ChartCore implements ChartInstance {
     const physicalValueAt = (columnIdx: number, index: number) => {
       let column = physicalColumns.get(columnIdx);
       if (!column) {
-        column = this.store.getPhysicalColumn(columnIdx);
+        column = store.getPhysicalColumn(columnIdx);
         physicalColumns.set(columnIdx, column);
       }
       return column[index] ?? Number.NaN;
@@ -1735,26 +1959,28 @@ export class ChartCore implements ChartInstance {
     endIdx: number,
     scaleType: Scale['type'],
     useIndex: boolean,
+    store: DataStore = this.store,
   ): [number, number] | null {
-    if (columnIdx < 0 || columnIdx >= this.store.seriesCount) return null;
+    if (columnIdx < 0 || columnIdx >= store.seriesCount) return null;
     const start = Math.max(0, startIdx);
-    const end = Math.min(this.store.length - 1, endIdx);
+    const end = Math.min(store.length - 1, endIdx);
     if (end < start) return null;
     const positiveOnly = scaleType === 'log';
 
     if (useIndex) {
       this.ensureRangeIndexesFresh();
-      let index = this.columnRangeIndexes.get(columnIdx);
+      const cacheKey = this.sourceStores.indexOf(store) + ":" + columnIdx;
+      let index = this.columnRangeIndexes.get(cacheKey);
       if (!index) {
         // Physical column columnIdx + 1: column 0 is X, series are 1-based.
-        index = new ColumnRangeIndex(this.store.getPhysicalColumn(columnIdx + 1));
-        this.columnRangeIndexes.set(columnIdx, index);
+        index = new ColumnRangeIndex(store.getPhysicalColumn(columnIdx + 1));
+        this.columnRangeIndexes.set(cacheKey, index);
       }
       // Segments map the logical range onto live physical ranges, so ring
       // buffers never query dead slots between head and tail.
       let min = Infinity;
       let max = -Infinity;
-      for (const segment of this.store.getSegments(start, end)) {
+      for (const segment of store.getSegments(start, end)) {
         const range = index.query(segment.physicalStart, segment.physicalEnd, positiveOnly);
         if (!range) continue;
         if (range[0] < min) min = range[0];
@@ -1766,7 +1992,7 @@ export class ChartCore implements ChartInstance {
     let min = Infinity;
     let max = -Infinity;
     for (let i = start; i <= end; i++) {
-      const v = this.store.yAt(columnIdx, i);
+      const v = store.yAt(columnIdx, i);
       if (!Number.isFinite(v) || (positiveOnly && v <= 0)) continue;
       if (v < min) min = v;
       if (v > max) max = v;
@@ -1780,9 +2006,10 @@ export class ChartCore implements ChartInstance {
     xScale: Scale | undefined,
     scaleType: Scale['type'],
     useIndex: boolean,
+    store: DataStore = this.store,
   ): [number, number] | null {
-    if (yColumnIdx < 0 || yColumnIdx >= this.store.seriesCount) return null;
-    if (!this.isValidColumn(xColumnIdx)) return null;
+    if (yColumnIdx < 0 || yColumnIdx >= store.seriesCount) return null;
+    if (!this.isValidColumn(xColumnIdx, store)) return null;
 
     const xMin = xScale?.min ?? -Infinity;
     const xMax = xScale?.max ?? Infinity;
@@ -1791,14 +2018,14 @@ export class ChartCore implements ChartInstance {
     // The sorted-permutation index assumes physical position == logical
     // position, which only holds for the plain columnar store. Ring buffers
     // fall back to the direct scan.
-    if (useIndex && this.store instanceof ColumnarStore) {
+    if (useIndex && store instanceof ColumnarStore) {
       this.ensureRangeIndexesFresh();
-      const key = xColumnIdx + ':' + yColumnIdx;
+      const key = this.sourceStores.indexOf(store) + ':' + xColumnIdx + ':' + yColumnIdx;
       let index = this.scatterRangeIndexes.get(key);
       if (!index) {
         index = new ScatterColumnRangeIndex(
-          this.store.getPhysicalColumn(xColumnIdx),
-          this.store.getPhysicalColumn(yColumnIdx + 1),
+          store.getPhysicalColumn(xColumnIdx),
+          store.getPhysicalColumn(yColumnIdx + 1),
         );
         this.scatterRangeIndexes.set(key, index);
       }
@@ -1807,11 +2034,11 @@ export class ChartCore implements ChartInstance {
 
     let min = Infinity;
     let max = -Infinity;
-    for (let i = 0; i < this.store.length; i++) {
-      const x = this.store.valueAt(xColumnIdx, i);
+    for (let i = 0; i < store.length; i++) {
+      const x = store.valueAt(xColumnIdx, i);
       if (!Number.isFinite(x)) continue;
       if (x < xMin || x > xMax) continue;
-      const v = this.store.yAt(yColumnIdx, i);
+      const v = store.yAt(yColumnIdx, i);
       if (!Number.isFinite(v) || (positiveOnly && v <= 0)) continue;
       if (v < min) min = v;
       if (v > max) max = v;
@@ -2156,7 +2383,8 @@ export class ChartCore implements ChartInstance {
       this.cancelPendingTouchCursor();
       const inPlot = this.isInPlotArea(x, y);
       this.updateLocalCursorFromPoint(x, y, pointerType, true);
-      if (inPlot) {
+      if (inPlot) this.emitPointClick(x, y);
+      if (inPlot && pointerType !== 'mouse') {
         // Leave a short-lived ring so the user can see the tap landed.
         this.tapFeedback = { x, y, startTime: performance.now() };
       }
@@ -2166,6 +2394,45 @@ export class ChartCore implements ChartInstance {
     this.eventBus.on('viewport:change', ({ scaleKey, min, max }) => {
       this.applyViewportChange(scaleKey, min, max);
     });
+  }
+
+  private emitPointClick(pixelX: number, pixelY: number): void {
+    const palette = this.categoricalPalette();
+    const pointSeries = this.config.series.map(series => series.type === 'bar' || series.type === 'histogram'
+      ? { ...series, visible: false } : series);
+    const points = this.hitTester.findPoints(this.store, this.scales, pointSeries, pixelX, pixelY,
+      'nearest', palette, this.lastPointerType, this.scatterPalettes(), this.stats.dataVersion,
+      si => this.scatterResolvers(si, this.config.series[si], palette[si % palette.length]).logicalResolver,
+      this.tooltipFormatters(), si => this.storeForSeries(si));
+    const bars = this.config.series.filter(series => series.visible !== false && series.type === 'bar');
+    for (const point of [...this.findBarTooltipPoints(), ...this.findHistogramTooltipPoints()]) {
+      const series = this.config.series[point.seriesIndex];
+      const store = this.storeForSeries(point.seriesIndex);
+      const xScale = this.scales.get(series.xAxisKey ?? 'x');
+      const yScale = this.scales.get(series.yAxisKey ?? 'y');
+      if (!xScale || !yScale || !Number.isFinite(point.y)) continue;
+      const top = yScale.dataToPixel(point.y);
+      const base = yScale.dataToPixel(yScale.type === 'log' ? yScale.min : 0);
+      if (pixelY < Math.min(top, base) || pixelY > Math.max(top, base)) continue;
+      let left: number;
+      let right: number;
+      if (series.type === 'histogram' && point.xRange) {
+        left = xScale.dataToPixel(point.xRange.min);
+        right = xScale.dataToPixel(point.xRange.max);
+      } else {
+        const rect = barRectForCategory({
+          centerX: xScale.dataToPixel(point.x),
+          categoryWidth: categoryWidthFromData(index => xScale.dataToPixel(store.xAt(index)),
+            point.dataIndex, store.length, this.layout.plot.width * 0.5),
+          series, barSeriesIndex: bars.indexOf(series), totalBarSeries: bars.length,
+        });
+        left = rect.left;
+        right = rect.left + rect.width;
+      }
+      if (pixelX >= Math.min(left, right) && pixelX <= Math.max(left, right)) points.unshift(point);
+    }
+    const point = points[0];
+    if (point) this.emitEvent('point:click', point);
   }
 
   private zoomedScaleRange(scale: Scale, anchorPx: number, factor: number): [number, number] {
@@ -2295,6 +2562,7 @@ export class ChartCore implements ChartInstance {
     // publish. Without this, dragging against the edge repaints all three
     // layers at gesture rate for zero visual change.
     if (scale.min === min && scale.max === max) return;
+    if (this.interactionGuards.viewport?.(scaleKey, { min, max }) === false) return;
 
     this.markViewportActive();
     this.userZoomedAxes.add(scaleKey);
@@ -2377,17 +2645,20 @@ export class ChartCore implements ChartInstance {
     const natural = this.naturalExtent.get(scaleKey);
     if (natural) return { min: natural[0], max: natural[1] };
 
-    if (this.store.length === 0) return null;
+    if (!this.hasData()) return null;
     if (isHoriz) {
-      return { min: this.store.xAt(0), max: this.store.xAt(this.store.length - 1) };
+      const extent = this.sourceExtent();
+      return extent ? { min: extent[0], max: extent[1] } : null;
     }
-    const seriesIndices = this.config.series
-      .filter((s) => (s.yAxisKey ?? 'y') === scaleKey && s.visible !== false)
-      .map((s) => seriesYDataIndex(s) - 1)
-      .filter((idx) => idx >= 0 && idx < this.store.seriesCount);
-    if (seriesIndices.length === 0) return null;
-    const [yMin, yMax] = this.store.yRange(seriesIndices, 0, this.store.length - 1);
-    return { min: yMin, max: yMax };
+    let min = Infinity;
+    let max = -Infinity;
+    this.config.series.forEach((series, si) => {
+      if ((series.yAxisKey ?? 'y') !== scaleKey || series.visible === false) return;
+      const store = this.storeForSeries(si);
+      const range = this.columnRange(seriesYDataIndex(series) - 1, 0, store.length - 1, 'linear', false, store);
+      if (range) { min = Math.min(min, range[0]); max = Math.max(max, range[1]); }
+    });
+    return min === Infinity ? null : { min, max };
   }
 
   /**
@@ -2594,6 +2865,7 @@ export class ChartCore implements ChartInstance {
     // order. This prevents the focused line from being visually composited
     // under later dimmed series.
     const drawOne = (si: number) => {
+      const store = this.storeForSeries(si);
       const series = this.config.series[si];
       if (!series || series.visible === false) return;
 
@@ -2603,30 +2875,30 @@ export class ChartCore implements ChartInstance {
       if (!xScale || !yScale) return;
 
       const colIdx = seriesYDataIndex(series);
-      if (colIdx < 1 || colIdx > this.store.seriesCount) return;
+      if (colIdx < 1 || colIdx > store.seriesCount) return;
 
       const type = series.type ?? 'line';
       const xColumnIdx = type === 'scatter' ? scatterXDataIndex(series) : 0;
-      if (!this.isValidColumn(xColumnIdx)) return;
+      if (!this.isValidColumn(xColumnIdx, store)) return;
       const canCullByGlobalX = xColumnIdx === 0;
       const [startIdx, endIdx] = canCullByGlobalX
-        ? this.store.getViewportIndices(xScale.min, xScale.max)
-        : [0, this.store.length - 1];
-      const segments = this.store.getSegments(startIdx, endIdx);
+        ? store.getViewportIndices(xScale.min, xScale.max)
+        : [0, store.length - 1];
+      const segments = store.getSegments(startIdx, endIdx);
       if (segments.length === 0) return;
-      const xData = this.store.getPhysicalColumn(xColumnIdx);
-      const yData = this.store.getPhysicalColumn(colIdx);
+      const xData = store.getPhysicalColumn(xColumnIdx);
+      const yData = store.getPhysicalColumn(colIdx);
       const colorBy = normalizeScatterColorBy(series.colorBy);
       const sizeBy = normalizeScatterSizeBy(series.sizeBy);
       const renderSegments = this.renderSegments(
         segments,
         xData,
         yData,
-        colorBy && this.isValidColumn(colorBy.dataIndex)
-          ? this.store.getPhysicalColumn(colorBy.dataIndex)
+        colorBy && this.isValidColumn(colorBy.dataIndex, store)
+          ? store.getPhysicalColumn(colorBy.dataIndex)
           : undefined,
-        sizeBy && this.isValidColumn(sizeBy.dataIndex)
-          ? this.store.getPhysicalColumn(sizeBy.dataIndex)
+        sizeBy && this.isValidColumn(sizeBy.dataIndex, store)
+          ? store.getPhysicalColumn(sizeBy.dataIndex)
           : undefined,
       );
       const renderSeries = type === 'scatter' && series.heatmap && !series.heatmapGradient
@@ -2650,11 +2922,11 @@ export class ChartCore implements ChartInstance {
             lowerIdx != null &&
             upperIdx >= 1 &&
             lowerIdx >= 1 &&
-            upperIdx <= this.store.seriesCount &&
-            lowerIdx <= this.store.seriesCount
+            upperIdx <= store.seriesCount &&
+            lowerIdx <= store.seriesCount
           ) {
-            const upperYData = this.store.getPhysicalColumn(upperIdx);
-            const lowerYData = this.store.getPhysicalColumn(lowerIdx);
+            const upperYData = store.getPhysicalColumn(upperIdx);
+            const lowerYData = store.getPhysicalColumn(lowerIdx);
             renderBandSegments(
               ctx,
               this.bandRenderSegments(segments, xData, yData, upperYData, lowerYData),
@@ -2863,6 +3135,7 @@ export class ChartCore implements ChartInstance {
     for (const point of this.tooltipPoints) {
       if (hlActive && point.seriesIndex !== this.highlightedSeries) continue;
 
+      const store = this.storeForSeries(point.seriesIndex);
       const sc = this.config.series[point.seriesIndex];
       if (!sc) continue;
 
@@ -2874,10 +3147,10 @@ export class ChartCore implements ChartInstance {
         // Highlight hovered bin, edges from X data, counts from Y data
         const colIdx = seriesYDataIndex(sc);
         const binIdx = point.dataIndex;
-        if (colIdx >= 1 && colIdx <= this.store.seriesCount && binIdx < this.store.length - 1) {
-          const x1 = xScale.dataToPixel(this.store.xAt(binIdx));
-          const x2 = xScale.dataToPixel(this.store.xAt(binIdx + 1));
-          const yTop = yScale.dataToPixel(this.store.yAt(colIdx - 1, binIdx));
+        if (colIdx >= 1 && colIdx <= store.seriesCount && binIdx < store.length - 1) {
+          const x1 = xScale.dataToPixel(store.xAt(binIdx));
+          const x2 = xScale.dataToPixel(store.xAt(binIdx + 1));
+          const yTop = yScale.dataToPixel(store.yAt(colIdx - 1, binIdx));
           const yBase = yScale.dataToPixel(0);
           ctx.fillStyle = `rgba(255, 255, 255, ${ringAlpha})`;
           ctx.fillRect(x1, Math.min(yTop, yBase), x2 - x1, Math.abs(yTop - yBase));
@@ -2893,12 +3166,12 @@ export class ChartCore implements ChartInstance {
         const barSeries = this.config.series.filter(s => s.visible !== false && s.type === 'bar');
         const barIdx = barSeries.indexOf(sc);
         const totalBars = barSeries.length;
-        if (barIdx >= 0 && idx < this.store.length) {
-          const centerX = xScale.dataToPixel(this.store.xAt(idx));
+        if (barIdx >= 0 && idx < store.length) {
+          const centerX = xScale.dataToPixel(store.xAt(idx));
           const categoryWidth = categoryWidthFromData(
-            (dataIndex) => xScale.dataToPixel(this.store.xAt(dataIndex)),
+            (dataIndex) => xScale.dataToPixel(store.xAt(dataIndex)),
             idx,
-            this.store.length,
+            store.length,
             this.layout.plot.width * 0.5,
           );
           const rect = barRectForCategory({
@@ -2925,7 +3198,7 @@ export class ChartCore implements ChartInstance {
       // Density scatter represents aggregate bins, not a single datum. A
       // nearest-point dot is misleading, so only point-rendered scatter gets
       // the unified indicator style.
-      if (sc.type === 'scatter' && isDensityScatterSeries(sc, this.store.length)) continue;
+      if (sc.type === 'scatter' && isDensityScatterSeries(sc, store.length)) continue;
 
       const px = xScale.dataToPixel(point.x);
       const py = yScale.dataToPixel(point.y);
@@ -3059,7 +3332,7 @@ export class ChartCore implements ChartInstance {
   }
 
   private updateTooltipPoints(): void {
-    if (this.store.length === 0 || this.cursorX === null || this.cursorY === null) {
+    if (!this.hasData() || this.cursorX === null || this.cursorY === null) {
       this.tooltipPoints = [];
       return;
     }
@@ -3095,6 +3368,7 @@ export class ChartCore implements ChartInstance {
           return this.scatterResolvers(si, series, fallback).logicalResolver;
         },
         this.tooltipFormatters(),
+        (si) => this.storeForSeries(si),
       );
     }
   }
@@ -3112,11 +3386,13 @@ export class ChartCore implements ChartInstance {
    */
   private findHistogramTooltipPoints(): TooltipPoint[] {
     const points: TooltipPoint[] = [];
-    if (this.cursorX === null || this.store.length < 2) return points;
+    if (this.cursorX === null || !this.hasData()) return points;
     const palette = this.categoricalPalette();
 
     for (let si = 0; si < this.config.series.length; si++) {
       const series = this.config.series[si];
+      const store = this.storeForSeries(si);
+      if (store.length === 0) continue;
       if (series.visible === false || series.type !== 'histogram') continue;
 
       const xScale = this.scales.get(series.xAxisKey ?? 'x');
@@ -3124,7 +3400,7 @@ export class ChartCore implements ChartInstance {
       const dataX = xScale.pixelToData(this.cursorX);
 
       const colIdx = seriesYDataIndex(series);
-      if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
+      if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
       const color = series.stroke ?? palette[si % palette.length];
 
@@ -3132,12 +3408,12 @@ export class ChartCore implements ChartInstance {
       // `upperBound` gives the largest b with edges[b] <= dataX in O(log n).
       // Bins are left-edge inclusive. The exact final edge maps to the
       // final bin so a click on the right border still selects that bar.
-      const b = this.histogramBinIndexForDataX(dataX);
+      const b = this.histogramBinIndexForDataX(dataX, store);
       if (b === null) continue;
 
-      const binMin = this.store.xAt(b);
-      const binMax = this.store.xAt(b + 1);
-      const count = this.store.yAt(colIdx - 1, b);
+      const binMin = store.xAt(b);
+      const binMax = store.xAt(b + 1);
+      const count = store.yAt(colIdx - 1, b);
 
       const fmt = this.tooltipFormatters();
       points.push({
@@ -3164,30 +3440,32 @@ export class ChartCore implements ChartInstance {
    */
   private findBarTooltipPoints(): TooltipPoint[] {
     const points: TooltipPoint[] = [];
-    if (this.cursorX === null || this.store.length === 0) return points;
+    if (this.cursorX === null || !this.hasData()) return points;
     const palette = this.categoricalPalette();
 
     for (let si = 0; si < this.config.series.length; si++) {
       const series = this.config.series[si];
+      const store = this.storeForSeries(si);
+      if (store.length === 0) continue;
       if (series.visible === false || series.type !== 'bar') continue;
 
       const xScale = this.scales.get(series.xAxisKey ?? 'x');
       if (!xScale) continue;
 
       const dataX = xScale.pixelToData(this.cursorX);
-      const idx = this.store.nearestXIndex(dataX);
-      const xVal = this.store.xAt(idx);
+      const idx = store.nearestXIndex(dataX);
+      const xVal = store.xAt(idx);
       const categoryWidth = categoryWidthFromData(
-        (dataIndex) => this.store.xAt(dataIndex),
+        (dataIndex) => store.xAt(dataIndex),
         idx,
-        this.store.length,
+        store.length,
       );
       if (Math.abs(dataX - xVal) > categoryWidth * 0.6) continue;
 
       const colIdx = seriesYDataIndex(series);
-      if (colIdx < 1 || colIdx > this.store.seriesCount) continue;
+      if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
-      const yVal = this.store.yAt(colIdx - 1, idx);
+      const yVal = store.yAt(colIdx - 1, idx);
       if (!Number.isFinite(yVal)) continue;
 
       const color = series.stroke ?? palette[si % palette.length];
@@ -3222,6 +3500,7 @@ export class ChartCore implements ChartInstance {
    * for both allocating and zero-alloc public variants.
    */
   private fillSnapshot(target: CursorSnapshot, opts?: CursorSnapshotOptions): CursorSnapshot {
+    if (this.sourceStores.length > 1 || !this.canUseGlobalXCursor()) return this.fillIndependentSnapshot(target, opts);
     const fallback = opts?.fallback ?? 'hide';
     const length = this.store.length;
 
@@ -3296,6 +3575,7 @@ export class ChartCore implements ChartInstance {
         row = {
           seriesIndex: si,
           dataIndex: idx,
+          dataX: xVal,
           label: s.label,
           color,
           value,
@@ -3306,6 +3586,7 @@ export class ChartCore implements ChartInstance {
       } else {
         row.seriesIndex = si;
         row.dataIndex = idx;
+        row.dataX = xVal;
         row.label = s.label;
         row.color = color;
         row.value = value;
@@ -3331,6 +3612,73 @@ export class ChartCore implements ChartInstance {
     return target;
   }
 
+  private fillIndependentSnapshot(target: CursorSnapshot, opts?: CursorSnapshotOptions): CursorSnapshot {
+    const fallback = opts?.fallback ?? 'hide';
+    const active = this.cursorDataX !== null && this.cursorX !== null;
+    const source: CursorSnapshot['source'] = active ? 'cursor'
+      : this.hasData() && fallback !== 'hide' ? fallback : 'none';
+    target.source = source;
+    target.dataIndex = null;
+    target.dataX = active ? this.cursorDataX : null;
+    target.formattedX = '';
+    target.activeSeriesIndex = null;
+    if (source === 'none') { target.points.length = 0; return target; }
+    const palette = this.categoricalPalette();
+    let count = 0;
+    let nearestDist = Infinity;
+    for (let si = 0; si < this.config.series.length; si++) {
+      const series = this.config.series[si];
+      const store = this.storeForSeries(si);
+      const column = seriesYDataIndex(series);
+      if (series.visible === false || !store.length || !this.isValidColumn(column, store)) continue;
+      const seriesX = this.scales.get(series.xAxisKey ?? 'x');
+      const targetX = active && seriesX && this.cursorX !== null ? seriesX.pixelToData(this.cursorX) : this.cursorDataX!;
+      let dataIndex = source === 'latest' ? Math.max(0, store.length - (series.type === 'histogram' ? 2 : 1))
+        : source === 'first' ? 0 : series.type === 'histogram'
+          ? this.histogramBinIndexForDataX(targetX, store)
+          : store.nearestXIndex(targetX);
+      const xColumn = series.type === 'scatter' ? scatterXDataIndex(series) : 0;
+      if (active && xColumn !== 0) {
+        let distance = Infinity;
+        dataIndex = null;
+        for (let i = 0; i < store.length; i++) {
+          const delta = Math.abs(store.valueAt(xColumn, i) - targetX);
+          if (delta < distance) { distance = delta; dataIndex = i; }
+        }
+      }
+      if (dataIndex === null) continue;
+      const range = series.type === 'histogram' ? this.histogramBinRange(dataIndex, store) : null;
+      const dataX = range ? (range.min + range.max) / 2 : store.valueAt(xColumn, dataIndex);
+      const value = store.valueAt(column, dataIndex);
+      const yScale = this.scales.get(series.yAxisKey ?? 'y');
+      const formattedValue = Number.isFinite(value) ? this.formatAxisValue(series.yAxisKey ?? 'y', value) : '';
+      const point = target.points[count] ?? (target.points[count] = {
+        seriesIndex: si, dataIndex, label: series.label, color: '', value, formattedValue,
+      });
+      point.seriesIndex = si;
+      point.dataIndex = dataIndex;
+      point.dataX = dataX;
+      point.label = series.label;
+      point.color = series.stroke ?? palette[si % palette.length];
+      point.value = value;
+      point.formattedValue = formattedValue;
+      point.meta = series.meta;
+      if (count === 0) {
+        target.dataIndex = dataIndex;
+        target.dataX ??= dataX;
+        target.formattedX = this.formatAxisValue(series.xAxisKey ?? 'x', target.dataX);
+      }
+      count++;
+      if (active && this.cursorY !== null && yScale && Number.isFinite(value)) {
+        const distance = Math.abs(yScale.dataToPixel(value) - this.cursorY);
+        if (distance < nearestDist) { nearestDist = distance; target.activeSeriesIndex = si; }
+      }
+    }
+    target.points.length = count;
+    if (count === 0) { target.source = 'none'; target.dataX = null; target.dataIndex = null; }
+    return target;
+  }
+
   // ─── Private: Helpers ───────────────────────────────────────
 
   private categoricalPalette(): string[] {
@@ -3349,11 +3697,12 @@ export class ChartCore implements ChartInstance {
     return this.theme.heatmapGradient ?? this.theme.sequentialPalette;
   }
 
-  private isValidColumn(columnIdx: number): boolean {
-    return Number.isInteger(columnIdx) && columnIdx >= 0 && columnIdx <= this.store.seriesCount;
+  private isValidColumn(columnIdx: number, store: DataStore = this.store): boolean {
+    return Number.isInteger(columnIdx) && columnIdx >= 0 && columnIdx <= store.seriesCount;
   }
 
   private canUseGlobalXCursor(): boolean {
+    if (this.sourceStores.length > 1) return false;
     return !this.config.series.some(
       series => series.visible !== false &&
         series.type === 'scatter' &&
@@ -3383,7 +3732,30 @@ export class ChartCore implements ChartInstance {
 
   private shouldNiceAutoRange(scale: Scale, axis: AxisConfig, hasExactGeometry: boolean): boolean {
     if (hasExactGeometry || scale.type === 'time') return false;
-    return axis.nice === true;
+    // Linear axes get clean 1/2/5 bounds by default. Log axes retain their
+    // existing opt-in behavior because their padded powers-of-ten extent is
+    // already meaningful; `nice: true` still rounds it to full decades.
+    return scale.type === 'linear' ? axis.nice !== false : axis.nice === true;
+  }
+
+  /**
+   * Expand a linear domain until the tick step selected from that domain is
+   * stable. One pass can widen the range enough to select the next 1/2/5
+   * interval, leaving a non-tick boundary behind (for example [-100, -85]
+   * selecting a 10-unit step). A bounded loop keeps the range deterministic
+   * while avoiding any renderer-specific endpoint insertion.
+   */
+  private niceAutoRange(scale: Scale, tickCount: number): void {
+    // niceRange treats one or two requested ticks as a two-reference
+    // fallback. Reapplying that fallback can keep widening the domain, so
+    // leave those intentionally sparse ranges at their first result.
+    const maxPasses = tickCount <= 2 ? 1 : 8;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      const previousMin = scale.min;
+      const previousMax = scale.max;
+      scale.nice(tickCount);
+      if (scale.min === previousMin && scale.max === previousMax) break;
+    }
   }
 
   private scatterPointsInSelection(
@@ -3395,17 +3767,19 @@ export class ChartCore implements ChartInstance {
 
     for (let si = 0; si < this.config.series.length; si++) {
       const series = this.config.series[si];
+      const store = this.storeForSeries(si);
+      if (store.length === 0) continue;
       if (series.visible === false || series.type !== 'scatter') continue;
       const xColumnIdx = scatterXDataIndex(series);
       const yColumnIdx = seriesYDataIndex(series);
-      if (!this.isValidColumn(xColumnIdx) || !this.isValidColumn(yColumnIdx)) continue;
+      if (!this.isValidColumn(xColumnIdx, store) || !this.isValidColumn(yColumnIdx, store)) continue;
 
       const fallbackColor = series.stroke ?? palette[si % palette.length];
       const style = this.scatterResolvers(si, series, fallbackColor).logicalResolver;
 
-      for (let i = 0; i < this.store.length; i++) {
-        const x = this.store.valueAt(xColumnIdx, i);
-        const y = this.store.valueAt(yColumnIdx, i);
+      for (let i = 0; i < store.length; i++) {
+        const x = store.valueAt(xColumnIdx, i);
+        const y = store.valueAt(yColumnIdx, i);
         if (
           !Number.isFinite(x) ||
           !Number.isFinite(y) ||
@@ -3439,11 +3813,108 @@ export class ChartCore implements ChartInstance {
   }
 
   /**
-   * Compute custom X-axis ticks for bar/histogram charts.
-   * Bar charts: tick at each category X value.
-   * Histograms: tick at each bin edge (thinned if too dense).
+   * Plan automatic numeric bar centers and cell boundaries together, so
+   * category padding cannot leave partial cells after tick thinning.
    */
-  private computeCustomXTicks(): { values: number[]; format?: (v: number) => string } | undefined {
+  private planBarXAxis(
+    rawValues: number[],
+    xMin: number,
+    xMax: number,
+    tickCount: number,
+  ): BarXAxisPlan | null {
+    const values = Array.from(new Set(rawValues.filter((value) => Number.isFinite(value)))).sort((a, b) => a - b);
+    if (values.length < 2 || !(xMax > xMin)) return null;
+
+    let minimumGap = Infinity;
+    for (let i = 1; i < values.length; i++) {
+      const gap = values[i] - values[i - 1];
+      if (gap > 0 && gap < minimumGap) minimumGap = gap;
+    }
+    if (!Number.isFinite(minimumGap)) return null;
+
+    // Keep the interval readable at the requested density, but never let it
+    // be narrower than the closest category spacing. The lower bound avoids
+    // introducing multiple ticks inside a single category slot.
+    const targetCount = Math.max(3, Math.floor(tickCount));
+    const suggested = niceStep(xMin, xMax, targetCount);
+    const minimumNice = this.niceIntervalAtLeast(minimumGap);
+    const interval = Math.max(suggested, minimumNice);
+    if (!(interval > 0) || !Number.isFinite(interval)) return null;
+
+    const roundingEpsilon = 1e-12;
+    let centerMin = Math.floor(xMin / interval + roundingEpsilon) * interval;
+    let centerMax = Math.ceil(xMax / interval - roundingEpsilon) * interval;
+
+    // BarRenderer sizes each category from its nearest local neighbor. For
+    // irregular spacing, the outermost bar can therefore extend beyond a
+    // simple half-interval edge. Keep expanding by whole tick intervals until
+    // every category slot fits while retaining a regular grid.
+    let geometryMin = Infinity;
+    let geometryMax = -Infinity;
+    for (let i = 0; i < rawValues.length; i++) {
+      const value = rawValues[i];
+      if (!Number.isFinite(value)) continue;
+      const width = categoryWidthFromData(
+        (index) => rawValues[index],
+        i,
+        rawValues.length,
+      );
+      geometryMin = Math.min(geometryMin, value - width * 0.5);
+      geometryMax = Math.max(geometryMax, value + width * 0.5);
+    }
+    if (!Number.isFinite(geometryMin) || !Number.isFinite(geometryMax)) return null;
+    const leftGap = (centerMin - interval * 0.5 - geometryMin) / interval;
+    const rightGap = (geometryMax - centerMax - interval * 0.5) / interval;
+    const leftSteps = leftGap > roundingEpsilon ? Math.ceil(leftGap - roundingEpsilon) : 0;
+    const rightSteps = rightGap > roundingEpsilon ? Math.ceil(rightGap - roundingEpsilon) : 0;
+    if (
+      !Number.isSafeInteger(leftSteps) ||
+      !Number.isSafeInteger(rightSteps) ||
+      leftSteps > 10_000 ||
+      rightSteps > 10_000
+    ) return null;
+    centerMin -= leftSteps * interval;
+    centerMax += rightSteps * interval;
+    if (!Number.isFinite(centerMin) || !Number.isFinite(centerMax)) return null;
+
+    const count = Math.round((centerMax - centerMin) / interval) + 1;
+    // A malformed or extremely fine input should fall back to the existing
+    // category path instead of allocating an unbounded tick list.
+    if (count < 2 || count > 10_000) return null;
+
+    const centers: number[] = [];
+    const gridValues: number[] = [];
+    const clean = (value: number) => Number(value.toPrecision(15));
+    for (let i = 0; i < count; i++) {
+      centers.push(clean(centerMin + i * interval));
+      gridValues.push(clean(centerMin - interval / 2 + i * interval));
+    }
+    gridValues.push(clean(centerMax + interval / 2));
+    return {
+      values: centers,
+      gridValues,
+      domainMin: gridValues[0],
+      domainMax: gridValues[gridValues.length - 1],
+    };
+  }
+
+  private niceIntervalAtLeast(value: number): number {
+    if (!(value > 0) || !Number.isFinite(value)) return 0;
+    const magnitude = 10 ** Math.floor(Math.log10(value));
+    const fraction = value / magnitude;
+    const niceFraction = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
+    return niceFraction * magnitude;
+  }
+
+  private axisMarkCoordinates(type: 'bar' | 'histogram'): number[] {
+    const stores = new Set(this.config.series.flatMap((series, si) =>
+      series.visible !== false && series.type === type && (series.xAxisKey ?? 'x') === 'x'
+        ? [this.storeForSeries(si)] : []));
+    if (stores.size === 1) return Array.from([...stores][0].x);
+    return [...new Set([...stores].flatMap(store => Array.from(store.x)))].sort((a, b) => a - b);
+  }
+
+  private computeCustomXTicks(): CustomXTicks | undefined {
     const visibleSeries = this.config.series.filter(s => s.visible !== false);
 
     // User-provided formatter on the X axis wins over the default numeric
@@ -3463,16 +3934,33 @@ export class ChartCore implements ChartInstance {
 
     // Histogram: X data = bin edges, use them as tick values
     const histSeries = visibleSeries.find(s => s.type === 'histogram');
-    if (histSeries && this.store.length > 0) {
+    if (histSeries && this.hasData()) {
       // X column contains bin edges directly (pre-computed by user)
-      const edgeValues = thinTicks(Array.from(this.store.x), maxCategoryTicks);
+      const edgeValues = thinTicks(this.axisMarkCoordinates('histogram'), maxCategoryTicks);
       return { values: edgeValues, format: userFormat ?? defaultFormat };
+    }
+
+    const xScale = this.scales.get('x');
+    const barPlan = xScale ? this.barXAxisPlans.get('x') : undefined;
+    const hasVisibleBar = visibleSeries.some((series) => series.type === 'bar');
+    if (
+      barPlan &&
+      hasVisibleBar &&
+      xScale?.type === 'linear' &&
+      Math.abs(xScale.min - barPlan.domainMin) <= Math.abs(barPlan.domainMax - barPlan.domainMin) * 1e-12 &&
+      Math.abs(xScale.max - barPlan.domainMax) <= Math.abs(barPlan.domainMax - barPlan.domainMin) * 1e-12 &&
+      xAxisCfg?.nice !== false &&
+      (!xAxisCfg?.ticks || xAxisCfg.ticks.length === 0) &&
+      xAxisCfg?.min === undefined &&
+      xAxisCfg?.max === undefined
+    ) {
+      return { values: barPlan.values, gridValues: barPlan.gridValues, format: userFormat ?? defaultFormat };
     }
 
     // Bar chart: tick at each category X value
     const barSeries = visibleSeries.find(s => s.type === 'bar');
-    if (barSeries && this.store.length > 0) {
-      const values = thinTicks(Array.from(this.store.x), maxCategoryTicks);
+    if (barSeries && this.hasData()) {
+      const values = thinTicks(this.axisMarkCoordinates('bar'), maxCategoryTicks);
       return { values, format: userFormat ?? defaultFormat };
     }
 
@@ -3480,6 +3968,7 @@ export class ChartCore implements ChartInstance {
   }
 
   private hasOnlyVisibleHistograms(): boolean {
+    if (this.sourceStores.length > 1) return false;
     let hasVisibleSeries = false;
     for (const series of this.config.series) {
       if (series.visible === false) continue;
@@ -3501,27 +3990,27 @@ export class ChartCore implements ChartInstance {
     };
   }
 
-  private histogramBinIndexForDataX(dataX: number): number | null {
-    if (this.store.length < 2) return null;
+  private histogramBinIndexForDataX(dataX: number, store: DataStore = this.store): number | null {
+    if (store.length < 2) return null;
 
-    const firstEdge = this.store.xAt(0);
-    const lastEdge = this.store.xAt(this.store.length - 1);
+    const firstEdge = store.xAt(0);
+    const lastEdge = store.xAt(store.length - 1);
     if (dataX < firstEdge || dataX > lastEdge) return null;
 
-    let binIdx = this.store.upperBoundX(dataX);
-    if (binIdx === this.store.length - 1 && dataX === lastEdge) {
-      binIdx = this.store.length - 2;
+    let binIdx = store.upperBoundX(dataX);
+    if (binIdx === store.length - 1 && dataX === lastEdge) {
+      binIdx = store.length - 2;
     }
 
-    if (binIdx < 0 || binIdx >= this.store.length - 1) return null;
+    if (binIdx < 0 || binIdx >= store.length - 1) return null;
     return binIdx;
   }
 
-  private histogramBinRange(dataIndex: number): { min: number; max: number } | null {
-    if (dataIndex < 0 || dataIndex >= this.store.length - 1) return null;
+  private histogramBinRange(dataIndex: number, store: DataStore = this.store): { min: number; max: number } | null {
+    if (dataIndex < 0 || dataIndex >= store.length - 1) return null;
     return {
-      min: this.store.xAt(dataIndex),
-      max: this.store.xAt(dataIndex + 1),
+      min: store.xAt(dataIndex),
+      max: store.xAt(dataIndex + 1),
     };
   }
 

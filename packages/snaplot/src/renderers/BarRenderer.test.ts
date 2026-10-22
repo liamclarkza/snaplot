@@ -30,25 +30,33 @@ function layout(): Layout {
 }
 
 function context() {
-  const fillRect = vi.fn();
+  const fill = vi.fn();
+  const stroke = vi.fn();
   const ctx = {
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
-    roundRect: vi.fn(),
+    rect: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    closePath: vi.fn(),
     clip: vi.fn(),
-    fillRect,
+    fill,
+    stroke,
     fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
     globalAlpha: 1,
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, fillRect };
+  return { ctx, fill, stroke };
 }
 
 const series: SeriesConfig = { label: 'bar', dataIndex: 1, type: 'bar' };
 
 describe('renderBars baseline', () => {
   it('anchors bars to the scale minimum on a log Y axis', () => {
-    const { ctx, fillRect } = context();
+    const { ctx, fill } = context();
     const scaleX = linearScale('x');
     const scaleY: Scale = {
       ...linearScale('y'),
@@ -61,13 +69,95 @@ describe('renderBars baseline', () => {
 
     renderBars(ctx, f([1, 2, 3]), f([10, 20, 30]), 0, 2, scaleX, scaleY, layout(), series, '#4e79a7', 0, 1);
 
-    expect(fillRect).toHaveBeenCalledTimes(3);
+    expect(fill).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses a translucent default fill and a one-pixel series outline', () => {
+    const { ctx, fill, stroke } = context();
+
+    renderBars(
+      ctx,
+      f([1]),
+      f([10]),
+      0,
+      0,
+      linearScale('x'),
+      linearScale('y'),
+      layout(),
+      { ...series, stroke: '#223344' },
+      '#4e79a7',
+      0,
+      1,
+    );
+
+    expect(fill).toHaveBeenCalledTimes(1);
+    expect(stroke).toHaveBeenCalledTimes(1);
+    expect(ctx.globalAlpha).toBe(0.75);
+    expect(ctx.strokeStyle).toBe('#223344');
+    expect(ctx.lineWidth).toBe(1);
+  });
+
+  it('keeps explicit opacity and highlight dimming', () => {
+    const { ctx } = context();
+
+    renderBars(
+      ctx,
+      f([1]),
+      f([10]),
+      0,
+      0,
+      linearScale('x'),
+      linearScale('y'),
+      layout(),
+      { ...series, opacity: 0.4 },
+      '#4e79a7',
+      0,
+      1,
+      0.5,
+    );
+
+    expect(ctx.globalAlpha).toBe(0.2);
+  });
+
+  it('rounds only the value edge and leaves the baseline edge square', () => {
+    const { ctx } = context();
+    const scaleY: Scale = {
+      ...linearScale('y'),
+      dataToPixel: (value: number) => 100 - value,
+    };
+
+    renderBars(
+      ctx,
+      f([10, 20]),
+      f([20, -20]),
+      0,
+      1,
+      linearScale('x'),
+      scaleY,
+      layout(),
+      series,
+      '#4e79a7',
+      0,
+      1,
+    );
+
+    const curves = (ctx.quadraticCurveTo as ReturnType<typeof vi.fn>).mock.calls;
+    const lineTos = (ctx.lineTo as ReturnType<typeof vi.fn>).mock.calls;
+    expect(curves).toHaveLength(4);
+    // Positive value edge is at y=80; neither curve touches its y=100 baseline.
+    expect(curves[0][1]).toBe(80);
+    expect(curves[1][1]).toBe(80);
+    // Negative value edge is at y=120; the y=100 baseline is square. The
+    // straight segments, rather than the curves, carry the baseline edge.
+    expect(curves[2][1]).toBe(120);
+    expect(curves[3][1]).toBe(120);
+    expect(lineTos.some((call) => call[1] === 100)).toBe(true);
   });
 });
 
 describe('renderBars width', () => {
   it('keeps a lone visible bar at its data spacing, not a fraction of the plot', () => {
-    const { ctx, fillRect } = context();
+    const { ctx, fill } = context();
     const scaleX = linearScale('x');
     const scaleY = linearScale('y');
     const xData = f([0, 10, 20, 30, 40, 50, 60, 70]);
@@ -76,8 +166,10 @@ describe('renderBars width', () => {
     // Viewport culling leaves a single bar (index 5) in range.
     renderBars(ctx, xData, yData, 5, 5, scaleX, scaleY, layout(), series, '#4e79a7', 0, 1);
 
-    expect(fillRect).toHaveBeenCalledTimes(1);
-    const width = fillRect.mock.calls[0][2] as number;
+    expect(fill).toHaveBeenCalledTimes(1);
+    const left = (ctx.moveTo as ReturnType<typeof vi.fn>).mock.calls[0][0] as number;
+    const right = (ctx.lineTo as ReturnType<typeof vi.fn>).mock.calls[0][0] as number;
+    const width = right - left;
     // Data spacing is 10px; the bar sits well under the old plot*0.5 fallback.
     expect(width).toBeGreaterThan(0);
     expect(width).toBeLessThan(10);
@@ -86,7 +178,7 @@ describe('renderBars width', () => {
 
 describe('renderBars per-datum fill', () => {
   it('honors a static series.fill string over the series color', () => {
-    const { ctx, fillRect } = context();
+    const { ctx, fill } = context();
     renderBars(
       ctx,
       f([10, 20, 30]),
@@ -101,16 +193,16 @@ describe('renderBars per-datum fill', () => {
       0,
       1,
     );
-    expect(fillRect).toHaveBeenCalledTimes(3);
+    expect(fill).toHaveBeenCalledTimes(3);
     expect(ctx.fillStyle).toBe('#ff0000');
   });
 
   it('calls a fill callback per bar with value and logical index', () => {
-    const { ctx, fillRect } = context();
+    const { ctx, fill } = context();
     const seen: Array<[number, number]> = [];
     const styles: string[] = [];
-    // Capture the fillStyle active at each fillRect call.
-    (fillRect as ReturnType<typeof vi.fn>).mockImplementation(() => {
+    // Capture the fillStyle active at each fill call.
+    (fill as ReturnType<typeof vi.fn>).mockImplementation(() => {
       styles.push(ctx.fillStyle as string);
     });
 

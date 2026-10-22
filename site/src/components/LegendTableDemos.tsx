@@ -1,10 +1,6 @@
+import { nameColumn, valueColumn, metricColumn, swatchColumn, column } from 'snaplot/solid';
 import { createSignal, createMemo, createEffect, onCleanup, For } from 'solid-js';
 import {
-  nameColumn,
-  valueColumn,
-  metricColumn,
-  swatchColumn,
-  column,
   lightTheme,
   darkTheme,
 } from 'snaplot';
@@ -16,9 +12,9 @@ import {
 } from 'snaplot/solid';
 import { useTheme } from '../ThemeContext';
 import type {
-  ChartConfig,
-  ChartInstance,
-  ColumnarData,
+  ChartOptions,
+  ChartHandle,
+  ColumnData,
   CursorSnapshot,
 } from 'snaplot';
 
@@ -36,7 +32,7 @@ interface RunMeta {
  * converging training metric. No hard clamp, so values can briefly
  * overshoot without being visibly flattened against the top of the chart.
  */
-function runSeriesData(numRuns: number, points: number): ColumnarData {
+function runSeriesData(numRuns: number, points: number): ColumnData {
   const x = new Float64Array(points);
   const series: Float64Array[] = [];
   for (let r = 0; r < numRuns; r++) {
@@ -54,7 +50,7 @@ function runSeriesData(numRuns: number, points: number): ColumnarData {
     }
     series.push(arr);
   }
-  return [x, ...series] as ColumnarData;
+  return { columns: { x: x, ...Object.fromEntries((series).map((values, index) => [`value${index + 1}`, values])) } } as ColumnData;
 }
 
 function runNames(n: number): string[] {
@@ -75,23 +71,23 @@ function runNames(n: number): string[] {
  * last X value. Y adds a small padding so the top-most line doesn't touch
  * the plot edge.
  */
-function runConfig(numRuns: number, metric: string): ChartConfig<RunMeta> {
+function runConfig(numRuns: number, metric: string): ChartOptions {
   const names = runNames(numRuns);
   return {
     axes: {
-      x: { type: 'linear', padding: 0 },
-      y: { type: 'linear', padding: 0.05 },
+      x: { type: 'linear', rangePadding: 0 },
+      y: { type: 'linear', rangePadding: 0.05 },
     },
     series: names.map((label, i) => ({
       label,
-      dataIndex: i + 1,
+      y: `value${i + 1}`,
       type: 'line' as const,
       interpolation: 'monotone' as const,
       lineWidth: 2,
       meta: { runId: `r${i}`, metricKey: metric, epoch: i },
     })),
     tooltip: { show: false },
-    // With highlight active (via activeSeriesIndex), only the focused
+    // With highlight active (via activeSeriesId), only the focused
     // series gets a cursor dot, the rest just show the crosshair line.
     cursor: { show: true, snap: true },
   };
@@ -101,7 +97,7 @@ function runConfig(numRuns: number, metric: string): ChartConfig<RunMeta> {
 
 export function DefaultLegendTableDemo() {
   const { theme: siteTheme } = useTheme();
-  const [chart, setChart] = createSignal<ChartInstance | undefined>();
+  const [chart, setChart] = createSignal<ChartHandle | undefined>();
   const data = runSeriesData(4, 200);
 
   const config = createMemo(() => ({
@@ -113,15 +109,15 @@ export function DefaultLegendTableDemo() {
   // focuses itself and everything else dims.
   const snap = createCursorSnapshot(chart);
   createEffect(() => {
-    chart()?.setHighlight(snap()?.activeSeriesIndex ?? null);
+    chart()?.setHighlight(snap()?.activeSeriesId ?? null);
   });
 
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '260px' }}>
-        <Chart config={config()} data={data} onReady={setChart} />
+        <Chart x="x" {...config()} data={data} onReady={setChart} />
       </div>
-      <LegendTable<RunMeta> chart={chart} />
+      <LegendTable chart={chart} />
     </div>
   );
 }
@@ -130,7 +126,7 @@ export function DefaultLegendTableDemo() {
 
 export function CustomColumnsDemo() {
   const { theme: siteTheme } = useTheme();
-  const [chart, setChart] = createSignal<ChartInstance | undefined>();
+  const [chart, setChart] = createSignal<ChartHandle | undefined>();
   const [precision, setPrecision] = createSignal(4);
   const data = runSeriesData(5, 200);
 
@@ -141,27 +137,27 @@ export function CustomColumnsDemo() {
 
   const snap = createCursorSnapshot(chart);
   createEffect(() => {
-    chart()?.setHighlight(snap()?.activeSeriesIndex ?? null);
+    chart()?.setHighlight(snap()?.activeSeriesId ?? null);
   });
 
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '260px' }}>
-        <Chart config={config()} data={data} onReady={setChart} />
+        <Chart x="x" {...config()} data={data} onReady={setChart} />
       </div>
-      <LegendTable<RunMeta>
+      <LegendTable
         chart={chart}
         columns={[
           swatchColumn(),
           nameColumn({ swatch: false }),
-          metricColumn<RunMeta>((p) => p.meta!.metricKey),
-          column<RunMeta>({
+          metricColumn((p) => (p.meta as RunMeta).metricKey),
+          column({
             key: 'epoch',
             header: 'Epoch',
             align: 'right',
-            cell: (p) => String(p.meta!.epoch),
+            cell: (p) => String((p.meta as RunMeta).epoch),
           }),
-          valueColumn<RunMeta>({
+          valueColumn({
             format: (v) => v.toFixed(precision()),
           }),
         ]}
@@ -185,41 +181,41 @@ export function CustomColumnsDemo() {
 
 export function CrossChartSyncDemo() {
   const { theme: siteTheme } = useTheme();
-  const group = createChartGroup();
-  const [chartA, setChartA] = createSignal<ChartInstance | undefined>();
-  const [chartB, setChartB] = createSignal<ChartInstance | undefined>();
+  const group = createChartGroup({ viewport: true });
+  const [chartA, setChartA] = createSignal<ChartHandle | undefined>();
+  const [chartB, setChartB] = createSignal<ChartHandle | undefined>();
   const data = runSeriesData(4, 200);
 
-  const configA = createMemo(() => group.apply({
+  const configA = createMemo(() => ({ group, ...{
     ...runConfig(4, 'eval/accuracy'),
     theme: siteTheme() === 'light' ? lightTheme : darkTheme,
-  }));
+  } }));
 
   const configB = createMemo(() => {
     const base = runConfig(4, 'eval/accuracy');
-    return group.apply({
+    return ({ group, ...{
       ...base,
       theme: siteTheme() === 'light' ? lightTheme : darkTheme,
       series: base.series.map((s) => ({
         ...s,
         meta: { ...s.meta!, metricKey: 'train/loss' },
       })),
-    });
+    } });
   });
 
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '180px' }}>
-        <Chart config={configA()} data={data} onReady={setChartA} />
+        <Chart x="x" {...configA()} data={data} onReady={setChartA} />
       </div>
       <div style={{ height: '180px', 'border-top': '1px solid var(--border)' }}>
-        <Chart config={configB()} data={data} onReady={setChartB} />
+        <Chart x="x" {...configB()} data={data} onReady={setChartB} />
       </div>
-      <LegendTable<RunMeta>
+      <LegendTable
         chart={chartA}
         columns={[
           nameColumn(),
-          metricColumn<RunMeta>((p) => p.meta!.metricKey),
+          metricColumn((p) => (p.meta as RunMeta).metricKey),
           valueColumn({ format: (v) => v.toFixed(4) }),
         ]}
       />
@@ -236,13 +232,13 @@ export function CrossChartSyncDemo() {
 
 export function SidepanelHighlightDemo() {
   const { theme: siteTheme } = useTheme();
-  const group = createChartGroup();
-  const [chart, setChart] = createSignal<ChartInstance | undefined>();
+  const group = createChartGroup({ viewport: true });
+  const [chart, setChart] = createSignal<ChartHandle | undefined>();
   const data = runSeriesData(6, 200);
-  const config = createMemo(() => group.apply({
+  const config = createMemo(() => ({ group, ...{
     ...runConfig(6, 'eval/accuracy'),
     theme: siteTheme() === 'light' ? lightTheme : darkTheme,
-  }));
+  } }));
   const names = runNames(6);
 
   return (
@@ -263,11 +259,11 @@ export function SidepanelHighlightDemo() {
             const hoverBg = 'rgba(127, 127, 127, 0.08)';
             const enter = (e: MouseEvent | FocusEvent) => {
               (e.currentTarget as HTMLElement).style.background = hoverBg;
-              group.highlight(i());
+              group.setHighlight(`value${i() + 1}`);
             };
             const leave = (e: MouseEvent | FocusEvent) => {
               (e.currentTarget as HTMLElement).style.background = 'transparent';
-              group.highlight(null);
+              group.setHighlight(null);
             };
             return (
               <button
@@ -302,9 +298,9 @@ export function SidepanelHighlightDemo() {
       </div>
       <div style={{ flex: '1', display: 'flex', 'flex-direction': 'column' }}>
         <div style={{ height: '260px' }}>
-          <Chart config={config()} data={data} onReady={setChart} />
+          <Chart x="x" {...config()} data={data} onReady={setChart} />
         </div>
-        <LegendTable<RunMeta> chart={chart} />
+        <LegendTable chart={chart} />
       </div>
     </div>
   );
@@ -316,18 +312,18 @@ export function BenchmarkDemo() {
   const { theme: siteTheme } = useTheme();
   const NUM_RUNS = 50;
   const POINTS = 2_000;
-  const [chart, setChart] = createSignal<ChartInstance | undefined>();
+  const [chart, setChart] = createSignal<ChartHandle | undefined>();
   const [fps, setFps] = createSignal(60);
 
   const data = runSeriesData(NUM_RUNS, POINTS);
   const cfg = createMemo(() => ({
     ...runConfig(NUM_RUNS, 'eval/accuracy'),
     theme: siteTheme() === 'light' ? lightTheme : darkTheme,
-  } as ChartConfig<RunMeta>));
+  } as ChartOptions));
 
   const snap = createCursorSnapshot(chart);
   createEffect(() => {
-    chart()?.setHighlight(snap()?.activeSeriesIndex ?? null);
+    chart()?.setHighlight(snap()?.activeSeriesId ?? null);
   });
 
   // FPS counter, measures rAF cadence while the page is animating
@@ -351,9 +347,9 @@ export function BenchmarkDemo() {
   return (
     <div style={{ position: 'relative', border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '260px' }}>
-        <Chart config={cfg()} data={data} onReady={setChart} />
+        <Chart x="x" {...cfg()} data={data} onReady={setChart} />
       </div>
-      <LegendTable<RunMeta>
+      <LegendTable
         chart={chart}
         maxHeight="180px"
         columns={[nameColumn({ truncate: 200 }), valueColumn({ format: (v) => v.toFixed(4) })]}
@@ -382,7 +378,7 @@ export function BenchmarkDemo() {
 
 export function HeadlessSnapshotDemo() {
   const { theme: siteTheme } = useTheme();
-  const [chart, setChart] = createSignal<ChartInstance | undefined>();
+  const [chart, setChart] = createSignal<ChartHandle | undefined>();
   const data = runSeriesData(2, 150);
   const config = createMemo(() => ({
     ...runConfig(2, 'eval/accuracy'),
@@ -392,15 +388,15 @@ export function HeadlessSnapshotDemo() {
   return (
     <div style={{ border: '1px solid var(--border)', 'border-radius': 'var(--radius-lg)', overflow: 'hidden', background: 'var(--bg-surface)' }}>
       <div style={{ height: '220px' }}>
-        <Chart config={config()} data={data} onReady={setChart} />
+        <Chart x="x" {...config()} data={data} onReady={setChart} />
       </div>
-      <LegendTable<RunMeta> chart={chart}>
+      <LegendTable chart={chart}>
         {(snap) => {
           // Focus the line nearest the cursor by pushing
-          // `activeSeriesIndex` through to the chart's highlight state,          // this is the "dim everything else" interaction demonstrated
+          // `activeSeriesId` through to the chart's highlight state,          // this is the "dim everything else" interaction demonstrated
           // via the cross-chart highlight API, but using a single chart.
           createEffect(() => {
-            chart()?.setHighlight(snap()?.activeSeriesIndex ?? null);
+            chart()?.setHighlight(snap()?.activeSeriesId ?? null);
           });
           return (
             <pre
@@ -425,21 +421,21 @@ export function HeadlessSnapshotDemo() {
   );
 }
 
-function snapshotPreview(s: CursorSnapshot<RunMeta> | null): string {
+function snapshotPreview(s: CursorSnapshot | null | undefined): string {
   if (!s) return 'no chart';
   return JSON.stringify(
     {
       source: s.source,
-      dataIndex: s.dataIndex,
+      x: s.x,
       formattedX: s.formattedX,
-      // `activeSeriesIndex` is the series whose value at the current X
+      // `activeSeriesId` is the series whose value at the current X
       // is visually closest to the cursor Y, pair with `setHighlight`
       // to focus the line under the cursor in every chart in the group.
-      activeSeriesIndex: s.activeSeriesIndex,
+      activeSeriesId: s.activeSeriesId,
       points: s.points.map((p) => ({
-        seriesIndex: p.seriesIndex,
+        seriesId: p.seriesId,
         label: p.label,
-        value: Number.isFinite(p.value) ? p.value.toFixed(4) : null,
+        value: Number.isFinite(p.y) ? p.y.toFixed(4) : null,
         meta: p.meta,
       })),
     },

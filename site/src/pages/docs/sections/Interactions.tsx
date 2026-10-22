@@ -68,8 +68,8 @@ export default function Interactions() {
   interaction: 'timeseries',
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
   series: [
-    { label: 'Series A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Series A', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Series B', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
@@ -89,7 +89,7 @@ export default function Interactions() {
           Use <code>minRange</code> and <code>maxRange</code> to set zoom limits. <code>wheelStep</code> controls the zoom fraction per max wheel / pinch tick (default <code>0.1</code>; <code>0</code> disables wheel zoom).
           When both axes are zoomable, touch pinch uses a uniform map/image-style 2D zoom by default; use <code>pinchMode: 'axis-lock'</code> for direction-based locking.
           Axis-gutter wheel zoom is opt-in with <code>zoom.axis: true</code>.
-          The <code>onZoom</code> callback fires whenever the viewport changes.
+          Subscribe to <code>viewport:change</code> to observe navigation. Framework components also expose <code>viewport</code> and <code>onViewportChange</code> for controlled navigation.
         </Prose>
         <Prose>
           <b>Bounds</b>, by default, pan and zoom are clamped to the data extent so users can't navigate past the data. Override via <code>zoom.bounds</code>:
@@ -100,15 +100,15 @@ zoom: { bounds: 'data' }                           // clamp every axis to data e
 zoom: { bounds: { x: 'data', y: 'unbounded' } }    // per-axis
 zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
         <Prose>
-          Bounds are evaluated on every viewport change. Panning into the edge stops at the edge (range preserved); zoom-out past the full extent collapses to the full extent. The <code>'data'</code> bound tracks what <code>resetZoom()</code> would produce, including padding, any explicit <code>nice: true</code> expansion, and axis pins, so the zoom-out limit matches the initial view.
+          Bounds are evaluated on every viewport change. Panning into the edge stops at the edge (range preserved); zoom-out past the full extent collapses to the full extent. The <code>'data'</code> bound tracks what <code>resetViewport()</code> would produce, including padding, any explicit <code>roundBounds: true</code> expansion, and axis pins, so the zoom-out limit matches the initial view.
         </Prose>
         <Demo title="Zoom controls" desc="Drag to zoom, double-click to reset. Try zooming out past the edges, bounds prevent you from escaping the data."
           data={d_zoom()}
           code={`{
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'Throughput', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Latency', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5 },
+    { label: 'Throughput', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Latency', y: 'value2', type: 'area', interpolation: 'monotone', lineWidth: 1.5 },
   ],
   zoom: { enabled: true, x: true, y: false, wheelStep: 0.05, bounds: true },
   tooltip: { show: true, mode: 'index' },
@@ -124,8 +124,8 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
           code={`{
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'Series A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Series A', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Series B', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
   zoom: { enabled: true, x: true },
   pan: { enabled: true, x: true, y: false },
@@ -139,7 +139,7 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
           <code>xLine</code>/<code>yLine</code> (toggle each crosshair line), <code>color</code>, <code>dash</code> (dash pattern array), and <code>indicators</code> (the per-series dot+ring drawn at each hit-tested point on hover, disable when a legend table already shows the values).
         </Prose>
         <Prose>
-          <b>Cross-chart cursor sync:</b> set the same <code>cursor.syncKey</code> on multiple charts to synchronize their crosshair positions. See also{' '}
+          <b>Cross-chart cursor sync:</b> pass the same <code>group</code> from <code>createChartGroup()</code> to each chart. See also{' '}
           <DocsLink slug="plugins" id="cross-chart-sync">Cross-chart Sync</DocsLink>{' '}
           for a more ergonomic one-line helper that bundles cursor + highlight sync together.
         </Prose>
@@ -148,8 +148,8 @@ zoom: { bounds: { x: { min: 0, max: 100 } } }      // custom hard walls`} />
           code={`{
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'Series A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Series A', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Series B', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
   cursor: { show: true, snap: true, xLine: true, yLine: false, dash: [4, 3], indicators: true },
   tooltip: { show: true, mode: 'index' },

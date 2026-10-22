@@ -3,7 +3,7 @@ import { highlight } from 'sugar-high';
 import * as snaplot from 'snaplot';
 import { darkTheme, lightTheme } from 'snaplot';
 import { Chart } from 'snaplot/solid';
-import type { ColumnarData, ChartConfig, ChartInstance } from 'snaplot';
+import type { DataSource, ChartOptions, ChartHandle } from 'snaplot';
 import { useTheme } from '../ThemeContext';
 
 // Everything snaplot exports is available as a bare identifier inside the
@@ -24,14 +24,14 @@ const evalArgValues = Object.values(evalContext);
  */
 export default function LiveEditor(props: {
   defaultCode: string;
-  data: ColumnarData;
+  data: DataSource<Record<string, unknown>>;
   height?: string;
-  onReady?: (chart: ChartInstance) => void;
+  onReady?: (chart: ChartHandle) => void;
 }) {
   const { theme: siteTheme } = useTheme();
   const [error, setError] = createSignal(false);
   const [status, setStatus] = createSignal('');
-  const [userConfig, setUserConfig] = createSignal<ChartConfig>(evalConfig(props.defaultCode));
+  const [userConfig, setUserConfig] = createSignal<ChartOptions>(evalConfig(props.defaultCode));
   const [copied, setCopied] = createSignal(false);
 
   // Merge the site-wide theme so all live-editor charts respond to
@@ -43,17 +43,17 @@ export default function LiveEditor(props: {
     return {
       theme: siteTheme() === 'light' ? lightTheme : darkTheme,
       ...uc,
-    } as ChartConfig;
+    } as ChartOptions;
   });
 
   let editorRef!: HTMLDivElement;
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let currentCode = props.defaultCode;
 
-  function evalConfig(text: string): ChartConfig {
+  function evalConfig(text: string): ChartOptions {
     try {
       // Theme objects (darkTheme, oceanTheme, etc.) are available in the eval scope
-      return new Function(...evalArgNames, 'return (' + text + ')')(...evalArgValues) as ChartConfig;
+      return new Function('data', ...evalArgNames, 'return (' + text + ')')(props.data, ...evalArgValues) as ChartOptions;
     } catch {
       return { series: [] };
     }
@@ -100,8 +100,8 @@ export default function LiveEditor(props: {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       try {
-        const result = new Function(...evalArgNames, 'return (' + text + ')')(...evalArgValues);
-        setUserConfig(result as ChartConfig);
+        const result = new Function('data', ...evalArgNames, 'return (' + text + ')')(props.data, ...evalArgValues);
+        setUserConfig(result as ChartOptions);
         setError(false);
         setStatus('');
       } catch (err) {
@@ -174,7 +174,7 @@ export default function LiveEditor(props: {
     }}>
       {/* Live chart */}
       <div style={{ height: props.height ?? '280px', background: 'var(--bg-surface)' }}>
-        <Chart config={config()} data={props.data} onReady={props.onReady} />
+        <Chart x="x" {...config()} data={props.data} onReady={props.onReady} />
       </div>
 
       {/* Editable highlighted code */}

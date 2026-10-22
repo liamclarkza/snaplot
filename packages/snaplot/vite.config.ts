@@ -6,10 +6,10 @@ import { copyFileSync, mkdirSync } from 'fs';
 
 export default defineConfig({
   plugins: [
-    solid(),
+    solid({ solid: { hydratable: true } }),
     dts({
       include: ['src/**/*'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/*.spec.ts', 'src/**/*.typecheck.ts'],
       outDir: 'dist',
     }),
     {
@@ -30,12 +30,13 @@ export default defineConfig({
         index: resolve(__dirname, 'src/index.ts'),
         core: resolve(__dirname, 'src/core.ts'),
         solid: resolve(__dirname, 'src/solid.ts'),
+        react: resolve(__dirname, 'src/react.ts'),
       },
       formats: ['es'],
       fileName: (_format, entryName) => `${entryName}.js`,
     },
     rollupOptions: {
-      external: ['solid-js', 'solid-js/web', 'solid-js/store'],
+      external: ['solid-js', 'solid-js/web', 'solid-js/store', 'react', 'react/jsx-runtime', 'react-dom'],
     },
     target: 'esnext',
     sourcemap: true,

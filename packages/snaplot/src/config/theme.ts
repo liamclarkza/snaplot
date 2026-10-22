@@ -55,6 +55,7 @@ export {
 export const CHART_CSS_VARS: Partial<Record<keyof ThemeConfig, string>> = {
   backgroundColor: '--chart-bg',
   textColor: '--chart-text',
+  axisLabelColor: '--chart-axis-label',
   tickColor: '--chart-tick',
   gridColor: '--chart-grid',
   axisLineColor: '--chart-axis',
@@ -73,7 +74,7 @@ export interface ThemeTokens {
   surface?: string;
   /** Primary chart text color. */
   text?: string;
-  /** Shared quiet color for ticks, gridlines, axes, and the plot frame. */
+  /** Axis/companion text color; grid, ticks and frame use this hue at 0.18 opacity unless overridden. */
   muted?: string;
   /** Interaction accent, currently used by the crosshair. */
   accent?: string;
@@ -107,10 +108,15 @@ export function createTheme(tokens: ThemeTokens): Partial<ThemeConfig> {
   if (tokens.surface !== undefined) theme.backgroundColor = tokens.surface;
   if (tokens.text !== undefined) theme.textColor = tokens.text;
   if (tokens.muted !== undefined) {
+    theme.axisLabelColor = tokens.muted;
     theme.tickColor = tokens.muted;
     theme.gridColor = tokens.muted;
     theme.axisLineColor = tokens.muted;
     theme.borderColor = tokens.muted;
+    // A text-strength muted color needs much less ink for chart furniture.
+    // Explicit opacity tokens below take precedence over these defaults.
+    theme.gridOpacity = 0.18;
+    theme.borderOpacity = 0.18;
   }
   if (tokens.accent !== undefined) theme.crosshairColor = tokens.accent;
   if (tokens.categorical !== undefined) {
@@ -157,6 +163,7 @@ export function applyThemeToElement(element: HTMLElement, theme: ThemeConfig): v
 
 /** Theme fields that hold a single CSS color and participate in resolution. */
 const COLOR_FIELDS: (keyof ThemeConfig)[] = [
+  'axisLabelColor',
   'backgroundColor',
   'textColor',
   'tickColor',

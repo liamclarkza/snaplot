@@ -16,12 +16,18 @@
       "types": "./dist/core.d.ts"
     },
     "./solid": {
-      "import": "./dist/solid.js",
-      "types": "./dist/solid.d.ts"
+      "types": "./dist/solid.d.ts",
+      "browser": "./dist/solid.js",
+      "node": "./dist/solid.server.js",
+      "default": "./dist/solid.js"
     },
     "./legend-table.css": {
       "import": "./dist/legend-table.css",
       "default": "./dist/legend-table.css"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
     }
   },
   "files": [
@@ -34,17 +40,22 @@
     "dist/*.css"
   ],
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && vite build --config vite.ssr.config.ts",
     "typecheck": "tsc --noEmit",
     "dev": "vite build --watch",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:consumers": "node scripts/check-consumers.mjs"
   },
   "peerDependencies": {
-    "solid-js": "^1.9.0"
+    "solid-js": "^1.9.0",
+    "react": "^19.0.0"
   },
   "peerDependenciesMeta": {
     "solid-js": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     }
   },
@@ -54,7 +65,11 @@
     "vite": "^7.0.0",
     "vite-plugin-dts": "^4.5.0",
     "vite-plugin-solid": "^2.11.0",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "react": "^19.0.0",
+    "@types/react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
   },
   "repository": {
     "type": "git",

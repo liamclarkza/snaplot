@@ -1,7 +1,7 @@
 import { createMemo, createSignal, onCleanup, onMount, type JSX } from 'solid-js';
 import { Chart } from 'snaplot/solid';
 import { darkTheme, lightTheme } from 'snaplot';
-import type { ChartConfig, ChartInstance, ColumnarData, ThemeConfig } from 'snaplot';
+import type { ChartOptions, ChartHandle, ColumnData, ThemeConfig } from 'snaplot';
 import { useTheme } from '../ThemeContext';
 
 /**
@@ -21,14 +21,11 @@ function useChartTheme(): () => ThemeConfig {
 const axes = { x: { type: 'linear' as const }, y: { type: 'linear' as const } };
 const padding = { top: 16, right: 18, bottom: 30, left: 42 };
 
-function gappyLine(): ColumnarData {
-  return [
-    f([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]),
-    f([18, 22, 25, NaN, NaN, NaN, 30, 27, 33, NaN, 29, 34, 31, 36]),
-  ];
+function gappyLine(): ColumnData {
+  return { columns: { x: f([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]), value1: f([18, 22, 25, NaN, NaN, NaN, 30, 27, 33, NaN, 29, 34, 31, 36]) } };
 }
 
-function multiLine(): ColumnarData {
+function multiLine(): ColumnData {
   const n = 90;
   const x = new Float64Array(n);
   const a = new Float64Array(n);
@@ -41,7 +38,7 @@ function multiLine(): ColumnarData {
     b[i] = 42 + Math.cos(t * Math.PI * 2) * 13;
     c[i] = 63 + Math.sin(t * Math.PI * 4 + 1) * 10;
   }
-  return [x, a, b, c];
+  return { columns: { x: x, value1: a, value2: b, value3: c } };
 }
 
 export default function FeatureDemos() {
@@ -76,10 +73,10 @@ export default function FeatureDemos() {
 function SpanGapsDemo() {
   const theme = useChartTheme();
   const [span, setSpan] = createSignal(false);
-  const config = createMemo<ChartConfig>(() => ({
+  const config = createMemo<ChartOptions>(() => ({
     theme: theme(),
     axes,
-    series: [{ label: 'signal', dataIndex: 1, type: 'line', interpolation: 'linear', lineWidth: 2, spanGaps: span() }],
+    series: [{ label: 'signal', y: "value1", type: 'line', interpolation: 'linear', lineWidth: 2, spanGaps: span() }],
     cursor: { show: false },
     tooltip: { show: false },
     padding,
@@ -108,20 +105,20 @@ function SpanGapsDemo() {
         </button>
       }
     >
-      <Chart config={config()} data={gappyLine()} />
+      <Chart x="x" {...config()} data={gappyLine()} />
     </Card>
   );
 }
 
 function ProximityDemo() {
   const theme = useChartTheme();
-  const config = createMemo<ChartConfig>(() => ({
+  const config = createMemo<ChartOptions>(() => ({
     theme: theme(),
     axes,
     series: [
-      { label: 'alpha', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-      { label: 'beta', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-      { label: 'gamma', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+      { label: 'alpha', y: "value1", type: 'line', interpolation: 'monotone', lineWidth: 2 },
+      { label: 'beta', y: "value2", type: 'line', interpolation: 'monotone', lineWidth: 2 },
+      { label: 'gamma', y: "value3", type: 'line', interpolation: 'monotone', lineWidth: 2 },
     ],
     // Auto-focus the line nearest the cursor within 24 CSS px; others dim.
     highlight: { proximity: 24 },
@@ -131,7 +128,7 @@ function ProximityDemo() {
   }));
   return (
     <Card title="highlight.proximity" meta="hover near a line">
-      <Chart config={config()} data={multiLine()} />
+      <Chart x="x" {...config()} data={multiLine()} />
     </Card>
   );
 }
@@ -147,34 +144,34 @@ const UPDATE_LAST_TICKS_PER_BUCKET = 6;
 // commits" story is legible at the slower cadence.
 const UPDATE_LAST_GROW_RATE = 0.42;
 
-function seedBuckets(rand: () => number): ColumnarData {
+function seedBuckets(rand: () => number): ColumnData {
   const x = new Float64Array(UPDATE_LAST_MAXLEN);
   const y = new Float64Array(UPDATE_LAST_MAXLEN);
   for (let i = 0; i < UPDATE_LAST_MAXLEN; i++) {
     x[i] = i;
     y[i] = 30 + Math.sin(i / 3) * 16 + rand() * 10;
   }
-  return [x, y];
+  return { columns: { x: x, value1: y } };
 }
 
 function UpdateLastDemo() {
   const theme = useChartTheme();
   const rand = mulberry(0x51ed);
   const seed = seedBuckets(rand);
-  const config = createMemo<ChartConfig>(() => ({
+  const config = createMemo<ChartOptions>(() => ({
     theme: theme(),
     interaction: 'readonly',
-    streaming: { maxLen: UPDATE_LAST_MAXLEN },
+    streaming: { maxPoints: UPDATE_LAST_MAXLEN },
     axes: { x: { type: 'linear' }, y: { type: 'linear', min: 0 } },
-    series: [{ label: 'req/s (forming bucket updates in place)', dataIndex: 1, type: 'bar' }],
+    series: [{ label: 'req/s (forming bucket updates in place)', y: "value1", type: 'bar' }],
     cursor: { show: false },
     tooltip: { show: false },
     padding,
   }));
 
-  let chart: ChartInstance | undefined;
-  let lastX = seed[0][UPDATE_LAST_MAXLEN - 1];
-  let forming = seed[1][UPDATE_LAST_MAXLEN - 1];
+  let chart: ChartHandle | undefined;
+  let lastX = seed.columns.x[UPDATE_LAST_MAXLEN - 1];
+  let forming = seed.columns.value1[UPDATE_LAST_MAXLEN - 1];
   let target = forming;
   let ticks = 0;
 
@@ -188,12 +185,12 @@ function UpdateLastDemo() {
         lastX += 1;
         target = 30 + rand() * 55;
         forming = 6 + rand() * 8;
-        chart.appendData([f([lastX]), f([forming])]);
+        chart.appendData({ columns: { x: f([lastX]), value1: f([forming]) } });
       } else {
         // The open bucket keeps filling: overwrite the tail in place rather
         // than appending a new point for every partial update.
         forming += (target - forming) * UPDATE_LAST_GROW_RATE;
-        chart.appendData([f([lastX]), f([forming])], { updateLast: true });
+        chart.appendData({ columns: { x: f([lastX]), value1: f([forming]) } }, { updateLast: true });
       }
     }, UPDATE_LAST_TICK_MS);
     onCleanup(() => clearInterval(interval));
@@ -201,7 +198,7 @@ function UpdateLastDemo() {
 
   return (
     <Card title="appendData updateLast" meta="last bar grows, then commits">
-      <Chart config={config()} data={seed} onReady={(c) => { chart = c; }} />
+      <Chart x="x" {...config()} data={seed} onReady={(c) => { chart = c; }} />
     </Card>
   );
 }

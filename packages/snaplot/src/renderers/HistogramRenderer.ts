@@ -62,7 +62,7 @@ export function renderHistogramSegments(
 
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height, 4);
+  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
   ctx.clip();
 
   ctx.fillStyle = color;

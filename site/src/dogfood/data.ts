@@ -1,4 +1,4 @@
-import { histogram, type ColumnarData, type SeriesConfig } from 'snaplot';
+import { histogram, type ColumnData, type HistogramBins, type SeriesOptions } from 'snaplot';
 
 export const f64 = (values: Iterable<number>): Float64Array => Float64Array.from(values);
 
@@ -48,30 +48,30 @@ export function pulsePoints(service = 0, count = 180): PulsePoint[] {
   });
 }
 
-export function pulseColumns(points: PulsePoint[], partial = false): ColumnarData {
-  return [
-    f64(points.map((p) => p.time)),
-    f64(points.map((p) => p.cpu)),
-    f64(points.map((p) => p.memory)),
-    f64(points.map((p, i) => partial && i % 17 === 0 ? Number.NaN : p.latency)),
-    f64(points.map((p) => p.requests)),
-    f64(points.map((p) => p.errors)),
-    f64(points.map((p) => p.forecast)),
-    f64(points.map((p) => p.upper)),
-    f64(points.map((p) => p.lower)),
-  ];
+export function pulseColumns(points: PulsePoint[], partial = false): ColumnData {
+  return { columns: {
+    time: f64(points.map((p) => p.time)),
+    cpu: f64(points.map((p) => p.cpu)),
+    memory: f64(points.map((p) => p.memory)),
+    latency: f64(points.map((p, i) => partial && i % 17 === 0 ? Number.NaN : p.latency)),
+    requests: f64(points.map((p) => p.requests)),
+    errors: f64(points.map((p) => p.errors)),
+    forecast: f64(points.map((p) => p.forecast)),
+    upper: f64(points.map((p) => p.upper)),
+    lower: f64(points.map((p) => p.lower)),
+  } };
 }
 
-export function pulseHistogram(points: PulsePoint[]): ColumnarData {
+export function pulseHistogram(points: PulsePoint[]): HistogramBins {
   const bins = histogram(f64(points.map((p) => p.latency)), { binCount: 16 });
-  return [bins.edges, bins.counts];
+  return bins;
 }
 
-export const serviceComparison: ColumnarData = [
-  f64([0, 1, 2, 3]),
-  f64([99.98, 99.94, 99.89, 99.97]),
-  f64([99.95, 99.91, 99.86, 99.95]),
-];
+export const serviceComparison: ColumnData = { columns: {
+  region: f64([0, 1, 2, 3]),
+  current: f64([99.98, 99.94, 99.89, 99.97]),
+  previous: f64([99.95, 99.91, 99.86, 99.95]),
+} };
 
 export type ModelFamily = 'Atlas' | 'Nova' | 'Sage' | 'Ember';
 export type RunStatus = 'ready' | 'training' | 'failed';
@@ -161,29 +161,20 @@ export function topRunsByAccuracy(
   return [...runs].sort((a, b) => b.accuracy - a.accuracy).slice(0, limit);
 }
 
-export function experimentColumns(runs: ExperimentRun[]): ColumnarData {
-  return [
-    f64(runs.map((r) => r.id)),
-    f64(runs.map((r) => r.latency)),
-    f64(runs.map((r) => r.accuracy * 100)),
-    f64(runs.map((r) => families.indexOf(r.family))),
-    f64(runs.map((r) => r.size)),
-    f64(runs.map((r) => r.cost)),
-  ];
-}
 
-export function metricHistogram(runs: ExperimentRun[], metric: 'accuracy' | 'latency'): ColumnarData {
+
+export function metricHistogram(runs: ExperimentRun[], metric: 'accuracy' | 'latency'): HistogramBins {
   const values = runs.map((r) => metric === 'accuracy' ? r.accuracy * 100 : r.latency);
   const bins = histogram(f64(values), { binCount: 18 });
-  return [bins.edges, bins.counts];
+  return bins;
 }
 
-export function progressColumns(runs: ExperimentRun[]): ColumnarData {
+export function progressColumns(runs: ExperimentRun[]): ColumnData {
   const steps = Array.from({ length: 80 }, (_, i) => i);
-  return [
-    f64(steps),
-    ...runs.map((run) => f64(steps.map((step) => progressValue(run, step)))),
-  ];
+  return { columns: {
+    step: f64(steps),
+    ...Object.fromEntries(runs.map((run) => [`run${run.id}`, f64(steps.map((step) => progressValue(run, step)))])),
+  } };
 }
 
 export function progressValue(run: ExperimentRun, step: number): number {
@@ -191,13 +182,14 @@ export function progressValue(run: ExperimentRun, step: number): number {
   return 54 + (ceiling - 54) * (1 - Math.exp(-step / (17 + run.id % 8))) + Math.sin(step / 5 + run.id) * 0.35;
 }
 
-/** Series order and data indexes shared by trajectories and the scorecard. */
+/** Stable series IDs and named fields shared by trajectories and the scorecard. */
 export function comparisonSeries(
   runs: readonly ExperimentRun[],
-): SeriesConfig<{ runId: number }>[] {
-  return runs.map((run, index) => ({
+): Array<Extract<SeriesOptions<Record<string, number>>, { type?: 'line' | 'area' | 'bar' }>> {
+  return runs.map((run) => ({
+    id: String(run.id),
     label: run.name,
-    dataIndex: index + 1,
+    y: `run${run.id}`,
     type: 'line',
     lineWidth: 2,
     interpolation: 'monotone',
@@ -205,11 +197,11 @@ export function comparisonSeries(
   }));
 }
 
-export function comparisonColumns(runs: ExperimentRun[]): ColumnarData {
-  return [
-    f64(comparisonMetrics.map((_, index) => index)),
-    ...runs.map((run) => f64(comparisonScores(run))),
-  ];
+export function comparisonColumns(runs: ExperimentRun[]): ColumnData {
+  return { columns: {
+    metric: f64(comparisonMetrics.map((_, index) => index)),
+    ...Object.fromEntries(runs.map((run) => [`run${run.id}`, f64(comparisonScores(run))])),
+  } };
 }
 
 /** Scorecard values in `comparisonMetrics` order; every metric is higher-is-better. */
@@ -264,40 +256,40 @@ export function energyDay(dayOffset = 0, solarScale = 1, batteryCapacity = 13.5)
   });
 }
 
-export function energyColumns(points: EnergyPoint[], missing = false, noForecast = false): ColumnarData {
-  return [
-    f64(points.map((p) => p.time)),
-    f64(points.map((p, i) => missing && i > 118 && i < 142 ? Number.NaN : p.consumption)),
-    f64(points.map((p) => p.solar)),
-    f64(points.map((p) => noForecast ? Number.NaN : p.forecast)),
-    f64(points.map((p) => noForecast ? Number.NaN : p.upper)),
-    f64(points.map((p) => noForecast ? Number.NaN : p.lower)),
-    f64(points.map((p) => p.battery)),
-    f64(points.map((p) => p.price)),
-    f64(points.map((p) => p.temperature)),
-  ];
+export function energyColumns(points: EnergyPoint[], missing = false, noForecast = false): ColumnData {
+  return { columns: {
+    time: f64(points.map((p) => p.time)),
+    consumption: f64(points.map((p, i) => missing && i > 118 && i < 142 ? Number.NaN : p.consumption)),
+    solar: f64(points.map((p) => p.solar)),
+    forecast: f64(points.map((p) => noForecast ? Number.NaN : p.forecast)),
+    upper: f64(points.map((p) => noForecast ? Number.NaN : p.upper)),
+    lower: f64(points.map((p) => noForecast ? Number.NaN : p.lower)),
+    battery: f64(points.map((p) => p.battery)),
+    price: f64(points.map((p) => p.price)),
+    temperature: f64(points.map((p) => p.temperature)),
+  } };
 }
 
-export function energyHistogram(points: EnergyPoint[]): ColumnarData {
+export function energyHistogram(points: EnergyPoint[]): HistogramBins {
   const bins = histogram(f64(points.map((p) => p.consumption)), { binCount: 14 });
-  return [bins.edges, bins.counts];
+  return bins;
 }
 
-export function energyScatter(days = 45): ColumnarData {
+export function energyScatter(days = 45): Array<{ id: number; temperature: number; demand: number }> {
   const rand = mulberry32(0x50a4);
   const rows = Array.from({ length: days * 24 }, (_, id) => {
     const temperature = 8 + rand() * 27;
     const demand = 0.6 + Math.abs(20 - temperature) * 0.09 + rand() * 0.75;
     return { id, temperature, demand };
   });
-  return [f64(rows.map((r) => r.id)), f64(rows.map((r) => r.temperature)), f64(rows.map((r) => r.demand))];
+  return rows;
 }
 
-export function energyComparison(): ColumnarData {
+export function energyComparison(): ColumnData {
   const days = Array.from({ length: 14 }, (_, i) => i);
-  return [
-    f64(days),
-    f64(days.map((i) => 16 + Math.sin(i / 2) * 3 + (i % 3))),
-    f64(days.map((i) => 21 + Math.cos(i / 3) * 5 + (i % 2))),
-  ];
+  return { columns: {
+    day: f64(days),
+    solar: f64(days.map((i) => 16 + Math.sin(i / 2) * 3 + (i % 3))),
+    home: f64(days.map((i) => 21 + Math.cos(i / 3) * 5 + (i % 2))),
+  } };
 }

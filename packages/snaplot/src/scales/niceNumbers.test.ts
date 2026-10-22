@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { niceStep, niceRange, niceTicks } from './niceNumbers';
 
 describe('niceStep', () => {
+  it('keeps aligned decimal endpoints without admitting genuinely out-of-range ticks', () => {
+    expect(niceTicks(-0.4, 0.6, 6)).toEqual([-0.4, -0.2, 0, 0.2, 0.4, 0.6]);
+    expect(niceTicks(1.2, 2.2, 6)).toEqual([1.2, 1.4, 1.6, 1.8, 2, 2.2]);
+    expect(niceTicks(1.200001, 2.199999, 6)).toEqual([1.4, 1.6, 1.8, 2]);
+    const [min, max] = niceRange(1.2, 2.2, 6);
+    expect(min).toBeCloseTo(1.2, 14);
+    expect(max).toBeCloseTo(2.2, 14);
+  });
   it('returns the raw range when count <= 1', () => {
     expect(niceStep(0, 100, 1)).toBe(100);
     expect(niceStep(0, 100, 0)).toBe(100);

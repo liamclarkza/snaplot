@@ -22,8 +22,8 @@ export default function Theming() {
   theme: studioTheme,
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'Series A', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Series B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+    { label: 'Series A', y: 'value1', type: 'area', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Series B', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />

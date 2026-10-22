@@ -20,7 +20,7 @@ export default function Plugins() {
     <>
       <Section id="reference-lines" title="Reference Lines">
         <Prose>
-          The reference lines plugin renders horizontal or vertical marker lines at fixed data values.
+          The referenceLines option renders horizontal or vertical marker lines at fixed data values.
           Use it for thresholds, baselines, targets, or event markers. Lines respond to zoom/pan and
           scale changes. Labels are positioned automatically within the plot area.
         </Prose>
@@ -29,23 +29,17 @@ export default function Plugins() {
           code={`{
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
   series: [
-    { label: 'Metric A', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Metric B', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
+    { label: 'Metric A', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Metric B', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 1.5 },
   ],
-  plugins: [
-    createReferenceLinesPlugin({
-      lines: [
+  referenceLines: [
         { axis: 'y', value: 75, label: 'Target', color: '#e74c3c', dash: [6, 3], lineWidth: 1.5 },
         { axis: 'y', value: 40, label: 'Floor', color: '#888', lineWidth: 1 },
-      ],
-    }),
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
         <Prose>
-          Call <code>refLines.setLines(newLines)</code> to update lines dynamically after creation.
-          The plugin renders in the <code>afterDrawData</code> hook, above series data but below
-          the overlay (crosshair, selection box).
+          Call <code>chart.update({'{ referenceLines: newLines }'})</code> to update annotations. Reference lines render above the data and below the cursor overlay. Use <code>referenceRegions</code> for shaded axis intervals.
         </Prose>
       </Section>
 
@@ -64,9 +58,9 @@ const config = {
           data={d_legend()}
           code={`{
   series: [
-    { label: 'Alpha', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Beta', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Gamma', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Alpha', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Beta', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Gamma', y: 'value3', type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
   plugins: [createLegendPlugin({ position: 'bottom' })],
   tooltip: { show: true, mode: 'index' },
@@ -75,14 +69,14 @@ const config = {
 
       <Section id="legend-table" title="Legend Table">
         <Prose>
-          A cursor-synchronised table that shows the value of every visible series at the cursor's X position, the common ML-dashboard pattern for comparing many runs. Available in two forms with feature parity:
+          A cursor-synchronised table that shows the value of every visible series at the cursor's X position, the common ML-dashboard pattern for comparing many runs. Available as a DOM plugin and as native React and Solid components:
         </Prose>
         <ul style={{ color: 'var(--text-secondary)', 'margin-bottom': '16px', 'font-size': '14.5px', 'line-height': '1.7', 'padding-left': '20px' }}>
           <li><code>createLegendTablePlugin()</code>, DOM-only, attaches to any chart.</li>
-          <li><code>&lt;LegendTable&gt;</code>, SolidJS component with JSX cells, typed <code>meta</code>, and a render-prop escape hatch.</li>
+          <li><code>&lt;LegendTable&gt;</code>, React or Solid component with native JSX cells, typed source rows, and a render-prop escape hatch.</li>
         </ul>
         <Prose>
-          Both share the same column helpers and the same CSS class names. Zero configuration produces a sensible default:
+          Import column helpers from the same entrypoint as your component. Each framework returns native JSX; the DOM plugin helpers come from the root package. All versions preserve the same CSS classes. Zero configuration produces a sensible default:
         </Prose>
         <CodeBlock code={`import { LegendTable } from 'snaplot/solid';
 import 'snaplot/legend-table.css';
@@ -95,28 +89,24 @@ import 'snaplot/legend-table.css';
         <Prose>
           <b>Custom columns</b> via the typed <code>meta</code> field on each series. Column helpers (<code>nameColumn</code>, <code>valueColumn</code>, <code>metricColumn</code>, <code>swatchColumn</code>, <code>column</code>) cover the common cases:
         </Prose>
-        <CodeBlock code={`type RunMeta = { runId: string; metricKey: string; epoch: number };
+        <CodeBlock code={`import { LegendTable, nameColumn, valueColumn, column } from 'snaplot/solid';
 
-const config: ChartConfig<RunMeta> = {
-  series: runs.map(r => ({
-    label: r.name,
-    dataIndex: r.idx,
-    type: 'line',
-    meta: { runId: r.id, metricKey: 'eval/accuracy', epoch: r.epoch },
+const options = {
+  x: 'step',
+  series: runs.map(run => ({
+    id: run.id, label: run.name, data: run.samples, y: 'accuracy',
+    meta: { metricKey: 'eval/accuracy' },
   })),
 };
 
-<LegendTable<RunMeta>
-  chart={chart}
-  columns={[
-    swatchColumn(),
-    nameColumn({ swatch: false }),
-    metricColumn(p => p.meta.metricKey),  // p.meta is RunMeta, fully typed
-    column({ key: 'epoch', header: 'Epoch', align: 'right',
-             cell: p => String(p.meta.epoch) }),
-    valueColumn({ format: v => v.toFixed(6) }),
-  ]}
-/>`} />
+<LegendTable chart={chart} columns={[
+  nameColumn(),
+  column({ key: 'action', header: 'Run',
+    cell: (point, series, api) => (
+      <button onClick={() => api.setHighlight(point.seriesId)}>{series.label}</button>
+    ) }),
+  valueColumn({ format: value => value.toFixed(6) }),
+]} />`} />
         <div style={{ height: '12px' }} />
         <LazyMount estHeight="380px"><CustomColumnsDemo /></LazyMount>
 
@@ -129,11 +119,11 @@ const config: ChartConfig<RunMeta> = {
           desc="Renders Step + values in a table below the chart on hover; series-only fallback keeps the layout stable when the cursor leaves."
           data={d_legend()}
           code={`{
-  axes: { x: { padding: 0 }, y: { padding: 0.05 } },
+  axes: { x: { rangePadding: 0 }, y: { rangePadding: 0.05 } },
   series: [
-    { label: 'live-training', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'failed-experiment', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'baseline-resnet50', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'live-training', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'failed-experiment', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'baseline-resnet50', y: 'value3', type: 'line', interpolation: 'monotone', lineWidth: 2 },
   ],
   plugins: [
     createLegendTablePlugin({
@@ -163,30 +153,20 @@ const config: ChartConfig<RunMeta> = {
 
       <Section id="cross-chart-sync" title="Cross-chart Sync">
         <Prose>
-          <code>createChartGroup()</code> mints a fresh sync key and exposes <code>group.bind()</code> or <code>group.apply(config)</code> to spread into each chart's config. Cursor position, series highlight, and zoom/pan viewport all propagate automatically across every chart in the group. Zooming one chart zooms all peers to the same X range; double-click reset propagates too.
+          Pass a group directly to each chart. Cursor and stable-ID highlight synchronization are enabled by default. Opt into viewport synchronization when navigation should move together.
         </Prose>
-        <CodeBlock code={`const group = createChartGroup();
+        <CodeBlock code={`const group = createChartGroup({ viewport: true });
 
-// group.apply(config) merges the sync keys into cursor/highlight
-// without clobbering your own cursor config (show, snap, indicators…).
-<Chart config={group.apply(myConfigA)} data={a} />
-<Chart config={group.apply(myConfigB)} data={b} />
+<Chart {...optionsA} data={a} group={group} />
+<Chart {...optionsB} data={b} group={group} />
 
-// External controls with identical series order:
-<button onMouseEnter={() => group.highlight(2)}
-        onMouseLeave={() => group.highlight(null)}>
-  Run #2
-</button>
-
-// External controls with stable run IDs across mismatched charts:
-<button onMouseEnter={() => group.highlightKey('run-42')}
-        onMouseLeave={() => group.highlightKey(null)}>
+<button onMouseEnter={() => group.setHighlight('run-42')}
+        onMouseLeave={() => group.setHighlight(null)}>
   Run #42
 </button>`} />
         <div style={{ height: '12px' }} />
         <Prose>
-          For stable series identity across charts (<code>highlight.getKey</code>), shared
-          config defaults, and linked Y domains with aligned gutters, see the{' '}
+          For stable series identity across charts (<code>series.id</code>), shared and linked Y domains with aligned gutters, see the{' '}
           <DocsLink slug="recipes" id="recipe-linked">Linked Charts recipe</DocsLink>.
         </Prose>
         <LazyMount estHeight="540px"><CrossChartSyncDemo /></LazyMount>
@@ -199,7 +179,7 @@ const config: ChartConfig<RunMeta> = {
 
         <div style={{ height: '24px' }} />
         <Prose>
-          <b>Performance check</b>, many series + a value-cell update per cursor frame. The legend table reuses row DOM (text-content swaps only on cursor moves), highlight redraws only the data canvas, and the snapshot is read into a single reused buffer.
+          <b>Performance check</b>, many series + a value-cell update per cursor frame. State snapshots are cached and immutable. Framework subscriptions update when chart state changes; highlight redraws the data layer.
         </Prose>
         <LazyMount estHeight="420px"><BenchmarkDemo /></LazyMount>
       </Section>
@@ -209,27 +189,18 @@ const config: ChartConfig<RunMeta> = {
           Both <code>&lt;LegendTable&gt;</code> and the plugin are built on the same primitive: <code>chart.getCursorSnapshot()</code>. Use it directly if you need cursor-synchronised data anywhere else in your UI.
         </Prose>
         <CodeBlock code={`import { createCursorSnapshot } from 'snaplot/solid';
-
+// React: useCursorSnapshot(handle)
 const snapshot = createCursorSnapshot(chart);
-// Accessor<CursorSnapshot | null>:
-//   {
-//     source: 'cursor' | 'latest' | 'first' | 'none',
-//     dataIndex, dataX, formattedX,
-//     activeSeriesIndex,  // series nearest the cursor in pixel space
-//     points: [{ seriesIndex, label, color, value, formattedValue, meta }]
-//   }
+// snapshot()?.points contain seriesId, row, rowIndex, rowId,
+// x, y, formattedX and formattedY.
 
-// Focus the line under the cursor in every chart in a group:
 createEffect(() => {
-  const s = snapshot();
-  group.highlight(s?.activeSeriesIndex ?? null);
+  group.setHighlight(snapshot()?.activeSeriesId ?? null);
 });
 
-// Imperative, zero-alloc variant for hot paths:
-const buf = chart.getCursorSnapshot();
-chart.on('cursor:move', () => {
-  chart.getCursorSnapshotInto(buf, { fallback: 'latest' });
-  // mutate the same buf each frame
+// Plain JavaScript:
+const unsubscribe = chart.on('cursor:change', snapshot => {
+  renderReadout(snapshot.points);
 });`} />
         <div style={{ height: '12px' }} />
         <LazyMount estHeight="360px"><HeadlessSnapshotDemo /></LazyMount>
@@ -237,70 +208,41 @@ chart.on('cursor:move', () => {
 
       <Section id="custom-plugins" title="Custom Plugins">
         <Prose>
-          Plugins hook into the chart lifecycle. Implement any subset of hooks on the <code>Plugin</code> interface:
+          Plugins implement the <code>ChartPlugin</code> interface. Subscribe to typed events during installation and release subscriptions during destruction. Draw hooks receive the public chart handle and the corresponding canvas context.
         </Prose>
-        <CodeBlock code={`interface Plugin {
-  id: string;
+        <CodeBlock code={`import type { ChartPlugin } from 'snaplot';
 
-  // Lifecycle
-  install?(chart: ChartInstance): void;
-  destroy?(chart: ChartInstance): void;
-
-  // Layout
-  beforeLayout?(chart: ChartInstance): void;
-  afterLayout?(chart: ChartInstance, layout: Layout): void;
-
-  // Grid layer (axes, gridlines)
-  beforeDrawGrid?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
-  afterDrawGrid?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
-
-  // Data layer (series marks)
-  beforeDrawData?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
-  afterDrawData?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
-
-  // Overlay layer (crosshair, selection)
-  beforeDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
-  afterDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
-
-  // Events
-  onCursorMove?(
-    chart: ChartInstance,
-    dataX: number | null,
-    dataIdx: number | null,
-    origin: CursorEventOrigin,
-  ): void;
-  onZoom?(chart: ChartInstance, scaleKey: string, range: ScaleRange): void;
-  onClick?(chart: ChartInstance, dataX: number, dataIdx: number): void;
-  onSetData?(chart: ChartInstance, data: ColumnarData): void;
-}`} />
+const plugin: ChartPlugin = {
+  id: 'readout',
+  install(chart) { /* subscribe or add application UI */ },
+  destroy(chart) { /* remove subscriptions and application UI */ },
+  beforeDraw(chart) { /* return false to skip painting */ },
+  afterDrawGrid(chart, context) {},
+  afterDrawData(chart, context) {},
+  afterDrawOverlay(chart, context) {},
+  onDataUpdate(chart) {},
+  onOptionsUpdate(chart) {},
+};`} />
         <div style={{ height: '16px' }} />
         <Prose>
-          <b>Example:</b> an annotation plugin that draws a horizontal threshold line on the data layer:
+          <b>Example:</b> a plugin reading the current cursor snapshot during overlay painting:
         </Prose>
-        <CodeBlock code={`const thresholdPlugin = (yValue: number, color = '#e74c3c'): Plugin => ({
-  id: 'threshold',
-  afterDrawData(chart, ctx) {
-    const layout = chart.getLayout();
-    const yScale = chart.getAxis('y');
-    if (!yScale) return;
-    const py = yScale.dataToPixel(yValue);
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.moveTo(layout.plot.left, py);
-    ctx.lineTo(layout.plot.left + layout.plot.width, py);
-    ctx.stroke();
-    ctx.restore();
+        <CodeBlock code={`const readout = {
+  id: 'readout',
+  afterDrawOverlay(chart, context) {
+    const point = chart.getCursorSnapshot().points[0];
+    if (!point) return;
+    const { plot } = chart.getLayout();
+    context.save();
+    context.fillStyle = chart.getTheme().textColor;
+    context.fillText(point.formattedY, plot.left + 8, plot.top + 16);
+    context.restore();
   },
-});
-
-// Usage:
-plugins: [thresholdPlugin(75, '#e74c3c')]`} />
+};
+// Usage: plugins: [readout]`} />
         <div style={{ height: '8px' }} />
         <Prose>
-          Return <code>false</code> from any <code>before*</code> hook to skip the default rendering for that layer, giving you full control over what gets drawn.
+          Return <code>false</code> from <code>beforeDraw</code> to skip painting.
           The <DocsLink slug="recipes" id="recipe-custom-plugin">Custom Plugin recipe</DocsLink>{' '}
           has a live-editable plugin combining a cursor hook with an overlay hook.
         </Prose>

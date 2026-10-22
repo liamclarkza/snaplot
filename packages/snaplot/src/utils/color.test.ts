@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDarkColor, parseColor, withAlpha } from './color';
+import { isDarkColor, parseColor, withAlpha, opaqueColorOnBackground } from './color';
 
 describe('parseColor', () => {
   it('parses 6-digit hex', () => {
@@ -60,5 +60,20 @@ describe('withAlpha', () => {
 
   it('returns unparseable input unchanged instead of rgba(NaN,...)', () => {
     expect(withAlpha('salmon-ish', 0.5)).toBe('salmon-ish');
+  });
+});
+
+describe('opaque grid colors', () => {
+  it('precomposites dark and light grid colors into opaque strokes', () => {
+    expect(opaqueColorOnBackground('#84969e', 0.18, '#151e22')).toBe('rgb(41,52,56)');
+    expect(opaqueColorOnBackground('#000', 0.2, '#fff')).toBe('rgb(204,204,204)');
+  });
+  it('preserves source alpha as well as configured opacity', () => {
+    for (const color of ['rgba(0,0,0,0.5)', 'rgb(0 0 0 / 50%)', '#00000080']) {
+      expect(opaqueColorOnBackground(color, 0.5, '#fff')).toBe('rgb(191,191,191)');
+    }
+    expect(opaqueColorOnBackground('#0008', 0.5, '#fff')).toBe('rgb(187,187,187)');
+    expect(opaqueColorOnBackground('transparent', 1, '#fff')).toBe('rgb(255,255,255)');
+    expect(opaqueColorOnBackground('#000', 0, '#fff')).toBe('rgb(255,255,255)');
   });
 });

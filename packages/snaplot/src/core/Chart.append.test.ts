@@ -11,6 +11,7 @@ function createMockContext(): CanvasRenderingContext2D {
     clearRect: vi.fn(),
     fillRect: vi.fn(),
     strokeRect: vi.fn(),
+    quadraticCurveTo: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
@@ -685,7 +686,7 @@ describe('ChartCore histogram cursor', () => {
     const chart = new ChartCore(
       document.createElement('div'),
       {
-        axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
+        axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
         series: [{ label: 'count', dataIndex: 1, type: 'histogram' }],
       },
       [f([0, 1, 2, 3, 4]), f([0, 100, 120, 80, 0])],
@@ -698,6 +699,142 @@ describe('ChartCore histogram cursor', () => {
     expect(yScale.max).toBeGreaterThan(120);
 
     chart.destroy();
+  });
+});
+
+describe('ChartCore bar X-axis planning', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', new MockDocument());
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const customTicks = (chart: ChartCore) =>
+    (chart as unknown as {
+      computeCustomXTicks: () => { values: number[]; gridValues?: number[] } | undefined;
+    }).computeCustomXTicks();
+
+  it('uses regular center ticks and half-interval grid cells for airport-style bars', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
+        series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
+      },
+      [f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]), f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])],
+    );
+
+    const xScale = chart.getAxis('x')!;
+    expect(xScale.min).toBe(5);
+    expect(xScale.max).toBe(19);
+    expect(customTicks(chart)).toEqual({
+      values: [6, 8, 10, 12, 14, 16, 18],
+      gridValues: [5, 7, 9, 11, 13, 15, 17, 19],
+      format: expect.any(Function),
+    });
+    chart.destroy();
+  });
+
+  it('keeps small integer categories at every center with half-slot edges', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
+        series: [{ label: 'score', type: 'bar', dataIndex: 1 }],
+      },
+      [f([0, 1, 2]), f([4, 5, 6])],
+    );
+
+    const xScale = chart.getAxis('x')!;
+    expect(xScale.min).toBe(-0.5);
+    expect(xScale.max).toBe(2.5);
+    expect(customTicks(chart)?.values).toEqual([0, 1, 2]);
+    expect(customTicks(chart)?.gridValues).toEqual([-0.5, 0.5, 1.5, 2.5]);
+    chart.destroy();
+  });
+
+  it('keeps grouped bars inside the planned outer cells', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
+        series: [
+          { label: 'A', type: 'bar', dataIndex: 1 },
+          { label: 'B', type: 'bar', dataIndex: 2 },
+        ],
+      },
+      [f([7, 8, 9]), f([1, 2, 3]), f([2, 3, 4])],
+    );
+
+    const xScale = chart.getAxis('x')!;
+    expect(xScale.min).toBe(6.5);
+    expect(xScale.max).toBe(9.5);
+    chart.destroy();
+  });
+
+  it('expands regular grid cells around irregular outer bar widths', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
+        series: [{ label: 'value', type: 'bar', dataIndex: 1 }],
+      },
+      [f([0, 1, 100]), f([1, 2, 3])],
+    );
+
+    const xScale = chart.getAxis('x')!;
+    // The final category's local slot is 99 units wide; whole 20-unit
+    // intervals keep its half-slot edge inside the regular grid domain.
+    expect(xScale.min).toBe(-10);
+    expect(xScale.max).toBe(150);
+    expect(customTicks(chart)?.values).toEqual([0, 20, 40, 60, 80, 100, 120, 140]);
+    chart.destroy();
+  });
+
+  it('keeps legacy bar bounds for nice:false, explicit ticks, and zoomed viewports', () => {
+    const optOut = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
+        series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
+      },
+      [f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]), f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])],
+    );
+    expect(optOut.getAxis('x')?.min).toBe(6.5);
+    expect(optOut.getAxis('x')?.max).toBe(18.5);
+    expect(customTicks(optOut)?.gridValues).toBeUndefined();
+    optOut.destroy();
+
+    const explicitTicks = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', ticks: [7, 12, 18] }, y: { type: 'linear', nice: false } },
+        series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
+      },
+      [f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]), f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])],
+    );
+    expect(explicitTicks.getAxis('x')?.min).toBe(6.5);
+    expect(explicitTicks.getAxis('x')?.max).toBe(18.5);
+    explicitTicks.destroy();
+
+    const zoomed = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
+        series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
+      },
+      [f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]), f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])],
+    );
+    zoomed.setAxis('x', { min: 8, max: 12 });
+    expect(zoomed.getAxis('x')?.min).toBe(8);
+    expect(zoomed.getAxis('x')?.max).toBe(12);
+    zoomed.destroy();
   });
 });
 
@@ -855,11 +992,11 @@ describe('ChartCore log interactions', () => {
     vi.unstubAllGlobals();
   });
 
-  it('keeps linear auto-range exact unless nice is explicitly enabled', () => {
+  it('nicens linear auto-range by default and honors explicit opt-out', () => {
     const exactChart = new ChartCore(
       document.createElement('div'),
       {
-        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
         series: [{ label: 'value', type: 'line', dataIndex: 1 }],
       },
       [
@@ -871,6 +1008,22 @@ describe('ChartCore log interactions', () => {
     expect(exactChart.getAxis('x')?.min).toBe(3);
     expect(exactChart.getAxis('x')?.max).toBe(97);
     exactChart.destroy();
+
+    const defaultChart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+      },
+      [
+        f([3, 50, 97]),
+        f([0.2, 0.3, 0.4]),
+      ],
+    );
+
+    expect(defaultChart.getAxis('x')?.min).toBe(0);
+    expect(defaultChart.getAxis('x')?.max).toBe(100);
+    defaultChart.destroy();
 
     const niceChart = new ChartCore(
       document.createElement('div'),
@@ -887,6 +1040,88 @@ describe('ChartCore log interactions', () => {
     expect(niceChart.getAxis('x')?.min).toBe(0);
     expect(niceChart.getAxis('x')?.max).toBe(100);
     niceChart.destroy();
+  });
+
+  it('uses tickCount to stabilize both automatic bounds and generated intervals', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', tickCount: 3 }, y: { type: 'linear', nice: false } },
+        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+      },
+      [f([-100, -89]), f([0, 1])],
+    );
+
+    const xScale = chart.getAxis('x')!;
+    expect(xScale.min).toBe(-100);
+    expect(xScale.max).toBe(-80);
+    expect(xScale.ticks(3)).toEqual([-100, -90, -80]);
+    chart.destroy();
+
+    const sparseChart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', tickCount: 2 }, y: { type: 'linear', nice: false } },
+        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+      },
+      [f([-1000, 1]), f([0, 1])],
+    );
+
+    expect(sparseChart.getAxis('x')?.min).toBe(-1000);
+    expect(sparseChart.getAxis('x')?.max).toBe(1000);
+    sparseChart.destroy();
+  });
+
+  it('keeps a usable vertical span for constant linear data', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false, padding: 0 } },
+        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+      },
+      [f([0, 1, 2]), f([10, 10, 10])],
+    );
+
+    const yScale = chart.getAxis('y')!;
+    expect(yScale.min).toBe(9);
+    expect(yScale.max).toBe(11);
+    expect(yScale.max).toBeGreaterThan(yScale.min);
+    chart.destroy();
+  });
+
+  it('preserves one-sided explicit bounds while nicening the free side', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: {
+          x: { type: 'linear', min: 13, tickCount: 6 },
+          y: { type: 'linear', nice: false },
+        },
+        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+      },
+      [f([13, 47]), f([0, 1])],
+    );
+
+    const xScale = chart.getAxis('x')!;
+    expect(xScale.min).toBe(13);
+    expect(xScale.max).toBe(50);
+    chart.destroy();
+  });
+
+  it('keeps bar X half-slot padding independent of linear nicening', () => {
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
+        series: [{ label: 'value', type: 'bar', dataIndex: 1 }],
+      },
+      [f([7, 9, 11]), f([1, 2, 3])],
+    );
+
+    const xScale = chart.getAxis('x')!;
+    expect(xScale.min).toBe(5);
+    expect(xScale.max).toBe(13);
+    chart.destroy();
   });
 
   it('pads horizontal log axes symmetrically in log space by default', () => {
@@ -1799,6 +2034,154 @@ describe('ChartCore live-follow viewport', () => {
     // Full extent restored.
     expect(chart.getAxis('x')?.min).toBe(0);
     expect(chart.getAxis('x')?.max).toBe(2);
+    chart.destroy();
+  });
+});
+
+describe('ChartCore independent data sources', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', new MockDocument());
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const sources = (): ColumnarData[] => [
+    [f([0, 2, 4]), f([1, 2, 3])],
+    [f([1, 3, 7, 9]), f([10, 30, 70, 90])],
+  ];
+  const config = () => ({
+    autoResize: false,
+    axes: { x: { nice: false }, y: { nice: false, padding: 0 } },
+    series: [{ label: 'a', dataIndex: 1 }, { label: 'b', dataIndex: 1 }],
+  });
+
+  it('ranges across independent sources without padding or joining their rows', () => {
+    const input = sources();
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: input, seriesSources: [0, 1] });
+    expect(chart.getAxis('x')?.min).toBe(0);
+    expect(chart.getAxis('x')?.max).toBe(9);
+    expect(chart.getAxis('y')?.max).toBe(90);
+    expect(chart.getSourceData(0)[0]).toBe(input[0][0]);
+    expect(chart.getSourceData(1)[0]).toBe(input[1][0]);
+    chart.setAxis('x', { min: 0, max: 3 });
+    expect(chart.getAxis('y')?.max).toBeLessThan(90);
+    chart.destroy();
+  });
+
+  it('samples every source at its own nearest X and latest index', () => {
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
+    chart.setCursorDataX(3.2);
+    const snapshot = chart.getCursorSnapshot();
+    expect(snapshot.source).toBe('cursor');
+    expect(snapshot.dataX).toBe(3.2);
+    expect(snapshot.points.map(p => [p.dataIndex, p.dataX, p.value])).toEqual([[2, 4, 3], [1, 3, 30]]);
+    chart.setCursorDataX(null);
+    expect(chart.getCursorSnapshot({ fallback: 'latest' }).points.map(p => [p.dataX, p.value])).toEqual([[4, 3], [9, 90]]);
+    chart.destroy();
+  });
+
+  it('supports an empty first source while other series draw and provide snapshots', () => {
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, {
+      sources: [[f([]), f([])], sources()[1]], seriesSources: [0, 1],
+    });
+    expect(chart.getAxis('x')?.max).toBe(9);
+    chart.setCursorDataX(7);
+    expect(chart.getCursorSnapshot().points.map(p => p.value)).toEqual([70]);
+    chart.destroy();
+  });
+
+  it('appends to only the chosen bounded source and follows the newest source', () => {
+    const chart = new ChartCore(document.createElement('div'), { ...config(), streaming: { maxLen: 3, follow: 4 } }, undefined, {
+      sources: sources(), seriesSources: [0, 1],
+    });
+    chart.appendToSource(1, [f([10, 12]), f([100, 120])]);
+    expect(Array.from(chart.getSourceData(0)[0])).toEqual([0, 2, 4]);
+    expect(Array.from(chart.getSourceData(1)[0])).toEqual([9, 10, 12]);
+    expect(chart.getAxis('x')?.max).toBe(12);
+    expect(chart.getSourceLength(1)).toBe(3);
+    expect(chart.getSourceValue(1, 1, 2)).toBe(120);
+    chart.destroy();
+  });
+
+  it('atomically rejects bad replacements and preserves a manual viewport across valid replacements', () => {
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
+    chart.setAxis('x', { min: 1, max: 3 });
+    chart.setSelection({ x: { min: 1, max: 2 } });
+    expect(() => chart.replaceSources(config(), [[f([0]), f([])]], [0, 0])).toThrow();
+    expect(chart.getSourceLength(1)).toBe(4);
+    expect(chart.getOptions().series[1].label).toBe('b');
+    chart.replaceSources({ ...config(), selection: { dataChange: 'preserve' } }, sources(), [1, 0]);
+    expect(chart.getAxis('x')?.min).toBe(1);
+    expect(chart.getAxis('x')?.max).toBe(3);
+    expect(chart.getSelection()?.x).toEqual({ min: 1, max: 2 });
+    expect(chart.isFollowing()).toBe(false);
+    chart.destroy();
+  });
+
+  it('uses each scatter source for selection and encoded coordinates', () => {
+    const onSelect = vi.fn();
+    const chart = new ChartCore(document.createElement('div'), {
+      ...config(), zoom: { enabled: false, x: true, y: true }, selection: { onSelect },
+      series: [{ label: 'a', type: 'scatter', xDataIndex: 1, yDataIndex: 2 },
+        { label: 'b', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
+    }, undefined, { sources: [[f([0, 1]), f([4, 1]), f([10, 20])],
+      [f([0, 1, 2]), f([6, 2, 8]), f([30, 40, 50])]], seriesSources: [0, 1] });
+    const x = chart.getAxis('x')!;
+    const y = chart.getAxis('y')!;
+    chartEventBus(chart).emit('action:box-end', {
+      x1: x.dataToPixel(1.5), x2: x.dataToPixel(7), y1: y.dataToPixel(45), y2: y.dataToPixel(5),
+    });
+    expect(onSelect.mock.calls[0][0].points.map((p: { seriesIndex: number; dataIndex: number; x: number }) =>
+      [p.seriesIndex, p.dataIndex, p.x])).toEqual([[0, 0, 4], [1, 0, 6], [1, 1, 2]]);
+    chart.setCursorDataX(2.1);
+    expect(chart.getCursorSnapshot().points.map(p => [p.dataX, p.value])).toEqual([[1, 20], [2, 40]]);
+    chart.destroy();
+  });
+
+  it('rejects a malformed updateLast tail before changing the source', () => {
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
+    expect(() => chart.appendToSource(1, [f([9, 8]), f([900, 800])], { updateLast: true })).toThrow();
+    expect(chart.getSourceValue(1, 1, 3)).toBe(90);
+    expect(chart.getSourceLength(1)).toBe(4);
+    chart.destroy();
+  });
+
+  it('emits a point-click payload with the independent series and source-local row', () => {
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
+    const onClick = vi.fn();
+    chart.on('point:click', onClick);
+    chartEventBus(chart).emit('action:tap', {
+      x: chart.getAxis('x')!.dataToPixel(7), y: chart.getAxis('y')!.dataToPixel(70), pointerType: 'mouse',
+    });
+    expect(onClick).toHaveBeenCalledWith(expect.objectContaining({ seriesIndex: 1, dataIndex: 2, x: 7, y: 70 }));
+    chartEventBus(chart).emit('action:tap', {
+      x: chart.getAxis('x')!.dataToPixel(9), y: chart.getAxis('y')!.dataToPixel(30), pointerType: 'mouse',
+    });
+    expect(onClick).toHaveBeenCalledTimes(1);
+    chart.destroy();
+  });
+
+  it('guards controlled viewport, selection and reset before committing state or events', () => {
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
+    chart.setAxis('x', { min: 1, max: 3 });
+    const viewport = vi.fn(() => false);
+    const selection = vi.fn(() => false);
+    const changes = vi.fn();
+    chart.on('viewport:change', changes);
+    chart.setInteractionGuards({ viewport, selection });
+    chart.setAxis('x', { min: 2, max: 5 });
+    chart.setSelection({ x: { min: 1, max: 2 } });
+    chart.resetZoom();
+    expect(chart.getAxis('x')?.min).toBe(1);
+    expect(chart.getAxis('x')?.max).toBe(3);
+    expect(chart.getSelection()).toBe(null);
+    expect(chart.isFollowing()).toBe(false);
+    expect(changes).not.toHaveBeenCalled();
+    expect(viewport).toHaveBeenCalledWith('x', { min: 2, max: 5 });
+    expect(selection).toHaveBeenCalledWith({ x: { min: 1, max: 2 } });
     chart.destroy();
   });
 });

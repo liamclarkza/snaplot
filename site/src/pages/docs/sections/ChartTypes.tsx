@@ -1,5 +1,5 @@
 import { createSignal, onCleanup } from 'solid-js';
-import type { ColumnarData, ChartInstance } from 'snaplot';
+import type { ChartHandle } from 'snaplot';
 import CodeBlock from '../../../components/CodeBlock';
 import DocsLink from '../DocsLink';
 import { Section, Prose, Demo } from '../../../components/ui';
@@ -23,14 +23,13 @@ export default function ChartTypes() {
 
   // Streaming line chart, appends a data point every second so the Line
   // demo is visibly alive when the reader scrolls past it.
-  let lineChart: ChartInstance | undefined;
+  let lineChart: ChartHandle | undefined;
+  const last = Object.fromEntries(Object.entries(d_line().columns).map(([key, values]) => [key, values[values.length - 1]]));
   const interval = setInterval(() => {
     if (!lineChart) return;
-    const d = lineChart.getData(); const x = d[0]; if (x.length === 0) return;
-    lineChart.appendData([
-      new Float64Array([x[x.length - 1] + 60_000]),
-      ...Array.from({ length: d.length - 1 }, (_, s) => new Float64Array([d[s + 1][x.length - 1] + (Math.random() - 0.5) * 10])),
-    ] as ColumnarData);
+    last.x += 60_000;
+    for (const name of Object.keys(last)) if (name !== 'x') last[name] += (Math.random() - .5) * 10;
+    lineChart.appendData({ columns: Object.fromEntries(Object.entries(last).map(([name, value]) => [name, new Float64Array([value])])) });
   }, 1000);
   onCleanup(() => clearInterval(interval));
 
@@ -41,12 +40,12 @@ export default function ChartTypes() {
         <Demo title="Multi-series streaming line chart" desc="Try changing interpolation to 'linear' or 'step-after'"
           data={d_line()} onReady={(c) => { lineChart = c; }}
           code={`{
-  streaming: { maxLen: 500 },
+  streaming: { maxPoints: 500 },
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'CPU %', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Memory %', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Network', dataIndex: 3, type: 'line', interpolation: 'linear', lineWidth: 1.5 },
+    { label: 'CPU %', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Memory %', y: 'value2', type: 'line', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Network', y: 'value3', type: 'line', interpolation: 'linear', lineWidth: 1.5 },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
@@ -58,8 +57,8 @@ export default function ChartTypes() {
           code={`{
   axes: { x: { type: 'time' } },
   series: [
-    { label: 'Requests/s', dataIndex: 1, type: 'area', interpolation: 'monotone', lineWidth: 2 },
-    { label: 'Errors/s', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5 },
+    { label: 'Requests/s', y: 'value1', type: 'area', interpolation: 'monotone', lineWidth: 2 },
+    { label: 'Errors/s', y: 'value2', type: 'area', interpolation: 'monotone', lineWidth: 1.5 },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
@@ -69,8 +68,8 @@ export default function ChartTypes() {
         <Prose>
           Use <code>type: 'band'</code> to render a confidence interval, error band, or min/max
           range as a single series. A band series combines three data columns into one visual unit:
-          a filled region between <code>upperDataIndex</code> and <code>lowerDataIndex</code>,
-          with a center line at <code>dataIndex</code>. The center line is what the tooltip
+          a filled region between <code>upper</code> and <code>lower</code>,
+          with a center line at <code>y</code>. The center line is what the tooltip
           and cursor snap to, the fill is purely decorative.
         </Prose>
         <Demo title="Mean line with ±σ confidence band" desc="One series, three columns: mean (1), upper (2), lower (3)"
@@ -78,8 +77,8 @@ export default function ChartTypes() {
           code={`{
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
   series: [
-    { label: 'Loss', type: 'band', dataIndex: 1,
-      upperDataIndex: 2, lowerDataIndex: 3,
+    { label: 'Loss', type: 'band', y: 'value1',
+      upper: 'value2', lower: 'value3',
       stroke: '#4f8fea', fill: '#4f8fea', opacity: 0.15,
       lineWidth: 2, interpolation: 'monotone' },
   ],
@@ -91,7 +90,7 @@ export default function ChartTypes() {
         <Prose>
           Scatter plots use stamp-based rendering, a single point shape is pre-rendered to an offscreen canvas, then stamped at each data position. This makes scatter rendering scale to tens of thousands of points with minimal overhead.
           Tooltip mode <code>'nearest'</code> uses euclidean (pixel-space) distance to find the closest point, with a cached screen-space grid for dense clouds.
-          For tabular datasets, set <code>xDataIndex</code> to use a column other than column 0 for X, then use <code>colorBy</code>, <code>sizeBy</code>, and <code>tooltipFields</code> for additional encodings.
+          For tabular datasets, set <code>x</code> to select the X field independently from row identity, then use <code>colorBy</code>, <code>sizeBy</code>, and <code>tooltipFields</code> for additional encodings.
         </Prose>
         <Prose>
     For value-driven color and size encodings (<code>colorBy</code>, <code>sizeBy</code>), see the{' '}
@@ -100,69 +99,65 @@ export default function ChartTypes() {
         <Demo title="Encoded cohort scatter (1.2K points)" desc="X/Y from tabular columns, colour by cohort, size by volume, score in the tooltip"
           data={d_scatter()}
           code={`{
-  axes: { x: { padding: 0.08 }, y: { padding: 0.08 } },
+  axes: { x: { rangePadding: 0.08 }, y: { rangePadding: 0.08 } },
   interaction: 'analytical',
   series: [{
     label: 'Users',
     type: 'scatter',
-    xDataIndex: 1, // embedding X
-    yDataIndex: 2, // embedding Y
+    x: 'value1', // embedding X
+    y: 'value2', // embedding Y
     renderMode: 'points',
     pointShape: 'circle',
     opacity: 0.68,
     colorBy: {
-      dataIndex: 3,
+      field: 'value3',
       type: 'category',
       label: 'Cohort',
       format: (value) => ['Core', 'Growth', 'Enterprise', 'Trial'][Math.round(value)] ?? 'Other',
     },
     sizeBy: {
-      dataIndex: 4,
+      field: 'value4',
       range: [2, 6.5],
       scale: 'sqrt',
       label: 'Volume',
       format: (value) => \`\${Math.round(value)} events\`,
     },
     tooltipFields: [
-      { dataIndex: 5, label: 'Score', format: (value) => value.toFixed(2) },
+      { field: 'value5', label: 'Score', format: (value) => value.toFixed(2) },
     ],
   }],
   zoom: { enabled: true, x: true, y: true },
   tooltip: { show: true, mode: 'nearest' },
 }`} />
         <Prose>
-          Scatter series can read from arbitrary data columns. Column indexes are absolute indexes into <code>ColumnarData</code>: column <code>0</code> is the default X column, while <code>xDataIndex</code>, <code>yDataIndex</code>, <code>colorBy.dataIndex</code>, <code>sizeBy.dataIndex</code>, and <code>tooltipFields[].dataIndex</code> all point at columns in the same array.
+          Scatter coordinates and encodings use named fields or accessors. A separate <code>rowId</code> identifies a point without imposing an order on its coordinates.
         </Prose>
-        <CodeBlock code={`const data = [
-  rowId,          // column 0: stable row identity / default X
-  embeddingX,     // column 1: scatter X
-  embeddingY,     // column 2: scatter Y
-  cohort,         // column 3: category id
-  volume,         // column 4: numeric size encoding
-  score,          // column 5: extra tooltip field
-];
+        <CodeBlock code={`const data = { columns: {
+  x: rowId, value1: embeddingX, value2: embeddingY,
+  value3: cohort, value4: volume, value5: score,
+} };
 
 const config = {
-  axes: { x: { padding: 0.08 }, y: { padding: 0.08 } },
+  axes: { x: { rangePadding: 0.08 }, y: { rangePadding: 0.08 } },
   interaction: 'analytical',
   series: [{
     label: 'Users',
     type: 'scatter',
-    xDataIndex: 1,
-    yDataIndex: 2,
+    x: 'value1',
+    y: 'value2',
     renderMode: 'points',
     pointShape: 'circle', // 'circle' | 'square' | 'diamond'
     opacity: 0.68,
 
     colorBy: {
-      dataIndex: 3,
+      field: 'value3',
       type: 'category',   // 'auto' | 'category' | 'continuous' | 'diverging'
       label: 'Cohort',
       format: (value) => ['Core', 'Growth', 'Enterprise', 'Trial'][Math.round(value)] ?? 'Other',
     },
 
     sizeBy: {
-      dataIndex: 4,
+      field: 'value4',
       range: [2, 6.5],    // radius range in CSS pixels
       scale: 'sqrt',      // 'linear' | 'sqrt'
       label: 'Volume',
@@ -170,7 +165,7 @@ const config = {
     },
 
     tooltipFields: [
-      { dataIndex: 5, label: 'Score', format: (value) => value.toFixed(2) },
+      { field: 'value5', label: 'Score', format: (value) => value.toFixed(2) },
     ],
   }],
   tooltip: { show: true, mode: 'nearest' },
@@ -196,14 +191,14 @@ const config = {
             </thead>
             <tbody>
               {[
-                ['xDataIndex', 'Use a non-zero column for scatter X values. This is useful for tabular experiment data where column 0 is just row identity.'],
-                ['yDataIndex', 'Use an explicit Y column for scatter values. Prefer this over dataIndex for scatter configs.'],
+                ['x', 'Name the scatter X field independently from source-row identity.'],
+                ['y', 'Name the scatter Y field or provide an accessor.'],
                 ['renderMode', "'points' forces stamped points, 'density' forces aggregate heatmap rendering, and 'auto' switches to density above the large-point threshold."],
                 ['pointShape', "Point shape for stamped scatter: 'circle', 'square', or 'diamond'."],
                 ['colorBy', 'Colour points from another column. Low-cardinality integer columns work well as categories; numeric columns can use continuous or diverging ramps.'],
                 ['sizeBy', 'Map a numeric column to point radius. Use sqrt scaling when the encoded value represents count, duration, or magnitude.'],
                 ['tooltipFields', 'Add extra columns to the default nearest-point tooltip without writing a custom tooltip renderer.'],
-                ['selection.onSelect', 'Box selections return ranges and selected scatter points when the drag spans both X and Y axes.'],
+                ['onSelect', 'Box selections return ranges and selected scatter points when the drag spans both X and Y axes.'],
               ].map(([option, use]) => (
                 <tr style={{ 'border-bottom': '1px solid var(--border)' }}>
                   <td style={{ padding: '8px 12px', 'font-family': 'var(--font-mono)', 'font-size': '12px', 'white-space': 'nowrap' }}>{option}</td>
@@ -221,12 +216,12 @@ const config = {
       <Section id="heatmap" title="Density Heatmap">
         <Prose>
           Set <code>renderMode: 'density'</code> on a scatter series for density rendering. Heatmaps use <code>theme.heatmapGradient</code>, then <code>theme.sequentialPalette</code>, and finally the built-in Viridis-style fallback. A series-level <code>heatmapGradient</code> overrides the theme for that one chart. Adjust <code>heatmapBinSize</code> for coarser or finer bins.
-          Density heatmaps auto-trigger when a scatter series exceeds 200K points in <code>renderMode: 'auto'</code>. The legacy <code>heatmap: true</code> flag remains supported.
+          Density heatmaps auto-trigger when a scatter series exceeds 200K points in <code>renderMode: 'auto'</code>.
           Since density rendering represents aggregate bins rather than individual points, this demo disables cursor and tooltip overlays.
         </Prose>
         <Demo title="300K points, 4 gaussian clusters" data={d_heat()}
           code={`{
-  series: [{ label: 'Density', yDataIndex: 1, type: 'scatter', renderMode: 'density', heatmapBinSize: 1 }],
+  series: [{ label: 'Density', y: 'value1', type: 'scatter', renderMode: 'density', heatmapBinSize: 1 }],
   zoom: { enabled: true, x: true, y: true },
   cursor: { show: false },
   tooltip: { show: false },
@@ -241,8 +236,8 @@ const config = {
         <Demo title="Grouped bars" data={d_bar()}
           code={`{
   series: [
-    { label: 'Revenue', dataIndex: 1, type: 'bar' },
-    { label: 'Expenses', dataIndex: 2, type: 'bar' },
+    { label: 'Revenue', y: 'value1', type: 'bar' },
+    { label: 'Expenses', y: 'value2', type: 'bar' },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
@@ -250,22 +245,22 @@ const config = {
 
       <Section id="histogram" title="Histogram">
         <Prose>
-          Histograms display pre-computed bins. Use the <code>histogram()</code> utility to compute bins from raw data, then pass the result as chart data:
+          Histograms display pre-computed bins. Use the <code>histogram()</code> utility to compute bins from raw data, then pass the result directly to a histogram series:
         </Prose>
         <CodeBlock code={`import { histogram } from 'snaplot';
 
 const raw = new Float64Array(values);
 const bins = histogram(raw, { method: 'freedman-diaconis' });
 // bins.edges = Float64Array (N+1 values)
-// bins.counts = Float64Array (N+1 values, last is padding 0)
+// bins.counts = Float64Array (N values)
 
-const data: ColumnarData = [bins.edges, bins.counts];`} />
+const options = { series: [{ id: 'distribution', type: 'histogram', data: bins }] };`} />
         <div style={{ height: '12px' }} />
         <Prose>Three bin methods: <code>freedman-diaconis</code> (IQR, robust to outliers), <code>sturges</code> (assumes normality), <code>scott</code> (std deviation).</Prose>
         <Demo title="Bimodal distribution (5K samples)"
           data={d_hist()}
           code={`{
-  series: [{ label: 'Response Time', dataIndex: 1, type: 'histogram' }],
+  series: [{ id: 'distribution', label: 'Response Time', type: 'histogram', data }],
   tooltip: { show: true },
 }`} />
       </Section>

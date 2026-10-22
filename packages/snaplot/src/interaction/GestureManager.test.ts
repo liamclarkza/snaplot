@@ -816,3 +816,38 @@ describe('GestureManager keyboard', () => {
     manager.detach();
   });
 });
+
+describe('GestureManager point activation suppression', () => {
+  it('emits a tap for a stationary mouse press and release', () => {
+    const { target, eventBus, manager } = createGesture();
+    const tap = vi.fn();
+    eventBus.on('action:tap', tap);
+    target.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+    target.dispatch('pointerup', { clientX: 100, clientY: 100 });
+    expect(tap).toHaveBeenCalledWith({ x: 100, y: 100, pointerType: 'mouse' });
+    manager.detach();
+  });
+
+  it('does not activate a point after a drag returns to its starting position', () => {
+    const { target, eventBus, manager } = createGesture();
+    const tap = vi.fn();
+    eventBus.on('action:tap', tap);
+    target.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+    target.dispatch('pointermove', { clientX: 150, clientY: 150 });
+    target.dispatch('pointermove', { clientX: 100, clientY: 100 });
+    target.dispatch('pointerup', { clientX: 100, clientY: 100 });
+    expect(tap).not.toHaveBeenCalled();
+    manager.detach();
+  });
+
+  it('does not activate a point after cancellation', () => {
+    const { target, eventBus, manager } = createGesture();
+    const tap = vi.fn();
+    eventBus.on('action:tap', tap);
+    target.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+    target.dispatch('pointercancel', { clientX: 100, clientY: 100 });
+    target.dispatch('pointerup', { clientX: 100, clientY: 100 });
+    expect(tap).not.toHaveBeenCalled();
+    manager.detach();
+  });
+});

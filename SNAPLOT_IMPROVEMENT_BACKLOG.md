@@ -1,8 +1,18 @@
 # Snaplot improvement backlog
 
+> This backlog preserves historical dogfood findings. The API overhaul addresses direct rows, categories, stable IDs, native React/Solid ownership, controlled state, independent sources and declarative groups/annotations; consult the root README for current contracts. Visual findings remain separately scoped.
+
 Living backlog derived from building and visually critiquing the three SolidJS dogfood applications. This document records candidate improvements before implementation so that repeated findings across PulseOps, CohortLab, and GridScope can be combined into coherent library changes rather than fixed piecemeal.
 
 The detailed implementation friction remains in `notes/dogfood-friction-log.md`. This document focuses on actionable product and API improvements.
+
+The September [cross-library trial](experiments/chart-lab/DEFAULTS_FINDINGS.md)
+now distinguishes tuned dashboards from native defaults. Its primary findings
+are DEF-01 long-title clipping, DEF-02 long-tick collisions, DEF-03 category-label
+collisions, DEF-04 invisible single observations and DEF-05 zero-span constant-Y
+domains. These specific browser reproductions take priority over React packaging.
+The same report records correction work and links source-backed API/feature audits;
+it makes no performance ranking. Earlier 0.12 fixes do not close these new edge cases.
 
 ## Working principles
 

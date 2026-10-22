@@ -1,64 +1,29 @@
-import { onMount, onCleanup, createEffect, on } from 'solid-js';
-import type { JSX } from 'solid-js';
-import { ChartCore } from '../core/Chart';
-import type { ChartConfig, ChartInstance, ColumnarData } from '../types';
-
-export interface ChartProps<TMeta = unknown> {
-  /** Chart configuration */
-  config: ChartConfig<TMeta>;
-  /** Columnar data (reactive, chart updates automatically when this changes) */
-  data: ColumnarData;
-  /** CSS class for the container div */
+import { onMount, onCleanup, createEffect, type JSX } from 'solid-js';
+import { createChart, reconcileChart, setChartControls } from '../api/createChart';
+import type { ChartOptions, ChartHandle } from '../api/types';
+import { applyDefaults, chartOptions, chartControls, type ChartControls } from '../react/shared';
+export interface ChartProps<Row = Record<string, unknown>> extends ChartOptions<Row>, ChartControls {
   class?: string;
-  /** Inline styles for the container div */
-  style?: string | Record<string, string>;
-  /** Callback when chart instance is ready */
-  onReady?: (chart: ChartInstance) => void;
+  style?: string | JSX.CSSProperties;
+  ref?: (chart: ChartHandle<Row> | undefined) => void;
+  onReady?: (chart: ChartHandle<Row>) => void;
 }
-
-/**
- * <Chart>, the SolidJS component wrapper for snaplot.
- *
- * Fine-grained reactivity: signal changes → targeted canvas layer updates.
- * No virtual DOM diffing.
- */
-export function Chart<TMeta = unknown>(props: ChartProps<TMeta>): JSX.Element {
-  let containerRef!: HTMLDivElement;
-  let chart: ChartCore | undefined;
-
+export function Chart<Row = Record<string, unknown>>(props: ChartProps<Row>): JSX.Element {
+  let host!: HTMLDivElement;
   onMount(() => {
-    chart = new ChartCore(containerRef, props.config as ChartConfig, props.data);
+    const chart = createChart(host, chartOptions(props));
+    setChartControls(chart, chartControls(props));
+    applyDefaults(chart, props);
     props.onReady?.(chart);
-
-    createEffect(
-      on(
-        () => props.data,
-        (data) => { chart?.setData(data); },
-        { defer: true },
-      ),
-    );
-
-    createEffect(
-      on(
-        () => props.config,
-        (config) => { chart?.replaceOptions(config as ChartConfig); },
-        { defer: true },
-      ),
-    );
+    createEffect(() => {
+      const ref = props.ref;
+      ref?.(chart);
+      onCleanup(() => ref?.(undefined));
+    });
+    createEffect(() => {
+      reconcileChart(chart, chartOptions(props), chartControls(props));
+    });
+    onCleanup(() => chart.destroy());
   });
-
-  onCleanup(() => { chart?.destroy(); });
-
-  return (
-    <div
-      ref={containerRef!}
-      class={props.class}
-      style={typeof props.style === 'string'
-        // Defaults first so user declarations win in both forms (later inline
-        // declarations and later object keys both override).
-        ? 'width:100%;height:100%;' + props.style
-        : { width: '100%', height: '100%', ...props.style }
-      }
-    />
-  );
+  return <div ref={host!} class={props.class} role="group" aria-label={props['aria-label'] ?? props.ariaLabel ?? 'Chart'} aria-describedby={props['aria-describedby']} aria-labelledby={props['aria-labelledby']} style={typeof props.style === 'string' ? 'width:100%;height:100%;' + props.style : { width: '100%', height: '100%', ...props.style }} />;
 }

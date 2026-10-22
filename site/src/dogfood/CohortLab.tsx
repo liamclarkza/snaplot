@@ -1,12 +1,11 @@
 import { createMemo, createSignal, For, Show } from 'solid-js';
-import { lightTheme, type ChartConfig, type ChartInstance } from 'snaplot';
-import { Chart, createChartGroup } from 'snaplot/solid';
+import { lightTheme, type ChartOptions, type ChartHandle } from 'snaplot';
+import { Chart, createChartGroup, createChartState } from 'snaplot/solid';
 import { ChartCard, DogfoodShell, EmptyState, Metric, Segmented } from './DogfoodShell';
-import { comparisonColumns, comparisonMetrics, comparisonSeries, experimentColumns, experimentRuns, families, metricHistogram, progressColumns, runIdsAtRows, runsById, topRunsByAccuracy, type ExperimentRun } from './data';
+import { comparisonColumns, comparisonMetrics, comparisonSeries, experimentRuns, families, metricHistogram, progressColumns, runsById, topRunsByAccuracy, type ExperimentRun } from './data';
 
 type DensityMode = 'points' | 'density';
 type ColorMode = 'family' | 'cost';
-interface RunMeta { runId: number }
 
 const allRuns = experimentRuns(24_000);
 const densityOptions = [{ value: 'points', label: 'Points' }, { value: 'density', label: 'Density' }] as const;
@@ -22,7 +21,9 @@ export default function CohortLab() {
   const [colorMode, setColorMode] = createSignal<ColorMode>('family');
   const [selectedCount, setSelectedCount] = createSignal(0);
   const [selectedIds, setSelectedIds] = createSignal<number[]>([124, 257, 618]);
-  const group = createChartGroup<RunMeta>();
+  const group = createChartGroup();
+  const [progressChart, setProgressChart] = createSignal<ChartHandle<Record<string, number>>>();
+  const progressState = createChartState(progressChart);
 
   const filtered = createMemo(() => allRuns.filter((run) =>
     (family() === 'All families' || run.family === family()) &&
@@ -34,56 +35,58 @@ export default function CohortLab() {
   const topVisibleRuns = createMemo(() => topRunsByAccuracy(filtered()));
   const bestRun = createMemo(() => filtered().reduce<ExperimentRun | undefined>((best, run) => !best || run.accuracy > best.accuracy ? run : best, undefined));
 
-  const scatterConfig = createMemo<ChartConfig>(() => ({
+  const scatterConfig = createMemo<ChartOptions<ExperimentRun>>(() => ({
     theme: cohortTheme,
     interaction: 'analytical',
+    x: 'latency', rowId: 'id',
     axes: {
-      x: { type: 'log', label: 'Inference latency (ms)', tickFormat: (v) => `${v} ms`, nice: true },
-      y: { type: 'linear', label: 'Validation accuracy', tickFormat: (v) => `${v.toFixed(0)}%`, nice: true },
+      x: { type: 'log', title: 'Inference latency (ms)', format: (v) => `${v} ms`, roundBounds: true },
+      y: { type: 'linear', title: 'Validation accuracy', format: (v) => `${Number(v).toFixed(0)}%`, roundBounds: true },
     },
     series: [{
-      label: 'Experiment runs', type: 'scatter', xDataIndex: 1, yDataIndex: 2,
+      id: 'runs', label: 'Experiment runs', type: 'scatter', y: (run) => run.accuracy * 100,
       colorBy: colorMode() === 'family'
-        ? { dataIndex: 3, type: 'category', label: 'Family', format: (v) => families[Math.round(v)] ?? 'Unknown' }
-        : { dataIndex: 5, type: 'continuous', domain: [0, 2.4], palette: ['#36a98f', '#f2bb52', '#d85a6a'], label: 'Cost / 1K', format: (v) => `$${v.toFixed(2)}` },
-      sizeBy: { dataIndex: 4, range: [2.4, 8], scale: 'sqrt', label: 'Parameters', format: (v) => `${v.toFixed(0)}M` },
-      tooltipFields: [{ dataIndex: 5, label: 'Cost / 1K', format: (v) => `$${v.toFixed(2)}` }],
+        ? { field: (run) => families.indexOf(run.family), type: 'category', label: 'Family', format: (v) => families[Math.round(Number(v))] ?? 'Unknown' }
+        : { field: 'cost', type: 'continuous', domain: [0, 2.4], palette: ['#36a98f', '#f2bb52', '#d85a6a'], label: 'Cost / 1K', format: (v) => `$${Number(v).toFixed(2)}` },
+      sizeBy: { field: 'size', range: [2.4, 8], scale: 'sqrt', label: 'Parameters', format: (v) => `${Number(v).toFixed(0)}M` },
+      tooltipFields: [{ field: 'cost', label: 'Cost / 1K', format: (v) => `$${Number(v).toFixed(2)}` }],
       renderMode: density(), opacity: 0.68,
     }],
-    selection: { onSelect: (selection) => {
+    onSelect: (selection) => {
       const points = selection.points ?? [];
       setSelectedCount(points.length);
       if (points.length > 0) {
-        const ids = runIdsAtRows(filtered(), points.map(point => point.dataIndex));
+        const ids = [...new Set(points.map(point => Number(point.rowId)))].slice(0, 4);
         if (ids.length) setSelectedIds(ids);
       }
-    } },
+    },
     zoom: { enabled: true, x: true, y: true, bounds: 'data' },
     pan: { enabled: true, x: true, y: true },
     touch: { drag: 'pan', selectionGesture: 'double-tap-drag' },
-    tooltip: { show: true, mode: 'nearest', yFormat: (v) => `${v.toFixed(2)}%` },
+    tooltip: { show: true, mode: 'nearest', yFormat: (v) => `${Number(v).toFixed(2)}%` },
     cursor: { show: true, xLine: true, yLine: true },
     padding: { top: 16, right: 16, bottom: 16, left: 16 },
   }));
 
-  const progressConfig = createMemo<ChartConfig<RunMeta>>(() => group.apply({
+  const progressConfig = createMemo<ChartOptions<Record<string, number>>>(() => ({
+    group,
     theme: cohortTheme,
-    axes: { x: { type: 'linear', label: 'Training step', nice: true }, y: { type: 'linear', label: 'Accuracy', min: 50, max: 100, tickFormat: (v) => `${v}%` } },
+    x: 'step', axes: { x: { type: 'linear', title: 'Training step', roundBounds: true }, y: { type: 'linear', title: 'Accuracy', min: 50, max: 100, format: (v) => `${v}%` } },
     series: comparisonSeries(selectedRuns()),
-    highlight: { dimOpacity: 0.12, getKey: (series) => series.meta?.runId },
-    tooltip: { mode: 'index', yFormat: (v) => `${v.toFixed(2)}%` },
+    highlight: { dimOpacity: 0.12 },
+    tooltip: { mode: 'index', yFormat: (v) => `${Number(v).toFixed(2)}%` },
     padding: { top: 16, right: 18, bottom: 50, left: 58 },
   }));
-  const comparisonConfig = createMemo<ChartConfig<RunMeta>>(() => group.apply({
+  const comparisonConfig = createMemo<ChartOptions<Record<string, number>>>(() => ({
+    group,
     theme: cohortTheme,
-    axes: { x: { type: 'linear', ticks: [0, 1, 2], tickFormat: (v) => comparisonMetrics[v] ?? '', grid: false }, y: { type: 'linear', min: 0, max: 100, tickFormat: (v) => `${v}` } },
+    x: 'metric', axes: { x: { type: 'linear', ticks: [0, 1, 2], format: (v) => comparisonMetrics[Number(v)] ?? '', grid: false }, y: { type: 'linear', min: 0, max: 100, format: (v) => `${v}` } },
     series: comparisonSeries(selectedRuns()).map((series) => ({ ...series, type: 'bar' as const, barWidthRatio: 0.76 })),
-    highlight: { dimOpacity: 0.12, getKey: (series) => series.meta?.runId },
-    tooltip: { mode: 'index', yFormat: (v) => `${v.toFixed(1)} score` },
+    highlight: { dimOpacity: 0.12 },
+    tooltip: { mode: 'index', yFormat: (v) => `${Number(v).toFixed(1)} score` },
     padding: { top: 16, right: 18, bottom: 38, left: 44 },
   }));
 
-  const registerLinked = (chart: ChartInstance) => group.link(chart, { yDomain: false, gutters: false });
   const clearFilters = () => { setFamily('All families'); setTeam('All teams'); setStatus('All statuses'); setDays('30'); };
 
   return (
@@ -113,28 +116,28 @@ export default function CohortLab() {
           <section class="cohort-workspace">
             <ChartCard class="cohort-scatter-card" title="Quality vs latency" subtitle={`Colour: ${colorMode() === 'family' ? 'model family' : 'cost per 1K'} · Size: parameter count`} meta={<div class="cohort-chart-controls"><Segmented label="Scatter colour encoding" value={colorMode()} options={colorOptions} onChange={setColorMode} /><Segmented label="Scatter render mode" value={density()} options={densityOptions} onChange={setDensity} /></div>}>
               <Show when={filtered().length > 0} fallback={<EmptyState title="No experiments match" detail="Broaden the filters to return runs to the workspace." />}>
-                <div class="df-chart cohort-scatter"><Chart config={scatterConfig()} data={experimentColumns(filtered())} /></div>
+                <div class="df-chart cohort-scatter"><Chart {...scatterConfig()} data={filtered()} /></div>
                 <p class="chart-instruction">Drag a box to select runs · Shift-drag to pan · Wheel to zoom at the cursor</p>
               </Show>
             </ChartCard>
 
             <div class="cohort-two-up">
-              <ChartCard title="Accuracy distribution" subtitle="Visible runs"><div class="df-chart df-chart-sm"><Chart config={{ theme: cohortTheme, axes: { x: { type: 'linear', tickFormat: (v) => `${v.toFixed(1)}%` }, y: { type: 'linear' } }, series: [{ label: 'Runs', type: 'histogram', dataIndex: 1, fill: '#625bf6' }], tooltip: { mode: 'x' }, padding: { top: 12, right: 14, bottom: 36, left: 40 } }} data={metricHistogram(filtered(), 'accuracy')} /></div></ChartCard>
-              <ChartCard title="Latency distribution" subtitle="Long tail included"><div class="df-chart df-chart-sm"><Chart config={{ theme: cohortTheme, axes: { x: { type: 'linear', tickFormat: (v) => `${v.toFixed(0)}ms` }, y: { type: 'linear' } }, series: [{ label: 'Runs', type: 'histogram', dataIndex: 1, fill: '#18a879' }], tooltip: { mode: 'x' }, padding: { top: 12, right: 14, bottom: 36, left: 40 } }} data={metricHistogram(filtered(), 'latency')} /></div></ChartCard>
+              <ChartCard title="Accuracy distribution" subtitle="Visible runs"><div class="df-chart df-chart-sm"><Chart {...{ theme: cohortTheme, axes: { x: { type: 'linear', format: (v) => `${Number(v).toFixed(1)}%` }, y: { type: 'linear' } }, series: [{ id: 'accuracy-distribution', label: 'Runs', type: 'histogram', data: metricHistogram(filtered(), 'accuracy'), fill: '#625bf6' }], tooltip: { mode: 'x' }, padding: { top: 12, right: 14, bottom: 36, left: 40 } }} /></div></ChartCard>
+              <ChartCard title="Latency distribution" subtitle="Long tail included"><div class="df-chart df-chart-sm"><Chart {...{ theme: cohortTheme, axes: { x: { type: 'linear', format: (v) => `${Number(v).toFixed(0)}ms` }, y: { type: 'linear' } }, series: [{ id: 'latency-distribution', label: 'Runs', type: 'histogram', data: metricHistogram(filtered(), 'latency'), fill: '#18a879' }], tooltip: { mode: 'x' }, padding: { top: 12, right: 14, bottom: 36, left: 40 } }} /></div></ChartCard>
             </div>
 
             <ChartCard title="Training trajectories" subtitle="Stable-key highlight sync across reordered charts" meta="80 checkpoints">
-              <div class="df-chart df-chart-md"><Chart config={progressConfig()} data={progressColumns(selectedRuns())} onReady={registerLinked} /></div>
+              <div class="df-chart df-chart-md"><Chart {...progressConfig()} data={progressColumns(selectedRuns())} onReady={setProgressChart} /></div>
             </ChartCard>
           </section>
 
           <aside class="cohort-sidebar">
             <ChartCard title="Comparison set" subtitle="Hover a run to focus every linked chart">
-              <div class="run-list"><For each={selectedRuns()}>{(run, index) => <button type="button" data-highlighted={group.highlightedKey() === run.id ? 'true' : undefined} onPointerEnter={() => group.highlightKey(run.id)} onPointerLeave={() => group.highlightKey(null)} onFocus={() => group.highlightKey(run.id)} onBlur={() => group.highlightKey(null)} onClick={() => setSelectedIds((ids) => ids.filter((id) => id !== run.id))}><span class={`run-swatch run-${index()}`} /><span><strong>{run.name}</strong><small>{run.family} · {run.team}</small></span><b>{(run.accuracy * 100).toFixed(2)}%</b></button>}</For></div>
+              <div class="run-list"><For each={selectedRuns()}>{(run, index) => <button type="button" data-highlighted={progressState()?.highlightedSeries === String(run.id) ? 'true' : undefined} onPointerEnter={() => group.setHighlight(String(run.id))} onPointerLeave={() => group.setHighlight(null)} onFocus={() => group.setHighlight(String(run.id))} onBlur={() => group.setHighlight(null)} onClick={() => setSelectedIds((ids) => ids.filter((id) => id !== run.id))}><span class={`run-swatch run-${index()}`} /><span><strong>{run.name}</strong><small>{run.family} · {run.team}</small></span><b>{(run.accuracy * 100).toFixed(2)}%</b></button>}</For></div>
               <Show when={selectedRuns().length === 0}><EmptyState title="No runs selected" detail="Box-select points in the scatter plot to compare them." /></Show>
               <p class="comparison-note">Box-select the scatter or choose a ranked run below. The same ordered set drives this list, Training trajectories, and the scorecard.</p>
             </ChartCard>
-            <ChartCard title="Normalized scorecard" subtitle="Accuracy %, inverse latency, inverse cost · higher is better"><div class="df-chart df-chart-md"><Chart config={comparisonConfig()} data={comparisonColumns(selectedRuns())} onReady={registerLinked} /></div></ChartCard>
+            <ChartCard title="Normalized scorecard" subtitle="Accuracy %, inverse latency, inverse cost · higher is better"><div class="df-chart df-chart-md"><Chart {...comparisonConfig()} data={comparisonColumns(selectedRuns())} /></div></ChartCard>
             <ChartCard title="Top visible runs" subtitle="Filter-aware ranking">
               <div class="cohort-table" role="table" aria-label="Top visible experiment runs"><div class="table-head"><span>Run</span><span>Accuracy</span><span>Latency</span></div><For each={topVisibleRuns()}>{(run) => <button type="button" onClick={() => setSelectedIds((ids) => [run.id, ...ids.filter((id) => id !== run.id)].slice(0, 4))}><span><b>{run.name}</b><small>{run.family}</small></span><span>{(run.accuracy * 100).toFixed(2)}%</span><span>{run.latency.toFixed(0)} ms</span></button>}</For></div>
             </ChartCard>

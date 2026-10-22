@@ -1,5 +1,5 @@
-import { ChartCore } from 'snaplot/core';
-import type { ChartConfig, ChartInstance, ColumnarData } from 'snaplot/core';
+import { createChart } from 'snaplot/core';
+import type { ChartOptions, ChartHandle, ColumnData } from 'snaplot/core';
 import { genAppendChunk, genTabular, genTimeSeries } from './data';
 import {
   heapMB,
@@ -33,20 +33,20 @@ function chartContainer(stage: HTMLElement, height = 440): HTMLDivElement {
   return el;
 }
 
-interface ChartHandle {
-  chart: ChartInstance;
+interface MountedChart {
+  chart: ChartHandle;
   el: HTMLDivElement;
   destroy(): void;
 }
 
 function makeChart(
   stage: HTMLElement,
-  config: ChartConfig,
-  data: ColumnarData,
+  config: ChartOptions,
+  data: ColumnData,
   height = 440,
-): ChartHandle {
+): MountedChart {
   const el = chartContainer(stage, height);
-  const chart = new ChartCore(el, { debug: { stats: true }, ...config }, data);
+  const chart = createChart(el, { debug: { stats: true }, x: 'x', ...config, data });
   return {
     chart,
     el,
@@ -57,43 +57,49 @@ function makeChart(
   };
 }
 
+function retainedPoints(chart: ChartHandle): number {
+  const first = chart.getCursorSnapshot({ fallback: 'first' }).points[0]?.rowIndex;
+  const last = chart.getCursorSnapshot({ fallback: 'latest' }).points[0]?.rowIndex;
+  return first === undefined || last === undefined ? 0 : last - first + 1;
+}
+
 /** Triangle wave in [0, 1] over `steps`, so a sweep ends where it started. */
 function triangle(i: number, steps: number): number {
   const t = (i % steps) / steps;
   return t < 0.5 ? t * 2 : (1 - t) * 2;
 }
 
-function xExtent(data: ColumnarData): [number, number] {
-  const x = data[0];
+function xExtent(data: ColumnData): [number, number] {
+  const x = data.columns.x ?? data.columns.row;
   return [x[0], x[x.length - 1]];
 }
 
 /** Pan a 40%-of-domain window back and forth across the data. */
-function panStep(chart: ChartInstance, extent: [number, number], i: number): void {
+function panStep(chart: ChartHandle, extent: [number, number], i: number): void {
   const [lo, hi] = extent;
   const full = hi - lo;
   const span = full * 0.4;
   const maxOffset = full - span;
   const offset = triangle(i, SWEEP_STEPS) * maxOffset;
-  chart.setAxis('x', { min: lo + offset, max: lo + offset + span });
+  chart.setViewport({ x: { min: lo + offset, max: lo + offset + span } });
 }
 
 /** Zoom from the full domain down to 4% around the center and back out. */
-function zoomStep(chart: ChartInstance, extent: [number, number], i: number): void {
+function zoomStep(chart: ChartHandle, extent: [number, number], i: number): void {
   const [lo, hi] = extent;
   const full = hi - lo;
   const center = lo + full / 2;
   const t = triangle(i, SWEEP_STEPS);
   const span = full * (1 - t * 0.96);
-  chart.setAxis('x', { min: center - span / 2, max: center + span / 2 });
+  chart.setViewport({ x: { min: center - span / 2, max: center + span / 2 } });
 }
 
 async function runSweep(
   opts: RunOpts,
   name: string,
-  config: ChartConfig,
-  data: ColumnarData,
-  step: (chart: ChartInstance, extent: [number, number], i: number) => void,
+  config: ChartOptions,
+  data: ColumnData,
+  step: (chart: ChartHandle, extent: [number, number], i: number) => void,
   meta: Record<string, string | number> = {},
 ): Promise<ScenarioResult> {
   const handle = makeChart(opts.stage, config, data);
@@ -126,7 +132,7 @@ async function runSweep(
       heapBefore !== null && heapAfter !== null
         ? Math.round((heapAfter - heapBefore) * 100) / 100
         : null,
-    meta: { points: data[0].length, ...meta },
+    meta: { points: (data.columns.x ?? data.columns.row).length, ...meta },
   };
   handle.destroy();
   return result;
@@ -135,8 +141,8 @@ async function runSweep(
 async function runRedrawLoop(
   opts: RunOpts,
   name: string,
-  config: ChartConfig,
-  data: ColumnarData,
+  config: ChartOptions,
+  data: ColumnData,
   meta: Record<string, string | number> = {},
 ): Promise<ScenarioResult> {
   const handle = makeChart(opts.stage, config, data);
@@ -162,7 +168,7 @@ async function runRedrawLoop(
       heapBefore !== null && heapAfter !== null
         ? Math.round((heapAfter - heapBefore) * 100) / 100
         : null,
-    meta: { points: data[0].length, ...meta },
+    meta: { points: (data.columns.x ?? data.columns.row).length, ...meta },
   };
   handle.destroy();
   return result;
@@ -170,50 +176,50 @@ async function runRedrawLoop(
 
 // ─── Config presets ─────────────────────────────────────────────
 
-const timeScatterConfig: ChartConfig = {
+const timeScatterConfig: ChartOptions = {
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
-  series: [{ label: 'points', type: 'scatter', dataIndex: 1 }],
+  series: [{ label: 'points', type: 'scatter', y: 'value' }],
 };
 
-const lineConfig: ChartConfig = {
+const lineConfig: ChartOptions = {
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
-  series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+  series: [{ label: 'value', type: 'line', y: 'value' }],
 };
 
-const tabularScatterConfig: ChartConfig = {
+const tabularScatterConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-  series: [{ label: 'metric', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
+  series: [{ label: 'metric', type: 'scatter', x: 'metricA', y: 'metricB' }],
 };
 
-const encodedScatterConfig: ChartConfig = {
+const encodedScatterConfig: ChartOptions = {
   axes: { x: { type: 'linear' }, y: { type: 'linear' } },
   series: [
     {
       label: 'metric',
       type: 'scatter',
-      xDataIndex: 1,
-      yDataIndex: 2,
-      colorBy: 3,
-      sizeBy: { dataIndex: 4, scale: 'sqrt' },
+      x: 'metricA',
+      y: 'metricB',
+      colorBy: 'category',
+      sizeBy: { field: 'size', scale: 'sqrt' },
     },
   ],
 };
 
-const densityConfig: ChartConfig = {
+const densityConfig: ChartOptions = {
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
-  series: [{ label: 'density', type: 'scatter', dataIndex: 1, renderMode: 'density' }],
+  series: [{ label: 'density', type: 'scatter', y: 'value', renderMode: 'density' }],
 };
 
 // ─── Gesture helpers ────────────────────────────────────────────
 
 /** Start gestures from a 40% window so pans and zoom-outs have room to move. */
-function zoomToMidWindow(chart: ChartInstance, extent: [number, number]): void {
+function zoomToMidWindow(chart: ChartHandle, extent: [number, number]): void {
   const [lo, hi] = extent;
   const full = hi - lo;
-  chart.setAxis('x', { min: lo + full * 0.3, max: lo + full * 0.7 });
+  chart.setViewport({ x: { min: lo + full * 0.3, max: lo + full * 0.7 } });
 }
 
-function plotCenterClient(chart: ChartInstance): { cx: number; cy: number } {
+function plotCenterClient(chart: ChartHandle): { cx: number; cy: number } {
   const rect = chart.container.getBoundingClientRect();
   const plot = chart.getLayout().plot;
   return {
@@ -254,9 +260,9 @@ function firePointer(el: Element, type: string, p: PointerInit): void {
 async function runGesture(
   opts: RunOpts,
   name: string,
-  config: ChartConfig,
-  data: ColumnarData,
-  makeStep: (chart: ChartInstance, el: Element, cx: number, cy: number) => {
+  config: ChartOptions,
+  data: ColumnData,
+  makeStep: (chart: ChartHandle, el: Element, cx: number, cy: number) => {
     step: (i: number) => void;
     end: () => void;
   },
@@ -266,7 +272,7 @@ async function runGesture(
    * Gestures at the full data extent are clamped to no-ops by the default
    * zoom bounds, which measures nothing.
    */
-  prepare?: (chart: ChartInstance, extent: [number, number]) => void,
+  prepare?: (chart: ChartHandle, extent: [number, number]) => void,
 ): Promise<ScenarioResult> {
   const handle = makeChart(opts.stage, config, data);
   handle.el.scrollIntoView();
@@ -305,7 +311,7 @@ async function runGesture(
       heapBefore !== null && heapAfter !== null
         ? Math.round((heapAfter - heapBefore) * 100) / 100
         : null,
-    meta: { points: data[0].length, ...meta },
+    meta: { points: (data.columns.x ?? data.columns.row).length, ...meta },
   };
   handle.destroy();
   return result;
@@ -314,6 +320,17 @@ async function runGesture(
 // ─── Scenario definitions ───────────────────────────────────────
 
 export const scenarios: Scenario[] = [
+  {
+    name: 'independent-lines-pan-75k',
+    run: (o) => runSweep(o, 'independent-lines-pan-75k', {
+      ...lineConfig,
+      series: [
+        { id: 'primary', label: 'Primary', y: 'value' },
+        { id: 'secondary', label: 'Secondary', data: genTimeSeries(25_000, 2), y: 'value' },
+      ],
+    }, genTimeSeries(50_000), panStep, { points: 75_000, sources: 2 }),
+  },
+
   {
     name: 'scatter-render-10k',
     run: (o) => runRedrawLoop(o, 'scatter-render-10k', timeScatterConfig, genTimeSeries(10_000)),
@@ -353,7 +370,7 @@ export const scenarios: Scenario[] = [
         const hi = 60;
         const span = (hi - lo) * 0.4;
         const offset = triangle(i, SWEEP_STEPS) * (hi - lo - span);
-        chart.setAxis('x', { min: lo + offset, max: lo + offset + span });
+        chart.setViewport({ x: { min: lo + offset, max: lo + offset + span } });
       });
     },
   },
@@ -366,7 +383,7 @@ export const scenarios: Scenario[] = [
         const hi = 60;
         const span = (hi - lo) * 0.4;
         const offset = triangle(i, SWEEP_STEPS) * (hi - lo - span);
-        chart.setAxis('x', { min: lo + offset, max: lo + offset + span });
+        chart.setViewport({ x: { min: lo + offset, max: lo + offset + span } });
       });
     },
   },
@@ -397,8 +414,8 @@ export const scenarios: Scenario[] = [
         SWEEP_WARMUP,
         (i) => {
           const on = i % 2 === 0;
-          a.chart.setHighlight(on ? 0 : null);
-          b.chart.setHighlight(on ? 0 : null);
+          a.chart.setHighlight(on ? 'value' : null);
+          b.chart.setHighlight(on ? 'value' : null);
         },
         () => {
           trackerA.sample();
@@ -435,20 +452,20 @@ export const scenarios: Scenario[] = [
       const initial = genTimeSeries(20_000);
       const handle = makeChart(
         o.stage,
-        { ...lineConfig, streaming: { maxLen: 50_000 } },
+        { ...lineConfig, streaming: { maxPoints: 50_000 } },
         initial,
       );
       await settleFrames();
       const tracker = new LayerTracker(handle.chart);
       const heapBefore = heapMB();
-      let lastX = initial[0][initial[0].length - 1];
+      let lastX = initial.columns.x[initial.columns.x.length - 1];
 
       const deltas = await measureFrames(
         SWEEP_STEPS,
         SWEEP_WARMUP,
         (i) => {
           const chunk = genAppendChunk(lastX, 200, i + 1);
-          lastX = chunk[0][chunk[0].length - 1];
+          lastX = chunk.columns.x[chunk.columns.x.length - 1];
           handle.chart.appendData(chunk);
         },
         () => tracker.sample(),
@@ -458,14 +475,14 @@ export const scenarios: Scenario[] = [
       const layers = tracker.result();
       const result: ScenarioResult = {
         name: 'append-stream-50k-window',
-        valid: handle.chart.getData()[0].length === 50_000 && layers.data.renders > 0,
+        valid: retainedPoints(handle.chart) === 50_000 && layers.data.renders > 0,
         frame: summarizeFrames(deltas),
         layers,
         heapDeltaMB:
           heapBefore !== null && heapAfter !== null
             ? Math.round((heapAfter - heapBefore) * 100) / 100
             : null,
-        meta: { finalPoints: handle.chart.getData()[0].length },
+        meta: { finalPoints: retainedPoints(handle.chart) },
       };
       handle.destroy();
       return result;

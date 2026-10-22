@@ -3,13 +3,13 @@
 //
 //   node scripts/generate-api-docs.mjs
 //
-// Reads packages/snaplot/src/types.ts (and the solid entry types) with
+// Reads packages/snaplot/src/api/types.ts (and the solid entry types) with
 // the TypeScript compiler API and writes site/src/pages/docs/api.gen.json:
 //
 //   {
-//     methods:  [{ name, signature, doc }]      // ChartInstance members
-//     events:   [{ name, signature, doc }]      // ChartEventMap members
-//     scatter:  [{ name, type, doc, optional }] // scatter fields on SeriesConfig
+//     methods:  [{ name, signature, doc }]      // ChartHandle members
+//     events:   [{ name, signature, doc }]      // ChartEvents members
+//     scatter:  [{ name, type, doc, optional }] // scatter fields on SeriesOptions
 //     types:    [{ name, kind, doc }]           // exported types from 'snaplot'
 //     solidTypes: [{ name, kind, doc }]         // exported types from 'snaplot/solid'
 //   }
@@ -29,14 +29,13 @@ const outFile = join(root, 'site', 'src', 'pages', 'docs', 'api.gen.json');
 // Scatter-specific fields of SeriesConfig, in display order. Curated here
 // (not in the site) so the generator is the single source of the section.
 const SCATTER_FIELDS = [
-  'xDataIndex',
-  'yDataIndex',
+  'x',
+  'y',
   'renderMode',
   'pointShape',
   'colorBy',
   'sizeBy',
   'tooltipFields',
-  'heatmap',
   'heatmapBinSize',
   'heatmapGradient',
 ];
@@ -110,40 +109,40 @@ function reExportedNames(entryFile) {
   return names;
 }
 
-const typesSource = parse(join(root, 'packages/snaplot/src/types.ts'));
-
-const methods = interfaceMembers(typesSource, 'ChartInstance');
-const events = interfaceMembers(typesSource, 'ChartEventMap');
-const seriesMembers = interfaceMembers(typesSource, 'SeriesConfig');
-const allTypes = exportedTypes(typesSource);
-
-// Only list types that actually reach consumers through the package entry.
-// index.ts is `export * from './core'`, so core.ts holds the named list.
+const apiPath = join(root, 'packages/snaplot/src/api/types.ts');
+const typesSource = parse(apiPath);
+const engineSource = parse(join(root, 'packages/snaplot/src/types.ts'));
+const methods = interfaceMembers(typesSource, 'ChartHandle');
+const events = interfaceMembers(typesSource, 'ChartEvents');
+const allTypes = [...exportedTypes(typesSource), ...exportedTypes(engineSource)];
 const indexNames = reExportedNames(join(root, 'packages/snaplot/src/core.ts'));
-const types = allTypes.filter((t) => indexNames.has(t.name));
-
-// Solid entry: collect exported types from the solid source files that the
-// entry re-exports, keyed off the entry's named export list.
-const solidNames = reExportedNames(join(root, 'packages/snaplot/src/solid.ts'));
-const solidTypes = [];
-for (const file of [
-  'packages/snaplot/src/solid/LegendTable.tsx',
-  'packages/snaplot/src/solid/createChartGroup.ts',
-  'packages/snaplot/src/solid/createChart.ts',
-]) {
-  try {
-    for (const t of exportedTypes(parse(join(root, file)))) {
-      if (solidNames.has(t.name)) solidTypes.push(t);
-    }
-  } catch {
-    // Optional file; the emptiness check below is the real guard.
-  }
+const types = [...new Map(allTypes.filter(t => indexNames.has(t.name)).reverse().map(t => [t.name, t])).values()];
+function frameworkTypes(framework) {
+  const names = reExportedNames(join(root, `packages/snaplot/src/${framework}.ts`));
+  const files = framework === 'react'
+    ? ['react/Chart.ts', 'react/legends.ts', 'react/shared.ts', 'api/types.ts']
+    : ['solid/Chart.tsx', 'solid/LegendTable.tsx', 'solid/SeriesLegend.tsx', 'react/shared.ts', 'api/types.ts'];
+  return files.flatMap(file => exportedTypes(parse(join(root, 'packages/snaplot/src', file)))).filter(type => names.has(type.name));
 }
+const solidTypes = frameworkTypes('solid');
+const reactTypes = frameworkTypes('react');
+// Resolve inherited and discriminated series fields through TypeScript itself.
+const program = ts.createProgram([apiPath], { target: ts.ScriptTarget.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext, skipLibCheck: true });
+const checker = program.getTypeChecker();
+const source = program.getSourceFile(apiPath);
+const declaration = source.statements.find(node => ts.isTypeAliasDeclaration(node) && node.name.text === 'SeriesOptions');
+const union = checker.getTypeAtLocation(declaration);
+const scatterType = union.types.find(type => {
+  const prop = type.getProperty('type');
+  return prop && checker.typeToString(checker.getTypeOfSymbolAtLocation(prop, declaration)) === '"scatter"';
+});
+const scatter = SCATTER_FIELDS.flatMap(name => {
+  const prop = scatterType?.getProperty(name);
+  if (!prop) return [];
+  return [{ name, type: checker.typeToString(checker.getTypeOfSymbolAtLocation(prop, declaration), undefined, ts.TypeFormatFlags.NoTruncation), doc: ts.displayPartsToString(prop.getDocumentationComment(checker)), optional: !!(prop.flags & ts.SymbolFlags.Optional) }];
+});
 
-const scatter = (seriesMembers ?? []).filter((m) => SCATTER_FIELDS.includes(m.name));
-scatter.sort((a, b) => SCATTER_FIELDS.indexOf(a.name) - SCATTER_FIELDS.indexOf(b.name));
-
-const sections = { methods, events, scatter, types, solidTypes };
+const sections = { methods, events, scatter, types, solidTypes, reactTypes };
 for (const [key, value] of Object.entries(sections)) {
   if (!value || value.length === 0) {
     console.error(`generate-api-docs: extracted 0 entries for "${key}" - did a declaration move or get renamed?`);

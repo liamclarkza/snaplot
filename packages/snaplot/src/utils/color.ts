@@ -74,3 +74,49 @@ export function withAlpha(color: string, alpha: number): string {
   if (!rgb) return color;
   return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
 }
+
+/**
+ * Flatten a stroke onto the opaque chart surface before painting it. Painting
+ * the resulting opaque color keeps grid intersections from accumulating alpha.
+ */
+export function opaqueColorOnBackground(color: string, opacity: number, background: string): string {
+  const foreground = parseColor(color);
+  const surface = parseColor(background);
+  const alpha = Math.max(0, Math.min(1, opacity));
+  if (foreground && surface) {
+    const normalized = color.trim().toLowerCase();
+    let sourceAlpha = normalized === 'transparent' ? 0 : 1;
+    if (/^#[\da-f]{4}$/i.test(normalized)) sourceAlpha = parseInt(normalized[4], 16) / 15;
+    else if (/^#[\da-f]{8}$/i.test(normalized)) sourceAlpha = parseInt(normalized.slice(7), 16) / 255;
+    else {
+      const match = normalized.match(/(?:\/|,\s*[\d.]+\s*,\s*[\d.]+\s*,)\s*([\d.]+%?)\s*\)$/);
+      if (match) sourceAlpha = match[1].endsWith('%') ? parseFloat(match[1]) / 100 : Number(match[1]);
+    }
+    const combined = alpha * Math.max(0, Math.min(1, sourceAlpha));
+    return `rgb(${foreground.map((channel, i) => Math.round(surface[i] + (channel - surface[i]) * combined)).join(',')})`;
+  }
+
+  // Per-axis colors may use CSS color spaces that aren't in the small parser.
+  // Cache the browser's conversion so pan/zoom frames do not read back pixels.
+  const key = `${color}|${alpha}|${background}`;
+  const cached = opaqueColorCache.get(key);
+  if (cached) return cached;
+  if (typeof document === 'undefined') return color;
+  colorProbe ??= document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  if (!colorProbe) return color;
+  colorProbe.canvas.width = 1;
+  colorProbe.canvas.height = 1;
+  colorProbe.fillStyle = background;
+  colorProbe.fillRect(0, 0, 1, 1);
+  colorProbe.globalAlpha = alpha;
+  colorProbe.fillStyle = color;
+  colorProbe.fillRect(0, 0, 1, 1);
+  const pixel = colorProbe.getImageData(0, 0, 1, 1).data;
+  const result = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
+  if (opaqueColorCache.size >= 128) opaqueColorCache.clear();
+  opaqueColorCache.set(key, result);
+  return result;
+}
+
+const opaqueColorCache = new Map<string, string>();
+let colorProbe: CanvasRenderingContext2D | null | undefined;

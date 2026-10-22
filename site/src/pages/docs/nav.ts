@@ -60,6 +60,7 @@ export const GROUPS: DocsGroup[] = [
       { id: 'linear-scale', label: 'Linear Scale' },
       { id: 'log-scale', label: 'Log Scale' },
       { id: 'time-scale', label: 'Time Scale' },
+      { id: 'category-scale', label: 'Category Scale' },
       { id: 'tick-format', label: 'Custom Tick Formatting' },
     ],
   },
@@ -133,7 +134,7 @@ export const GROUPS: DocsGroup[] = [
     slug: 'api',
     label: 'API Reference',
     items: [
-      { id: 'api-methods', label: 'ChartInstance Methods' },
+      { id: 'api-methods', label: 'ChartHandle Methods' },
       { id: 'api-events', label: 'Events' },
       { id: 'api-scatter-options', label: 'Scatter Options' },
       { id: 'api-types', label: 'Types' },

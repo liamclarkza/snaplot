@@ -2,6 +2,11 @@
 
 Three independent SolidJS applications exercise Snaplot in realistic product layouts. They live in the documentation-site workspace so they resolve the local `snaplot` package during development.
 
+A separate [React comparison lab](experiments/chart-lab/README.md) now exercises
+UAV, F1, ML, airport and biology dashboards across Snaplot, Chart.js, Recharts
+and ECharts. Its [evaluation](experiments/chart-lab/EVALUATION.md) extends this
+dogfood work with common-fixture comparisons and an unpublished React adapter.
+
 ## Run locally
 
 ```bash

@@ -37,9 +37,9 @@ Performance panel while clicking a scenario button.
 
 - `scatter-render-{10k,50k,200k}`: full-pipeline redraw per frame at rest.
 - `scatter-pan-{50k,200k}` / `scatter-zoom-{50k,200k}`: scripted viewport
-  sweeps through `setAxis`, the same path pan/zoom gestures drive. This is
+  sweeps through `setViewport`, the same path pan/zoom gestures drive. This is
   the headline mobile-jank scenario.
-- `scatter-offaxis-pan-50k`: scatter with `xDataIndex` pointing at an
+- `scatter-offaxis-pan-50k`: scatter with an `x` field referencing an
   unsorted column, where sorted-X culling cannot apply.
 - `scatter-encoded-pan-50k`: `colorBy` + `sizeBy` variable-style path.
 - `heatmap-pan-300k`: density-mode scatter under viewport changes.
@@ -89,3 +89,5 @@ this work deliberately did not target.
 - Numbers are machine-specific. Compare runs from the same machine only;
   `compare.mjs` exists for exactly that, and applies a 2ms floor so
   sub-millisecond noise cannot fail a build.
+
+The `independent-lines-pan-75k` workload pans two separately sampled named-column sources (50K and 25K points) without joining their X grids.

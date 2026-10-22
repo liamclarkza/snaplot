@@ -30,7 +30,7 @@ export default function SeriesOptions() {
         <Demo title="Edit the interpolation mode" desc="Change 'monotone' to 'step-after', 'linear', 'step-before', or 'step-middle'"
           data={d_interp()} height="220px"
           code={`{
-  series: [{ label: 'Signal', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2.5 }],
+  series: [{ label: 'Signal', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2.5 }],
 }`} />
       </Section>
 
@@ -43,9 +43,9 @@ export default function SeriesOptions() {
           data={d_styling()}
           code={`{
   series: [
-    { label: 'Thick', dataIndex: 1, type: 'line', stroke: '#e74c3c', lineWidth: 3, interpolation: 'monotone' },
-    { label: 'Dashed area', dataIndex: 2, type: 'area', stroke: '#2ecc71', opacity: 0.6, fillGradient: { top: 'rgba(46,204,113,0.3)', bottom: 'rgba(46,204,113,0.02)' }, interpolation: 'monotone', lineWidth: 2, lineDash: [8, 4] },
-    { label: 'Points', yDataIndex: 3, type: 'scatter', stroke: '#9b59b6', pointRadius: 4 },
+    { label: 'Thick', y: 'value1', type: 'line', stroke: '#e74c3c', lineWidth: 3, interpolation: 'monotone' },
+    { label: 'Dashed area', y: 'value2', type: 'area', stroke: '#2ecc71', opacity: 0.6, fillGradient: { top: 'rgba(46,204,113,0.3)', bottom: 'rgba(46,204,113,0.02)' }, interpolation: 'monotone', lineWidth: 2, lineDash: [8, 4] },
+    { label: 'Points', y: 'value3', type: 'scatter', stroke: '#9b59b6', pointRadius: 4 },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
@@ -62,9 +62,9 @@ export default function SeriesOptions() {
           code={`{
   axes: { x: { type: 'time' }, y: { type: 'linear' } },
   series: [
-    { label: 'Solid', dataIndex: 1, type: 'line', stroke: '#4f8fea', lineWidth: 2 },
-    { label: 'Dashed', dataIndex: 2, type: 'line', stroke: '#e69f00', lineWidth: 2, lineDash: [8, 4] },
-    { label: 'Dotted', dataIndex: 3, type: 'line', stroke: '#2ecc71', lineWidth: 2, lineDash: [2, 3] },
+    { label: 'Solid', y: 'value1', type: 'line', stroke: '#4f8fea', lineWidth: 2 },
+    { label: 'Dashed', y: 'value2', type: 'line', stroke: '#e69f00', lineWidth: 2, lineDash: [8, 4] },
+    { label: 'Dotted', y: 'value3', type: 'line', stroke: '#2ecc71', lineWidth: 2, lineDash: [2, 3] },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />
@@ -80,13 +80,13 @@ export default function SeriesOptions() {
         <Demo title="Sensor data with dropouts" desc="Step interpolation with NaN gaps at indices 12-16, 30-33, and 48-50"
           data={d_gap()}
           code={`{
-  series: [{ label: 'Sensor', dataIndex: 1, type: 'line', interpolation: 'step-after', lineWidth: 2 }],
+  series: [{ label: 'Sensor', y: 'value1', type: 'line', interpolation: 'step-after', lineWidth: 2 }],
 }`} />
       </Section>
 
       <Section id="dual-axis" title="Dual Y-Axis">
         <Prose>
-          Bind series to different Y axes using <code>yAxisKey</code>. Define a second Y axis with <code>position: 'right'</code> to render its axis on the right edge of the chart.
+          Bind series to different Y axes using <code>yAxis</code>. Define a second Y axis with <code>position: 'right'</code> to render its axis on the right edge of the chart.
         </Prose>
         <Demo title="Temperature + Humidity" data={d_dual()}
           code={`{
@@ -96,8 +96,8 @@ export default function SeriesOptions() {
     y2: { type: 'linear', position: 'right' },
   },
   series: [
-    { label: 'Temp (\u00b0C)', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 2, yAxisKey: 'y' },
-    { label: 'Humidity (%)', dataIndex: 2, type: 'area', interpolation: 'monotone', lineWidth: 1.5, yAxisKey: 'y2' },
+    { label: 'Temp (\u00b0C)', y: 'value1', type: 'line', interpolation: 'monotone', lineWidth: 2, yAxis: 'y' },
+    { label: 'Humidity (%)', y: 'value2', type: 'area', interpolation: 'monotone', lineWidth: 1.5, yAxis: 'y2' },
   ],
   tooltip: { show: true, mode: 'index' },
 }`} />

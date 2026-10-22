@@ -1,5 +1,5 @@
 import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
-import { createReferenceLinesPlugin, refinedDarkTheme, type ChartConfig, type ChartInstance, type ColumnarData } from 'snaplot';
+import { refinedDarkTheme, type ChartOptions, type ChartHandle, type ColumnData, type ReferenceLine } from 'snaplot';
 import { Chart, createChartGroup, LegendTable, SeriesLegend } from 'snaplot/solid';
 import { ChartCard, DogfoodShell, EmptyState, Metric, Segmented } from './DogfoodShell';
 import { mulberry32, pulseColumns, pulseHistogram, pulsePoints, serviceComparison, type PulsePoint } from './data';
@@ -20,78 +20,77 @@ export default function PulseOps() {
   const [windowSize, setWindowSize] = createSignal<'15m' | '30m' | '1h'>('30m');
   const [state, setState] = createSignal<PulseState>('live');
   const [latest, setLatest] = createSignal<PulsePoint>(pulsePoints(0, 360).at(-1)!);
-  const [legendChart, setLegendChart] = createSignal<ChartInstance>();
-  const group = createChartGroup();
-  const chartInstances = new Set<ChartInstance>();
-  const unlinkers: Array<() => void> = [];
+  const [legendChart, setLegendChart] = createSignal<ChartHandle<Record<string, number>>>();
+  const group = createChartGroup({ viewport: true, alignPlots: true });
+  const chartInstances = new Set<ChartHandle<Record<string, number>>>();
   const rand = mulberry32(0x0b5e7e);
   let sequence = 0;
 
   const basePoints = createMemo(() => pulsePoints(service(), 360));
-  const baseData = createMemo<ColumnarData>(() => {
+  const baseData = createMemo<ColumnData>(() => {
     if (state() === 'empty') return pulseColumns([]);
     return pulseColumns(basePoints(), state() === 'partial');
   });
 
   const follow = () => windowSize() === '15m' ? 900_000 : windowSize() === '30m' ? 1_800_000 : 3_600_000;
-  const shared = (config: ChartConfig): ChartConfig => group.apply({
+  const shared = (config: ChartOptions<Record<string, number>>): ChartOptions<Record<string, number>> => ({
+    group, x: 'time',
     ...config,
     theme: pulseTheme,
-    streaming: { maxLen: 720, follow: follow() },
+    streaming: { maxPoints: 720, followWindow: follow() },
     cursor: { show: true, indicators: true, syncTooltip: false },
     zoom: { enabled: true, x: true, y: false, bounds: 'data' },
     pan: { enabled: true, x: true },
-    tooltip: { show: true, mode: 'index', xFormat: (v) => timeLabel(v) },
+    tooltip: { show: true, mode: 'index', xFormat: timeLabel },
     padding: { top: 14, right: 18, bottom: 32, left: 54 },
-  }, { zoom: true });
+  });
 
-  const cpuRefs = createReferenceLinesPlugin({ lines: [
+  const cpuRefs: ReferenceLine[] = [
     { axis: 'y', value: 75, label: 'warning', color: '#f5b942', dash: [5, 4] },
     { axis: 'y', value: 90, label: 'critical', color: '#ff647c', dash: [5, 4] },
-  ] });
-  const latencyRefs = createReferenceLinesPlugin({ lines: [
+  ];
+  const latencyRefs: ReferenceLine[] = [
     { axis: 'y', value: 180, label: 'SLO 180 ms', color: '#f5b942', dash: [5, 4] },
-  ] });
-  const errorRefs = createReferenceLinesPlugin({ lines: [
+  ];
+  const errorRefs: ReferenceLine[] = [
     { axis: 'y', value: 2, label: 'budget 2%', color: '#ff647c', dash: [5, 4] },
-  ] });
+  ];
 
   const cpuConfig = createMemo(() => shared({
-    axes: { x: { type: 'time', tickCount: 5 }, y: { type: 'linear', min: 0, max: 100, tickFormat: (v) => `${v}%`, nice: true } },
+    axes: { x: { type: 'time', tickCount: 5 }, y: { type: 'linear', min: 0, max: 100, format: (v) => `${v}%`, roundBounds: true } },
     series: [
-      { label: 'CPU', dataIndex: 1, type: 'line', stroke: '#6de5c2', lineWidth: 2, interpolation: 'monotone' },
-      { label: 'Memory', dataIndex: 2, type: 'area', stroke: '#7e9cff', fillGradient: { top: 'rgba(126,156,255,.25)', bottom: 'rgba(126,156,255,.015)' }, lineWidth: 1.5 },
+      { label: 'CPU', y: 'cpu', type: 'line', stroke: '#6de5c2', lineWidth: 2, interpolation: 'monotone' },
+      { label: 'Memory', y: 'memory', type: 'area', stroke: '#7e9cff', fillGradient: { top: 'rgba(126,156,255,.25)', bottom: 'rgba(126,156,255,.015)' }, lineWidth: 1.5 },
     ],
-    plugins: [cpuRefs],
-    tooltip: { yFormat: (v) => `${v.toFixed(1)}%` },
+    referenceLines: cpuRefs,
+    tooltip: { yFormat: (v) => `${Number(v).toFixed(1)}%` },
   }));
   const latencyConfig = createMemo(() => shared({
-    axes: { x: { type: 'time', tickCount: 5 }, y: { type: 'linear', min: 0, tickFormat: (v) => `${v}ms`, nice: true } },
+    axes: { x: { type: 'time', tickCount: 5 }, y: { type: 'linear', min: 0, format: (v) => `${v}ms`, roundBounds: true } },
     series: [
-      { label: 'Expected range', type: 'band', dataIndex: 6, upperDataIndex: 7, lowerDataIndex: 8, stroke: '#9b87f5', fill: '#9b87f5', opacity: 0.16 },
-      { label: 'p95 latency', dataIndex: 3, type: 'line', stroke: '#f4ca64', lineWidth: 2.2, interpolation: 'monotone', spanGaps: false },
+      { label: 'Expected range', type: 'band', y: 'forecast', upper: 'upper', lower: 'lower', stroke: '#9b87f5', fill: '#9b87f5', opacity: 0.16 },
+      { label: 'p95 latency', y: 'latency', type: 'line', stroke: '#f4ca64', lineWidth: 2.2, interpolation: 'monotone', spanGaps: false },
     ],
-    plugins: [latencyRefs],
-    tooltip: { yFormat: (v) => `${v.toFixed(0)} ms` },
+    referenceLines: latencyRefs,
+    tooltip: { yFormat: (v) => `${Number(v).toFixed(0)} ms` },
   }));
   const trafficConfig = createMemo(() => shared({
     axes: {
       x: { type: 'time', tickCount: 5 },
-      y: { type: 'linear', min: 0, tickFormat: (v) => `${(v / 1000).toFixed(1)}k`, nice: true },
-      y2: { type: 'linear', position: 'right', min: 0, max: 4, tickFormat: (v) => `${v}%` },
+      y: { type: 'linear', min: 0, format: (v) => `${(Number(v) / 1000).toFixed(1)}k`, roundBounds: true },
+      y2: { type: 'linear', position: 'right', min: 0, max: 4, format: (v) => `${v}%` },
     },
     series: [
-      { label: 'Requests', dataIndex: 4, type: 'area', stroke: '#57b8ff', fillGradient: { top: 'rgba(87,184,255,.28)', bottom: 'rgba(87,184,255,.02)' }, lineWidth: 1.6 },
-      { label: 'Errors', dataIndex: 5, type: 'line', yAxisKey: 'y2', stroke: '#ff647c', lineWidth: 2 },
+      { label: 'Requests', y: 'requests', type: 'area', stroke: '#57b8ff', fillGradient: { top: 'rgba(87,184,255,.28)', bottom: 'rgba(87,184,255,.02)' }, lineWidth: 1.6 },
+      { label: 'Errors', y: 'errors', type: 'line', yAxis: 'y2', stroke: '#ff647c', lineWidth: 2 },
     ],
-    plugins: [errorRefs],
-    tooltip: { yFormat: (v, i) => i === 1 ? `${v.toFixed(2)}%` : `${Math.round(v)} req/s` },
+    referenceLines: errorRefs,
+    tooltip: { yFormat: (v, i) => i === 'errors' ? `${Number(v).toFixed(2)}%` : `${Math.round(Number(v))} req/s` },
     padding: { top: 14, right: 56, bottom: 32, left: 54 },
   }));
 
-  const register = (chart: ChartInstance, legend = false) => {
+  const register = (chart: ChartHandle<Record<string, number>>, legend = false) => {
     chartInstances.add(chart);
-    unlinkers.push(group.link(chart, { yDomain: false, gutters: true }));
     if (legend) setLegendChart(chart);
   };
 
@@ -118,7 +117,7 @@ export default function PulseOps() {
     }, 1000);
     onCleanup(() => window.clearInterval(timer));
   });
-  onCleanup(() => unlinkers.forEach((unlink) => { unlink(); }));
+  onCleanup(() => chartInstances.clear());
 
   const changeService = (value: string) => {
     const index = services.indexOf(value);
@@ -151,22 +150,22 @@ export default function PulseOps() {
         <div class="pulse-layout">
           <div class="pulse-main">
             <ChartCard title="Resource pressure" subtitle="CPU and memory utilization" meta={<span class="chart-hint">Drag to zoom · Shift-drag to pan</span>}>
-              <div class="df-chart df-chart-lg"><Chart config={cpuConfig()} data={baseData()} onReady={(c) => register(c)} /></div>
+              <div class="df-chart df-chart-lg"><Chart {...cpuConfig()} data={baseData()} onReady={(c) => register(c)} /></div>
               <StateOverlay state={state()} />
             </ChartCard>
-            <ChartCard title="Request latency" subtitle="p95 against predicted operating envelope" meta={<div class="grid-chart-meta"><Show when={legendChart()}>{chart => <SeriesLegend chart={chart()} />}</Show><span>SLO 180 ms</span></div>}>
-              <div class="df-chart df-chart-lg"><Chart config={latencyConfig()} data={baseData()} onReady={(c) => register(c, true)} /></div>
+            <ChartCard title="Request latency" subtitle="p95 against predicted operating envelope" meta={<div class="grid-chart-meta"><Show when={legendChart()}>{chart => <SeriesLegend chart={chart} />}</Show><span>SLO 180 ms</span></div>}>
+              <div class="df-chart df-chart-lg"><Chart {...latencyConfig()} data={baseData()} onReady={(c) => register(c, true)} /></div>
               <StateOverlay state={state()} />
             </ChartCard>
             <ChartCard title="Traffic & errors" subtitle="Dual-axis service health">
-              <div class="df-chart df-chart-lg"><Chart config={trafficConfig()} data={baseData()} onReady={(c) => register(c)} /></div>
+              <div class="df-chart df-chart-lg"><Chart {...trafficConfig()} data={baseData()} onReady={(c) => register(c)} /></div>
               <StateOverlay state={state()} />
             </ChartCard>
           </div>
           <aside class="pulse-side">
-            <ChartCard title="Cursor details" subtitle="Synced to request latency"><LegendTable chart={legendChart} fallback="latest" showStepHeader formatStep={timeLabel} /></ChartCard>
-            <ChartCard title="Latency distribution" subtitle="Last 30 minutes"><div class="df-chart df-chart-sm"><Chart config={{ theme: pulseTheme, axes: { x: { type: 'linear', tickFormat: (v) => `${v.toFixed(0)}ms` }, y: { type: 'linear' } }, series: [{ label: 'Samples', type: 'histogram', dataIndex: 1, fill: '#9b87f5' }], tooltip: { mode: 'x' }, padding: compactChartPadding }} data={pulseHistogram(basePoints().slice(-180))} /></div></ChartCard>
-            <ChartCard title="Regional availability" subtitle="Current vs previous window"><div class="df-chart df-chart-sm"><Chart config={{ theme: pulseTheme, axes: { x: { type: 'linear', ticks: [0,1,2,3], tickFormat: (v) => ['JHB','FRA','IAD','SIN'][v] ?? '', grid: false }, y: { type: 'linear', min: 99.8, max: 100, tickFormat: (v) => `${v.toFixed(1)}%` } }, series: [{ label: 'Current', type: 'bar', dataIndex: 1, fill: '#6de5c2' }, { label: 'Previous', type: 'bar', dataIndex: 2, fill: '#40506c' }], tooltip: { mode: 'index', yFormat: (v) => `${v.toFixed(2)}%` }, padding: compactChartPadding }} data={serviceComparison} /></div></ChartCard>
+            <ChartCard title="Cursor details" subtitle="Synced to request latency"><LegendTable chart={legendChart} fallback="latest" showStepHeader formatStep={(value) => timeLabel(Number(value))} /></ChartCard>
+            <ChartCard title="Latency distribution" subtitle="Last 30 minutes"><div class="df-chart df-chart-sm"><Chart {...{ theme: pulseTheme, axes: { x: { type: 'linear', format: (v) => `${Number(v).toFixed(0)}ms` }, y: { type: 'linear' } }, series: [{ id: 'samples', label: 'Samples', type: 'histogram', data: pulseHistogram(basePoints().slice(-180)), fill: '#9b87f5' }], tooltip: { mode: 'x' }, padding: compactChartPadding }} /></div></ChartCard>
+            <ChartCard title="Regional availability" subtitle="Current vs previous window"><div class="df-chart df-chart-sm"><Chart {...{ theme: pulseTheme, axes: { x: { type: 'linear', ticks: [0,1,2,3], format: (v) => ['JHB','FRA','IAD','SIN'][Number(v)] ?? '', grid: false }, y: { type: 'linear', min: 99.8, max: 100, format: (v) => `${Number(v).toFixed(1)}%` } }, series: [{ label: 'Current', type: 'bar', y: 'current', fill: '#6de5c2' }, { label: 'Previous', type: 'bar', y: 'previous', fill: '#40506c' }], tooltip: { mode: 'index', yFormat: (v) => `${Number(v).toFixed(2)}%` }, padding: compactChartPadding }} x="region" data={serviceComparison} /></div></ChartCard>
           </aside>
         </div>
       </div>

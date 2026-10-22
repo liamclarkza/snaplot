@@ -98,8 +98,8 @@ export interface Layout {
 // ============================================================
 
 /**
- * Mark type for a series. `band` needs `upperDataIndex`/`lowerDataIndex`;
- * `histogram` expects pre-binned N+1 edges data. Defaults to `line`.
+ * Mark type for a series. Public bands name `lower` and `upper` fields;
+ * histogram series consume explicit binning results. Defaults to `line`.
  */
 export type ChartType = 'line' | 'area' | 'band' | 'scatter' | 'bar' | 'histogram';
 
@@ -127,6 +127,8 @@ export interface ScatterColorEncoding {
    * otherwise uses a continuous ramp. Default: `auto`.
    */
   type?: ScatterColorEncodingType;
+  /** Internal stable category codes supplied by row preparation. */
+  categoryValues?: readonly number[];
   /** Palette/ramp override for this encoding. */
   palette?: string[];
   /** Numeric domain for continuous/diverging encodings. */
@@ -219,7 +221,7 @@ export interface SeriesConfig<TMeta = unknown> {
   pointRadius?: number;
   /**
    * Mark opacity, 0 to 1. Defaults are type-specific (line/area outline 1,
-   * bar 0.85, histogram 0.75, band fill 0.15). Multiplied by highlight dimming.
+   * bar 0.75, histogram 0.75, band fill 0.15). Multiplied by highlight dimming.
    */
   opacity?: number;
 
@@ -376,7 +378,7 @@ export interface AxisTickMarksConfig {
   length?: number;
   /** Which side of the plot border the mark extends toward. Default: `'out'`. */
   direction?: 'out' | 'in' | 'both';
-  /** Mark color. Default: `theme.tickColor`. */
+  /** Mark color. Default: `theme.axisLineColor` at `theme.gridOpacity`. An explicit color is opaque. */
   color?: string;
 }
 
@@ -407,11 +409,12 @@ export interface AxisConfig {
    */
   padding?: number;
   /**
-   * Whether to call `scale.nice(DEFAULT_TICK_COUNT)` after auto-ranging,
-   * which rounds the bounds outward to produce clean tick boundaries.
-   * Default: `false`, so padded data bounds stay exact and predictable.
-   * Set `nice: true` to opt into rounded presentation bounds. Always skipped
-   * for bar/histogram X axes where exact-boundary rendering is required.
+   * Whether to round auto-ranged bounds outward to clean 1/2/5 tick
+   * boundaries. Linear continuous axes use this by default; set `nice: false`
+   * to keep padded data bounds exact. Log axes remain opt-in with
+   * `nice: true`, and time axes do not use this switch. Automatic linear bar
+   * X axes use regular tick centers with half-interval outer grid cells;
+   * `nice: false` retains category-edge padding. Histogram X bounds stay exact.
    */
   nice?: boolean;
   /**
@@ -428,10 +431,10 @@ export interface AxisConfig {
   tickFormat?: (value: number) => string;
   /**
    * Target tick density. Scales treat it as a hint (nice-number rounding
-   * still applies on linear axes); bar and histogram category ticks treat
-   * it as a hard cap and thin evenly to stay under it. Default: 6, and
-   * bar/histogram X ticks additionally auto-thin to the plot width so a
-   * year of daily bars does not label every day.
+   * still applies on linear axes, including automatic bar grids). Default: 6.
+   * Bar labels can thin independently of their slot-boundary grid. Histogram
+   * and exact-bound bar category ticks treat it as a cap and also thin to fit
+   * the plot width, so a year of daily bars does not label every day.
    */
   tickCount?: number;
   /**
@@ -448,8 +451,9 @@ export interface AxisConfig {
    */
   grid?: boolean | AxisGridConfig;
   /**
-   * Short marks connecting visible tick labels to their exact axis positions.
-   * Uses the same final, thinned tick set as labels. Default: `true`.
+   * Short marks at axis grid positions. Continuous axes follow their visible
+   * tick labels; automatic bar axes mark slot boundaries around center labels.
+   * Default: `true`.
    */
   tickMarks?: boolean | AxisTickMarksConfig;
 }
@@ -788,6 +792,8 @@ export interface LegendItem<TMeta = unknown> {
  * at a given X index, plus everything the legend table needs to render it.
  */
 export interface CursorSeriesPoint<TMeta = unknown> {
+  /** Actual X coordinate sampled from this series source. */
+  dataX?: number;
   /** Index of this series in `ChartConfig.series` (stable across cursor moves). */
   seriesIndex: number;
   /** X-column index this row was sampled at (same for every row in a snapshot). */
@@ -1087,13 +1093,15 @@ export interface ThemeConfig {
    * to copy the nearest non-transparent ancestor background color.
    */
   backgroundColor: string;
-  /** Axis label / tick text color. Themes keep this off pure black/white for contrast comfort. */
+  /** Primary text color for DOM companions. Axis text uses axisLabelColor when set. */
   textColor: string;
+  /** Shared axis title and tick-label color. Built-in themes use the muted text color. */
+  axisLabelColor?: string;
   /** CSS font stack for all axis and tooltip text. */
   fontFamily: string;
   /** Base text size in CSS pixels. Built-in themes use 11. */
   fontSize: number;
-  /** Gridline hue. Combined with `gridOpacity`; the border shares this hue at a higher opacity. */
+  /** Gridline hue. Combined with gridOpacity. Built-in frames share this hue and opacity. */
   gridColor: string;
   /** Gridline opacity, 0 to 1. Kept low so lines sit beneath the data. */
   gridOpacity: number;
@@ -1121,8 +1129,8 @@ export interface ThemeConfig {
   axisLineColor: string;
   /**
    * Plot-area frame. Kept separate from `axisLineColor` so you can tune
-   * the rectangle around the plot without touching axis ticks. Typically
-   * the same hue as the grid but more opaque, see `borderOpacity`.
+   * the rectangle around the plot without touching axis ticks. Built-in
+   * themes use the same hue and opacity as the grid.
    */
   borderColor: string;
   /**
@@ -1131,7 +1139,7 @@ export interface ThemeConfig {
    * while sharing its hue.
    */
   borderOpacity: number;
-  /** Color of the short tick marks along each axis. */
+  /** Muted companion text color. Built-in themes also use this hue for axisLabelColor. */
   tickColor: string;
   /** Default crosshair line color, overridable per chart via `cursor.color`. */
   crosshairColor: string;
@@ -1374,6 +1382,8 @@ export type CursorEventOrigin = 'local' | 'sync' | 'programmatic';
 
 /** Event name to handler-signature map for `chart.on()`. */
 export interface ChartEventMap {
+  /** A non-drag activation hit an actual data point or bar. */
+  'point:click': (point: TooltipPoint) => void;
   /** Cursor moved or left (null args on leave). Fires on the cursor hot path. */
   'cursor:move': (
     dataX: number | null,

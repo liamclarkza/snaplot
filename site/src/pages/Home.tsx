@@ -1,7 +1,7 @@
 import { createSignal, createMemo, onCleanup } from 'solid-js';
 import { createLegendPlugin, darkTheme, lightTheme } from 'snaplot';
 import { Chart } from 'snaplot/solid';
-import type { ColumnarData, ChartConfig } from 'snaplot';
+import type { ColumnData, ChartOptions } from 'snaplot';
 import CodeBlock from '../components/CodeBlock';
 import { Button } from '../components/ui';
 import { useTheme } from '../ThemeContext';
@@ -42,7 +42,7 @@ function stepCores(prev: CoreState): CoreState {
   return next;
 }
 
-function generateCores(): { data: ColumnarData; tail: CoreState } {
+function generateCores(): { data: ColumnData; tail: CoreState } {
   const now = Date.now();
   const x = new Float64Array(WINDOW_POINTS);
   const c0 = new Float64Array(WINDOW_POINTS);
@@ -58,26 +58,25 @@ function generateCores(): { data: ColumnarData; tail: CoreState } {
     c2[i] = s[2];
     c3[i] = s[3];
   }
-  return { data: [x, c0, c1, c2, c3], tail: s };
+  return { data: { columns: { x, value1: c0, value2: c1, value3: c2, value4: c3 } }, tail: s };
 }
 
-const heroCode = `import { createLegendPlugin } from 'snaplot';
-import { Chart } from 'snaplot/solid';
+const heroCode = `import { Chart, SeriesLegend } from 'snaplot/solid';
 
 <Chart
-  config={{
-    axes: { x: { type: 'time' }, y: { type: 'linear', min: 0, max: 100 } },
-    series: [
-      { label: 'Core 0', dataIndex: 1, type: 'line', interpolation: 'monotone' },
-      { label: 'Core 1', dataIndex: 2, type: 'line', interpolation: 'monotone' },
-      { label: 'Core 2', dataIndex: 3, type: 'line', interpolation: 'monotone' },
-      { label: 'Core 3', dataIndex: 4, type: 'line', interpolation: 'monotone' },
-    ],
-    tooltip: { show: true, mode: 'index' },
-    plugins: [createLegendPlugin({ position: 'bottom' })],
-  }}
-  data={[times, core0, core1, core2, core3]}
-/>`;
+  data={{ columns: { time: times, core0, core1, core2, core3 } }}
+  x="time"
+  axes={{ x: { type: 'time' }, y: { min: 0, max: 100 } }}
+  series={[
+    { y: 'core0', label: 'Core 0', interpolation: 'monotone' },
+    { y: 'core1', label: 'Core 1', interpolation: 'monotone' },
+    { y: 'core2', label: 'Core 2', interpolation: 'monotone' },
+    { y: 'core3', label: 'Core 3', interpolation: 'monotone' },
+  ]}
+  tooltip={{ mode: 'index' }}
+  onReady={setChart}
+/>
+<SeriesLegend chart={chart()} />`;
 
 type Stat = { value: string; label: string };
 const stats: Stat[] = [
@@ -89,7 +88,7 @@ const stats: Stat[] = [
 
 export default function Home() {
   const initial = generateCores();
-  const [chartData, setChartData] = createSignal<ColumnarData>(initial.data);
+  const [chartData, setChartData] = createSignal<ColumnData>(initial.data);
   let tail: CoreState = initial.tail;
   const { theme } = useTheme();
 
@@ -103,7 +102,7 @@ export default function Home() {
       ? ['#4e79a7', '#59a14f', '#f28e2b', '#e15759']
       : ['#7aa2f7', '#9ece6a', '#ff9e64', '#f7768e'];
 
-  const heroConfig = createMemo<ChartConfig>(() => {
+  const heroConfig = createMemo<ChartOptions>(() => {
     const p = palette();
     return {
       theme: theme() === 'light' ? lightTheme : darkTheme,
@@ -113,14 +112,14 @@ export default function Home() {
           type: 'linear',
           min: 0,
           max: 100,
-          tickFormat: (v: number) => `${v}%`,
+          format: (v: number) => `${v}%`,
         },
       },
       series: [
-        { label: 'Core 0', dataIndex: 1, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[0] },
-        { label: 'Core 1', dataIndex: 2, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[1] },
-        { label: 'Core 2', dataIndex: 3, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[2] },
-        { label: 'Core 3', dataIndex: 4, type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[3] },
+        { label: 'Core 0', y: "value1", type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[0] },
+        { label: 'Core 1', y: "value2", type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[1] },
+        { label: 'Core 2', y: "value3", type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[2] },
+        { label: 'Core 3', y: "value4", type: 'line', interpolation: 'monotone', lineWidth: 1.5, stroke: p[3] },
       ],
       cursor: { show: true },
       zoom: { enabled: true, x: true },
@@ -135,10 +134,10 @@ export default function Home() {
   // demonstrates sustained repaint throughput, not just an append-to-tail
   // optimisation. Writing the signal is enough: the <Chart> data prop is
   // reactive and pushes the new column to the canvas on its own, so we do
-  // not (and must not) also call chart.setData here.
+  // not (and must not) also call chart.update here.
   const interval = setInterval(() => {
     setChartData((prev) => {
-      const [x, c0, c1, c2, c3] = prev;
+      const { x, value1: c0, value2: c1, value3: c2, value4: c3 } = prev.columns;
       const len = x.length;
       const nx = new Float64Array(len);
       const n0 = new Float64Array(len);
@@ -156,7 +155,7 @@ export default function Home() {
       n1[len - 1] = tail[1];
       n2[len - 1] = tail[2];
       n3[len - 1] = tail[3];
-      return [nx, n0, n1, n2, n3];
+      return { columns: { x: nx, value1: n0, value2: n1, value3: n2, value4: n3 } };
     });
   }, TICK_MS);
   onCleanup(() => clearInterval(interval));
@@ -272,7 +271,7 @@ export default function Home() {
             </div>
           </div>
           <div style={{ height: 'clamp(280px, 44vh, 380px)', padding: '8px 0 var(--space-2)' }}>
-            <Chart config={heroConfig()} data={chartData()} />
+            <Chart x="x" {...heroConfig()} data={chartData()} />
           </div>
         </ChartPanel>
       </section>
