@@ -1,0 +1,244 @@
+{
+  "date": "2026-09-17",
+  "browser": "Codex in-app Chromium",
+  "desktopViewport": {
+    "width": 1440,
+    "height": 960
+  },
+  "desktopStates": [
+    {
+      "scenario": "01 UAV ground station ↗",
+      "state": "ready",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Eyes on the flight."
+    },
+    {
+      "scenario": "01 UAV ground station ↗",
+      "state": "gaps",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Eyes on the flight."
+    },
+    {
+      "scenario": "01 UAV ground station ↗",
+      "state": "empty",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 12,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Eyes on the flight."
+    },
+    {
+      "scenario": "02 Formula 1 telemetry ↗",
+      "state": "ready",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Find the tenth."
+    },
+    {
+      "scenario": "02 Formula 1 telemetry ↗",
+      "state": "gaps",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Find the tenth."
+    },
+    {
+      "scenario": "02 Formula 1 telemetry ↗",
+      "state": "empty",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 12,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Find the tenth."
+    },
+    {
+      "scenario": "03 ML experiment tracker ↗",
+      "state": "ready",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Follow the signal."
+    },
+    {
+      "scenario": "03 ML experiment tracker ↗",
+      "state": "gaps",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Follow the signal."
+    },
+    {
+      "scenario": "03 ML experiment tracker ↗",
+      "state": "empty",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 12,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Follow the signal."
+    },
+    {
+      "scenario": "04 Airport operations ↗",
+      "state": "ready",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Keep the day moving."
+    },
+    {
+      "scenario": "04 Airport operations ↗",
+      "state": "gaps",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Keep the day moving."
+    },
+    {
+      "scenario": "04 Airport operations ↗",
+      "state": "empty",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 12,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Keep the day moving."
+    },
+    {
+      "scenario": "05 Biological experiment ↗",
+      "state": "ready",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Separate effect from noise."
+    },
+    {
+      "scenario": "05 Biological experiment ↗",
+      "state": "gaps",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 0,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Separate effect from noise."
+    },
+    {
+      "scenario": "05 Biological experiment ↗",
+      "state": "empty",
+      "alerts": [],
+      "canvases": 15,
+      "cards": 12,
+      "emptyOverlays": 12,
+      "invalidPaths": 0,
+      "overflow": false,
+      "svgs": 3,
+      "title": "Separate effect from noise."
+    }
+  ],
+  "mobileStates": [
+    {
+      "scenario": "01 UAV ground station",
+      "alerts": [],
+      "cards": 12,
+      "overflow": false,
+      "viewport": 390
+    },
+    {
+      "scenario": "02 Formula 1 telemetry",
+      "alerts": [],
+      "cards": 12,
+      "overflow": false,
+      "viewport": 390
+    },
+    {
+      "scenario": "03 ML experiment tracker",
+      "alerts": [],
+      "cards": 12,
+      "overflow": false,
+      "viewport": 390
+    },
+    {
+      "scenario": "04 Airport operations",
+      "alerts": [],
+      "cards": 12,
+      "overflow": false,
+      "viewport": 390
+    },
+    {
+      "scenario": "05 Biological experiment",
+      "alerts": [],
+      "cards": 12,
+      "overflow": false,
+      "viewport": 390
+    }
+  ],
+  "stress": {
+    "density": 2000,
+    "window": "final third (667 rows)",
+    "theme": "light",
+    "reactStrictMode": true,
+    "remounted": true,
+    "tick": "53",
+    "alerts": [],
+    "canvases": 15,
+    "hiddenButtons": 20,
+    "overflow": false
+  },
+  "limits": [
+    "DOM checks do not prove pixel-perfect rendering.",
+    "Screenshots are separate visual evidence.",
+    "This is not a performance or memory benchmark."
+  ]
+}

@@ -1,0 +1,24 @@
+
+#### desktop (baseline unknown -> current 2375f32)
+
+| scenario | base median | cur median | ratio | verdict |
+| :-- | --: | --: | --: | :-- |
+| scatter-render-10k | 25 | 25 | 1.00 | ok |
+| scatter-render-50k | 91.7 | 91.7 | 1.00 | ok |
+| scatter-render-200k | 366.7 | 358.5 | 0.98 | ok |
+| scatter-pan-50k | 16.6 | 8.3 | 0.50 | improved |
+| scatter-pan-200k | 16.6 | 8.3 | 0.50 | improved |
+| scatter-zoom-50k | 16.6 | 8.4 | 0.51 | improved |
+| scatter-zoom-200k | 16.6 | 8.3 | 0.50 | improved |
+| scatter-offaxis-pan-50k | 8.4 | 8.4 | 1.00 | ok |
+| scatter-encoded-pan-50k | 24 | 16.8 | 0.70 | ok |
+| heatmap-pan-300k | 8.3 | 8.3 | 1.00 | ok |
+| line-pan-200k | 8.3 | 8.3 | 1.00 | ok |
+| two-heatmaps-highlight-150k | 8.3 | 8.3 | 1.00 | ok |
+| append-stream-50k-window | 116.7 | 108.4 | 0.93 | ok |
+| hover-sweep-50k | 8.3 | 8.3 | 1.00 | ok |
+| touch-pan-gesture-50k | 8.3 | 8.3 | 1.00 | ok |
+| pinch-zoom-gesture-50k | 8.3 | 8.3 | 1.00 | ok |
+| wheel-zoom-gesture-50k | 8.3 | 8.3 | 1.00 | ok |
+
+no regressions beyond threshold

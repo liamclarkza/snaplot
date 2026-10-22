@@ -1,0 +1,18 @@
+.defaults-audit { background: #f3f5f7; color: #1c3039; padding: 28px; min-height: 100vh; }
+.defaults-audit header { max-width: 850px; }
+.defaults-audit header a { color: #167570; font-size: 12px; }
+.defaults-audit header > span { display: block; margin: 26px 0 12px; color: #647480; font: 11px monospace; letter-spacing: 2px; }
+.defaults-audit h1 { font-size: 32px; }
+.defaults-audit p { font-size: 13px; line-height: 1.7; color: #566773; }
+.audit-controls { display: flex; flex-wrap: wrap; gap: 16px; margin: 24px 0 16px; }
+.audit-controls label { display: grid; gap: 7px; font-size: 12px; }
+.audit-controls select { color: #1c3039; background: white; border: 1px solid #bac7cd; font-size: 12px; padding: 9px; }
+.audit-method { max-width: 1020px; }
+.audit-grid { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin: 24px 0; }
+.audit-card { background: white; border: 1px solid #d4dfe3; max-width: 100%; min-width: 0; }
+.audit-card h2 { padding: 14px; font-size: 15px; border-bottom: 1px solid #e3e9ed; margin: 0; }
+.audit-card small { display: block; color: #697c89; font-size: 10px; font-weight: 400; margin-top: 5px; }
+.audit-chart { position: relative; width: 100%; }
+.audit-checklist { max-width: 860px; }
+.audit-checklist li { font-size: 13px; line-height: 1.9; }
+@media (max-width: 500px) { .defaults-audit { padding: 16px; } .defaults-audit h1 { font-size: 27px; } }

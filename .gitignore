@@ -37,3 +37,6 @@ site/screenshots/
 .vercel/
 .netlify/
 .wrangler/
+
+# Comparison-lab screenshots are local evidence, not source
+experiments/chart-lab/evidence/*.png
