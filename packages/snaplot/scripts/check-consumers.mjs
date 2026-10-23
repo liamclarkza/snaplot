@@ -1,109 +1,146 @@
-import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+// Consumer checks (plan §11.3 G5): pack the built package, install the tarball into a throwaway
+// consumer project and use it the way applications do. The scenarios live in test/consumers/ and
+// run under vitest inside that project, so expected failures are ordinary `it.fails('[id] …')`.
+//
+//   node scripts/check-consumers.mjs [--keep] [--filter <test name text>]
+//
+// The consumer lives in the OS temp directory, outside the repository, so nothing resolves through
+// the workspace's node_modules by accident. node_modules/snaplot is the extracted `npm pack`
+// tarball (exactly the published files); the other packages are symlinks to the workspace's copies.
+import { spawnSync } from 'node:child_process';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve, dirname } from 'node:path';
-import ts from 'typescript';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
-import { createElement } from 'react';
-import { renderToString as reactSSR } from 'react-dom/server';
-import { createComponent } from 'solid-js';
-import { renderToString as solidSSR } from 'solid-js/web';
-import { Chart as ReactChart } from 'snaplot/react';
-import { Chart as SolidChart } from 'snaplot/solid';
-const options = {
-  data: [{ x: 1, y: 2 }],
-  x: 'x',
-  series: [{ y: 'y' }],
-  ariaLabel: 'Consumer chart',
-};
-assert.match(reactSSR(createElement(ReactChart, options)), /aria-label="Consumer chart"/);
-assert.match(
-  solidSSR(() => createComponent(SolidChart, options)),
-  /aria-label="Consumer chart"/,
-);
-const packageRoot = fileURLToPath(new URL('../', import.meta.url));
-// Traverse emitted static imports/re-exports and literal dynamic imports. Importing
-// the core must never resolve either optional framework peer.
-const visited = new Set();
-function inspectCore(file) {
-  if (visited.has(file)) return;
-  visited.add(file);
-  const source = ts.createSourceFile(
-    file,
-    readFileSync(file, 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.JS,
-  );
-  function check(specifier) {
-    assert.ok(
-      !/^(react|react-dom|solid-js)(\/|$)/.test(specifier),
-      `Core loads optional framework: ${specifier}`,
-    );
-    if (specifier.startsWith('.')) inspectCore(resolve(dirname(file), specifier));
-  }
-  function visit(node) {
-    if (
-      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
-      node.moduleSpecifier &&
-      ts.isStringLiteral(node.moduleSpecifier)
-    )
-      check(node.moduleSpecifier.text);
-    if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments[0] &&
-      ts.isStringLiteral(node.arguments[0])
-    )
-      check(node.arguments[0].text);
-    ts.forEachChild(node, visit);
-  }
-  visit(source);
+
+const packageRoot = realpathSync(fileURLToPath(new URL('../', import.meta.url)));
+const scenarios = join(packageRoot, 'test/consumers');
+const args = process.argv.slice(2);
+const keep = args.includes('--keep');
+const filterAt = args.indexOf('--filter');
+const filter = filterAt >= 0 ? args[filterAt + 1] : undefined;
+
+// The packages a consumer app would install next to snaplot, plus the tools the scenarios drive.
+const CONSUMER_DEPS = [
+  'react',
+  'react-dom',
+  'solid-js',
+  '@types/react',
+  '@types/react-dom',
+  // npm hoists csstype from @types/react, and snaplot/react's declarations reference it.
+  'csstype',
+  'typescript',
+  'vitest',
+  'vite',
+  'vite-plugin-solid',
+  'jsdom',
+  'esbuild',
+];
+
+function fail(message) {
+  console.error(`check-consumers: ${message}`);
+  process.exit(1);
 }
-inspectCore(join(packageRoot, 'dist/index.js'));
-inspectCore(join(packageRoot, 'dist/core.js'));
-const fixture = mkdtempSync(join(tmpdir(), 'snaplot-consumers-'));
-try {
-  const reactPath = JSON.stringify(join(packageRoot, 'dist/react.js'));
-  const solidPath = JSON.stringify(join(packageRoot, 'dist/solid.js'));
-  writeFileSync(
-    join(fixture, 'consumer.ts'),
-    `
-import type { ChartProps as ReactProps } from ${reactPath};
-import type { ChartProps as SolidProps } from ${solidPath};
-type Row = { time: number; cpu: number; label: string };
-const react: ReactProps<Row> = { data: [{ time: 1, cpu: 2, label: 'a' }], x: 'time', series: [{ y: 'cpu' }], viewport: { x: { min: 0, max: 2 } } };
-const solid: SolidProps<Row> = { data: react.data, x: 'time', series: [{ y: 'cpu' }], ref: chart => { chart?.setHighlight('cpu'); } };
-const invalid: ReactProps<Row> = { series: [
-  // @ts-expect-error misspelled fields are rejected
-  { y: 'cpus' }
-] };
-const invalidSolid: SolidProps<Row> = { series: [
-  // @ts-expect-error string metric fields are rejected
-  { y: 'label' }
-] };
-void [react, solid, invalid, invalidSolid];
-`,
+
+if (!existsSync(join(packageRoot, 'dist/index.js'))) {
+  fail('dist/ is missing. Run `npm run build` first.');
+}
+
+// Warn when dist is older than the newest source file: the checks would test a stale build.
+function newestMtime(dir) {
+  let newest = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    newest = Math.max(newest, entry.isDirectory() ? newestMtime(path) : statSync(path).mtimeMs);
+  }
+  return newest;
+}
+if (newestMtime(join(packageRoot, 'src')) > statSync(join(packageRoot, 'dist/index.js')).mtimeMs) {
+  console.warn(
+    'check-consumers: src/ is newer than dist/. Run `npm run build` for a current result.',
   );
-  execFileSync(
-    process.execPath,
+}
+
+function findPackageDir(name) {
+  for (let dir = packageRoot; ; dir = dirname(dir)) {
+    const candidate = join(dir, 'node_modules', name);
+    if (existsSync(join(candidate, 'package.json'))) return realpathSync(candidate);
+    if (dirname(dir) === dir) fail(`cannot find ${name} in any node_modules above ${packageRoot}`);
+  }
+}
+
+const consumer = mkdtempSync(join(realpathSync(tmpdir()), 'snaplot-consumer-'));
+let status = 1;
+try {
+  writeFileSync(
+    join(consumer, 'package.json'),
+    `${JSON.stringify({ name: 'snaplot-consumer', private: true, type: 'module' }, null, 2)}\n`,
+  );
+  const modules = join(consumer, 'node_modules');
+  mkdirSync(join(modules, '@types'), { recursive: true });
+  // npm pack runs the prepack and postpack scripts, as `npm publish` does.
+  const pack = spawnSync('npm', ['pack', '--json', '--pack-destination', consumer], {
+    cwd: packageRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  if (pack.status !== 0) fail('npm pack failed');
+  const [packed] = JSON.parse(pack.stdout.slice(pack.stdout.indexOf('[')));
+  writeFileSync(join(consumer, 'pack.json'), `${JSON.stringify(packed, null, 2)}\n`);
+  mkdirSync(join(modules, 'snaplot'));
+  const untar = spawnSync(
+    'tar',
     [
-      resolve(packageRoot, '../../node_modules/typescript/bin/tsc'),
-      '--noEmit',
-      '--strict',
-      '--skipLibCheck',
-      '--target',
-      'ESNext',
-      '--module',
-      'ESNext',
-      '--moduleResolution',
-      'bundler',
-      join(fixture, 'consumer.ts'),
+      '-xzf',
+      join(consumer, packed.filename),
+      '-C',
+      join(modules, 'snaplot'),
+      '--strip-components=1',
     ],
     { stdio: 'inherit' },
   );
+  if (untar.status !== 0) fail(`could not extract ${packed.filename}`);
+  for (const dep of CONSUMER_DEPS) symlinkSync(findPackageDir(dep), join(modules, dep), 'dir');
+  cpSync(scenarios, consumer, { recursive: true });
+
+  const report = join(packageRoot, 'test-results/consumers.json');
+  mkdirSync(dirname(report), { recursive: true });
+  const vitest = join(modules, 'vitest/vitest.mjs');
+  const run = spawnSync(
+    process.execPath,
+    [
+      vitest,
+      'run',
+      '--root',
+      consumer,
+      '--config',
+      join(consumer, 'vitest.config.mjs'),
+      '--reporter=verbose',
+      '--reporter=json',
+      `--outputFile.json=${report}`,
+      ...(filter ? ['-t', filter] : []),
+    ],
+    {
+      cwd: consumer,
+      stdio: 'inherit',
+      env: { ...process.env, SNAPLOT_CONSUMER_DIR: consumer },
+    },
+  );
+  status = run.status ?? 1;
+  if (status === 0) console.log(`check-consumers: passed (report: ${resolve(report)})`);
 } finally {
-  rmSync(fixture, { recursive: true, force: true });
+  if (keep) console.log(`check-consumers: kept the consumer project at ${consumer}`);
+  else rmSync(consumer, { recursive: true, force: true });
 }
-console.log('Built core isolation, React and Solid declarations, and server rendering passed.');
+process.exit(status);
