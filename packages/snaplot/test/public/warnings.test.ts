@@ -4,7 +4,7 @@
 // every build. Public API and the shared fakes only. Warning texts are module
 // state for the page, so every test uses its own option names or values.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ChartHandle } from '../../src/index';
+import { type ChartHandle, histogram } from '../../src/index';
 import { type Fakes, installFakes } from '../fakes';
 
 let fakes: Fakes;
@@ -138,6 +138,32 @@ describe('[arch-15] removed options name their replacement', () => {
     expect(text).toMatch(/xFormat.*format/);
     expect(text).toMatch(/cursor/);
     expect(text).toMatch(/highlight/);
+  });
+
+  // fill is the area and band fill. Bars, points and histogram bars take color (0.12 bars
+  // took fill), so fill there warns and is ignored, and the legend shows what the marks draw.
+  it.fails('[arch-15] fill on a bar, scatter or histogram series warns and is ignored', () => {
+    const bar = mount({ data: rows, x: 't', series: [{ type: 'bar', y: 'v', fill: '#ff0001' }] });
+    mount({ data: rows, x: 't', series: [{ type: 'scatter', y: 'v', fill: '#ff0002' }] });
+    const bins = mount({
+      series: [{ id: 'h', type: 'histogram', data: histogram([1, 2, 2, 3]), fill: '#ff0003' }],
+    });
+    const text = warnings().join('\n');
+    for (const type of ['bar', 'scatter', 'histogram'])
+      expect(text).toMatch(
+        new RegExp(
+          `"series\\[0\\]\\.fill" is not an option of ${type} series and is ignored\\. Use color\\.`,
+        ),
+      );
+    expect(JSON.stringify(bar.getLegendItems())).not.toMatch(/#ff0001/);
+    expect(JSON.stringify(bins.getLegendItems())).not.toMatch(/#ff0003/);
+  });
+
+  it('fill on line, area and band series prints nothing (control)', () => {
+    mount({ ...base, series: [{ y: 'v', fill: '#ff0004' }] });
+    mount({ ...base, series: [{ type: 'area', y: 'v', fill: null }] });
+    mount({ ...base, series: [{ type: 'band', y: 'v', lower: 'v', upper: 'v', fill: '#ff0005' }] });
+    expect(warnings()).toEqual([]);
   });
 });
 
