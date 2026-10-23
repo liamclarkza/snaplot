@@ -19,13 +19,20 @@ produce the `-linux` set.
 | `npm run test:visual` | Both projects against the committed `__screenshots__/<area>/<name>-<platform>.png` |
 | `npm run test:visual -- --against <ref>` | Renders `<ref>`'s own fixture app into the reference cache (twice: it must reproduce itself exactly), then compares the working tree with it exactly. This is the merge gate |
 | `npm run test:visual -- --strict` | Compares the committed baselines exactly too (a run against a ref always does) |
-| `node scripts/overhaul/check-visual-diffs.mjs` | Judges the last run: zero changes for M2/M9a/M9b, else every changed fixture needs a visual-ledger row from this milestone. It fails a run against a ref that was not exact |
-| `node scripts/overhaul/check-visual-ledger.mjs` | P13: every commit that touches screenshots or has a `visual:` paragraph adds or edits its row file |
+| `node scripts/overhaul/check-visual-diffs.mjs` | Judges the last run: zero changes for M2/M9a/M9b, else every changed fixture needs a visual-ledger row from this milestone. It fails a run against a ref that was not exact, a reference image that changed after its capture, and on a milestone branch a reference other than the merge base with `overhaul` |
+| `node scripts/overhaul/check-visual-ledger.mjs` | P13: every commit that touches screenshots or has a `visual:` paragraph adds or edits its row file, and every new row has the Commit, Milestone, Fixtures, Before → after, Finding and Revert lines |
 | `npm run test:visual -- --update` | Rewrites the committed baselines and prunes stale ones (M3a and M14 only) |
 | `npm run test:visual -- --serve` | Serves the fixture app; open `/index.html` for the list, `?fixture=<id>` for one |
 
 Other flags: `--project visual|geometry`, `--grep <re>`, `--workers <n>`, and anything after `--` goes to
 Playwright. The port is `$PORT`, else 5333 (EXECUTION.md rule 6), else a free one.
+
+The runner refuses (exit 2) the Playwright flags that would write, skip or relocate the expected
+images: `-u`, `--update-snapshots`, `--update-source-method`, `--ignore-snapshots` and `--config`
+(`run-args.mjs`). The head always compares with `--update-snapshots=none`. `--update` is the only
+way to rewrite the committed baselines, and a reference from `--against` is never updated. Before
+review #3, `--against <ref> -u` wrote the head's screenshots into the shared reference cache, and
+the next run against it passed with 0 changed shots.
 
 Every run writes `packages/snaplot/test-results/visual/`:
 - `report.json` (Playwright JSON);
@@ -34,7 +41,9 @@ Every run writes `packages/snaplot/test-results/visual/`:
   - the head: its SHA, whether the tree was dirty, and `inputs`, a fingerprint of the render inputs;
   - where the expected images live;
   - for `--against`, the reference outcome: `complete`, the capture and second-render exit codes,
-    the declared shot count, and the `shots` that rendered and reproduced;
+    the declared shot count, the `shots` that rendered and reproduced, and their `hashes`
+    (SHA-256 of each image);
+- for `--against`, `reference/`: the head's own copy of the reference images (see below);
 - `contact-sheet.html` (open it from disk to review every shot, with diffs for changed ones).
 
 The reference cache is `$SNAPLOT_SNAPSHOT_DIR/<sha>/`, default `<main checkout>/.claude/visual-cache/`.
@@ -54,15 +63,33 @@ when that directory does not exist. In a clone, set `SNAPLOT_BENCH_LOCK` to the 
 lock.
 
 The reference is rendered twice, and the second render must match the first exactly (no tolerance,
-whatever the comparison then uses). It is cached (`capture.json`) only when every shot it declares
-rendered and reproduced. Otherwise the runner exits non-zero, and `check-visual-diffs` fails the run:
+whatever the comparison then uses). It is cached (`capture.json`, format 4) only when every shot it
+declares rendered and reproduced, with the SHA-256 of each image. The cache is never a write
+target for the head:
+- the head compares against a per-run copy in `test-results/visual/reference/`, made only from
+  images whose hash matches the capture;
+- a cached reference whose images no longer match is moved aside to `shots-….damaged-<time>` and
+  captured again;
+- `check-visual-diffs` fails, even with `--allow-partial`, when an image of the copy changed after
+  the capture, is gone, or was never captured.
+
+A reference that did not complete is never cached. The runner exits non-zero, and
+`check-visual-diffs` fails the run:
 - a head shot is `added` only when the reference is complete and lacks it, else `unverified`
   (a failure unless `--allow-partial`);
 - a reference with no shots, or a platform with no committed baselines, fails outright: nothing was
   compared.
 
 Row files count for a milestone only when they differ from the base and their `**Milestone:**` line
-names it. `V0.md` never covers a change, and editing it fails the check.
+names it. `V0.md` never covers a change, and editing it fails the check. A base that does not resolve
+(a clone without a local `overhaul`) exits 2 and asks for `--base <ref>`, except under the
+zero-change rule, which reads no rows.
+
+On a milestone branch (`ovh/m<N>-…`), a run against a ref must compare against the branch's merge
+base with `overhaul`, the merge gate's reference. After a milestone's commits, `--against HEAD`
+compares the change with itself, so `check-visual-diffs` fails it and names the merge base. An
+explicit `--base <ref>` judges another reference deliberately, with a note. A merge base older
+than the fixture app (M3a's own branch) and a clone without `overhaul` print a note instead.
 
 `check-visual-diffs` refuses a stale report. `inputs` fingerprints the working-tree content of
 `packages/snaplot`, `package.json` and `package-lock.json` (`record.mjs`), so an edit there after
@@ -129,9 +156,10 @@ Determinism:
 - IBM Plex Sans (`@fontsource`) is loaded before the chart exists, and `theme.fontFamily` is set
   explicitly.
 - The page reports ready after `document.fonts.ready`, two frames and an idle callback, and only
-  once the grid and data layers have rendered and the data layer holds ink (the grid layer for a
-  fixture with `blankData`). It waits up to 5 s and never asks for a redraw; a chart that does not
-  paint fails its tests.
+  once the grid and data layers have rendered and the data layer holds ink (`paint.ts`). A fixture
+  with `blankData` needs grid-layer ink instead, and one that also has `blankGrid` (plan §5.1's
+  empty state, which draws no grid) needs only both renders. It waits up to 5 s and never asks for
+  a redraw; a chart that does not paint fails its tests.
 - The Playwright config fixes the viewport (1280 × 800), reduced motion, `en-US` and UTC.
 - `minFontSize` fixtures run in a persistent full-Chromium profile, because the headless shell ignores
   the font preference.
