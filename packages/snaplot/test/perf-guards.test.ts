@@ -65,6 +65,9 @@ describe('data and culling', () => {
     const vertices = record.calls
       .slice(before)
       .filter((call) => call.name === 'lineTo' || call.name === 'moveTo').length;
+    // At least the 101 visible points (a repaint that draws nothing fails),
+    // at most those ±1 plus a path restart per gap.
+    expect(vertices).toBeGreaterThanOrEqual(101);
     expect(vertices).toBeLessThanOrEqual(101 + 2 + 4);
   });
 
@@ -310,6 +313,8 @@ describe('labels and layout', () => {
     fakes.frames.flush();
     const after = nodes();
     expect(before.length).toBeGreaterThan(0);
+    // Every label is still there, and every one is a node from before.
+    expect(after.length).toBe(before.length);
     expect(after.every((node) => before.includes(node))).toBe(true);
   });
 
@@ -463,18 +468,32 @@ describe('groups, visibility and theme', () => {
       fakes.mount({ data: columns(200, (i) => i % 9), x: 'x', series: [{ y: 'y' }] }),
     );
     fakes.frames.flush();
+    // The refresh may be queued on a timer (today) or a frame (M11's shared
+    // observer); let both run, twice, so either order lands.
+    const settleTheme = async () => {
+      for (let round = 0; round < 2; round++) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        fakes.frames.flush();
+      }
+    };
     const style = vi.spyOn(window, 'getComputedStyle');
+    const reads = () =>
+      charts.map(
+        (chart) =>
+          style.mock.calls.filter(
+            ([element]) => chart.container.contains(element as Node) || element === chart.container,
+          ).length,
+      );
+    // Calibrate: the computed-style reads of one resolution, per chart.
+    document.body.classList.toggle('dark');
+    await settleTheme();
+    const one = reads();
+    for (const count of one) expect(count, 'one mutation re-resolves the theme').toBeGreaterThan(0);
+    style.mockClear();
+
     for (let i = 0; i < 100; i++) document.body.classList.toggle('dark');
-    await Promise.resolve();
-    await Promise.resolve();
-    fakes.frames.flush();
-    const perChart = charts.map(
-      (chart) =>
-        style.mock.calls.filter(
-          ([element]) => chart.container.contains(element as Node) || element === chart.container,
-        ).length,
-    );
-    // One resolution reads the container (and its root) a bounded number of times.
-    for (const reads of perChart) expect(reads).toBeLessThanOrEqual(4);
+    await settleTheme();
+    // At least one resolution (the theme still follows the page) and at most one.
+    expect(reads()).toEqual(one);
   });
 });
