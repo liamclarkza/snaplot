@@ -5,7 +5,7 @@
 // array- and object-valued options on intake, and maps every public option
 // leaf onto the engine. Public API, the shared fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { type ChartHandle, createChartGroup } from '../../src/index';
+import { type ChartHandle, createChart, createChartGroup } from '../../src/index';
 import {
   clientPoint,
   debug,
@@ -703,6 +703,76 @@ describe('state options at creation (D3)', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
     chart.update({ viewport: { x: [4, 12] } } as never);
     expect(chart.getAxis('x')).toMatchObject({ min: 4, max: 12 });
+  });
+});
+
+// A state option is checked against the chart's axes before anything changes, like the data
+// it may arrive with: a rejected call leaves the chart, its options and later calls as they were.
+describe('state options are checked before anything changes (D3, D23)', () => {
+  const latest = (chart: ChartHandle<any>) =>
+    chart.getCursorSnapshot({ fallback: 'latest' }).points[0];
+
+  it.fails('[arch-15] a viewport naming an unknown axis throws at createChart and leaves the container empty', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const observers = fakes.resizeObserver.observerCount;
+    const message = thrown(() =>
+      createChart(host, {
+        data: rows,
+        x: 't',
+        series: [{ y: 'cpu' }],
+        viewport: { z: [0, 1] },
+      } as never),
+    );
+    expect(message).toMatch(/^snaplot: viewport names axis "z", which this chart does not have/);
+    expect(host.children).toHaveLength(0);
+    expect(fakes.resizeObserver.observerCount).toBe(observers);
+  });
+
+  it.fails('[arch-15] a rejected update({ viewport }) changes nothing, and later updates work', () => {
+    const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
+    const x = chart.getAxis('x');
+    expect(thrown(() => chart.update({ viewport: { x: [2, 8], z: [0, 1] } } as never))).toMatch(
+      /^snaplot: viewport names axis "z"/,
+    );
+    expect(chart.getAxis('x')).toEqual(x);
+    expect(chart.getOptions().viewport).toBeUndefined();
+    expect(() => chart.update({ axes: { y: { title: 'Load' } } } as never)).not.toThrow();
+    expect(() => chart.update({ data: rows.slice(0, 10) } as never)).not.toThrow();
+    expect(latest(chart)).toMatchObject({ x: 9 });
+    chart.update({ viewport: { x: [2, 8] } } as never);
+    expect(chart.getAxis('x')).toMatchObject({ min: 2, max: 8 });
+  });
+
+  it.fails('[dataapi-03][arch-15] a rejected update({ data, viewport }) keeps the old data and row ids', () => {
+    const data = Array.from({ length: 5 }, (_, i) => ({ x: i, y: i * 2, id: `r${i}` }));
+    const chart = mount({ data, x: 'x', rowId: 'id', series: [{ y: 'y' }] });
+    const x = chart.getAxis('x');
+    const next = Array.from({ length: 3 }, (_, i) => ({ x: 100 + i, y: i, id: `n${i}` }));
+    expect(thrown(() => chart.update({ data: next, viewport: { z: [0, 1] } } as never))).toMatch(
+      /^snaplot: viewport names axis "z"/,
+    );
+    expect(chart.getAxis('x')).toEqual(x);
+    expect(latest(chart)).toMatchObject({ x: 4, y: 8, rowIndex: 4, rowId: 'r4' });
+    expect(latest(chart).row).toBe(data[4]);
+    chart.update({ data: next } as never);
+    expect(latest(chart)).toMatchObject({ x: 102, y: 2, rowIndex: 2, rowId: 'n2' });
+    expect(latest(chart).row).toBe(next[2]);
+  });
+
+  it.fails('[arch-15] a viewport on a log axis needs bounds above 0', () => {
+    const options = { data: rows, x: 't', series: [{ y: 'cpu' }], axes: { y: { type: 'log' } } };
+    expect(thrown(() => mount({ ...options, viewport: { y: [0, 10] } }))).toMatch(
+      /^snaplot: viewport\.y is \[0, 10\], but axis "y" is a log axis/,
+    );
+    const chart = mount(options);
+    const y = chart.getAxis('y');
+    expect(thrown(() => chart.update({ viewport: { y: [-1, 10] } } as never))).toMatch(
+      /^snaplot: viewport\.y is \[-1, 10\], but axis "y" is a log axis/,
+    );
+    expect(chart.getAxis('y')).toEqual(y);
+    chart.update({ viewport: { y: [1, 100] } } as never);
+    expect(chart.getAxis('y')).toMatchObject({ min: 1, max: 100 });
   });
 });
 
