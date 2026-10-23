@@ -3,6 +3,7 @@
  *
  * Projects:
  * - `visual`: one screenshot per fixture shot (test/visual/visual.spec.ts).
+ * - `geometry`: platform-independent label and ink checks (test/visual/geometry.spec.ts).
  *
  * Run through `npm run test:visual` (test/visual/run.mjs), which sets the environment below.
  * Environment (the contract every ref from M3a on honours, so `--against <ref>` can drive it):
@@ -52,7 +53,10 @@ export default defineConfig({
     timezoneId: 'UTC',
     trace: 'off',
   },
-  projects: [{ name: 'visual', testMatch: 'visual/visual.spec.ts' }],
+  projects: [
+    { name: 'visual', testMatch: 'visual/visual.spec.ts' },
+    { name: 'geometry', testMatch: 'visual/geometry.spec.ts' },
+  ],
   webServer: {
     command:
       `npx vite build --config ${appConfig} && ` +

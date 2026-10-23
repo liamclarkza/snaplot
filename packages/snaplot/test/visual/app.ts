@@ -15,6 +15,7 @@ import type { ChartHandle, ChartOptions } from '../../src/index';
 import { createChart, histogram } from '../../src/index';
 import { FIXTURES, type Fixture, findFixture } from './fixtures';
 import { FONT_FAMILY, FONT_WEIGHTS, type FixturePageApi } from './page-api';
+import { collectGeometry } from './probe';
 
 const frames = (n: number): Promise<void> =>
   new Promise((resolve) => {
@@ -66,6 +67,7 @@ function withFont(options: ChartOptions<any>): ChartOptions<any> {
 async function renderFixture(id: string): Promise<void> {
   let chart: ChartHandle<any> | undefined;
   let host: HTMLElement | undefined;
+  let options: ChartOptions<any> | undefined;
   const api: FixturePageApi = {
     id,
     status: 'loading',
@@ -78,6 +80,10 @@ async function renderFixture(id: string): Promise<void> {
         y: box.top + plot.top + fy * plot.height,
       };
     },
+    geometry() {
+      if (!chart || !host || !options) throw new Error('fixture not rendered');
+      return collectGeometry(id, chart, options, host);
+    },
     frames,
   };
   window.__snaplotFixture = api;
@@ -88,7 +94,8 @@ async function renderFixture(id: string): Promise<void> {
     await Promise.all(FONT_WEIGHTS.map((w) => document.fonts.load(`${w} 12px "IBM Plex Sans"`)));
     const box = mountBox(fixture);
     host = box.host;
-    chart = createChart(host, withFont(fixture.options({ histogram })));
+    options = fixture.options({ histogram });
+    chart = createChart(host, withFont(options));
     api.chart = chart;
     await frames(2);
     if (fixture.after) {

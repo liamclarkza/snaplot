@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// `npm run test:visual` (plan §11.3 G10). Runs the `visual` Playwright project
+// `npm run test:visual` (plan §11.3 G10). Runs the `visual` and `geometry` Playwright projects
 // in local Chromium (EXECUTION.md rule 1; scripts/visual-docker.sh is the optional Linux path).
 //
 //   npm run test:visual                       compare against the committed -<platform> baselines
@@ -279,7 +279,11 @@ async function main() {
   const reference = opts.against
     ? await captureReference(opts.against, port, opts.againstTree, opts.againstSha)
     : null;
-  const projects = opts.projects.length ? opts.projects : ['visual'];
+  const projects = opts.projects.length
+    ? opts.projects
+    : opts.update
+      ? ['visual']
+      : ['visual', 'geometry'];
   const args = [playwrightBin(repoRoot), 'test', ...projects.flatMap((p) => ['--project', p])];
   args.push(
     opts.update ? '--update-snapshots=all' : '--update-snapshots=none',
