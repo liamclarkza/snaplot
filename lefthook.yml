@@ -12,9 +12,17 @@ pre-commit:
       run: npx biome check --staged --no-errors-on-unmatched
 
     - name: typecheck
-      glob: 'packages/snaplot/src/**/*.{ts,tsx}'
+      # `**/` needs at least one directory here, so each tree also lists its
+      # top-level files (src/index.ts, test/golden-api.test.ts).
+      glob:
+        - 'packages/snaplot/src/*.{ts,tsx}'
+        - 'packages/snaplot/src/**/*.{ts,tsx}'
+        - 'packages/snaplot/test/*.{ts,tsx}'
+        - 'packages/snaplot/test/**/*.{ts,tsx}'
+        - 'packages/snaplot/tsconfig*.json'
       # tsc runs against the whole project, so we only invoke it when a
-      # file under the library source actually changed.
+      # library source file, a test or a tsconfig changed (test-only commits
+      # are type-checked too: tsconfig.test.json covers test/).
       run: npm run typecheck
 
 pre-push:
