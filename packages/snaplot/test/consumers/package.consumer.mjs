@@ -1,5 +1,7 @@
 // What the tarball ships: the React entry's 'use client' directive (repo-08, research-06), lean
-// sourcemaps (repo-15:maps), the README and LICENSE (prepack) and nothing outside dist/.
+// sourcemaps (repo-15:maps), syntax within the D25 floor (gap-environments-08), the README and
+// LICENSE (prepack) and nothing outside dist/.
+import { transform } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import { manifest, packageFile, packed } from './helpers/consumer.mjs';
 
@@ -29,5 +31,18 @@ describe('the packed files', () => {
 
   it('declares the Node floor that require(esm) needs', () => {
     expect(manifest.engines.node).toBe('>=22.12');
+  });
+
+  it('[gap-environments-08] the JavaScript needs no syntax newer than ES2022 (D25)', async () => {
+    // esbuild lowers anything newer than the target, so ES2022 code comes out unchanged.
+    const lowered = [];
+    for (const file of files.filter((f) => /\.(js|jsx)$/.test(f))) {
+      const code = packageFile(file);
+      const loader = file.endsWith('.jsx') ? 'jsx' : 'js';
+      const as = async (target) =>
+        (await transform(code, { loader, target, format: 'esm', jsx: 'preserve' })).code;
+      if ((await as('es2022')) !== (await as('esnext'))) lowered.push(file);
+    }
+    expect(lowered).toEqual([]);
   });
 });
