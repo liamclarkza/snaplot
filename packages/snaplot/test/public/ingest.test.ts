@@ -246,6 +246,68 @@ describe('appends are validated before anything changes', () => {
     expect(chart.getCursorSnapshot().points[0]).toMatchObject({ x: 2, y: 2, rowIndex: 2 });
   });
 
+  // A batch is taken whole whatever its size: the engine and the retained rows and ids grow
+  // together, so an update() re-ingests every appended point (D23).
+  const BIG = 200_000;
+  it.fails('[dataapi-03] an append of 200,000 rows keeps every row through an update', () => {
+    const chart = mount({ data: [{ t: 0, v: 0 }], x: 't', series: [{ y: 'v' }] });
+    const batch = Array.from({ length: BIG }, (_, i) => ({ t: i + 1, v: i }));
+    chart.appendData(batch);
+    expect(latest(chart)).toMatchObject({ x: BIG, y: BIG - 1, rowIndex: BIG });
+    expect(latest(chart).row).toBe(batch[BIG - 1]);
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect(latest(chart)).toMatchObject({ x: BIG, y: BIG - 1, rowIndex: BIG });
+    expect(latest(chart).row).toBe(batch[BIG - 1]);
+    chart.appendData([{ t: BIG + 1, v: 1 }]);
+    expect(latest(chart)).toMatchObject({ x: BIG + 1, rowIndex: BIG + 1 });
+  });
+
+  it.fails('[dataapi-03] an append of 200,000 rows with row ids keeps every id through an update', () => {
+    const chart = mount({
+      data: [{ id: 'a', t: 0, v: 0 }],
+      x: 't',
+      rowId: 'id',
+      series: [{ y: 'v' }],
+    });
+    const batch = Array.from({ length: BIG }, (_, i) => ({ id: `r${i}`, t: i + 1, v: i }));
+    chart.appendData(batch);
+    expect(latest(chart)).toMatchObject({ x: BIG, rowIndex: BIG, rowId: `r${BIG - 1}` });
+    expect(latest(chart).row).toBe(batch[BIG - 1]);
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect(latest(chart)).toMatchObject({ x: BIG, rowIndex: BIG, rowId: `r${BIG - 1}` });
+    expect(latest(chart).row).toBe(batch[BIG - 1]);
+    // The appended ids are in the window: a repeat still throws.
+    expect(thrown(() => chart.appendData([{ id: 'r7', t: BIG + 1, v: 1 }]))).toMatch(
+      /rowId "r7" is already in the chart/,
+    );
+  });
+
+  it.fails('[dataapi-03] an append of 200,000 { columns, rowIds } keeps every id through an update', () => {
+    const chart = mount({
+      data: { columns: { t: Float64Array.of(0), v: Float64Array.of(0) }, rowIds: ['a'] },
+      x: 't',
+      series: [{ y: 'v' }],
+    });
+    chart.appendData({
+      columns: {
+        t: Float64Array.from({ length: BIG }, (_, i) => i + 1),
+        v: Float64Array.from({ length: BIG }, (_, i) => i),
+      },
+      rowIds: Array.from({ length: BIG }, (_, i) => `r${i}`),
+    });
+    expect(latest(chart)).toMatchObject({ x: BIG, y: BIG - 1, rowId: `r${BIG - 1}` });
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect(latest(chart)).toMatchObject({ x: BIG, y: BIG - 1, rowId: `r${BIG - 1}` });
+    expect(
+      thrown(() =>
+        chart.appendData({
+          columns: { t: Float64Array.of(BIG + 1), v: Float64Array.of(1) },
+          rowIds: ['r7'],
+        }),
+      ),
+    ).toMatch(/rowId "r7" is already in the chart/);
+  });
+
   it('a sorted scatter source takes an append before its last X and keeps every point', () => {
     const chart = mount({
       data: [
