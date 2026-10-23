@@ -1,5 +1,8 @@
 name: Deploy to GitHub Pages
 
+# The legacy docs site was removed in overhaul M0. The Astro site (M6a) restores
+# the site build and the Pages steps; deploys move to v* tags (D32, M5).
+
 on:
   push:
     branches: [main]
@@ -16,9 +19,6 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
 
@@ -29,12 +29,3 @@ jobs:
 
       - run: npm install
       - run: npm run build
-      - run: npm run build:site
-
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: site/dist
-
-      - id: deployment
-        uses: actions/deploy-pages@v5

@@ -62,9 +62,6 @@ jobs:
       - name: Build library
         run: npm run build
 
-      - name: Build site
-        run: npm run build:site
-
       - name: Copy README + LICENSE into package
         run: cp README.md LICENSE packages/snaplot/
 

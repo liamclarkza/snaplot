@@ -35,9 +35,6 @@ jobs:
       - name: Build library
         run: npm run build
 
-      - name: Build site
-        run: npm run build:site
-
   # Best-effort performance guard. CI hardware is noisy and differs from the
   # machine that produced the committed baseline, so this is a coarse
   # smoke check for gross regressions, not a tight gate: it runs the desktop
