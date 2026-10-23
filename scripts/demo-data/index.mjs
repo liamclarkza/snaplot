@@ -28,6 +28,8 @@ export const DEMOS = {
     slices: ['waveform.ts'],
     audio: /\.(mp3|wav)$/,
   },
+  // A seeded simulator (site/src/demos/deploy-482/simulator.ts): only SOURCE.md, no generator.
+  'deploy-482': { script: null, slices: [] },
 };
 const ALIASES = { 'train-digits': 'pick-a-checkpoint' };
 
