@@ -12,10 +12,15 @@
 //   docs/decisions/visual-ledger/V<n>.md that differs from <base> (committed, staged, unstaged or
 //   untracked). A fixture id names all its shots (`theme/card-dark` covers `@light`, `@dark` and
 //   `@2x`); a trailing `*` matches a prefix (`marks/grid-*`).
-// - A shot that exists only on the head is reported as added and needs no row.
+// - A shot that exists only on the head is reported as added and needs no row, but only when the
+//   reference is known to be whole: a reference rendered from a ref must have completed (run.mjs
+//   records `against.complete` and the shot list in meta.json), and committed baselines must
+//   exist for the platform. A head shot that an incomplete reference lacks is "unverified".
+// - Nothing compared fails outright: a reference with no shots, or no committed baselines.
 // - Any geometry failure, and any visual test that failed for another reason than a screenshot
-//   difference (the fixture threw, timed out), fails the check. So does a run without both
-//   projects or narrowed by --grep, unless --allow-partial.
+//   difference (the fixture threw, timed out), fails the check. So do unverified shots, an
+//   incomplete reference, and a run without both projects or narrowed by --grep, unless
+//   --allow-partial.
 //
 // The milestone defaults to the branch name (`ovh/m10-…` → M10); <base> defaults to the ref the
 // run compared against, else `overhaul`. With a milestone, the actual, reference and diff images
@@ -127,6 +132,52 @@ function rowFixtures(text) {
   return [...block.join(' ').matchAll(/`([^`]+)`/g)].map((m) => m[1].trim());
 }
 
+/**
+ * What the run compared against: the shot names the reference holds, and whether that list is
+ * whole. A reference rendered from a ref is whole when run.mjs recorded `complete`; committed
+ * baselines are whatever `-<platform>` images exist.
+ */
+function referenceOf(meta, expectedDir) {
+  if (meta.mode === 'against') {
+    const a = meta.against;
+    if (!a || typeof a.complete !== 'boolean' || !Array.isArray(a.shots)) {
+      console.error(
+        'check-visual-diffs: FAIL: meta.json does not record the reference outcome (it was ' +
+          'written by an older run.mjs): run npm run test:visual -- --against <ref> again',
+      );
+      process.exit(1);
+    }
+    const outcome =
+      `capture exit ${a.exit}` +
+      (a.verifyExit === null || a.verifyExit === undefined
+        ? ''
+        : `, second render exit ${a.verifyExit}`) +
+      `; ${a.shots.length} of ${a.declared ?? '?'} declared shots usable`;
+    return {
+      shots: new Set(a.shots),
+      complete: a.complete,
+      outcome,
+      summary: a.complete
+        ? `complete, ${a.shots.length} shots${a.cached ? ' (cached)' : ''}`
+        : `INCOMPLETE (${outcome})`,
+      empty: `the reference ${a.ref} produced no shots (${outcome}): nothing was compared`,
+    };
+  }
+  const suffix = `${meta.suffix ?? ''}.png`;
+  const shots = listPngs(expectedDir)
+    .filter((f) => f.endsWith(suffix))
+    .map((f) => f.slice(0, -suffix.length));
+  return {
+    shots: new Set(shots),
+    complete: true,
+    outcome: '',
+    summary: `${shots.length} committed ${meta.platform} baselines`,
+    empty:
+      `no committed ${meta.platform} baselines in ${expectedDir}: nothing was compared. ` +
+      'Compare with --against <ref>; only M3a and M14 commit baselines (--update)',
+  };
+}
+
 function covers(pattern, fixture) {
   return pattern.endsWith('*') ? fixture.startsWith(pattern.slice(0, -1)) : pattern === fixture;
 }
@@ -155,25 +206,26 @@ function main() {
   const { visual, geometry } = collect(report);
   const expectedDir = resolve(repoRoot, 'packages/snaplot', meta.expectedDir);
   const expectedPath = (shot) => join(expectedDir, `${shot}${meta.suffix ?? ''}.png`);
+  const reference = referenceOf(meta, expectedDir);
   const changed = [];
   const added = [];
   const broken = [];
+  const unverified = [];
   for (const t of visual) {
-    if (t.status === 'expected' || t.status === 'skipped') continue;
-    if (!existsSync(expectedPath(t.shot))) added.push(t);
-    else if (/stable screenshots/i.test(t.error)) broken.push(t);
-    else if (/toHaveScreenshot/.test(t.error)) changed.push(t);
-    else broken.push(t);
+    const passed = t.status === 'expected' || t.status === 'skipped';
+    const noImage = /snapshot doesn't exist at/i.test(t.error);
+    const diff = /toHaveScreenshot/.test(t.error) && !/stable screenshots/i.test(t.error);
+    // The head itself failed to render (threw, timed out, never stabilised): not a comparison.
+    if (!passed && !noImage && !diff) broken.push(t);
+    else if (!reference.shots.has(t.shot)) (reference.complete ? added : unverified).push(t);
+    else if (passed) continue;
+    // Listed by the reference, but its image is gone from the cache.
+    else if (noImage) unverified.push(t);
+    else changed.push(t);
   }
   const ran = new Set(visual.map((t) => t.shot));
   const partial = Boolean(meta.filtered) || !meta.projects?.includes('visual');
-  const suffix = `${meta.suffix ?? ''}.png`;
-  const removed = partial
-    ? []
-    : listPngs(expectedDir)
-        .filter((f) => f.endsWith(suffix))
-        .map((f) => f.slice(0, -suffix.length))
-        .filter((shot) => !ran.has(shot));
+  const removed = partial ? [] : [...reference.shots].filter((shot) => !ran.has(shot)).sort();
   const geometryFailures = geometry.filter(
     (t) => t.status === 'unexpected' || t.status === 'flaky',
   );
@@ -191,11 +243,12 @@ function main() {
   console.log(
     `check-visual-diffs: head ${String(meta.head?.sha).slice(0, 10)}${meta.head?.dirty ? ' + working tree' : ''} vs ${against}`,
   );
+  console.log(`  reference: ${reference.summary}`);
   console.log(
     `  milestone ${milestone ?? '(unknown)'}, ${zero ? 'zero-change rule' : `rows changed since ${base.slice(0, 12)}: ${rows.map((r) => basename(r)).join(', ') || 'none'}`}`,
   );
   console.log(
-    `  ${visual.length} shots: ${changed.length} changed, ${added.length} added, ${removed.length} removed, ${broken.length} broken` +
+    `  ${visual.length} shots: ${changed.length} changed, ${added.length} added, ${removed.length} removed, ${broken.length} broken, ${unverified.length} unverified` +
       (partial ? ' (partial run: removals not checked)' : '') +
       `; geometry: ${geometry.length} checks, ${geometryFailures.length} failing`,
   );
@@ -205,6 +258,7 @@ function main() {
   }
   for (const s of removed) console.log(`  removed  ${s}${rowFor(s) ? `  (${rowFor(s).row})` : ''}`);
   for (const t of added) console.log(`  added    ${t.shot}`);
+  for (const t of unverified) console.log(`  unverified ${t.shot}: no usable reference image`);
   for (const t of broken) console.log(`  broken   ${t.shot}: ${t.error.split('\n')[0]}`);
   for (const t of geometryFailures) console.log(`  geometry ${t.title}: ${t.error.split('\n')[0]}`);
 
@@ -238,6 +292,15 @@ function main() {
   }
 
   const failures = [];
+  // Not overridable: a run that compared nothing proves nothing.
+  if (reference.shots.size === 0) failures.push(reference.empty);
+  if (!opts.allowPartial && (!reference.complete || unverified.length > 0)) {
+    failures.push(
+      `${reference.complete ? 'the reference is missing images it lists' : `the reference capture did not complete (${reference.outcome})`}: ` +
+        `${unverified.length} head shot(s) unverified. Run npm run test:visual -- --against ${meta.against?.ref ?? '<ref>'} again, ` +
+        'or pass --allow-partial to judge only the shots the reference produced',
+    );
+  }
   if (uncovered.length) {
     failures.push(
       zero

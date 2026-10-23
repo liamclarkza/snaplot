@@ -38,7 +38,7 @@ describe('check-visual-diffs: the reference', () => {
     expect(r.status).toBe(0);
   });
 
-  it.fails('[repo-10] fails when the reference captured no shots, even with --allow-partial', () => {
+  it('[repo-10] fails when the reference captured no shots, even with --allow-partial', () => {
     for (const args of [[], ['--allow-partial']]) {
       const r = runScenario({
         head: SHOTS.map(missing),
@@ -51,7 +51,7 @@ describe('check-visual-diffs: the reference', () => {
     }
   });
 
-  it.fails('[repo-10] counts a shot an incomplete reference lacks as unverified, not added', () => {
+  it('[repo-10] counts a shot an incomplete reference lacks as unverified, not added', () => {
     const r = runScenario({
       head: [{ name: 'marks/a' }, missing('marks/b'), missing('marks/c')],
       referenceFiles: ['marks/a'],
@@ -63,7 +63,7 @@ describe('check-visual-diffs: the reference', () => {
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] judges only the produced shots of an incomplete reference with --allow-partial', () => {
+  it('[repo-10] judges only the produced shots of an incomplete reference with --allow-partial', () => {
     const r = runScenario({
       head: [{ name: 'marks/a' }, missing('marks/b')],
       referenceFiles: ['marks/a'],
@@ -74,7 +74,7 @@ describe('check-visual-diffs: the reference', () => {
     expect(r.status).toBe(0);
   });
 
-  it.fails('[repo-10] does not trust a reference shot that did not reproduce itself', () => {
+  it('[repo-10] does not trust a reference shot that did not reproduce itself', () => {
     // capture.json is written only when a second render of the reference matches the first;
     // marks/b differed, so its image exists but is not in the reference's shot list.
     const r = runScenario({
@@ -87,7 +87,7 @@ describe('check-visual-diffs: the reference', () => {
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] refuses a meta.json that does not record the reference outcome', () => {
+  it('[repo-10] refuses a meta.json that does not record the reference outcome', () => {
     const r = runScenario({
       head: unchanged,
       referenceFiles: SHOTS,
@@ -97,7 +97,7 @@ describe('check-visual-diffs: the reference', () => {
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] calls a head shot that failed to render broken, not added', () => {
+  it('[repo-10] calls a head shot that failed to render broken, not added', () => {
     const r = runScenario({
       head: [...unchanged, { name: 'marks/new', status: 'unexpected', error: ERRORS.threw }],
       referenceFiles: SHOTS,
@@ -124,7 +124,7 @@ describe('check-visual-diffs: committed baselines', () => {
     expect(r.status).toBe(0);
   });
 
-  it.fails('[repo-10] fails when the platform has no committed baselines at all', () => {
+  it('[repo-10] fails when the platform has no committed baselines at all', () => {
     const r = runScenario({ mode: 'baselines', head: SHOTS.map(missing), referenceFiles: [] });
     expect(r.output).toContain('nothing was compared');
     expect(r.status).toBe(1);

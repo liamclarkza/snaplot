@@ -16,13 +16,19 @@
 // The reference cache lives outside the tracked tree: $SNAPLOT_SNAPSHOT_DIR, default
 // <main checkout>/.claude/visual-cache/<sha>/. A ref is extracted with `git archive` (no worktree)
 // and its own playwright config captures its own fixtures, so a fixture renamed between the two
-// sides compares like with like. Nothing is ever deleted outside this worktree.
+// sides compares like with like. The reference is rendered twice; it is cached (capture.json)
+// only when every shot it declares rendered and reproduced itself. meta.json records the
+// outcome (`against.complete`, the exit codes and the shot list), and check-visual-diffs fails
+// on an incomplete reference. Nothing is ever deleted outside this worktree (except a stale
+// node_modules symlink the runner itself made in the cache).
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   statSync,
   symlinkSync,
   unlinkSync,
@@ -39,6 +45,8 @@ const OUT = join(PKG, 'test-results/visual');
 const BASELINES = join(HERE, '__screenshots__');
 const DEFAULT_PORT = 5333; // EXECUTION.md rule 6: M3a = 5300 + 33
 const LOCK_STALE_MS = 2 * 60 * 60 * 1000;
+/** capture.json format: 2 records the verified shot list. Older entries are captured again. */
+const CAPTURE_FORMAT = 2;
 
 function git(args, cwd = PKG) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
@@ -118,15 +126,92 @@ function playwrightBin(root) {
   return join(root, 'node_modules/@playwright/test/cli.js');
 }
 
+function headPlaywrightVersion() {
+  return JSON.parse(
+    readFileSync(join(repoRoot, 'node_modules/@playwright/test/package.json'), 'utf8'),
+  ).version;
+}
+
 function browserFingerprint() {
   const core = JSON.parse(
     readFileSync(join(repoRoot, 'node_modules/playwright-core/browsers.json'), 'utf8'),
   );
   const chromium = core.browsers.find((b) => b.name === 'chromium');
-  const pw = JSON.parse(
-    readFileSync(join(repoRoot, 'node_modules/@playwright/test/package.json'), 'utf8'),
-  );
-  return `${process.platform}-${process.arch}-pw${pw.version}-chromium${chromium?.revision}`;
+  return `${process.platform}-${process.arch}-pw${headPlaywrightVersion()}-chromium${chromium?.revision}`;
+}
+
+/**
+ * The cache key of the browser that renders the reference. A ref whose lockfile pins another
+ * Playwright renders with that Playwright (and the Chromium it pins), not the head's.
+ */
+function referenceFingerprint(refLock) {
+  let version = null;
+  try {
+    version = JSON.parse(refLock ?? '').packages?.['node_modules/@playwright/test']?.version;
+  } catch {
+    version = null;
+  }
+  if (!version || version === headPlaywrightVersion()) return browserFingerprint();
+  return `${process.platform}-${process.arch}-pw${version}`;
+}
+
+/** Points <link> at <target>, replacing a symlink that is dangling or points elsewhere. */
+function linkModules(target, link) {
+  let stat = null;
+  try {
+    stat = lstatSync(link);
+  } catch {
+    stat = null;
+  }
+  if (stat?.isSymbolicLink()) {
+    if (readlinkSync(link) === target && existsSync(link)) return;
+    // Made by this runner for a worktree that has since been removed (or another worktree).
+    unlinkSync(link);
+  } else if (stat) {
+    return; // a real node_modules (npm ci ran in the reference tree)
+  }
+  symlinkSync(target, link, 'dir');
+}
+
+/**
+ * Shot names in a Playwright JSON report of the visual project: every shot the run declared, and
+ * the ones whose test passed. A report that is missing or unreadable declares nothing.
+ */
+function readShotReport(path) {
+  let report;
+  try {
+    report = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return { declared: [], passed: [] };
+  }
+  const declared = [];
+  const passed = [];
+  const walk = (suite) => {
+    for (const spec of suite.specs ?? []) {
+      for (const t of spec.tests ?? []) {
+        // A test that never started has no annotations; its describe block is the shot name.
+        const name =
+          (t.annotations ?? []).find((a) => a.type === 'screenshot')?.description ??
+          (t.projectName === 'visual' ? suite.title : undefined);
+        if (!name) continue;
+        declared.push(name);
+        if (t.status === 'expected') passed.push(name);
+      }
+    }
+    for (const child of suite.suites ?? []) walk(child);
+  };
+  for (const suite of report.suites ?? []) walk(suite);
+  return { declared, passed };
+}
+
+/** capture.json of a complete reference in the current format, else null. */
+function readMarker(marker) {
+  try {
+    const data = JSON.parse(readFileSync(marker, 'utf8'));
+    return data.format === CAPTURE_FORMAT && Array.isArray(data.shots) ? data : null;
+  } catch {
+    return null;
+  }
 }
 
 function run(cmd, args, options) {
@@ -147,19 +232,86 @@ function listPngs(dir, base = dir) {
   return out.sort();
 }
 
-/** Extracts <sha> and renders its own fixture app into the cache; returns the shots directory. */
+/** One render of the reference's visual project into <shots>, reported to <reportPath>. */
+async function renderReference({ tree, port, shots, entry, update, reportPath }) {
+  const refPkg = join(tree, 'packages/snaplot');
+  // A run that dies before it reports must not leave an older report to be read.
+  writeFileSync(reportPath, '{}\n');
+  const code = await run(
+    process.execPath,
+    [
+      playwrightBin(tree),
+      'test',
+      '--config',
+      join(refPkg, 'playwright.config.ts'),
+      '--project',
+      'visual',
+      `--update-snapshots=${update}`,
+      '--reporter=dot,json',
+    ],
+    {
+      cwd: refPkg,
+      env: {
+        ...process.env,
+        PORT: String(port),
+        SNAPLOT_VISUAL_EXPECTED_DIR: shots,
+        SNAPLOT_VISUAL_OUTPUT_DIR: join(entry, 'out'),
+        PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
+      },
+    },
+  );
+  return { code, ...readShotReport(reportPath) };
+}
+
+/**
+ * Extracts <sha> and renders its own fixture app into the cache, twice: the second render must
+ * reproduce the first. Returns the reference outcome that meta.json records:
+ * `{ ref, sha, dir, fingerprint, cached, exit, verifyExit, complete, declared, shots }`, where
+ * `shots` lists the shot names that rendered and reproduced, and `complete` says whether that is
+ * every shot the ref declares (only then is it cached).
+ */
 async function captureReference(ref, port, givenTree, givenSha) {
   const sha = givenTree ? (givenSha ?? 'tree') : git(['rev-parse', '--verify', `${ref}^{commit}`]);
   const cacheRoot = resolve(
     process.env.SNAPLOT_SNAPSHOT_DIR || join(mainRoot, '.claude/visual-cache'),
   );
   const entry = join(cacheRoot, sha);
-  const fingerprint = browserFingerprint();
+  const refLockPath = givenTree ? join(givenTree, 'package-lock.json') : null;
+  const refLock = givenTree
+    ? existsSync(refLockPath)
+      ? readFileSync(refLockPath, 'utf8')
+      : null
+    : (() => {
+        const show = spawnSync('git', ['show', `${sha}:package-lock.json`], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          maxBuffer: 256 * 1024 * 1024,
+        });
+        return show.status === 0 ? show.stdout : null;
+      })();
+  const fingerprint = referenceFingerprint(refLock);
   const shots = join(entry, `shots-${fingerprint}`);
   const marker = join(shots, 'capture.json');
+  const cached = readMarker(marker);
+  if (cached) {
+    console.log(
+      `visual: reference ${ref} (${sha.slice(0, 10)}) from cache ${shots} (${cached.shots.length} shots)`,
+    );
+    return {
+      ref,
+      sha,
+      dir: shots,
+      fingerprint,
+      cached: true,
+      exit: cached.exit,
+      verifyExit: cached.verifyExit,
+      complete: true,
+      declared: cached.declared,
+      shots: cached.shots,
+    };
+  }
   if (existsSync(marker)) {
-    console.log(`visual: reference ${ref} (${sha.slice(0, 10)}) from cache ${shots}`);
-    return { ref, sha, shots };
+    console.log('visual: the cached reference predates the verified shot list; capturing again');
   }
   const refHasHarness = givenTree
     ? existsSync(join(givenTree, 'packages/snaplot/test/visual/visual.spec.ts'))
@@ -184,14 +336,10 @@ async function captureReference(ref, port, givenTree, givenSha) {
     const untar = spawnSync('tar', ['-x', '-C', tree], { input: archive.stdout });
     if (untar.status !== 0) throw new Error(`tar -x failed: ${untar.stderr}`);
   }
-  const refPkg = join(tree, 'packages/snaplot');
-  const refLock = join(tree, 'package-lock.json');
-  const headLock = join(repoRoot, 'package-lock.json');
-  const sameLock =
-    existsSync(refLock) && readFileSync(refLock, 'utf8') === readFileSync(headLock, 'utf8');
+  const headLock = readFileSync(join(repoRoot, 'package-lock.json'), 'utf8');
   const refModules = join(tree, 'node_modules');
-  if (sameLock) {
-    if (!existsSync(refModules)) symlinkSync(join(repoRoot, 'node_modules'), refModules, 'dir');
+  if (refLock !== null && refLock === headLock) {
+    linkModules(join(repoRoot, 'node_modules'), refModules);
   } else if (!existsSync(join(refModules, '@playwright/test'))) {
     console.log('visual: the reference lockfile differs; running npm ci in the extracted tree');
     await waitForBenchLock();
@@ -201,46 +349,58 @@ async function captureReference(ref, port, givenTree, givenSha) {
     if (code !== 0) throw new Error('npm ci in the reference tree failed');
   }
   mkdirSync(shots, { recursive: true });
-  const code = await run(
-    process.execPath,
-    [
-      playwrightBin(tree),
-      'test',
-      '--config',
-      join(refPkg, 'playwright.config.ts'),
-      '--project',
-      'visual',
-      '--update-snapshots=all',
-      '--reporter=dot,json',
-    ],
-    {
-      cwd: refPkg,
-      env: {
-        ...process.env,
-        PORT: String(port),
-        SNAPLOT_VISUAL_EXPECTED_DIR: shots,
-        SNAPLOT_VISUAL_OUTPUT_DIR: join(entry, 'out'),
-        PLAYWRIGHT_JSON_OUTPUT_NAME: join(entry, 'out/capture-report.json'),
-      },
-    },
-  );
-  const captured = listPngs(shots);
-  if (code !== 0) {
-    // Not cached: a transient failure must not freeze a partial reference. The shots that did
-    // render are compared; a fixture with no reference is reported as added.
-    console.warn(
-      `visual: WARNING: the reference run exited ${code} (${captured.length} shots captured); ` +
-        `see ${join(entry, 'out/capture-report.json')}. Fixtures it could not render will be ` +
-        'reported as added.',
-    );
-    return { ref, sha, shots };
+  mkdirSync(join(entry, 'out'), { recursive: true });
+  const render = { tree, port, shots, entry };
+  const captureReport = join(entry, 'out/capture-report.json');
+  const capture = await renderReference({ ...render, update: 'all', reportPath: captureReport });
+  let verify = null;
+  if (capture.code === 0 && capture.passed.length > 0) {
+    console.log('visual: rendering the reference again; every shot must reproduce');
+    verify = await renderReference({
+      ...render,
+      update: 'none',
+      reportPath: join(entry, 'out/verify-report.json'),
+    });
   }
+  const onDisk = new Set(listPngs(shots).map((f) => f.split('\\').join('/').slice(0, -4)));
+  const reproduced = verify ? new Set(verify.passed) : null;
+  const usable = capture.passed.filter((n) => onDisk.has(n) && (!reproduced || reproduced.has(n)));
+  const complete =
+    capture.code === 0 &&
+    verify?.code === 0 &&
+    capture.declared.length > 0 &&
+    usable.length === capture.declared.length;
+  const outcome = {
+    ref,
+    sha,
+    dir: shots,
+    fingerprint,
+    cached: false,
+    exit: capture.code,
+    verifyExit: verify ? verify.code : null,
+    complete,
+    declared: capture.declared.length,
+    shots: usable,
+  };
+  if (!complete) {
+    // Not cached: a transient failure must not freeze a partial reference.
+    const unreproduced = reproduced ? capture.passed.filter((n) => !reproduced.has(n)) : [];
+    console.warn(
+      `visual: WARNING: the reference is incomplete: capture exit ${capture.code}` +
+        (verify ? `, second render exit ${verify.code}` : '') +
+        `; ${usable.length} of ${capture.declared.length} declared shots usable` +
+        (unreproduced.length ? ` (did not reproduce: ${unreproduced.join(', ')})` : '') +
+        `. See ${captureReport}. check-visual-diffs fails on this run; re-run it.`,
+    );
+    return outcome;
+  }
+  const { dir: _dir, cached: _cached, ...record } = outcome;
   writeFileSync(
     marker,
-    `${JSON.stringify({ ref, sha, fingerprint, exit: code, shots: captured.length, date: new Date().toISOString() }, null, 2)}\n`,
+    `${JSON.stringify({ format: CAPTURE_FORMAT, ...record, date: new Date().toISOString() }, null, 2)}\n`,
   );
-  console.log(`visual: captured ${captured.length} reference screenshots`);
-  return { ref, sha, shots };
+  console.log(`visual: captured ${usable.length} reference screenshots (each reproduced)`);
+  return outcome;
 }
 
 function pruneStaleBaselines(produced) {
@@ -299,14 +459,17 @@ async function main() {
     ...opts.passthrough,
   );
   const env = { ...process.env, PORT: String(port) };
-  if (reference) env.SNAPLOT_VISUAL_EXPECTED_DIR = reference.shots;
+  if (reference) env.SNAPLOT_VISUAL_EXPECTED_DIR = reference.dir;
   else delete env.SNAPLOT_VISUAL_EXPECTED_DIR;
   delete env.SNAPLOT_VISUAL_OUTPUT_DIR;
+  const reportPath = join(OUT, 'report.json');
+  // A head run that dies before it reports must not leave the previous report to be judged.
+  mkdirSync(OUT, { recursive: true });
+  writeFileSync(reportPath, '{}\n');
   const code = await run(process.execPath, args, { cwd: PKG, env });
 
-  const reportPath = join(OUT, 'report.json');
-  const report = existsSync(reportPath) ? JSON.parse(readFileSync(reportPath, 'utf8')) : null;
-  const produced = report ? shotNames(report) : [];
+  const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  const produced = shotNames(report);
   // Anything but a worker count narrows the run, so stale baselines and removals are not judged.
   const narrowing = opts.passthrough.filter(
     (a, i, all) => a !== '--workers' && all[i - 1] !== '--workers',
@@ -317,7 +480,7 @@ async function main() {
   }
   const head = git(['rev-parse', 'HEAD']);
   const dirty = git(['status', '--porcelain']) !== '';
-  const expectedAbs = reference ? reference.shots : BASELINES;
+  const expectedAbs = reference ? reference.dir : BASELINES;
   const inPkg = relative(PKG, expectedAbs);
   const meta = {
     mode: reference ? 'against' : opts.update ? 'update' : 'baselines',
@@ -332,16 +495,13 @@ async function main() {
     exit: code,
     date: new Date().toISOString(),
   };
-  mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, 'meta.json'), `${JSON.stringify(meta, null, 2)}\n`);
-  if (report) {
-    const sheet = writeContactSheet({
-      report,
-      meta: { ...meta, expectedDir: expectedAbs },
-      outFile: join(OUT, 'contact-sheet.html'),
-    });
-    console.log(`visual: contact sheet ${relative(process.cwd(), sheet)}`);
-  }
+  const sheet = writeContactSheet({
+    report,
+    meta: { ...meta, expectedDir: expectedAbs },
+    outFile: join(OUT, 'contact-sheet.html'),
+  });
+  console.log(`visual: contact sheet ${relative(process.cwd(), sheet)}`);
   if (opts.update) {
     const files = listPngs(BASELINES).filter((f) => f.endsWith(`-${process.platform}.png`));
     const bytes = files.reduce((sum, f) => sum + statSync(join(BASELINES, f)).size, 0);
@@ -349,6 +509,13 @@ async function main() {
       `visual: committed set for ${process.platform}: ${files.length} PNGs, ` +
         `${(bytes / 1024 / 1024).toFixed(2)} MB`,
     );
+  }
+  if (reference && !reference.complete) {
+    console.error(
+      `visual: the reference ${reference.ref} is incomplete (${reference.shots.length} of ` +
+        `${reference.declared} shots usable): this run cannot pass check-visual-diffs; run it again`,
+    );
+    process.exit(code === 0 ? 1 : code);
   }
   process.exit(code);
 }
