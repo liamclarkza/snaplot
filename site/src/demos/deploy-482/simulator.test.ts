@@ -92,11 +92,11 @@ describe('[deploy-482] simulator', () => {
   it('#482 multiplies /search p99 and leaves the other endpoints alone; #481 changes nothing', () => {
     for (const seed of [DEFAULT_SEED, 1, 2, 3, 99]) {
       const { buckets } = run(21, { seed });
-      const before = (e: string) => median(p99s(buckets, e, START + 13 * MIN, START + 18 * MIN));
-      const after = (e: string) => median(p99s(buckets, e, START + 18 * MIN, START + 20 * MIN));
-      expect(after('/search') / before('/search'), `seed ${seed}`).toBeGreaterThan(2);
+      const p99Before = (e: string) => median(p99s(buckets, e, START + 13 * MIN, START + 18 * MIN));
+      const p99After = (e: string) => median(p99s(buckets, e, START + 18 * MIN, START + 20 * MIN));
+      expect(p99After('/search') / p99Before('/search'), `seed ${seed}`).toBeGreaterThan(2);
       for (const e of ['/product', '/cart', '/checkout']) {
-        expect(Math.abs(after(e) / before(e) - 1), `seed ${seed} ${e}`).toBeLessThan(0.2);
+        expect(Math.abs(p99After(e) / p99Before(e) - 1), `seed ${seed} ${e}`).toBeLessThan(0.2);
       }
       for (const e of ENDPOINTS.map((x) => x.name)) {
         const b = median(p99s(buckets, e, START + MIN, START + 6 * MIN));
