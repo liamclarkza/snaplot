@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/*.test.mjs\"",
     "bench": "node run.mjs",
     "bench:compare": "node compare.mjs"
   },
