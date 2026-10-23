@@ -2669,7 +2669,8 @@ export class ChartCore implements ChartInstance {
       (si) =>
         this.scatterResolvers(si, this.config.series[si], palette[si % palette.length])
           .logicalResolver,
-      this.tooltipFormatters(),
+      // The tooltip's readout, so a clicked point reads like its tooltip.
+      { ...this.tooltipFormatters(), readout: this.readoutY },
       (si) => this.storeForSeries(si),
     );
     const bars = this.config.series.filter(

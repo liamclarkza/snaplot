@@ -168,7 +168,7 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
     expect(log.getCursorSnapshot().points.map((p) => p.formattedY)).toEqual(['123,456']);
   });
 
-  it.fails('[visuals-01] a clicked point reads like its tooltip', () => {
+  it('[visuals-01] a clicked point reads like its tooltip', () => {
     // Quarter ticks: a 0.25 step allows 4 readout decimals, where the default
     // tick count (a 0.2 step) would allow 3.
     const chart = fakes.mount<Row>({
