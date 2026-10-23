@@ -57,6 +57,18 @@ describe('[gap-annotations-extensibility-07][gap-annotations-extensibility-08] p
     expect(debug(chart).renderCount.data).toBeGreaterThan(before);
   });
 
+  // Plan §5.9 and RC15: a duplicate plugin id throws (M8's plugin host). Today the second is ignored.
+  it.fails('[backlog-27] two plugins with the same id throw, naming the id', () => {
+    expect(() =>
+      fakes.mount<Row>({
+        data: rows,
+        x: 't',
+        series: [{ y: 'v' }],
+        plugins: [{ id: 'note' }, { id: 'note' }],
+      }),
+    ).toThrow(/^snaplot: .*"note"/);
+  });
+
   it('[gap-annotations-extensibility-06:mount] reference lines given at creation are drawn by the first paint', () => {
     // An M1 regression (5106dd4), fixed by M1b (4a042b7): the engine's first
     // paint now waits until the controller has installed the annotation and
