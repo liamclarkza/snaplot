@@ -353,10 +353,16 @@ function planColumns<Row>(
   };
 }
 
+/** Append in place without spreading: `push(...items)` overflows the stack on large batches. */
+function pushAll<T>(target: T[], items: readonly T[]): void {
+  for (const item of items) target.push(item);
+}
+
 /**
  * Record a committed append: retained rows, indices and ids grow, `evicted`
  * rows leave from the front, and category labels follow their rows. Returns
- * whether an X category registry changed.
+ * whether an X category registry changed. It runs after the engine has taken
+ * the batch, so nothing here may throw: every check belongs in the plan.
  */
 export function commitAppend<Row>(
   ingested: Ingested<Row>,
@@ -375,10 +381,10 @@ export function commitAppend<Row>(
     const id = source.rowIds?.pop();
     if (id !== undefined) source.idSet?.delete(id);
   }
-  if (plan.rows) source.rows!.push(...plan.rows);
-  if (plan.index) source.index!.push(...plan.index);
+  if (plan.rows) pushAll(source.rows!, plan.rows);
+  if (plan.index) pushAll(source.index!, plan.index);
   if (plan.rowIds) {
-    source.rowIds!.push(...plan.rowIds);
+    pushAll(source.rowIds!, plan.rowIds);
     for (const id of plan.rowIds) source.idSet!.add(id);
   }
   source.nextIndex += count - (options.updateLast ? 1 : 0);

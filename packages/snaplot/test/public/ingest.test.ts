@@ -249,7 +249,7 @@ describe('appends are validated before anything changes', () => {
   // A batch is taken whole whatever its size: the engine and the retained rows and ids grow
   // together, so an update() re-ingests every appended point (D23).
   const BIG = 200_000;
-  it.fails('[dataapi-03] an append of 200,000 rows keeps every row through an update', () => {
+  it('[dataapi-03] an append of 200,000 rows keeps every row through an update', () => {
     const chart = mount({ data: [{ t: 0, v: 0 }], x: 't', series: [{ y: 'v' }] });
     const batch = Array.from({ length: BIG }, (_, i) => ({ t: i + 1, v: i }));
     chart.appendData(batch);
@@ -262,7 +262,7 @@ describe('appends are validated before anything changes', () => {
     expect(latest(chart)).toMatchObject({ x: BIG + 1, rowIndex: BIG + 1 });
   });
 
-  it.fails('[dataapi-03] an append of 200,000 rows with row ids keeps every id through an update', () => {
+  it('[dataapi-03] an append of 200,000 rows with row ids keeps every id through an update', () => {
     const chart = mount({
       data: [{ id: 'a', t: 0, v: 0 }],
       x: 't',
@@ -282,7 +282,7 @@ describe('appends are validated before anything changes', () => {
     );
   });
 
-  it.fails('[dataapi-03] an append of 200,000 { columns, rowIds } keeps every id through an update', () => {
+  it('[dataapi-03] an append of 200,000 { columns, rowIds } keeps every id through an update', () => {
     const chart = mount({
       data: { columns: { t: Float64Array.of(0), v: Float64Array.of(0) }, rowIds: ['a'] },
       x: 't',
