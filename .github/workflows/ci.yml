@@ -5,9 +5,9 @@ name: CI
 # workflow and `needs:` it, so nothing deploys or publishes unless every blocking job passes.
 #
 # Blocking: lint (G1), types (G2), unit (G3), ledger (G4), package (G5), size (G6), api (G7),
-# palettes (G8, advisory inside the script until M11), browser (G9), docs (G11),
-# conformance (from M13).
-# Advisory: visual (G10, blocking from M14) and bench (G12).
+# palettes (G8, advisory inside the script until M11), browser (G9), geometry (G10),
+# docs (G11), conformance (from M13).
+# Advisory: visual (G10 screenshots, blocking from M14) and bench (G12).
 
 on:
   push:
@@ -214,6 +214,32 @@ jobs:
       - run: npm run build
       - run: npm run conformance:install
       - run: npm run test:conformance
+
+  geometry:
+    name: Geometry (G10)
+    runs-on: ubuntu-latest
+    # The same image as the visual job: the 24 px minimum-font fixture needs full Chromium.
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Label and ink checks on the fixture app (built from source); they need no baselines,
+      # so they block on every platform while the screenshots stay advisory.
+      - run: npx playwright test --project geometry
+        working-directory: packages/snaplot
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: geometry-report
+          path: |
+            packages/snaplot/playwright-report/
+            packages/snaplot/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   visual:
     name: Visual (G10, advisory until M14)
