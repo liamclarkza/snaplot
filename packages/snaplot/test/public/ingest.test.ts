@@ -5,7 +5,7 @@
 // X order so it can be culled; appends are validated before anything changes.
 // Public API, the shared fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ChartHandle } from '../../src/index';
+import { type ChartHandle, createChartGroup } from '../../src/index';
 import { debug, type Fakes, installFakes } from '../fakes';
 
 let fakes: Fakes;
@@ -99,24 +99,40 @@ describe('row sources are sorted for you, with their identity kept', () => {
 });
 
 describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X order', () => {
-  /** Points drawn during a gesture over 10 % of X, over min(in view, max(400, 1.5 × plot width)). */
-  function fidelity(x: (i: number) => number): number {
-    const n = 20_000;
-    const chart = mount({
-      data: { columns: columns(n, x) },
-      x: 'x',
-      series: [{ type: 'scatter', y: 'y' }],
-    });
+  const n = 20_000;
+  /**
+   * Points drawn during a gesture over 10 % of X, over min(in view, max(400, 1.5 × plot width)):
+   * exactly 1 for a source culled by X, whose stride runs over the points in view.
+   */
+  function gestureFidelity(chart: ChartHandle<any>): number {
     fakes.frames.flush();
     chart.setViewport({ x: { min: 0, max: n / 10 } });
     fakes.frames.flush();
     const { drawnPoints, inViewPoints } = debug(chart);
     const budget = Math.max(400, 1.5 * chart.getLayout().plot.width);
+    chart.resetViewport();
+    fakes.frames.flush();
     return drawnPoints / Math.min(inViewPoints, budget);
   }
+  const scatter = (x: (i: number) => number) =>
+    mount({ data: { columns: columns(n, x) }, x: 'x', series: [{ type: 'scatter', y: 'y' }] });
+  const fidelity = (x: (i: number) => number) => gestureFidelity(scatter(x));
 
   it('[arch-06:ingest][gap-perf-gate-01:storage] a sorted scatter source is culled by X during a gesture', () => {
     expect(fidelity((i) => i)).toBe(1);
+  });
+
+  it.fails('[arch-06:ingest] a scatter stored unsorted by an append is culled again once its data is replaced', () => {
+    const chart = scatter((i) => i);
+    // An append before the last X stores the source unsorted.
+    chart.appendData({ columns: { x: Float64Array.of(-1), y: Float64Array.of(0) } });
+    expect(gestureFidelity(chart)).not.toBe(1);
+    chart.update({ data: { columns: columns(n) } });
+    expect(gestureFidelity(chart)).toBe(1);
+    // Appended in order and read again from what it retains, it stays sorted.
+    chart.appendData({ columns: { x: Float64Array.of(n), y: Float64Array.of(0) } });
+    chart.update({ axes: { y: { title: 'Load' } } });
+    expect(gestureFidelity(chart)).toBe(1);
   });
 
   it('an unsorted scatter source is accepted and keeps its row order (control)', () => {
@@ -273,6 +289,37 @@ describe('appends are validated before anything changes', () => {
     );
     chart.appendData([{ x: 4, y: 5, id: 'f', key: 'a' }]);
     expect(latest(chart)).toMatchObject({ x: 4, rowId: 'a' });
+  });
+
+  it.fails('[dataapi-20] an append a group rejects changes nothing, one that would store a scatter unsorted too', () => {
+    const group = createChartGroup();
+    const options = {
+      data: [
+        { k: 'A', y: 1 },
+        { k: 'B', y: 2 },
+      ],
+      x: 'k',
+      series: [{ type: 'scatter', y: 'y' }],
+      group,
+    };
+    const chart = mount(options);
+    mount(options);
+    const events: string[] = [];
+    chart.on('options:update', () => events.push('options:update'));
+    chart.on('data:update', () => events.push('data:update'));
+    const ingests = debug(chart).ingestCount;
+    // A comes before B, so the scatter would be stored unsorted, and the other chart lacks C.
+    expect(
+      thrown(() =>
+        chart.appendData([
+          { k: 'A', y: 3 },
+          { k: 'C', y: 4 },
+        ]),
+      ),
+    ).toMatch(/^snaplot: charts in one group need the same category order/);
+    expect(events).toEqual([]);
+    expect(debug(chart).ingestCount).toBe(ingests);
+    expect(latest(chart)).toMatchObject({ x: 'B', y: 2 });
   });
 
   it('[dataapi-03] duplicate rowIds inside one batch throw before any mutation', () => {
