@@ -114,6 +114,7 @@ const defaults: Fixture[] = [
     title: 'DEF-04: one observation draws no mark (render-05, backlog-04)',
     width: 320,
     height: 220,
+    blankData: 'a single observation paints nothing today (visuals-21:def-04)',
     options: () => labLine(labRows().slice(0, 1)),
   },
   {
@@ -154,6 +155,7 @@ const edges: Fixture[] = [
       minLabels: 'the empty state shows no ticks by design (plan §5.1 "Empty data")',
       paints: 'no data',
     },
+    blankData: 'no data',
     options: () => ({ data: [], x: 't', series: [{ y: 'v', label: 'Reading' }] }),
   },
   {

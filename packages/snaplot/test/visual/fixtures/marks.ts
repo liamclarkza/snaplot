@@ -450,6 +450,7 @@ const edges: Fixture[] = [
     title: 'Finite points isolated between gaps draw nothing (render-05, backlog-04)',
     width: 480,
     height: 240,
+    blankData: 'points isolated between gaps paint nothing today (render-05)',
     options: () => ({
       data: [1, null, 3, null, 2, null, 4].map((v, t) => ({ t, v })),
       x: 't',

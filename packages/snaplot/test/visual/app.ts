@@ -17,6 +17,8 @@ import { FIXTURES, type Fixture, findFixture } from './fixtures';
 import { FONT_FAMILY, FONT_WEIGHTS, type FixturePageApi } from './page-api';
 import { collectGeometry } from './probe';
 
+const DEBUG = Symbol.for('snaplot.debug');
+
 const frames = (n: number): Promise<void> =>
   new Promise((resolve) => {
     const step = (left: number) => {
@@ -31,6 +33,51 @@ const idle = (): Promise<void> =>
     if ('requestIdleCallback' in window) requestIdleCallback(() => resolve(), { timeout: 250 });
     else setTimeout(resolve, 0);
   });
+
+/** The paint state on the untyped debug symbol (plan D31). */
+interface PaintView {
+  renderCount?: { grid: number; data: number; overlay: number };
+  layers?: { grid?: HTMLCanvasElement; data?: HTMLCanvasElement };
+}
+
+const PAINT_TIMEOUT_MS = 5000;
+
+/** Pixels with any alpha on a canvas layer; 0 for a missing, empty or lost canvas. */
+function inkOf(canvas: HTMLCanvasElement | undefined): number {
+  if (!canvas || canvas.width === 0 || canvas.height === 0) return 0;
+  const ctx = canvas.getContext('2d');
+  if (!ctx || ctx.isContextLost()) return 0;
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let ink = 0;
+  for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) ink++;
+  return ink;
+}
+
+/**
+ * Resolves once the grid and data layers have painted: both rendered at least once, and the
+ * data layer holds ink (the grid layer for a fixture declared `blankData`). Under load a capture
+ * once showed the DOM labels over blank canvases; that state must fail the fixture loudly, never
+ * become a reference. It only waits: it never asks the chart to redraw, which would hide a
+ * missing paint (such as the reference lines that are not painted at mount).
+ */
+async function painted(chart: ChartHandle<any>, fixture: Fixture): Promise<void> {
+  const deadline = performance.now() + PAINT_TIMEOUT_MS;
+  for (;;) {
+    const view = (chart as unknown as Record<symbol, PaintView | undefined>)[DEBUG];
+    const counts = view?.renderCount;
+    const grid = inkOf(view?.layers?.grid);
+    const data = inkOf(view?.layers?.data);
+    const rendered = (counts?.grid ?? 0) >= 1 && (counts?.data ?? 0) >= 1;
+    if (rendered && (fixture.blankData ? grid > 0 : data > 0)) return;
+    if (performance.now() > deadline) {
+      throw new Error(
+        `the chart did not paint within ${PAINT_TIMEOUT_MS} ms: renderCount ` +
+          `${JSON.stringify(counts ?? null)}, grid layer ${grid} px of ink, data layer ${data} px`,
+      );
+    }
+    await frames(1);
+  }
+}
 
 function mountBox(fixture: Fixture): { root: HTMLElement; host: HTMLDivElement } {
   const stage = document.getElementById('stage')!;
@@ -105,6 +152,7 @@ async function renderFixture(id: string): Promise<void> {
     await document.fonts.ready;
     await frames(2);
     await idle();
+    await painted(chart, fixture);
     api.status = 'ready';
   } catch (error) {
     api.status = 'error';

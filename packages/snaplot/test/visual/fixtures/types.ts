@@ -52,6 +52,12 @@ export interface Fixture {
   hover?: { x: number; y: number };
   /** Geometry checks that do not apply to this fixture, each with its reason. */
   skip?: Partial<Record<GeometryCheck, string>>;
+  /**
+   * Why the data layer is blank today: no data, or a known defect (with its finding id). The app
+   * reports ready only once the data layer holds ink, or for these fixtures the grid layer. The
+   * fix that paints the layer drops the field.
+   */
+  blankData?: string;
 }
 
 export type ColorScheme = 'light' | 'dark';
