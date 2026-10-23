@@ -35,7 +35,7 @@ describe('the visual runner command line', () => {
 
   // M3a review #3: `-u` after `--update-snapshots=none` made Playwright write the head's
   // screenshots into the reference, and the next run against it passed.
-  it.fails('[repo-10] refuses the Playwright flags that write or skip the expected images', () => {
+  it('[repo-10] refuses the Playwright flags that write or skip the expected images', () => {
     const flags = [
       ['-u'],
       ['--update-snapshots'],

@@ -10,8 +10,8 @@
 # It copies the working tree (tracked and untracked files, never node_modules or dist) and, for
 # --against, `git archive <ref>` into the container, runs `npm ci` and
 # `node packages/snaplot/test/visual/run.mjs` there, and copies back
-# packages/snaplot/test-results/visual (report, meta, contact sheet, diff images) and, with
-# --update, the `-linux` screenshots. Default platform linux/amd64 (GitHub's x86_64 runners);
+# packages/snaplot/test-results/visual (report, meta, contact sheet, diff images, the reference
+# copy) and, with --update, the `-linux` screenshots. Default platform linux/amd64 (GitHub's x86_64 runners);
 # if that is unavailable or too slow, use --platform linux/arm64 and keep CI's visual job advisory.
 set -euo pipefail
 
@@ -66,18 +66,8 @@ docker run --rm --platform "$PLATFORM" --ipc=host \
     export SNAPLOT_SNAPSHOT_DIR=/work/cache CI=1
     status=0
     node packages/snaplot/test/visual/run.mjs "${ARGS[@]}" || status=$?
-    # Bring the reference shots along and point meta.json at them, so check-visual-diffs can
-    # read the result on the host.
-    node -e "
-      const fs = require(\"fs\"), path = require(\"path\");
-      const dir = \"packages/snaplot/test-results/visual\";
-      const meta = JSON.parse(fs.readFileSync(path.join(dir, \"meta.json\"), \"utf8\"));
-      if (path.isAbsolute(meta.expectedDir)) {
-        fs.cpSync(meta.expectedDir, path.join(dir, \"reference\"), { recursive: true });
-        meta.expectedDir = \"test-results/visual/reference\";
-        fs.writeFileSync(path.join(dir, \"meta.json\"), JSON.stringify(meta, null, 2) + \"\\n\");
-      }
-    " || true
+    # With --against, run.mjs compared the head against its own copy of the reference in
+    # test-results/visual/reference/ (meta.json points there), so the copy comes back with it.
     tar -cf /io/result.tar packages/snaplot/test-results/visual \
       $(cd packages/snaplot && find test/visual/__screenshots__ -name "*-linux.png" 2>/dev/null | sed "s|^|packages/snaplot/|")
     exit $status

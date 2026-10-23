@@ -76,11 +76,11 @@ describe('check-visual-diffs: the reference', () => {
 
   it('[repo-10] does not trust a reference shot that did not reproduce itself', () => {
     // capture.json is written only when a second render of the reference matches the first;
-    // marks/b differed, so its image exists but is not in the reference's shot list.
+    // marks/b differed, so it is not in the reference's shot list, and run.mjs leaves it out of
+    // the head's copy of the reference.
     const r = runScenario({
-      head: unchanged,
-      referenceFiles: SHOTS,
-      referenceShots: ['marks/a', 'marks/c'],
+      head: [{ name: 'marks/a' }, missing('marks/b'), { name: 'marks/c' }],
+      referenceFiles: ['marks/a', 'marks/c'],
       against: { exit: 0, verifyExit: 1, complete: false, declared: 3 },
     });
     expect(r.output).toContain('1 unverified');
@@ -296,7 +296,7 @@ describe('check-visual-diffs: visual-ledger rows', () => {
 // M3a review #3: `--against <ref> -u` wrote the head's screenshots into the shared reference
 // cache, and the next run against that cache reported 0 changed shots and OK.
 describe('check-visual-diffs: a reference written after capture', () => {
-  it.fails('[repo-10] fails a reference image that changed after capture, even with --allow-partial', () => {
+  it('[repo-10] fails a reference image that changed after capture, even with --allow-partial', () => {
     for (const args of [[], ['--allow-partial']]) {
       const r = runScenario({
         head: unchanged,
@@ -309,7 +309,7 @@ describe('check-visual-diffs: a reference written after capture', () => {
     }
   });
 
-  it.fails('[repo-10] fails the row rule too when a reference image changed after capture', () => {
+  it('[repo-10] fails the row rule too when a reference image changed after capture', () => {
     const r = runScenario({
       head: unchanged,
       referenceFiles: SHOTS,
@@ -321,7 +321,7 @@ describe('check-visual-diffs: a reference written after capture', () => {
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] fails a reference image that the capture did not produce', () => {
+  it('[repo-10] fails a reference image that the capture did not produce', () => {
     const r = runScenario({
       head: [...unchanged, { name: 'marks/new' }],
       referenceFiles: SHOTS,
@@ -332,7 +332,7 @@ describe('check-visual-diffs: a reference written after capture', () => {
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] fails a captured reference image that is gone, even with --allow-partial', () => {
+  it('[repo-10] fails a captured reference image that is gone, even with --allow-partial', () => {
     const r = runScenario({
       head: [{ name: 'marks/a' }, missing('marks/b'), { name: 'marks/c' }],
       referenceFiles: SHOTS,
@@ -343,7 +343,7 @@ describe('check-visual-diffs: a reference written after capture', () => {
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] refuses a meta.json that does not record the reference image hashes', () => {
+  it('[repo-10] refuses a meta.json that does not record the reference image hashes', () => {
     const r = runScenario({ head: unchanged, referenceFiles: SHOTS, legacyHashes: true });
     expect(r.output).toContain('does not record the reference image hashes');
     expect(r.status).toBe(1);

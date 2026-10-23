@@ -1,7 +1,8 @@
 // What a visual run compares with and what it rendered, shared by playwright.config.ts (which
 // applies the comparison), run.mjs (which records both in meta.json) and
 // scripts/overhaul/check-visual-diffs.mjs (which judges them). Kept in .mjs so the config, the
-// runner and the checker all load it in Node.
+// runner and the checker all load it in Node. It also hashes the reference images, so the runner
+// and the checker can tell that nothing wrote into a reference after its capture (review #3).
 //
 // Plan §11.3 G10 sets `maxDiffPixelRatio: 0.002`, with Playwright's per-pixel colour `threshold`
 // left at 0.2. M3a review #2 measured what that hides: a theme-wide grid colour change gave
@@ -14,8 +15,8 @@
 //   colour differs at all (`threshold: 0`).
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 /** The environment variable that selects EXACT. Every ref from M3a on honours it. */
 export const STRICT_ENV = 'SNAPLOT_VISUAL_STRICT';
@@ -77,4 +78,56 @@ export function headInputs(repoRoot, env = process.env) {
   const hash = createHash('sha256');
   for (const [i, file] of files.entries()) hash.update(`${blobs[i]} ${file}\n`);
   return hash.digest('hex');
+}
+
+/** The `.png` files under <dir>, as `/`-separated paths relative to it, sorted. */
+export function listPngs(dir, base = dir) {
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...listPngs(path, base));
+    else if (entry.name.endsWith('.png')) out.push(relative(base, path).split('\\').join('/'));
+  }
+  return out.sort();
+}
+
+/** The SHA-256 of some bytes, in hex. */
+export function sha256(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+/**
+ * The SHA-256 of each shot's image `<dir>/<shot><suffix>.png`, by shot name. A shot without an
+ * image is left out.
+ */
+export function shotHashes(dir, shots, suffix = '') {
+  const hashes = {};
+  for (const shot of shots) {
+    const file = join(dir, `${shot}${suffix}.png`);
+    if (existsSync(file)) hashes[shot] = sha256(readFileSync(file));
+  }
+  return hashes;
+}
+
+/**
+ * How the images in <dir> differ from what the capture recorded (`shots` and their `hashes`):
+ * `changed` (another hash, or none recorded), `missing` (a recorded shot's image is gone) and
+ * `extra` (an image the capture did not record). Each list is sorted.
+ */
+export function compareShots(dir, shots, hashes, suffix = '') {
+  const listed = new Set(shots);
+  const changed = [];
+  const missing = [];
+  for (const shot of [...listed].sort()) {
+    const file = join(dir, `${shot}${suffix}.png`);
+    if (!existsSync(file)) missing.push(shot);
+    else if (hashes?.[shot] !== sha256(readFileSync(file))) changed.push(shot);
+  }
+  const ending = `${suffix}.png`;
+  const extra = listPngs(dir)
+    .filter((f) => f.endsWith(ending))
+    .map((f) => f.slice(0, -ending.length))
+    .filter((shot) => !listed.has(shot));
+  return { changed, missing, extra };
 }

@@ -31,24 +31,24 @@
 //   and for the zero-change rule. A tolerance hides library-wide default changes: at the plan's
 //   0.002, a theme-wide grid colour change gave 0 changed shots (M3a review #2). A committed-
 //   baseline run within the tolerance passes the row rule with a note: it is not the merge gate.
+// - The reference images must be the ones the reference captured: run.mjs records the SHA-256 of
+//   each in meta.json (`against.hashes`), and an image that changed, is gone, or was never
+//   captured fails the check, even with --allow-partial. A head run that wrote into its
+//   reference (Playwright's -u, which run.mjs refuses) would otherwise compare the head with
+//   itself and pass (M3a review #3).
 //
 // The milestone defaults to the branch name (`ovh/m10-…` → M10); <base> defaults to the ref the
 // run compared against, else `overhaul`. With a milestone, the actual, reference and diff images
 // of every changed shot are copied to <main checkout>/notes/overhaul-audit/visual-diffs/<M>/.
 import { execFileSync } from 'node:child_process';
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import {
+  compareShots,
   describeComparison,
   headInputs,
   INPUT_PATHS,
+  listPngs,
 } from '../../packages/snaplot/test/visual/record.mjs';
 
 const ZERO_CHANGE = new Set(['M2', 'M9a', 'M9b']);
@@ -113,17 +113,6 @@ function collect(report) {
   return { visual, geometry };
 }
 
-function listPngs(dir, base = dir) {
-  if (!existsSync(dir)) return [];
-  const out = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listPngs(path, base));
-    else if (entry.name.endsWith('.png')) out.push(relative(base, path).split('\\').join('/'));
-  }
-  return out;
-}
-
 const fixtureOf = (shot) => shot.split('@')[0];
 
 /** Row files that differ from <base>, each `added` (new since <base>) or `edited`. */
@@ -166,9 +155,10 @@ function rowFixtures(text) {
 }
 
 /**
- * What the run compared against: the shot names the reference holds, and whether that list is
- * whole. A reference rendered from a ref is whole when run.mjs recorded `complete`; committed
- * baselines are whatever `-<platform>` images exist.
+ * What the run compared against: the shot names the reference holds, whether that list is
+ * whole, and how its images differ from the capture. A reference rendered from a ref is whole
+ * when run.mjs recorded `complete`; committed baselines are whatever `-<platform>` images exist
+ * (their content is under the stale-report fingerprint, since they are tracked).
  */
 function referenceOf(meta, expectedDir) {
   if (meta.mode === 'against') {
@@ -176,6 +166,13 @@ function referenceOf(meta, expectedDir) {
     if (!a || typeof a.complete !== 'boolean' || !Array.isArray(a.shots)) {
       console.error(
         'check-visual-diffs: FAIL: meta.json does not record the reference outcome (it was ' +
+          'written by an older run.mjs): run npm run test:visual -- --against <ref> again',
+      );
+      process.exit(1);
+    }
+    if (!a.hashes || typeof a.hashes !== 'object') {
+      console.error(
+        'check-visual-diffs: FAIL: meta.json does not record the reference image hashes (it was ' +
           'written by an older run.mjs): run npm run test:visual -- --against <ref> again',
       );
       process.exit(1);
@@ -189,6 +186,7 @@ function referenceOf(meta, expectedDir) {
     return {
       shots: new Set(a.shots),
       complete: a.complete,
+      written: compareShots(expectedDir, a.shots, a.hashes, meta.suffix ?? ''),
       outcome,
       summary: a.complete
         ? `complete, ${a.shots.length} shots${a.cached ? ' (cached)' : ''}`
@@ -203,6 +201,7 @@ function referenceOf(meta, expectedDir) {
   return {
     shots: new Set(shots),
     complete: true,
+    written: { changed: [], missing: [], extra: [] },
     outcome: '',
     summary: `${shots.length} committed ${meta.platform} baselines`,
     empty:
@@ -306,6 +305,15 @@ function main() {
     `check-visual-diffs: head ${String(meta.head?.sha).slice(0, 10)}${meta.head?.dirty ? ' + working tree' : ''} vs ${against}`,
   );
   console.log(`  reference: ${reference.summary}; comparison ${comparison}`);
+  const written = [
+    ['changed after capture', reference.written.changed],
+    ['missing', reference.written.missing],
+    ['not captured', reference.written.extra],
+  ]
+    .filter(([, shots]) => shots.length > 0)
+    .map(([what, shots]) => `${what}: ${shots.join(', ')}`)
+    .join('; ');
+  if (written) console.log(`  reference images differ from the capture: ${written}`);
   if (stale && opts.anyHead) {
     console.log(
       `  note: --any-head: the report is stale (${INPUT_PATHS.join(', ')} changed since the run); ` +
@@ -375,6 +383,14 @@ function main() {
   }
   // Not overridable: a run that compared nothing proves nothing.
   if (reference.shots.size === 0) failures.push(reference.empty);
+  // Not overridable either: the head may have been compared with its own screenshots.
+  if (written) {
+    failures.push(
+      `the reference images no longer match their capture (${written}): something wrote into ` +
+        'the reference after it was captured, such as a Playwright -u or --update-snapshots ' +
+        `run. Run npm run test:visual -- --against ${meta.against?.ref ?? '<ref>'} again`,
+    );
+  }
   // Not overridable either: a tolerance hides library-wide default changes (header comment).
   if (meta.mode === 'against' && !exact) {
     failures.push(

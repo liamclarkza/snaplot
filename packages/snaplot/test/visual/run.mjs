@@ -13,20 +13,29 @@
 //   --against-tree <dir> [--against-sha <sha>] use an already extracted ref (scripts/visual-docker.sh)
 //
 // Other flags: --project visual|geometry (repeatable), --grep <re>, --workers <n>; anything after
-// `--` goes to Playwright unchanged. Output: test-results/visual/{report.json,meta.json,
-// contact-sheet.html}; `node scripts/overhaul/check-visual-diffs.mjs` reads them.
+// `--` goes to Playwright unchanged, except the flags that would write, skip or relocate the
+// expected images (-u, --update-snapshots, --update-source-method, --ignore-snapshots, --config;
+// run-args.mjs), which exit 2. Output: test-results/visual/{report.json,meta.json,
+// contact-sheet.html}, and for --against the reference copy test-results/visual/reference/;
+// `node scripts/overhaul/check-visual-diffs.mjs` reads them.
 //
 // The reference cache lives outside the tracked tree: $SNAPLOT_SNAPSHOT_DIR, default
 // <main checkout>/.claude/visual-cache/<sha>/. A ref is extracted with `git archive` (no worktree)
 // and its own playwright config captures its own fixtures, so a fixture renamed between the two
 // sides compares like with like. The reference is rendered twice, and the second render must
 // match the first exactly (SNAPLOT_VISUAL_STRICT), and the head is then compared with it exactly
-// too (record.mjs says why). It is cached (capture.json) only when every shot it declares rendered and reproduced itself.
-// meta.json records the outcome (`against.complete`, the exit codes and the shot list), and
-// check-visual-diffs fails on an incomplete reference. Two runs against the same SHA take turns
-// (<entry>/capture.lock), so they never build into the same extracted tree at once. Nothing is
-// ever deleted outside this worktree (except a stale node_modules symlink, or a released
-// capture lock, that the runner itself made in the cache).
+// too (record.mjs says why). It is cached (capture.json) only when every shot it declares
+// rendered and reproduced itself, with the SHA-256 of each image. meta.json records the outcome
+// (`against.complete`, the exit codes, the shot list and the hashes), and check-visual-diffs fails
+// on an incomplete reference. Two runs against the same SHA take turns (<entry>/capture.lock), so
+// they never build into the same extracted tree at once.
+//
+// The head never writes into the cache (M3a review #3): it compares against a per-run copy of
+// the reference in test-results/visual/reference/, made from images whose hashes match the
+// capture. A cached reference whose images no longer match is moved aside and captured again, and
+// check-visual-diffs fails a copy that changed after the capture. Nothing is ever deleted outside
+// this worktree (except a stale node_modules symlink, or a released capture lock, that the runner
+// itself made in the cache).
 //
 // Environment: SNAPLOT_SNAPSHOT_DIR (the reference cache), SNAPLOT_BENCH_LOCK and
 // SNAPLOT_CLAUDE_DIR (as in bench/: the lock, default <main checkout>/.claude/bench.lock, found
@@ -37,11 +46,11 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
   readlinkSync,
   renameSync,
   rmdirSync,
+  rmSync,
   statSync,
   symlinkSync,
   unlinkSync,
@@ -51,20 +60,32 @@ import { createServer } from 'node:net';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeContactSheet } from './contact-sheet.mjs';
-import { comparisonFor, describeComparison, headInputs, STRICT_ENV } from './record.mjs';
+import {
+  comparisonFor,
+  compareShots,
+  describeComparison,
+  headInputs,
+  listPngs,
+  STRICT_ENV,
+  sha256,
+  shotHashes,
+} from './record.mjs';
 import { parseArgs } from './run-args.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = resolve(HERE, '../..');
 const OUT = join(PKG, 'test-results/visual');
+/** The head's per-run copy of the reference: the cache itself is never a write target. */
+const REFERENCE_COPY = join(OUT, 'reference');
 const BASELINES = join(HERE, '__screenshots__');
 const DEFAULT_PORT = 5333; // EXECUTION.md rule 6: M3a = 5300 + 33
 const LOCK_STALE_MS = 2 * 60 * 60 * 1000;
 /**
  * capture.json format: 2 recorded the verified shot list; 3 means the second render matched the
- * first exactly, not within the comparison tolerance. Older entries are captured again.
+ * first exactly, not within the comparison tolerance; 4 records the SHA-256 of each shot's image.
+ * Older entries are captured again.
  */
-const CAPTURE_FORMAT = 3;
+const CAPTURE_FORMAT = 4;
 
 function git(args, cwd = PKG) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
@@ -276,10 +297,30 @@ function readShotReport(path) {
 function readMarker(marker) {
   try {
     const data = JSON.parse(readFileSync(marker, 'utf8'));
-    return data.format === CAPTURE_FORMAT && Array.isArray(data.shots) ? data : null;
+    return data.format === CAPTURE_FORMAT &&
+      Array.isArray(data.shots) &&
+      data.hashes &&
+      typeof data.hashes === 'object'
+      ? data
+      : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * The shots of a cached reference whose images no longer match their recorded hashes (changed or
+ * gone), as `changed: a, b; missing: c`, or '' when every image matches. Extra images are fine in
+ * the cache (an earlier incomplete capture may have left some); they are never copied.
+ */
+function cacheDamage(shots, cached) {
+  const { changed, missing } = compareShots(shots, cached.shots, cached.hashes);
+  return [
+    changed.length ? `changed: ${changed.join(', ')}` : '',
+    missing.length ? `missing: ${missing.join(', ')}` : '',
+  ]
+    .filter(Boolean)
+    .join('; ');
 }
 
 function run(cmd, args, options) {
@@ -287,17 +328,6 @@ function run(cmd, args, options) {
     const child = spawn(cmd, args, { stdio: 'inherit', ...options });
     child.on('exit', (code, signal) => resolveRun(signal ? 1 : (code ?? 1)));
   });
-}
-
-function listPngs(dir, base = dir) {
-  if (!existsSync(dir)) return [];
-  const out = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listPngs(path, base));
-    else if (entry.name.endsWith('.png')) out.push(relative(base, path));
-  }
-  return out.sort();
 }
 
 /**
@@ -379,12 +409,15 @@ async function captureReference(ref, port, givenTree, givenSha) {
       complete: true,
       declared: cached.declared,
       shots: cached.shots,
+      hashes: cached.hashes,
     };
   };
   const cached = readMarker(marker);
-  if (cached) return fromCache(cached);
-  if (existsSync(marker)) {
-    console.log('visual: the cached reference predates the verified shot list; capturing again');
+  if (cached && !cacheDamage(shots, cached)) return fromCache(cached);
+  if (!cached && existsSync(marker)) {
+    console.log(
+      'visual: the cached reference predates the current capture format; capturing again',
+    );
   }
   const refHasHarness = givenTree
     ? existsSync(join(givenTree, 'packages/snaplot/test/visual/visual.spec.ts'))
@@ -399,9 +432,20 @@ async function captureReference(ref, port, givenTree, givenSha) {
   }
   const release = await takeCaptureLock(entry);
   try {
-    // Another run may have completed this reference while this one waited for the lock.
+    // Another run may have completed (or repaired) this reference while this one waited.
     const done = readMarker(marker);
-    if (done) return fromCache(done);
+    const damage = done ? cacheDamage(shots, done) : '';
+    if (done && !damage) return fromCache(done);
+    if (damage) {
+      // Something wrote into the cache after the capture (review #3: a head run with -u). Keep
+      // the evidence, never trust it, and capture again from an empty directory.
+      const aside = `${shots}.damaged-${Date.now()}`;
+      renameSync(shots, aside);
+      console.warn(
+        `visual: WARNING: the cached reference ${shots} no longer matches its capture ` +
+          `(${damage}). Moved it aside to ${aside}; capturing again`,
+      );
+    }
     return await renderInto({
       ref,
       sha,
@@ -477,7 +521,7 @@ async function renderInto({
       exact: true,
     });
   }
-  const onDisk = new Set(listPngs(shots).map((f) => f.split('\\').join('/').slice(0, -4)));
+  const onDisk = new Set(listPngs(shots).map((f) => f.slice(0, -4)));
   const reproduced = verify ? new Set(verify.passed) : null;
   const usable = capture.passed.filter((n) => onDisk.has(n) && (!reproduced || reproduced.has(n)));
   const complete =
@@ -496,6 +540,8 @@ async function renderInto({
     complete,
     declared: capture.declared.length,
     shots: usable,
+    // What check-visual-diffs verifies the head's copy against, and the cache on reuse.
+    hashes: shotHashes(shots, usable),
   };
   if (!complete) {
     // Not cached: a transient failure must not freeze a partial reference.
@@ -517,6 +563,28 @@ async function renderInto({
   );
   console.log(`visual: captured ${usable.length} reference screenshots (each reproduced)`);
   return outcome;
+}
+
+/**
+ * Copies the reference's usable shots into REFERENCE_COPY (this worktree's own output, emptied
+ * first), checking each image against its recorded hash on the way. The head compares against
+ * the copy, so nothing it does can reach the shared cache.
+ */
+function copyReference(reference) {
+  mkdirSync(REFERENCE_COPY, { recursive: true });
+  for (const shot of reference.shots) {
+    const bytes = readFileSync(join(reference.dir, `${shot}.png`));
+    if (sha256(bytes) !== reference.hashes[shot]) {
+      throw new Error(
+        `the reference image ${shot} changed while it was being copied from ${reference.dir}; ` +
+          'run again',
+      );
+    }
+    const file = join(REFERENCE_COPY, `${shot}.png`);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, bytes);
+  }
+  return REFERENCE_COPY;
 }
 
 function pruneStaleBaselines(produced) {
@@ -565,6 +633,9 @@ async function main() {
   const reference = opts.against
     ? await captureReference(opts.against, port, opts.againstTree, opts.againstSha)
     : null;
+  // A copy from an earlier run must never be judged as this run's reference.
+  rmSync(REFERENCE_COPY, { recursive: true, force: true });
+  const expectedAbs = reference ? copyReference(reference) : BASELINES;
   const projects = opts.projects.length
     ? opts.projects
     : opts.update
@@ -580,7 +651,7 @@ async function main() {
   const comparison = comparisonFor({ against: Boolean(reference), strict: opts.strict });
   env[STRICT_ENV] = comparison.exact ? '1' : '';
   console.log(`visual: comparing ${describeComparison(comparison)}`);
-  if (reference) env.SNAPLOT_VISUAL_EXPECTED_DIR = reference.dir;
+  if (reference) env.SNAPLOT_VISUAL_EXPECTED_DIR = expectedAbs;
   else delete env.SNAPLOT_VISUAL_EXPECTED_DIR;
   delete env.SNAPLOT_VISUAL_OUTPUT_DIR;
   const reportPath = join(OUT, 'report.json');
@@ -603,7 +674,6 @@ async function main() {
   }
   const head = git(['rev-parse', 'HEAD']);
   const dirty = git(['status', '--porcelain']) !== '';
-  const expectedAbs = reference ? reference.dir : BASELINES;
   const inPkg = relative(PKG, expectedAbs);
   const meta = {
     mode: reference ? 'against' : opts.update ? 'update' : 'baselines',
