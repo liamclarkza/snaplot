@@ -642,9 +642,12 @@ export const DEFAULT_LONG_PRESS_MS = 400;
 /** Default tap timeout (ms), max time for a press to count as a tap */
 export const TAP_TIMEOUT = 300;
 
-/** Default scatter point budget while the viewport is changing */
+/** The most scatter points drawn per frame while the viewport is changing. */
 export const DEFAULT_INTERACTION_SAMPLING = 10_000;
-/** Touch gesture budget scales with CSS width; settled rendering stays full fidelity. */
+/**
+ * The gesture budget scales with the plot's CSS width: max(400, 1.5 × width) in-view points
+ * (plan §3.4); settled rendering stays full fidelity.
+ */
 export const TOUCH_INTERACTION_POINTS_PER_PIXEL = 1.5;
 export const MIN_TOUCH_INTERACTION_SAMPLING = 400;
 

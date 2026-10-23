@@ -199,7 +199,10 @@ describe('marks', () => {
     );
   });
 
-  /** Points drawn during a gesture over min(in view, budget). */
+  /**
+   * Points drawn during a gesture over min(in view, budget), with the bench's budget of
+   * max(400, 1.5 × plot width) (plan §3.4; bench FidelitySampler).
+   */
   function fidelity(sorted: boolean): number {
     const n = 200_000;
     const chart = fakes.mount(
@@ -215,7 +218,8 @@ describe('marks', () => {
     chart.setViewport({ x: { min: 0, max: n / 10 } });
     fakes.frames.flush();
     const { drawnPoints, inViewPoints } = debug(chart);
-    return drawnPoints / Math.min(inViewPoints, 10_000);
+    const budget = Math.max(400, 1.5 * chart.getLayout().plot.width);
+    return drawnPoints / Math.min(inViewPoints, budget);
   }
 
   it('[perf:scatter-fidelity][gap-perf-gate-01:storage][arch-06:ingest] a sorted 200k scatter keeps fidelity ≥ 0.8 during a gesture', () => {

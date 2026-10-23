@@ -1922,16 +1922,15 @@ export class ChartCore implements EngineHost {
     const configured = this.config.performance?.interactionSampling;
     if (configured === false) return null;
     if (typeof configured === 'number') return configured > 0 ? configured : null;
-    if (this.lastPointerType === 'touch' || this.lastPointerType === 'pen') {
-      return Math.min(
-        DEFAULT_INTERACTION_SAMPLING,
-        Math.max(
-          MIN_TOUCH_INTERACTION_SAMPLING,
-          Math.round(this.layout.plot.width * TOUCH_INTERACTION_POINTS_PER_PIXEL),
-        ),
-      );
-    }
-    return DEFAULT_INTERACTION_SAMPLING;
+    // Plan §3.4: the budget counts in-view points (a sorted scatter is culled to the
+    // view first) and scales with the plot width, for every pointer type.
+    return Math.min(
+      DEFAULT_INTERACTION_SAMPLING,
+      Math.max(
+        MIN_TOUCH_INTERACTION_SAMPLING,
+        Math.round(this.layout.plot.width * TOUCH_INTERACTION_POINTS_PER_PIXEL),
+      ),
+    );
   }
 
   /** True while a gesture is moving the viewport and reduced-fidelity drawing is enabled. */

@@ -69,7 +69,7 @@ describe('engine interaction sampling', () => {
     expect(settled.inViewPoints).toBe(during.inViewPoints);
   });
 
-  it('uses a CSS-pixel-scaled interaction budget for touch gestures', () => {
+  it('uses a CSS-pixel-scaled interaction budget for every pointer type', () => {
     const n = 4800;
     const xs = new Float64Array(n);
     const ys = new Float64Array(n);
@@ -101,9 +101,11 @@ describe('engine interaction sampling', () => {
     expect(touch.inViewPoints).toBe(n);
     expect(touch.drawnPoints).toBe(480);
 
-    // After a mouse move, the budget is 10,000 points, so nothing is sampled.
+    // After a mouse move the budget is the same (plan §3.4: max(400, 1.5 × plot width)
+    // in-view points, whatever the pointer).
     hoverAt(chart, plotPoint(chart));
     const mouse = nudge();
-    expect(mouse.drawnPoints).toBe(n);
+    expect(mouse.inViewPoints).toBe(n);
+    expect(mouse.drawnPoints).toBe(480);
   });
 });

@@ -99,7 +99,7 @@ describe('row sources are sorted for you, with their identity kept', () => {
 });
 
 describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X order', () => {
-  /** Points drawn during a gesture over 10 % of X, over min(in view, the 10,000 budget). */
+  /** Points drawn during a gesture over 10 % of X, over min(in view, max(400, 1.5 × plot width)). */
   function fidelity(x: (i: number) => number): number {
     const n = 20_000;
     const chart = mount({
@@ -111,7 +111,8 @@ describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X orde
     chart.setViewport({ x: { min: 0, max: n / 10 } });
     fakes.frames.flush();
     const { drawnPoints, inViewPoints } = debug(chart);
-    return drawnPoints / Math.min(inViewPoints, 10_000);
+    const budget = Math.max(400, 1.5 * chart.getLayout().plot.width);
+    return drawnPoints / Math.min(inViewPoints, budget);
   }
 
   it('[arch-06:ingest][gap-perf-gate-01:storage] a sorted scatter source is culled by X during a gesture', () => {
