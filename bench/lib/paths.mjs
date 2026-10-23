@@ -44,3 +44,11 @@ export function lockPath() {
 export function abCacheDir() {
   return process.env.SNAPLOT_AB_CACHE ?? join(claudeDir(), 'ab-cache');
 }
+
+/**
+ * Resolves a path the user typed. `npm run` starts scripts in the bench workspace, so relative
+ * paths are taken from where npm was invoked (INIT_CWD), not from bench/.
+ */
+export function fromInvocation(path) {
+  return resolve(process.env.INIT_CWD ?? process.cwd(), path);
+}

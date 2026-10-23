@@ -11,13 +11,13 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { loadPlaywright, serve } from './lib/browser.mjs';
 import { load1, machine, parseArgs, playwrightVersion, profilesFrom } from './lib/env.mjs';
 import { evaluateBudgets, evaluateProfile, loadGate, setScenarios } from './lib/gate.mjs';
 import { acquireLock, waitWhileLocked } from './lib/lock.mjs';
 import { matchesFilter, measure } from './lib/measure.mjs';
-import { lockPath, resultsDir } from './lib/paths.mjs';
+import { fromInvocation, lockPath, resultsDir } from './lib/paths.mjs';
 import { abReport } from './lib/report.mjs';
 import {
   buildPage,
@@ -208,14 +208,17 @@ try {
     noiseThreshold: cpus().length * gate.noise.loadPerCore,
   };
   delete meta.browser.scenarios;
-  const markdown = abReport({ meta, evaluation });
-  const out = args.out ?? join(resultsDir, `ab-${labelFor(base.ref)}-${labelFor(head.ref)}.md`);
-  mkdirSync(resultsDir, { recursive: true });
-  writeFileSync(out, markdown);
+  const out = args.out
+    ? fromInvocation(args.out)
+    : join(resultsDir, `ab-${labelFor(base.ref)}-${labelFor(head.ref)}.md`);
+  mkdirSync(dirname(out), { recursive: true });
+  // The raw measurements first, so a failure in the report cannot lose them.
   writeFileSync(
-    out.replace(/\.md$/, '.json'),
+    out.replace(/\.md$/, '') + '.json',
     `${JSON.stringify({ kind: 'ab', meta, evaluation, profiles: measured.profiles, rounds: measured.rounds }, null, 1)}\n`,
   );
+  const markdown = abReport({ meta, evaluation });
+  writeFileSync(out, markdown);
   console.log(`\n${markdown}`);
   console.log(`wrote ${out}`);
   process.exitCode = evaluation.failures.length ? 1 : 0;

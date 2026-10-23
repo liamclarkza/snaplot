@@ -17,7 +17,7 @@ import { load1, machine, parseArgs, playwrightVersion, profilesFrom } from './li
 import { loadGate, setScenarios } from './lib/gate.mjs';
 import { waitWhileLocked } from './lib/lock.mjs';
 import { matchesFilter, measure } from './lib/measure.mjs';
-import { lockPath, resultsDir } from './lib/paths.mjs';
+import { fromInvocation, lockPath, resultsDir } from './lib/paths.mjs';
 import { runReport } from './lib/report.mjs';
 import { buildPage, prepareWorktree, worktreeSide } from './lib/sides.mjs';
 import { aggregate } from './lib/stats.mjs';
@@ -54,7 +54,7 @@ const gate = loadGate();
 const inSet = args.set ? setScenarios(gate, args.set) : null;
 const profiles = profilesFrom(args.profile);
 const runs = Number(args.runs);
-const out = args.out ?? join(resultsDir, 'latest.json');
+const out = args.out ? fromInvocation(args.out) : join(resultsDir, 'latest.json');
 
 // A one-sided run does not hold the lock, but it must not disturb another session's measurement.
 await waitWhileLocked(lockPath(), { log });
@@ -108,13 +108,14 @@ try {
     loadPerCore: gate.noise.loadPerCore,
     noiseThreshold: cpus().length * gate.noise.loadPerCore,
   };
-  const markdown = runReport({ meta, aggregates });
   mkdirSync(dirname(out), { recursive: true });
+  // The raw measurements first, so a failure in the report cannot lose them.
   writeFileSync(
     out,
     `${JSON.stringify({ kind: 'run', meta, aggregates, profiles: measured.profiles }, null, 1)}\n`,
   );
-  writeFileSync(out.replace(/\.json$/, '.md'), markdown);
+  const markdown = runReport({ meta, aggregates });
+  writeFileSync(out.replace(/\.json$/, '') + '.md', markdown);
   console.log(`\n${markdown}`);
   console.log(`wrote ${out}`);
 } finally {

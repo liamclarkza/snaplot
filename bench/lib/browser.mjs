@@ -24,7 +24,11 @@ export const PROFILES = {
 };
 
 // gap-perf-gate-07: without these, usedJSHeapSize is a quantised constant and gc() is missing.
-const MEMORY_FLAGS = ['--enable-precise-memory-info', '--js-flags=--expose-gc'];
+// Diagnostics only: BENCH_JS_FLAGS adds V8 flags to the same --js-flags switch.
+function memoryFlags() {
+  const v8 = ['--expose-gc', ...(process.env.BENCH_JS_FLAGS ?? '').split(/\s+/).filter(Boolean)];
+  return ['--enable-precise-memory-info', `--js-flags=${v8.join(' ')}`];
+}
 
 /**
  * Raster modes (gap-perf-gate-02). `gpu` (default) is the full Chromium build in new-headless mode
@@ -45,7 +49,7 @@ function baseLaunchOptions(raster, headed) {
       channel: 'chromium',
       headless: !headed,
       args: [
-        ...MEMORY_FLAGS,
+        ...memoryFlags(),
         '--enable-gpu',
         '--enable-gpu-rasterization',
         // Pin canvas 2D to out-of-process raster. Left to Chromium, contexts alternate between
@@ -60,7 +64,7 @@ function baseLaunchOptions(raster, headed) {
   if (raster === 'software') {
     return {
       headless: !headed,
-      args: [...MEMORY_FLAGS, ...(headed ? ['--disable-gpu'] : [])],
+      args: [...memoryFlags(), ...(headed ? ['--disable-gpu'] : [])],
     };
   }
   throw new Error(`unknown --raster ${raster} (expected gpu or software)`);

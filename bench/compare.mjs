@@ -12,6 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from './lib/env.mjs';
 import { evaluateBudgets, evaluateProfile, loadGate } from './lib/gate.mjs';
+import { fromInvocation } from './lib/paths.mjs';
 
 const USAGE = `usage: node bench/compare.mjs --base <a.json> --current <b.json> [--set M<N>]
        [--allow-new] [--base-side base|head] [--current-side base|head]`;
@@ -46,7 +47,7 @@ if (!basePath || !args.current) {
 }
 
 function sideOf(path, side) {
-  const doc = JSON.parse(readFileSync(path, 'utf8'));
+  const doc = JSON.parse(readFileSync(fromInvocation(path), 'utf8'));
   if (doc.kind === 'run') return doc.aggregates;
   if (doc.kind === 'ab') {
     return Object.fromEntries(
