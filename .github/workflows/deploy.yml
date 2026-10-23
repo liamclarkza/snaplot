@@ -4,12 +4,12 @@ name: Deploy docs
 # npm). It runs after the full CI workflow passes, and refuses to deploy a version that npm does
 # not serve yet: a prerelease must be `snaplot@next`, a release `snaplot@latest` (D1).
 #
-# Manual dispatch only until M6a adds the site and enables the v* tag trigger below.
+# Runs on version tags (D32) and by manual dispatch.
 
 on:
   workflow_dispatch:
-  # push:
-  #   tags: ['v*']
+  push:
+    tags: ['v*']
 
 permissions:
   contents: read
