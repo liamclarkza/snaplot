@@ -137,6 +137,8 @@ export interface SourceState<Row> {
   fields: ColumnField[];
   /** The row-id accessor of row sources. */
   rowIdField?: AccessorLike;
+  /** The column a typed-column source reads its row ids from (`rowId: '<column>'`). */
+  rowIdColumn?: string;
   /** Retained rows (row sources), from `head`. */
   rows?: Row[];
   /** The original index of each retained row (row sources), from `head`. */

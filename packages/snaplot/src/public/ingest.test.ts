@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { commitAppend, planAppend } from './append';
 import { ingest } from './ingest';
 import { type IngestContext, parseIso } from './sources';
 import { normalize } from './normalize';
@@ -462,5 +463,48 @@ describe('ingest (plan §3.2, D18, D23)', () => {
     });
     expect(result.spec.axes?.x).toBeUndefined();
     expect(result.spec.series[0]).toMatchObject({ type: 'bar', label: 'y', yColumn: 1 });
+  });
+});
+
+describe('[dataapi-20] an append plan changes nothing until it is committed (D23)', () => {
+  const options: ChartOptions = {
+    data: [{ t: 0, v: 1, k: 'a', w: 1 }],
+    x: 't',
+    series: [
+      { id: 'dots', type: 'scatter', y: 'v', colorBy: { field: 'k' } },
+      { id: 'line', y: 'w' },
+    ],
+  };
+  const setup = () => {
+    const n = normalize(options);
+    const ctx = { counters: { xValidations: 0 } };
+    const ingested = ingest(n, ctx);
+    const plan = (rows: Record<string, unknown>[]) =>
+      planAppend(
+        ingested,
+        n,
+        [0],
+        rows,
+        {},
+        ctx,
+        () => 0,
+        () => 1,
+      );
+    return { ingested, plan };
+  };
+
+  it('[dataapi-20] a plan that fails after reading a colorBy label leaves the labels as they were', () => {
+    const { ingested, plan } = setup();
+    // "w" fails after the colorBy column of the same row has been read.
+    expect(() => plan([{ t: 1, v: 1, k: 'new', w: 'bad' }])).toThrow(/"bad"/);
+    expect(ingested.encodings.get('field:k')).toEqual(['a']);
+  });
+
+  it('[dataapi-20] new colorBy labels arrive with the commit', () => {
+    const { ingested, plan } = setup();
+    const [planned] = plan([{ t: 1, v: 1, k: 'new', w: 2 }]);
+    expect(ingested.encodings.get('field:k')).toEqual(['a']);
+    commitAppend(ingested, planned, {}, 0, []);
+    expect(ingested.encodings.get('field:k')).toEqual(['a', 'new']);
   });
 });

@@ -36,6 +36,8 @@ export interface SourceAppend<Row> {
   codes?: number[];
   /** New category labels, in code order. */
   newLabels: string[];
+  /** The colorBy and tooltip label lists with this append's new labels, set on commit. */
+  encodings?: Map<string, string[]>;
   /** The scatter source must be stored unsorted before this append fits. */
   demote?: true;
 }
@@ -56,6 +58,8 @@ export function planAppend<Row>(
   length: (source: number) => number,
 ): SourceAppend<Row>[] {
   const out: SourceAppend<Row>[] = [];
+  // Label lists with this append's new labels, shared by its targets and set on commit.
+  const encodings = new Map<string, string[]>();
   for (const target of targets) {
     const source = ingested.sources[target];
     const path = `appendData() to series "${ingested.seriesIds[source.series[0]]}"`;
@@ -72,7 +76,7 @@ export function planAppend<Row>(
     ctx.counters.xValidations++;
     out.push(
       source.kind === 'rows'
-        ? planRows(ingested, n, target, data as Row[], options, path, lastX, length)
+        ? planRows(ingested, n, target, data as Row[], options, path, lastX, length, encodings)
         : planColumns(ingested, target, data as ColumnData, options, path, lastX, length),
     );
   }
@@ -105,6 +109,7 @@ function planRows<Row>(
   path: string,
   lastX: (source: number, back: number) => number,
   length: (source: number) => number,
+  encodings: Map<string, string[]>,
 ): SourceAppend<Row> {
   const source = ingested.sources[target];
   const count = batch.length;
@@ -213,7 +218,11 @@ function planRows<Row>(
           `${path}: ${fieldLabel(reader)} of appended row ${i}`,
         );
     } else if (field.kind === 'encoding') {
-      const labels = ingested.encodings.get(field.key) ?? [];
+      let labels = encodings.get(field.key);
+      if (!labels) {
+        labels = [...(ingested.encodings.get(field.key) ?? [])];
+        encodings.set(field.key, labels);
+      }
       const codes = new Map(labels.map((label, i) => [label, i]));
       for (let i = 0; i < count; i++) {
         const value = read(field.read, rows[i], index[i], path);
@@ -231,7 +240,6 @@ function planRows<Row>(
           out[i] = c;
         }
       }
-      ingested.encodings.set(field.key, labels);
     }
     return out;
   });
@@ -243,6 +251,7 @@ function planRows<Row>(
     ...(rowIds ? { rowIds } : {}),
     ...(source.xKind === 'category' ? { codes: Array.from(sortedXValues) } : {}),
     newLabels,
+    ...(encodings.size ? { encodings } : {}),
     ...(demote ? { demote } : {}),
   };
 }
@@ -305,7 +314,17 @@ function planColumns<Row>(
     } else checkOrder(target, x[0], options, path, lastX, length);
   }
   let rowIds: RowId[] | undefined;
-  if (source.rowIds) {
+  const idColumn = source.rowIdColumn;
+  if (idColumn !== undefined) {
+    // Checked with the other columns above: present, a Float64Array, `count` long.
+    if (batch.rowIds)
+      fail(
+        `${path}: this data's row ids come from column "${idColumn}"; append them in that column, without rowIds.`,
+      );
+    rowIds = Array.from(named[idColumn]);
+    for (const id of rowIds) if (!isRowId(id)) fail(`${path}: column "${idColumn}" holds ${id}.`);
+    checkNewIds(source, rowIds, options, path);
+  } else if (source.rowIds) {
     if (!batch.rowIds)
       fail(`${path}: this data has row ids; append { columns, rowIds } with one id per row.`);
     if (batch.rowIds.length !== count)
@@ -364,6 +383,7 @@ export function commitAppend<Row>(
   }
   source.nextIndex += count - (options.updateLast ? 1 : 0);
   source.streamed = true;
+  for (const [key, labels] of plan.encodings ?? []) ingested.encodings.set(key, labels);
   // Eviction from the front.
   if (evicted > 0) {
     for (let i = 0; i < evicted; i++) {

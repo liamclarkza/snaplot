@@ -131,6 +131,39 @@ describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X orde
 });
 
 describe('appends are validated before anything changes', () => {
+  it('[dataapi-03] typed columns read appended row ids from the rowId column', () => {
+    const chart = mount({
+      data: {
+        columns: {
+          t: Float64Array.of(0, 1),
+          v: Float64Array.of(1, 2),
+          id: Float64Array.of(10, 11),
+        },
+      },
+      x: 't',
+      rowId: 'id',
+      series: [{ y: 'v' }],
+    });
+    const batch = (t: number, id: number) => ({
+      columns: { t: Float64Array.of(t), v: Float64Array.of(t + 1), id: Float64Array.of(id) },
+    });
+    chart.appendData(batch(2, 12));
+    expect(latest(chart)).toMatchObject({ x: 2, y: 3, rowId: 12 });
+    expect(thrown(() => chart.appendData(batch(3, 11)))).toMatch(
+      /^snaplot: .*rowId 11 is already in the chart/,
+    );
+    // The ids come from one place: rowIds beside the id column would disagree with it.
+    expect(thrown(() => chart.appendData({ ...batch(3, 13), rowIds: [99] }))).toMatch(
+      /^snaplot: .*row ids come from column "id"/,
+    );
+    expect(latest(chart)).toMatchObject({ x: 2, rowId: 12 });
+    // An update re-reads the retained columns, ids included, and appends keep using the column.
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect(thrown(() => chart.appendData(batch(3, 12)))).toMatch(/rowId 12 is already/);
+    chart.appendData(batch(3, 13));
+    expect(latest(chart)).toMatchObject({ x: 3, rowId: 13 });
+  });
+
   it('[dataapi-20] an append before the last retained X throws in public words and changes nothing', () => {
     const chart = mount({
       data: [

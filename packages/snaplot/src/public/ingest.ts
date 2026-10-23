@@ -431,6 +431,7 @@ function ingestColumns<Row>(
       if (!(column instanceof Float64Array))
         fail(`${path}: the data has no column "${field}" for rowId.`);
       state.rowIds = Array.from(column);
+      state.rowIdColumn = field;
       finishRowIds(state, path);
     }
   }

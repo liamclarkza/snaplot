@@ -261,7 +261,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const base = {
       evicted: source.evicted,
       nextIndex: source.nextIndex,
-      ...(source.rowIds ? { rowIds: source.rowIds.slice(source.head) } : {}),
+      // Ids read from a column are read from the retained column again.
+      ...(source.rowIds && !source.rowIdColumn ? { rowIds: source.rowIds.slice(source.head) } : {}),
     };
     if (source.kind === 'rows')
       return {
