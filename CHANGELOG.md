@@ -30,8 +30,8 @@ to [Semantic Versioning](https://semver.org/).
   options it names without re-reading data.
 - Axis and series `format` accept `Intl.NumberFormat` options with `prefix` and `suffix`; time
   axes accept `Intl.DateTimeFormat` options. Axis `min`, `max` and `ticks` accept Dates. Series
-  `color` replaces `stroke`, `dash` replaces `lineDash`, and a bar `color` function receives the
-  value, the row and its index. Reference regions take `color` and accept `±Infinity` ends.
+  `color` replaces `stroke`, `dash` replaces `lineDash` (legend items name it `dash` too), and a
+  bar `color` function receives the value, the row and its index. Reference regions take `color` and accept `±Infinity` ends.
 - A `format` on a category axis throws. `appendData({ seriesId })` on a series that shares its data
   with other series throws. Re-reading a source of 10,000 rows or more because an accessor
   function keeps getting a new identity warns once.

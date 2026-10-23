@@ -74,7 +74,7 @@ export function SeriesLegend<Row>(props: SeriesLegendProps<Row>): ReactElement {
         h('span', {
           className: 'snaplot-legend-dot',
           'data-mark': item.type,
-          'data-dashed': item.lineDash.length ? 'true' : undefined,
+          'data-dashed': item.dash.length ? 'true' : undefined,
           style: {
             color: item.color,
             opacity: item.opacity,

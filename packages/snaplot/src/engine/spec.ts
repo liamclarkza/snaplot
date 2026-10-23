@@ -730,7 +730,7 @@ export interface LegendItem<TMeta = unknown> {
   color: string;
   fill: string | null;
   lineWidth: number;
-  lineDash: number[];
+  dash: number[];
   opacity: number;
   meta?: TMeta;
 }

@@ -955,7 +955,7 @@ export class ChartCore implements EngineHost {
         color,
         fill,
         lineWidth: series.lineWidth ?? 1.5,
-        lineDash: series.dash ? [...series.dash] : [],
+        dash: series.dash ? [...series.dash] : [],
         opacity: series.opacity ?? 1,
         meta: series.meta,
       };

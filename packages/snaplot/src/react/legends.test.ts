@@ -23,7 +23,7 @@ function chartFixture() {
       color: '#123456',
       fill: null,
       visible: true,
-      lineDash: [],
+      dash: [],
       opacity: 1,
     },
   ];

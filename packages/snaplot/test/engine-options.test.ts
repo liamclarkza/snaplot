@@ -38,7 +38,7 @@ describe('engine runtime options', () => {
         type: 'band',
         color: '#f90',
         fill: '#f90',
-        lineDash: [4, 2],
+        dash: [4, 2],
         visible: true,
       },
       { label: 'Observed', type: 'line', fill: null, visible: false },

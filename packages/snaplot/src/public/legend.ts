@@ -300,7 +300,7 @@ export function createLegendPlugin<Row = Record<string, any>>(
           dot.style.borderColor = item.color;
           dot.style.backgroundColor = item.fill ?? '';
           dot.style.opacity = String(item.opacity);
-          setFlag(dot, 'dashed', item.lineDash.length > 0);
+          setFlag(dot, 'dashed', item.dash.length > 0);
           if (label.textContent !== item.label) label.textContent = item.label;
         });
       };

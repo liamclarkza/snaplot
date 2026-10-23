@@ -507,7 +507,7 @@ describe('§4.4 option leaves reach the engine', () => {
       x: 't',
       series: [{ y: 'cpu', color: '#cc79a7', dash: [4, 2] }],
     });
-    expect(chart.getLegendItems()[0]).toMatchObject({ color: '#cc79a7', lineDash: [4, 2] });
+    expect(chart.getLegendItems()[0]).toMatchObject({ color: '#cc79a7', dash: [4, 2] });
   });
 
   it('[arch-15] a bar color function receives the value, the row and the row index', () => {

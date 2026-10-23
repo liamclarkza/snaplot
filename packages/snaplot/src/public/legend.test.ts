@@ -26,7 +26,7 @@ function chartFixture() {
     color: 'red',
     fill: null,
     visible: true,
-    lineDash: [],
+    dash: [],
     opacity: 1,
   }));
   let snapshot: CursorSnapshot = {

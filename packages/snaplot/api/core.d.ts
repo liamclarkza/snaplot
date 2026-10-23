@@ -872,7 +872,7 @@ export declare interface LegendItem {
     /** Whether the series is shown. */
     visible: boolean;
     /** The dash pattern; empty when solid. */
-    lineDash: number[];
+    dash: number[];
     /** The series opacity. */
     opacity: number;
 }
