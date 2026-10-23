@@ -136,9 +136,26 @@ export function runScenario(scenario) {
     for (const [name, text] of Object.entries(scenario.baseRows ?? { 'V0.md': V0 })) {
       writeFileSync(join(ledger, name), text);
     }
+    if (scenario.branch && !scenario.preHarnessBase) {
+      // The file run.mjs checks for: a merge base from M3a on has the fixture app.
+      const spec = join(dir, 'packages/snaplot/test/visual/visual.spec.ts');
+      mkdirSync(dirname(spec), { recursive: true });
+      writeFileSync(spec, '// the fixture app\n');
+    }
     git(dir, ['add', '-A']);
     git(dir, ['commit', '-qm', 'base']);
     const base = git(dir, ['rev-parse', 'HEAD']);
+    if (scenario.branch) {
+      // A milestone branch cut from `overhaul` at the base commit.
+      if (!scenario.noOverhaul) git(dir, ['branch', 'overhaul']);
+      git(dir, ['checkout', '-qb', scenario.branch]);
+      if (scenario.branchCommit) {
+        writeFileSync(join(dir, 'milestone.txt'), 'a committed milestone change\n');
+        git(dir, ['add', '-A']);
+        git(dir, ['commit', '-qm', 'a milestone commit']);
+      }
+    }
+    const tip = git(dir, ['rev-parse', 'HEAD']);
     for (const [name, text] of Object.entries(scenario.rows ?? {})) {
       writeFileSync(join(ledger, name), text);
     }
@@ -169,7 +186,7 @@ export function runScenario(scenario) {
         ? null
         : (scenario.againstExact ?? {
             ref: 'REF',
-            sha: base,
+            sha: scenario.againstTip ? tip : base,
             dir: reference,
             cached: false,
             exit: 0,
@@ -201,7 +218,7 @@ export function runScenario(scenario) {
     const meta = {
       mode,
       head: {
-        sha: base,
+        sha: tip,
         dirty: false,
         ...(scenario.legacyHead ? {} : { inputs: headInputs(dir, cleanEnv()) }),
       },
@@ -232,14 +249,14 @@ export function runScenario(scenario) {
       writeFileSync(join(dir, path), text);
     }
 
+    const baseArg = scenario.base ?? 'base';
     const run = spawnSync(
       process.execPath,
       [
         SCRIPT,
         '--report',
         results,
-        '--base',
-        base,
+        ...(baseArg === 'none' ? [] : ['--base', baseArg === 'against' ? against.sha : base]),
         '--no-copy',
         '--milestone',
         scenario.milestone ?? 'M2',

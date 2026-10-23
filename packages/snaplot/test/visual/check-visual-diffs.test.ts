@@ -349,3 +349,93 @@ describe('check-visual-diffs: a reference written after capture', () => {
     expect(r.status).toBe(1);
   });
 });
+
+// M3a review #3: once a milestone commits its changes, `--against HEAD` compares the head with
+// itself and passes either rule, so on a milestone branch the reference must be the merge base.
+describe('check-visual-diffs: the merge base', () => {
+  const branch = { branch: 'ovh/m11-marks', branchCommit: true, milestone: 'M11' } as const;
+
+  it.fails('[repo-10] fails a run against a ref other than the merge base with overhaul', () => {
+    const r = runScenario({
+      ...branch,
+      head: unchanged,
+      referenceFiles: SHOTS,
+      againstTip: true,
+      base: 'none',
+    });
+    expect(r.output).toContain('merge base');
+    expect(r.status).toBe(1);
+  });
+
+  it('passes a run against the merge base', () => {
+    const r = runScenario({ ...branch, head: unchanged, referenceFiles: SHOTS, base: 'none' });
+    expect(r.output).toContain('check-visual-diffs: OK');
+    expect(r.status).toBe(0);
+  });
+
+  it('judges a run against another ref when --base names it', () => {
+    const r = runScenario({
+      ...branch,
+      head: unchanged,
+      referenceFiles: SHOTS,
+      againstTip: true,
+      base: 'against',
+    });
+    expect(r.output).toContain('check-visual-diffs: OK');
+    expect(r.status).toBe(0);
+  });
+
+  it.fails('[repo-10] notes a merge base that predates the fixture app (M3a itself)', () => {
+    const r = runScenario({
+      ...branch,
+      preHarnessBase: true,
+      head: unchanged,
+      referenceFiles: SHOTS,
+      againstTip: true,
+      base: 'none',
+    });
+    expect(r.output).toContain('predates the fixture app');
+    expect(r.status).toBe(0);
+  });
+
+  it.fails('[repo-10] notes that the merge base was not checked without a local overhaul', () => {
+    const r = runScenario({
+      ...branch,
+      noOverhaul: true,
+      head: unchanged,
+      referenceFiles: SHOTS,
+      againstTip: true,
+      base: 'none',
+    });
+    expect(r.output).toContain('no local overhaul branch');
+    expect(r.status).toBe(0);
+  });
+});
+
+// M3a review #3: in a clone without a local `overhaul`, a committed-baseline run exited 2 with
+// git's "bad revision 'overhaul'", even under the zero-change rule, which reads no rows.
+describe('check-visual-diffs: a base that does not resolve', () => {
+  it.fails('[repo-10] applies the zero-change rule without reading rows', () => {
+    const r = runScenario({
+      mode: 'baselines',
+      comparison: 'exact',
+      head: unchanged,
+      referenceFiles: SHOTS,
+      base: 'none',
+    });
+    expect(r.output).toContain('check-visual-diffs: OK');
+    expect(r.status).toBe(0);
+  });
+
+  it.fails('[repo-10] asks for --base under the row rule', () => {
+    const r = runScenario({
+      mode: 'baselines',
+      head: unchanged,
+      referenceFiles: SHOTS,
+      milestone: 'M11',
+      base: 'none',
+    });
+    expect(r.output).toContain('pass --base <ref>');
+    expect(r.status).toBe(2);
+  });
+});

@@ -44,6 +44,24 @@ export interface Scenario {
   addAfterCapture?: string[];
   /** Reference images deleted after the capture. */
   removeAfterCapture?: string[];
+  /**
+   * Run on a milestone branch of this name (e.g. `ovh/m11-marks`), cut from an `overhaul` branch
+   * at the base commit. Default: the repository's initial branch, and no `overhaul` branch.
+   */
+  branch?: string;
+  /** With `branch`: add a commit on the branch, so its tip is no longer the merge base. */
+  branchCommit?: boolean;
+  /** With `branch`: create no `overhaul` branch (a clone without one). */
+  noOverhaul?: boolean;
+  /** With `branch`: leave the fixture app out of the base commit (M3a's own merge base). */
+  preHarnessBase?: boolean;
+  /** The reference was rendered from the branch tip (`--against HEAD`), not the base commit. */
+  againstTip?: boolean;
+  /**
+   * `--base` for check-visual-diffs.mjs: the base commit (`base`, the default), the reference's
+   * SHA (`against`), or none (`none`, so the script picks its own default).
+   */
+  base?: 'base' | 'against' | 'none';
   /** Extra arguments for check-visual-diffs.mjs. */
   args?: string[];
 }
