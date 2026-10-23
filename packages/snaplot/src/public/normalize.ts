@@ -702,15 +702,16 @@ function normalizeSeries(
   if (!isPlain(value)) fail(`${path} must be an object, not ${describe(value)}.`);
   checkKeys(value, SERIES, path);
   const type = (value.type ?? 'line') as SeriesType;
+  // How messages name the series: by its id or y field, else by its path.
   const name =
     typeof value.id === 'string'
-      ? `"${value.id}"`
+      ? `series "${value.id}"`
       : typeof value.y === 'string'
-        ? `"${value.y}"`
+        ? `series "${value.y}"`
         : path;
   if (!SERIES_TYPES.includes(type))
     fail(
-      `series ${name} has unknown type ${describe(value.type)}. Use one of: ${SERIES_TYPES.join(', ')}.`,
+      `${name} has unknown type ${describe(value.type)}. Use one of: ${SERIES_TYPES.join(', ')}.`,
     );
   const histogram = type === 'histogram';
   if (histogram) {
@@ -720,13 +721,13 @@ function normalizeSeries(
         `a histogram series takes histogram() bins as its data: { type: 'histogram', id, data: histogram(values) }.`,
       );
   } else if (value.y === undefined) {
-    fail(`series ${name} needs y: the field name of its values, or a function of the row.`);
+    fail(`${name} needs y: the field name of its values, or a function of the row.`);
   }
   if (type === 'band' && (value.lower === undefined || value.upper === undefined))
-    fail(`band series ${name} needs both lower and upper.`);
+    fail(`band ${name} needs both lower and upper.`);
   const id = value.id !== undefined ? value.id : typeof value.y === 'string' ? value.y : undefined;
   if (typeof id !== 'string' || id.length === 0)
-    fail(`series ${name} needs an id: its y is not a field name.`);
+    fail(`${name} needs an id: its y is not a field name.`);
 
   const spec: Partial<SeriesSpec> = {};
   const color = value.color;
@@ -804,7 +805,7 @@ function normalizeSeries(
     value.tooltipFields !== undefined
   ) {
     if (type !== 'scatter')
-      fail(`series ${name} uses colorBy, sizeBy or tooltipFields, which need type: 'scatter'.`);
+      fail(`${name} uses colorBy, sizeBy or tooltipFields, which need type: 'scatter'.`);
     if (value.colorBy !== undefined)
       normalized.colorBy = normalizeEncoding(value.colorBy, `${path}.colorBy`, COLOR_BY);
     if (value.sizeBy !== undefined)

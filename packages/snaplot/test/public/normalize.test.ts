@@ -138,6 +138,17 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].x).toBe(20);
   });
 
+  it('[dataapi-20] a series with no id or y field is named by its path', () => {
+    const message = thrown(() =>
+      mount({ data: rows, x: 't', series: [{ y: (r: { cpu: number }) => r.cpu }] }),
+    );
+    expect(message).toMatch(/^snaplot: series\[0\] needs an id: /);
+    expect(message).not.toMatch(/series series/);
+    expect(
+      thrown(() => mount({ data: rows, x: 't', series: [{ y: 'cpu', type: 'pie' }] })),
+    ).toMatch(/^snaplot: series "cpu" has unknown type/);
+  });
+
   it('[dataapi-20] a non-array series option throws', () => {
     expect(thrown(() => mount({ data: rows, x: 't', series: { y: 'cpu' } }))).toMatch(
       /^snaplot: .*series/,
