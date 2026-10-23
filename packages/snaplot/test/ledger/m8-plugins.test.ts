@@ -57,10 +57,10 @@ describe('[gap-annotations-extensibility-07][gap-annotations-extensibility-08] p
     expect(debug(chart).renderCount.data).toBeGreaterThan(before);
   });
 
-  it.fails('[gap-annotations-extensibility-06:mount] reference lines given at creation are drawn by the first paint', () => {
-    // An M1 regression: the constructor paints before the controller installs
-    // the annotation plugins, and the first ResizeObserver delivery no longer
-    // repaints an unchanged box, so nothing draws them until a later repaint.
+  it('[gap-annotations-extensibility-06:mount] reference lines given at creation are drawn by the first paint', () => {
+    // An M1 regression (5106dd4), fixed by M1b (4a042b7): the engine's first
+    // paint now waits until the controller has installed the annotation and
+    // user plugins. test/ledger/m1-mount.test.ts locks the mount paint itself.
     fakes.mount<Row>({
       data: rows,
       x: 't',
@@ -72,7 +72,7 @@ describe('[gap-annotations-extensibility-07][gap-annotations-extensibility-08] p
     expect(texts()).toContain('Deploy A');
   });
 
-  it.fails('[gap-annotations-extensibility-06:mount] a plugin given at creation draws in the first paint', () => {
+  it('[gap-annotations-extensibility-06:mount] a plugin given at creation draws in the first paint', () => {
     const drawn = vi.fn();
     fakes.mount<Row>({
       data: rows,
