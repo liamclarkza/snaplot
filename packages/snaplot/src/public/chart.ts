@@ -172,6 +172,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.options = normalized.options;
     this.ingested = ingest(normalized, this.context(normalized, false));
     validateGroup(normalized.group, this.candidate(this.ingested));
+    this.validateState(normalized.state, this.ingested);
     if (normalized.state.hiddenSeries) {
       this.hidden = new Set(normalized.state.hiddenSeries);
       this.appliedState.hiddenSeries = normalized.state.hiddenSeries;
@@ -200,20 +201,27 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           ),
         ),
     });
-    this.applyAccessibleName();
-    this.state = this.readState();
-    this.bindEngine();
-    this.installGuards();
-    this.lines.setLines(this.ingested.referenceLines);
-    this.regions.setRegions(this.ingested.referenceRegions);
-    for (const plugin of config.plugins ?? []) this.engine.use(plugin);
-    this.applyState(normalized.state, ['viewport', 'selection', 'highlight']);
-    // The mount paint: nothing repaints an unchanged box after it, so it must
-    // draw the annotations and plugins (gap-annotations-extensibility-06:mount).
-    this.engine.paint();
-    groups.get(normalized.group!)?.members.add(this);
-    coordinate(normalized.group);
-    this.state = this.readState();
+    try {
+      this.applyAccessibleName();
+      this.state = this.readState();
+      this.bindEngine();
+      this.installGuards();
+      this.lines.setLines(this.ingested.referenceLines);
+      this.regions.setRegions(this.ingested.referenceRegions);
+      for (const plugin of config.plugins ?? []) this.engine.use(plugin);
+      this.applyState(normalized.state, ['viewport', 'selection', 'highlight']);
+      // The mount paint: nothing repaints an unchanged box after it, so it must
+      // draw the annotations and plugins (gap-annotations-extensibility-06:mount).
+      this.engine.paint();
+      groups.get(normalized.group!)?.members.add(this);
+      coordinate(normalized.group);
+      this.state = this.readState();
+    } catch (error) {
+      // Every option is checked before the engine exists. Should anything here throw anyway,
+      // the caller gets no handle to destroy, so leave the container as it was.
+      this.destroy();
+      throw error;
+    }
   }
 
   private columns() {
@@ -280,9 +288,30 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   /**
+   * Check the state options against an ingest before anything changes (plan D3, D23), as
+   * validateControls() checks the framework controls. normalize() has checked the ranges and
+   * the series ids; this checks what needs the axes: each viewport key names an axis the
+   * engine builds (`x`, `y` or an axis of the spec), and a log axis takes bounds above 0.
+   */
+  private validateState(state: NormalizedState, ingested: Ingested<Row>): void {
+    const axes = ingested.spec.axes ?? {};
+    for (const [key, range] of Object.entries(state.viewport ?? {})) {
+      if (key !== 'x' && key !== 'y' && !Object.hasOwn(axes, key))
+        fail(
+          `viewport names axis "${key}", which this chart does not have.${hint(key, new Set(['x', 'y', ...Object.keys(axes)]))}`,
+        );
+      if (axes[key]?.type === 'log' && range.min <= 0)
+        fail(
+          `viewport.${key} is [${range.min}, ${range.max}], but axis "${key}" is a log axis: give bounds above 0.`,
+        );
+    }
+  }
+
+  /**
    * Apply state options (plan D3) without emitting: `keys` are applied when
    * present in `state`; a value equal to the one last applied is skipped unless
-   * `always` (an update() names the key, so it always applies).
+   * `always` (an update() names the key, so it always applies). validateState()
+   * has checked `state` against the engine's axes, so nothing here throws.
    */
   private applyState(state: NormalizedState, keys: readonly StateKey[], always = true): void {
     const wasMutating = this.mutating;
@@ -292,11 +321,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         if (!Object.hasOwn(state, key)) continue;
         if (!always && equivalent(state[key], this.appliedState[key])) continue;
         if (key === 'viewport') {
-          for (const [axis, range] of Object.entries(state.viewport ?? {})) {
-            if (!this.engine.getAxis(axis))
-              fail(`viewport names axis "${axis}", which this chart does not have.`);
+          for (const [axis, range] of Object.entries(state.viewport ?? {}))
             this.engine.setAxis(axis, range);
-          }
         } else if (key === 'selection') {
           this.engine.setSelection(state.selection ?? null);
         } else if (key === 'hiddenSeries') {
@@ -431,15 +457,20 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       );
     };
     if (!forceData && equivalent(withoutState(this.options), withoutState(next))) {
+      // Check first and keep the new options only once they apply, so a rejected
+      // call leaves the chart and its options as they were (D23).
+      this.validateState(normalized.state, this.ingested);
+      if (controls) this.validateControls(controls);
+      applyState();
+      if (controls) this.setControls(controls);
       this.options = next;
       this.normalized = normalized;
       this.optionsSnapshot = undefined;
-      applyState();
-      if (controls) this.setControls(controls);
       this.publish();
       return;
     }
     const ingested = ingest(normalized, this.context(normalized, forceData));
+    this.validateState(normalized.state, ingested);
     if (controls) this.validateControls(controls, ingested);
     validateGroup(next.group, this.candidate(ingested), this);
     this.commit(normalized, ingested, () => {
@@ -448,7 +479,11 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     });
   }
 
-  /** Swap in a new ingest as one transaction; restore everything if the engine throws. */
+  /**
+   * Swap in a new ingest as one transaction. Callers check the options, the state options and
+   * the controls against `ingested` first, so nothing after replaceSources() throws; if the
+   * engine rejects the candidate, everything is restored.
+   */
   private commit(
     normalized: NormalizedOptions<Row>,
     ingested: Ingested<Row>,
@@ -465,6 +500,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const highlighted = this.state.highlightedSeries;
     this.hidden = new Set([...this.hidden].filter((id) => ingested.seriesIds.includes(id)));
     this.mutating = true;
+    let replaced = false;
     try {
       this.ingested = ingested;
       this.options = next;
@@ -476,6 +512,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         ingested.seriesSources,
         /* trusted */ true,
       );
+      replaced = true;
       this.lines.setLines(ingested.referenceLines);
       this.regions.setRegions(ingested.referenceRegions);
       this.engine.setHighlight(highlighted ? ingested.seriesIds.indexOf(highlighted) : null);
@@ -487,11 +524,16 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         groups.get(next.group!)?.members.add(this);
       }
     } catch (error) {
-      this.ingested = previous.ingested;
-      this.options = previous.options;
-      this.normalized = previous.normalized;
-      this.optionsSnapshot = previous.optionsSnapshot;
-      this.hidden = previous.hidden;
+      // replaceSources() checks its candidate before it replaces a store. Once the engine holds
+      // the new sources, the facade keeps the ingest that matches them: restoring the previous
+      // one would report its rows and ids for the new points.
+      if (!replaced) {
+        this.ingested = previous.ingested;
+        this.options = previous.options;
+        this.normalized = previous.normalized;
+        this.optionsSnapshot = previous.optionsSnapshot;
+        this.hidden = previous.hidden;
+      }
       throw error;
     } finally {
       this.mutating = false;

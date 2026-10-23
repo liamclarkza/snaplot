@@ -712,7 +712,7 @@ describe('state options are checked before anything changes (D3, D23)', () => {
   const latest = (chart: ChartHandle<any>) =>
     chart.getCursorSnapshot({ fallback: 'latest' }).points[0];
 
-  it.fails('[arch-15] a viewport naming an unknown axis throws at createChart and leaves the container empty', () => {
+  it('[arch-15] a viewport naming an unknown axis throws at createChart and leaves the container empty', () => {
     const host = document.createElement('div');
     document.body.append(host);
     const observers = fakes.resizeObserver.observerCount;
@@ -729,7 +729,7 @@ describe('state options are checked before anything changes (D3, D23)', () => {
     expect(fakes.resizeObserver.observerCount).toBe(observers);
   });
 
-  it.fails('[arch-15] a rejected update({ viewport }) changes nothing, and later updates work', () => {
+  it('[arch-15] a rejected update({ viewport }) changes nothing, and later updates work', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
     const x = chart.getAxis('x');
     expect(thrown(() => chart.update({ viewport: { x: [2, 8], z: [0, 1] } } as never))).toMatch(
@@ -744,7 +744,7 @@ describe('state options are checked before anything changes (D3, D23)', () => {
     expect(chart.getAxis('x')).toMatchObject({ min: 2, max: 8 });
   });
 
-  it.fails('[dataapi-03][arch-15] a rejected update({ data, viewport }) keeps the old data and row ids', () => {
+  it('[dataapi-03][arch-15] a rejected update({ data, viewport }) keeps the old data and row ids', () => {
     const data = Array.from({ length: 5 }, (_, i) => ({ x: i, y: i * 2, id: `r${i}` }));
     const chart = mount({ data, x: 'x', rowId: 'id', series: [{ y: 'y' }] });
     const x = chart.getAxis('x');
@@ -760,7 +760,7 @@ describe('state options are checked before anything changes (D3, D23)', () => {
     expect(latest(chart).row).toBe(next[2]);
   });
 
-  it.fails('[arch-15] a viewport on a log axis needs bounds above 0', () => {
+  it('[arch-15] a viewport on a log axis needs bounds above 0', () => {
     const options = { data: rows, x: 't', series: [{ y: 'cpu' }], axes: { y: { type: 'log' } } };
     expect(thrown(() => mount({ ...options, viewport: { y: [0, 10] } }))).toMatch(
       /^snaplot: viewport\.y is \[0, 10\], but axis "y" is a log axis/,
