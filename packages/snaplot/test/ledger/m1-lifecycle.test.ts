@@ -133,7 +133,7 @@ describe('[gap-scale-longevity-01] resize paints synchronously', () => {
     expectPainted(chart);
   });
 
-  it.fails('[gap-scale-longevity-01] observing an unchanged box paints nothing more', () => {
+  it('[gap-scale-longevity-01] observing an unchanged box paints nothing more', () => {
     // The constructor already painted this box; the first observation of it
     // (every mount) must not paint the whole chart a second time in the
     // same frame.

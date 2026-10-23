@@ -463,8 +463,11 @@ export class ChartCore implements ChartInstance {
     // delivers after this frame's rAF callbacks and before paint), and a
     // reallocation cleared every layer. Paint now, or the cleared, opaque grid
     // is composited as a black frame (gap-scale-longevity-01). A delivery
-    // that reallocates nothing still re-lays out and paints here.
-    this.canvasManager = new CanvasManager(parent, (w, h) => {
+    // that reallocated nothing (the first observation at mount, or a box
+    // shown again at its old size) needs work only when the layout was made
+    // for another box, such as the fallback size while display: none.
+    this.canvasManager = new CanvasManager(parent, (w, h, reallocated) => {
+      if (!reallocated && !this.layoutIsStale()) return;
       this.onResize(w, h);
       this.scheduler.flush();
     });
@@ -2297,6 +2300,13 @@ export class ChartCore implements ChartInstance {
       if (v > max) max = v;
     }
     return min === Infinity ? null : [min, max];
+  }
+
+  /** Whether the layout was computed for another box, options or scales than the current ones. */
+  private layoutIsStale(): boolean {
+    const w = this.canvasManager.cssWidth || 600;
+    const h = this.canvasManager.cssHeight || 400;
+    return !this.layout || this.createLayoutCacheKey(w, h) !== this.layoutCacheKey;
   }
 
   private updateLayout(): void {

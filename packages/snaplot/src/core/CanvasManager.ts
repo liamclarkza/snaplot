@@ -30,7 +30,11 @@ export class CanvasManager {
 
   constructor(
     parent: HTMLElement,
-    private onResize?: (width: number, height: number) => void,
+    /**
+     * Called after a non-zero ResizeObserver delivery, and after a real dpr
+     * change. `reallocated` says whether the backing stores were cleared.
+     */
+    private onResize?: (width: number, height: number, reallocated: boolean) => void,
   ) {
     this._dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 
@@ -82,10 +86,10 @@ export class CanvasManager {
   }
 
   /**
-   * Enable ResizeObserver for auto-resize. Every non-zero delivery re-lays
-   * out (`onResize`), even when the backing stores need no reallocation:
-   * a box shown again at its old size after `display: none` (deliveries of
-   * 0 × 0 are skipped) still carries the fallback layout made while hidden.
+   * Enable ResizeObserver for auto-resize. Every non-zero delivery calls
+   * back, even when the backing stores need no reallocation: a box shown
+   * again at its old size after `display: none` (deliveries of 0 × 0 are
+   * skipped) may still carry the fallback layout made while hidden.
    */
   enableAutoResize(): void {
     if (this.resizeObserver) return;
@@ -94,8 +98,7 @@ export class CanvasManager {
       if (!entry) return;
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) {
-        this.resize(width, height);
-        this.onResize?.(width, height);
+        this.onResize?.(width, height, this.resize(width, height));
       }
     });
     this.resizeObserver.observe(this.container);
@@ -127,7 +130,7 @@ export class CanvasManager {
         (window.devicePixelRatio || 1) !== this._dpr &&
         this.resize(this.cssWidth, this.cssHeight)
       ) {
-        this.onResize?.(this.cssWidth, this.cssHeight);
+        this.onResize?.(this.cssWidth, this.cssHeight, true);
       }
       // The query is pinned to the dpr it was armed with; re-arm for the current one.
       this.watchDpr();
