@@ -122,7 +122,7 @@ describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X orde
     expect(fidelity((i) => i)).toBe(1);
   });
 
-  it.fails('[arch-06:ingest] a scatter stored unsorted by an append is culled again once its data is replaced', () => {
+  it('[arch-06:ingest] a scatter stored unsorted by an append is culled again once its data is replaced', () => {
     const chart = scatter((i) => i);
     // An append before the last X stores the source unsorted.
     chart.appendData({ columns: { x: Float64Array.of(-1), y: Float64Array.of(0) } });

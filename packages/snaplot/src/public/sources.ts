@@ -172,6 +172,11 @@ export interface SourceState<Row> {
   nextIndex: number;
   /** The source received appends since its last full ingest. */
   streamed: boolean;
+  /**
+   * A scatter source stored unsorted because an append broke its X order: it stays so while
+   * its data is retained, and replaced data is sorted again.
+   */
+  unsorted?: true;
 }
 
 /** Everything a chart needs from one ingest. */
@@ -229,7 +234,11 @@ export interface IngestContext<Row> {
   previousCategories?: ReadonlyMap<string, CategoryAxis>;
   /** Axis types to keep for inferred axes that now hold no data. */
   previousTypes?: ReadonlyMap<string, AxisSpec['type']>;
-  /** Scatter sources (by input and axis) to store unsorted even if X is sorted. */
+  /**
+   * Scatter sources (by source index and axis) to store unsorted even if X is sorted, in this
+   * ingest: the ones an append is about to break the X order of. A retained source that was
+   * stored unsorted stays so on its own (`Retained.unsorted`).
+   */
   unsorted?: ReadonlySet<string>;
 }
 
@@ -240,6 +249,8 @@ export interface Retained<Row> {
   columns?: Record<string, Float64Array>;
   /** The ids of a `{ columns, rowIds }` source, which has no accessor to read them with. */
   rowIds?: RowId[];
+  /** The source is stored unsorted (`SourceState.unsorted`). */
+  unsorted?: true;
   evicted: number;
   nextIndex: number;
 }

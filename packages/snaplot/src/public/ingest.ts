@@ -230,7 +230,8 @@ function ingestSource<Row>(
 ): SourceState<Row> {
   const name = n.series[plan.series[0]].id;
   const path = `series "${name}"`;
-  const forceUnsorted = ctx.unsorted?.has(sourceKey(index, plan.axis)) ?? false;
+  const forceUnsorted =
+    retained?.unsorted === true || (ctx.unsorted?.has(sourceKey(index, plan.axis)) ?? false);
 
   if (isBins(plan.input)) return ingestBins(plan, plan.input, path, n, kinds);
 
@@ -239,6 +240,7 @@ function ingestSource<Row>(
     : plan.input;
   if (isColumns(input)) {
     const state = ingestColumns(plan, input, path, n, ctx, kinds, forceUnsorted);
+    if (forceUnsorted && !plan.ordered) state.unsorted = true;
     if (retained) {
       state.evicted = retained.evicted;
       state.nextIndex = retained.nextIndex;
@@ -261,6 +263,7 @@ function ingestSource<Row>(
     categoryAxis,
     forceUnsorted,
   );
+  if (forceUnsorted && !plan.ordered) state.unsorted = true;
   if (retained) {
     state.evicted = retained.evicted;
     state.nextIndex = retained.nextIndex;

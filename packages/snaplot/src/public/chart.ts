@@ -150,8 +150,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   private churn = { streak: 0, times: [] as number[] };
   /** The one X pass per source and append batch (plan §3.4), for the debug symbol. */
   private counters = { xValidations: 0 };
-  /** Scatter sources stored unsorted after an append broke their X order. */
-  private unsorted = new Set<string>();
   private hidden = new Set<string>();
   private state!: ChartState<Row>;
   private subscribers = new Set<() => void>();
@@ -248,7 +246,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       previousEncodings: previous?.encodings,
       previousCategories: previous?.categories,
       previousTypes,
-      unsorted: this.unsorted,
       retained: (input, axis, x) => {
         if (!previous || (forceData && input === normalized.data)) return undefined;
         const exact = previous.sources.findIndex(
@@ -267,7 +264,11 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
 
   /** What a streamed source retains, to ingest again instead of its declared input. */
   private retained(source: SourceState<Row>, index: number): Retained<Row> {
-    const base = { evicted: source.evicted, nextIndex: source.nextIndex };
+    const base = {
+      evicted: source.evicted,
+      nextIndex: source.nextIndex,
+      ...(source.unsorted ? { unsorted: true as const } : {}),
+    };
     // A row source reads its ids with the current rowId again (it is an accessor, D16).
     if (source.kind === 'rows')
       return {
@@ -643,9 +644,13 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const demoted = plans.filter((plan) => plan.demote);
     if (demoted.length) {
       // A scatter source whose X was sorted gets an append that is not: store it unsorted.
-      for (const plan of demoted)
-        this.unsorted.add(sourceKey(plan.source, sources[plan.source].axis));
-      this.commit(this.normalized, ingest(this.normalized, this.context(this.normalized, false)));
+      const unsorted = new Set(
+        demoted.map((plan) => sourceKey(plan.source, sources[plan.source].axis)),
+      );
+      this.commit(
+        this.normalized,
+        ingest(this.normalized, { ...this.context(this.normalized, false), unsorted }),
+      );
       this.appendData(data, options);
       return;
     }
