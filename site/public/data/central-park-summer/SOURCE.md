@@ -54,7 +54,7 @@ npm run demo-data -- central-park-summer --offline  # rebuild from that cache
 ## Processing
 
 - GHCN-Daily TMAX/TMIN are tenths of °C; converted with °F = °C × 9/5 + 32 and rounded to whole °F, which recovers the whole-°F U.S. observation exactly (the tenths-of-°C storage is off by at most 0.09 °F). Values with a non-blank quality flag (QFLAG) are skipped.
-- Records: the highest TMAX and lowest TMIN for each calendar day over 1869–2024 (2025 excluded, so 2025 can set records); ties keep the most recent year.
+- Records: the highest TMAX and lowest TMIN for each calendar day over 1869–2024 (2025 excluded, so 2025 can set records), compared in whole °F; ties keep the most recent year.
 - Normal band: the 10th, 50th and 90th percentiles (linear interpolation, R-7) of 1991–2020 daily TMAX within ±7 calendar days of the day (a 15-day window, about 450 values; 02-29 is its own slot).
 - `meanHigh`: the plain 1991–2020 mean TMAX of that exact calendar day, kept for the monthly-normals oracle.
 - `summer2025`: the observed daily high and low of every day from 2025-06-01 to 2025-08-31.

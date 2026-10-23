@@ -98,9 +98,10 @@ export function buildClimatology(days) {
     const i = slot.get(d.date.slice(5));
     if (year >= RECORD_YEARS[0] && year <= RECORD_YEARS[1]) {
       const r = rec[i];
-      // Ties keep the most recent year, as NWS climate reports do.
-      if (d.tmax !== null && d.tmax >= r.hi) [r.hi, r.hiYear] = [d.tmax, year];
-      if (d.tmin !== null && d.tmin <= r.lo) [r.lo, r.loYear] = [d.tmin, year];
+      // Compared in published whole °F; ties keep the most recent year, as NWS climate
+      // reports do.
+      if (d.tmax !== null && toF(d.tmax) >= r.hi) [r.hi, r.hiYear] = [toF(d.tmax), year];
+      if (d.tmin !== null && toF(d.tmin) <= r.lo) [r.lo, r.loYear] = [toF(d.tmin), year];
     }
     if (year >= NORMAL_YEARS[0] && year <= NORMAL_YEARS[1] && d.tmax !== null) {
       exact[i].push(d.tmax);
@@ -112,9 +113,9 @@ export function buildClimatology(days) {
     const mean = exact[i].reduce((s, v) => s + toF(v), 0) / exact[i].length;
     return {
       day,
-      recordHigh: toF(rec[i].hi),
+      recordHigh: rec[i].hi,
       recordHighYear: rec[i].hiYear,
-      recordLow: toF(rec[i].lo),
+      recordLow: rec[i].lo,
       recordLowYear: rec[i].loYear,
       normalP10: round(percentile(band, 0.1), 1),
       normalMedian: round(percentile(band, 0.5), 1),
@@ -125,10 +126,12 @@ export function buildClimatology(days) {
   });
 }
 
-/** A separate scan for the oracle: the largest raw TMAX string for `MM-DD` in the record years. */
+/**
+ * A separate scan for the oracle: every raw TMAX string for `MM-DD` in the record years. The record
+ * is the largest raw value in °F; its year is the most recent year with that °F value.
+ */
 function spotCheck(text, mmdd) {
-  let best = -Infinity;
-  let year = 0;
+  const seen = [];
   for (const line of text.split('\n')) {
     const m = /^"USW00094728","(\d{4})-(\d\d-\d\d)"/.exec(line);
     if (!m || m[2] !== mmdd) continue;
@@ -137,10 +140,12 @@ function spotCheck(text, mmdd) {
     const fields = line.match(/("[^"]*"|[^,]*)(,|$)/g).map((f) => f.replace(/,$/, ''));
     const tmax = fields[12]?.replaceAll('"', '').trim();
     const qflag = fields[13]?.replaceAll('"', '').split(',')[1];
-    if (!tmax || qflag) continue;
-    if (Number(tmax) >= best) [best, year] = [Number(tmax), y];
+    if (tmax && !qflag) seen.push({ year: y, tenths: Number(tmax) });
   }
-  return { day: mmdd, rawTenthsC: best, recordHigh: toF(best), year };
+  const rawTenthsC = Math.max(...seen.map((s) => s.tenths));
+  const recordHigh = toF(rawTenthsC);
+  const year = Math.max(...seen.filter((s) => toF(s.tenths) === recordHigh).map((s) => s.year));
+  return { day: mmdd, rawTenthsC, recordHigh, year };
 }
 
 async function main() {
@@ -270,7 +275,7 @@ async function main() {
     raw,
     processing: [
       'GHCN-Daily TMAX/TMIN are tenths of °C; converted with °F = °C × 9/5 + 32 and rounded to whole °F, which recovers the whole-°F U.S. observation exactly (the tenths-of-°C storage is off by at most 0.09 °F). Values with a non-blank quality flag (QFLAG) are skipped.',
-      `Records: the highest TMAX and lowest TMIN for each calendar day over ${RECORD_YEARS.join('–')} (2025 excluded, so 2025 can set records); ties keep the most recent year.`,
+      `Records: the highest TMAX and lowest TMIN for each calendar day over ${RECORD_YEARS.join('–')} (2025 excluded, so 2025 can set records), compared in whole °F; ties keep the most recent year.`,
       `Normal band: the 10th, 50th and 90th percentiles (linear interpolation, R-7) of ${NORMAL_YEARS.join('–')} daily TMAX within ±${WINDOW} calendar days of the day (a ${2 * WINDOW + 1}-day window, about 450 values; 02-29 is its own slot).`,
       `\`meanHigh\`: the plain ${NORMAL_YEARS.join('–')} mean TMAX of that exact calendar day, kept for the monthly-normals oracle.`,
       '`summer2025`: the observed daily high and low of every day from 2025-06-01 to 2025-08-31.',
