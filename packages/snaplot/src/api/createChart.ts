@@ -128,13 +128,20 @@ function validateGroup(
   }
 }
 
-function coordinate(group: ChartGroup | undefined): void {
+/**
+ * Re-coordinate a group: align plot padding (`alignPlots`), then share Y
+ * (`yRange`). Runs on mount, update, visibility and resize. Horizontal
+ * viewport changes pass `shareY` only: they move no Y gutter, and the
+ * padding pass costs two `setOptions` per member on every wheel or drag
+ * event.
+ */
+function coordinate(group: ChartGroup | undefined, only?: 'shareY'): void {
   if (!group) return;
   const record = groups.get(group);
   if (!record || record.destroyed || record.broadcasting) return;
   record.broadcasting = true;
   try {
-    if (group.options.alignPlots && record.members.size) {
+    if (only !== 'shareY' && group.options.alignPlots && record.members.size) {
       // Measure each member's own gutters, not the previous group's maximum.
       for (const member of record.members) member.coordinatePadding(undefined, undefined);
       const layouts = [...record.members].map((member) => member.getLayout());
@@ -936,7 +943,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         // following its data is a reset: peers return to their own range.
         const reset = this.engine.isFollowing();
         broadcast(group, (member) => member.syncViewport(key, range, reset), this);
-        if (group.options.yRange) coordinate(group);
+        // Keep the shared Y after the sync (a reset returns each peer to its own).
+        if (group.options.yRange) coordinate(group, 'shareY');
       }),
       this.engine.on('highlight:change', () => {
         if (this.mutating) return;

@@ -159,7 +159,7 @@ describe('[dataapi-01][dxtrial-01][frameworks-06][interact-01] group viewport sy
     expect(warm.getAxis('y')).toEqual(union);
   });
 
-  it.fails('[dataapi-01] a viewport sync in an alignPlots group shares Y without an options pass', () => {
+  it('[dataapi-01] a viewport sync in an alignPlots group shares Y without an options pass', () => {
     // Every wheel or drag frame syncs the viewport. Aligning the plots is an
     // options pass per member (merge, axes, auto-range), so it runs on mount,
     // update and resize only; a horizontal change moves no Y gutter.
