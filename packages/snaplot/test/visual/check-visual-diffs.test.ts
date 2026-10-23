@@ -200,7 +200,7 @@ describe('check-visual-diffs: the comparison', () => {
 
 // M3a review #2: a report from an earlier commit, or from before an edit, was judged as current.
 describe('check-visual-diffs: a stale report', () => {
-  it.fails('[repo-10] fails a report whose render inputs changed after the run', () => {
+  it('[repo-10] fails a report whose render inputs changed after the run', () => {
     const r = runScenario({
       head: unchanged,
       referenceFiles: SHOTS,
@@ -210,7 +210,7 @@ describe('check-visual-diffs: a stale report', () => {
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] refuses a meta.json that does not record the head inputs', () => {
+  it('[repo-10] refuses a meta.json that does not record the head inputs', () => {
     const r = runScenario({ head: unchanged, referenceFiles: SHOTS, legacyHead: true });
     expect(r.output).toContain('does not record the render inputs');
     expect(r.status).toBe(1);
@@ -233,7 +233,7 @@ describe('check-visual-diffs: a stale report', () => {
     expect(r.status).toBe(0);
   });
 
-  it.fails('[repo-10] judges a stale report with --any-head, and says so', () => {
+  it('[repo-10] judges a stale report with --any-head, and says so', () => {
     const r = runScenario({
       head: unchanged,
       referenceFiles: SHOTS,

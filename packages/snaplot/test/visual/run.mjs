@@ -42,7 +42,7 @@ import { createServer } from 'node:net';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeContactSheet } from './contact-sheet.mjs';
-import { comparisonFor, describeComparison, STRICT_ENV } from './record.mjs';
+import { comparisonFor, describeComparison, headInputs, STRICT_ENV } from './record.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = resolve(HERE, '../..');
@@ -495,6 +495,8 @@ async function main() {
   // A head run that dies before it reports must not leave the previous report to be judged.
   mkdirSync(OUT, { recursive: true });
   writeFileSync(reportPath, '{}\n');
+  // What this run renders; check-visual-diffs refuses the report once the working tree differs.
+  const inputs = headInputs(repoRoot);
   const code = await run(process.execPath, args, { cwd: PKG, env });
 
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
@@ -513,7 +515,7 @@ async function main() {
   const inPkg = relative(PKG, expectedAbs);
   const meta = {
     mode: reference ? 'against' : opts.update ? 'update' : 'baselines',
-    head: { sha: head, dirty },
+    head: { sha: head, dirty, inputs },
     against: reference,
     // Relative to packages/snaplot when inside it, so a copied result directory stays readable.
     expectedDir: inPkg.startsWith('..') ? expectedAbs : inPkg,

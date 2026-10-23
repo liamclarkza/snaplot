@@ -29,9 +29,12 @@ Playwright. The port is `$PORT`, else 5333 (EXECUTION.md rule 6), else a free on
 
 Every run writes `packages/snaplot/test-results/visual/`:
 - `report.json` (Playwright JSON);
-- `meta.json` (mode, head, where the expected images live, and for `--against` the reference
-  outcome: `complete`, the capture and second-render exit codes, the declared shot count and the
-  `shots` that rendered and reproduced);
+- `meta.json`:
+  - the mode and the `comparison` (see Comparison);
+  - the head: its SHA, whether the tree was dirty, and `inputs`, a fingerprint of the render inputs;
+  - where the expected images live;
+  - for `--against`, the reference outcome: `complete`, the capture and second-render exit codes,
+    the declared shot count, and the `shots` that rendered and reproduced;
 - `contact-sheet.html` (open it from disk to review every shot, with diffs for changed ones).
 
 The reference cache is `$SNAPLOT_SNAPSHOT_DIR/<sha>/`, default `<main checkout>/.claude/visual-cache/`.
@@ -50,6 +53,12 @@ rendered and reproduced. Otherwise the runner exits non-zero, and `check-visual-
 
 Row files count for a milestone only when they differ from the base and their `**Milestone:**` line
 names it. `V0.md` never covers a change, and editing it fails the check.
+
+`check-visual-diffs` refuses a stale report. `inputs` fingerprints the working-tree content of
+`packages/snaplot`, `package.json` and `package-lock.json` (`record.mjs`), so an edit there after
+the run fails the check until the run is repeated. A row file or a handoff written after the run is
+fine. `--any-head` judges a stale report anyway, with a note. The fingerprint is by content, so the
+results that `scripts/visual-docker.sh` copies back match the host tree.
 
 ## Comparison
 

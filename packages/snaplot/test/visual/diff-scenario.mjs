@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EXACT, TOLERANCE } from './record.mjs';
+import { EXACT, headInputs, TOLERANCE } from './record.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = resolve(HERE, '../..');
@@ -179,7 +179,11 @@ export function runScenario(scenario) {
     const comparison = scenario.comparison ?? (mode === 'against' ? 'exact' : 'tolerance');
     const meta = {
       mode,
-      head: { sha: base, dirty: false },
+      head: {
+        sha: base,
+        dirty: false,
+        ...(scenario.legacyHead ? {} : { inputs: headInputs(dir, cleanEnv()) }),
+      },
       against,
       expectedDir: reference,
       platform: 'darwin',

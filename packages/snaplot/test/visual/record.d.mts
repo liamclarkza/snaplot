@@ -21,3 +21,9 @@ export function screenshotSettings(
 export function comparisonFor(run: { against: boolean; strict: boolean }): Comparison;
 
 export function describeComparison(comparison: Comparison): string;
+
+/** The paths whose content a head run renders from. */
+export const INPUT_PATHS: readonly string[];
+
+/** A fingerprint of the render inputs in the working tree at `repoRoot`. */
+export function headInputs(repoRoot: string, env?: Record<string, string | undefined>): string;

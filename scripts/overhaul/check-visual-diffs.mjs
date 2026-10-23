@@ -4,7 +4,7 @@
 //
 //   node scripts/overhaul/check-visual-diffs.mjs [--milestone M10] [--base <ref>] [--zero]
 //                                                [--report packages/snaplot/test-results/visual]
-//                                                [--no-copy] [--allow-partial]
+//                                                [--no-copy] [--allow-partial] [--any-head]
 //
 // - M2, M9a and M9b (or --zero): no fixture may change. Blocking.
 // - Every other milestone: every changed (or removed) shot must belong to a fixture named in the
@@ -23,6 +23,10 @@
 //   difference (the fixture threw, timed out), fails the check. So do unverified shots, an
 //   incomplete reference, and a run without both projects or narrowed by --grep, unless
 //   --allow-partial.
+// - The report must be current: run.mjs records a fingerprint of the render inputs
+//   (packages/snaplot, package.json, package-lock.json in the working tree), and a report whose
+//   inputs differ from the working tree's is stale and fails. Edits elsewhere (row files,
+//   handoffs) are fine. --any-head judges a stale report anyway, with a note.
 // - The comparison must be exact for a run against a ref (run.mjs always compares those exactly)
 //   and for the zero-change rule. A tolerance hides library-wide default changes: at the plan's
 //   0.002, a theme-wide grid colour change gave 0 changed shots (M3a review #2). A committed-
@@ -41,7 +45,11 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
-import { describeComparison } from '../../packages/snaplot/test/visual/record.mjs';
+import {
+  describeComparison,
+  headInputs,
+  INPUT_PATHS,
+} from '../../packages/snaplot/test/visual/record.mjs';
 
 const ZERO_CHANGE = new Set(['M2', 'M9a', 'M9b']);
 /** `m9a`, `M9A` → `M9a`. */
@@ -58,6 +66,7 @@ function parseArgs(argv) {
     report: null,
     copy: true,
     allowPartial: false,
+    anyHead: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -67,6 +76,7 @@ function parseArgs(argv) {
     else if (a === '--report') opts.report = argv[++i];
     else if (a === '--no-copy') opts.copy = false;
     else if (a === '--allow-partial') opts.allowPartial = true;
+    else if (a === '--any-head') opts.anyHead = true;
     else if (a === '--help' || a === '-h') {
       console.log(readFileSync(new URL(import.meta.url), 'utf8').split('\nimport ')[0]);
       process.exit(0);
@@ -228,6 +238,14 @@ function main() {
   }
   const exact = meta.comparison.exact;
   const comparison = describeComparison(meta.comparison);
+  if (typeof meta.head?.inputs !== 'string') {
+    console.error(
+      'check-visual-diffs: FAIL: meta.json does not record the render inputs of the head (it was ' +
+        'written by an older run.mjs): run npm run test:visual again',
+    );
+    process.exit(1);
+  }
+  const stale = headInputs(repoRoot) !== meta.head.inputs;
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], repoRoot);
   const fromBranch = /^ovh\/(m\d+[a-z]?)-/.exec(branch)?.[1];
   const raw = opts.milestone ?? fromBranch;
@@ -286,6 +304,12 @@ function main() {
     `check-visual-diffs: head ${String(meta.head?.sha).slice(0, 10)}${meta.head?.dirty ? ' + working tree' : ''} vs ${against}`,
   );
   console.log(`  reference: ${reference.summary}; comparison ${comparison}`);
+  if (stale && opts.anyHead) {
+    console.log(
+      `  note: --any-head: the report is stale (${INPUT_PATHS.join(', ')} changed since the run); ` +
+        'judging it anyway',
+    );
+  }
   if (meta.mode !== 'against' && !exact && !zero) {
     console.log(
       '  note: a committed-baseline run within the tolerance is not the merge gate. The gate is ' +
@@ -340,6 +364,13 @@ function main() {
   }
 
   const failures = [];
+  if (stale && !opts.anyHead) {
+    failures.push(
+      `the report is stale: ${INPUT_PATHS.join(', ')} changed in the working tree since the run ` +
+        `at ${String(meta.head.sha).slice(0, 10)}${meta.head.dirty ? ' + working tree' : ''}. ` +
+        'Run npm run test:visual again, or pass --any-head to judge this report anyway',
+    );
+  }
   // Not overridable: a run that compared nothing proves nothing.
   if (reference.shots.size === 0) failures.push(reference.empty);
   // Not overridable either: a tolerance hides library-wide default changes (header comment).
