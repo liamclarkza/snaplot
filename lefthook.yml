@@ -5,7 +5,7 @@ pre-commit:
   parallel: true
   jobs:
     - name: biome
-      glob: '*.{js,ts,tsx,jsx,json,jsonc,css}'
+      glob: '*.{js,mjs,cjs,ts,mts,cts,tsx,jsx,json,jsonc,css}'
       # --staged runs against the git index, matching what will be committed.
       # --no-errors-on-unmatched silently skips commits that touch only
       # files biome ignores (e.g. markdown-only changes).
