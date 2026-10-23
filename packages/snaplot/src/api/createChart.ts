@@ -1,7 +1,14 @@
 import { ChartCore } from '../core/Chart';
+import { inferPosition } from '../core/Layout';
 import { createReferenceLinesPlugin } from '../plugins/builtins/referenceLinesPlugin';
 import { createReferenceRegionsPlugin } from '../plugins/builtins/referenceRegionsPlugin';
-import type { CursorSnapshotOptions, Plugin, SelectionRange, TooltipPoint } from '../types';
+import type {
+  CursorSnapshotOptions,
+  Plugin,
+  ScaleRange,
+  SelectionRange,
+  TooltipPoint,
+} from '../types';
 import { prepareChart, type PreparedChart } from './prepare';
 import { equivalent, patchOptions } from './options';
 import type {
@@ -34,7 +41,7 @@ interface GroupMember {
   getOptions(): { axes?: ChartOptions['axes']; group?: ChartGroup };
   getAxis(key: string): Readonly<{ type: string; min: number; max: number }> | undefined;
   getLayout(): ReturnType<ChartHandle['getLayout']>;
-  setViewport(viewport: Viewport): void;
+  syncViewport(key: string, range: ScaleRange, reset: boolean): void;
   setCursor(x: number | string | null): void;
   setHighlight(id: string | null): void;
   coordinatePadding(left: number | undefined, right: number | undefined): void;
@@ -674,6 +681,14 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.engine.resetZoom();
     this.publish();
   }
+  syncViewport(key: string, range: ScaleRange, reset: boolean): void {
+    if (reset) this.resetViewport();
+    else if (this.engine.getAxis(key)) this.setViewport({ [key]: range });
+  }
+  private isHorizontal(key: string): boolean {
+    const position = inferPosition(key, this.engine.getOptions().axes?.[key]?.position);
+    return position === 'bottom' || position === 'top';
+  }
   resumeFollow(): void {
     this.engine.scrollToLatest();
     this.publish();
@@ -903,13 +918,19 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         if (this.options.group?.options.cursor)
           broadcast(this.options.group, (member) => member.setCursor(this.state.cursor.x), this);
       }),
-      this.engine.on('viewport:change', () => {
+      this.engine.on('viewport:change', (key, range) => {
         if (this.mutating) return;
         this.publish();
         this.emit('viewport:change', this.state.viewport);
         if (!this.applyingControls) this.controls.onViewportChange?.(this.state.viewport);
-        if (this.options.group?.options.viewport)
-          broadcast(this.options.group, (member) => member.setViewport(this.state.viewport), this);
+        const group = this.options.group;
+        if (!group?.options.viewport || !this.isHorizontal(key)) return;
+        // Plan D17: link horizontal axes only, and only axes a peer has, so a
+        // peer's Y is never copied or pinned. A change that leaves this chart
+        // following its data is a reset: peers return to their own range.
+        const reset = this.engine.isFollowing();
+        broadcast(group, (member) => member.syncViewport(key, range, reset), this);
+        if (group.options.yRange) coordinate(group);
       }),
       this.engine.on('highlight:change', () => {
         if (this.mutating) return;

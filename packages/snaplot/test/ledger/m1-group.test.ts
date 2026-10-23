@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createChartGroup } from '../../src/index';
-import { type Fakes, installFakes } from '../fakes';
+import { clientPoint, type Fakes, installFakes, pointerTarget } from '../fakes';
 
 // Plan D17: group viewport sync links horizontal axes only, and only axes the
 // peer has; it never pins a peer's Y, resets propagate, and `yRange: true` is
@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe('[dataapi-01][dxtrial-01][frameworks-06][interact-01] group viewport sync links X only', () => {
-  it.fails('[dataapi-01][dxtrial-01][frameworks-06][interact-01] peers with different Y units keep their own Y', () => {
+  it('[dataapi-01][dxtrial-01][frameworks-06][interact-01] peers with different Y units keep their own Y', () => {
     const group = createChartGroup({ viewport: true });
     const data = rows(21);
     const cpu = fakes.mount({ data, x: 't', series: [{ y: 'cpu' }], group });
@@ -48,7 +48,7 @@ describe('[dataapi-01][dxtrial-01][frameworks-06][interact-01] group viewport sy
     expect(memory.getAxis('y')!.max).toBeGreaterThan(memoryY!.max * 1.5);
   });
 
-  it.fails('[dataapi-01][dxtrial-01][frameworks-06][interact-01] a y2 peer keeps its own y2; a y2 driver still syncs x', () => {
+  it('[dataapi-01][dxtrial-01][frameworks-06][interact-01] a y2 peer keeps its own y2; a y2 driver still syncs x', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const group = createChartGroup({ viewport: true });
     const data = rows(21);
@@ -74,7 +74,7 @@ describe('[dataapi-01][dxtrial-01][frameworks-06][interact-01] group viewport sy
     expect(errors).not.toHaveBeenCalled();
   });
 
-  it.fails('[dataapi-01][dxtrial-01][frameworks-06][interact-01] a peer without x2 still syncs x', () => {
+  it('[dataapi-01][dxtrial-01][frameworks-06][interact-01] a peer without x2 still syncs x', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const group = createChartGroup({ viewport: true });
     const data = rows(21);
@@ -94,7 +94,7 @@ describe('[dataapi-01][dxtrial-01][frameworks-06][interact-01] group viewport sy
     expect(errors).not.toHaveBeenCalled();
   });
 
-  it.fails('[dataapi-01][dxtrial-01][frameworks-06][interact-01] reset propagates; peers return to their own automatic range', () => {
+  it('[dataapi-01][dxtrial-01][frameworks-06][interact-01] reset propagates; peers return to their own automatic range', () => {
     const group = createChartGroup({ viewport: true });
     const cpu = fakes.mount({ data: rows(21), x: 't', series: [{ y: 'cpu' }], group });
     const memory = fakes.mount({ data: rows(41), x: 't', series: [{ y: 'mem' }], group });
@@ -114,7 +114,31 @@ describe('[dataapi-01][dxtrial-01][frameworks-06][interact-01] group viewport sy
     expect(memory.getAxis('x')!.max).toBeGreaterThanOrEqual(50);
   });
 
-  it.fails('[dataapi-01] a yRange group shares the union of its members’ ranges after a reset', () => {
+  it('[dataapi-01][dxtrial-01][frameworks-06][interact-01] a wheel zoom and a double-click reset sync X only', () => {
+    const group = createChartGroup({ viewport: true });
+    const cpu = fakes.mount({ data: rows(21), x: 't', series: [{ y: 'cpu' }], group });
+    const memory = fakes.mount({ data: rows(41), x: 't', series: [{ y: 'mem' }], group });
+    const cpuX = cpu.getAxis('x');
+    const memoryX = memory.getAxis('x');
+    const memoryY = memory.getAxis('y');
+
+    const centre = clientPoint(cpu, 10, 60);
+    pointerTarget(cpu).dispatchEvent(
+      new WheelEvent('wheel', { ...centre, deltaY: -20, ctrlKey: true, bubbles: true }),
+    );
+    const zoomed = cpu.getAxis('x')!;
+    expect(zoomed.max - zoomed.min).toBeLessThan(cpuX!.max - cpuX!.min);
+    expect(memory.getAxis('x')).toMatchObject({ min: zoomed.min, max: zoomed.max });
+    expect(memory.getAxis('y')).toEqual(memoryY);
+
+    pointerTarget(memory).dispatchEvent(
+      new MouseEvent('dblclick', { ...clientPoint(memory, 10, 1.6e9), bubbles: true }),
+    );
+    expect(memory.getAxis('x')).toEqual(memoryX);
+    expect(cpu.getAxis('x')).toEqual(cpuX);
+  });
+
+  it('[dataapi-01] a yRange group shares the union of its members’ ranges after a reset', () => {
     const group = createChartGroup({ viewport: true, yRange: true });
     const data = rows(21);
     const cpu = fakes.mount({ data, x: 't', series: [{ y: 'cpu' }], group });
