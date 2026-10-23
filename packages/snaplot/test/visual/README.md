@@ -16,7 +16,7 @@ produce the `-linux` set.
 | Command | What it does |
 |---|---|
 | `npm run test:visual` | Both projects against the committed `__screenshots__/<area>/<name>-<platform>.png` |
-| `npm run test:visual -- --against <ref>` | Renders `<ref>`'s own fixture app into the reference cache (twice: it must reproduce itself), then compares the working tree with it |
+| `npm run test:visual -- --against <ref>` | Renders `<ref>`'s own fixture app into the reference cache (twice: it must reproduce itself exactly), then compares the working tree with it |
 | `npm run test:visual -- --strict` | Compares exactly instead of `maxDiffPixelRatio: 0.002`; use it for the zero-change milestones (M2, M9a, M9b) |
 | `node scripts/overhaul/check-visual-diffs.mjs` | Judges the last run: zero changes for M2/M9a/M9b, else every changed fixture needs a visual-ledger row from this milestone |
 | `node scripts/overhaul/check-visual-ledger.mjs` | P13: every commit that touches screenshots or has a `visual:` paragraph adds or edits its row file |
@@ -39,9 +39,9 @@ options a milestone renamed therefore still compares like with like. Refs older 
 no fixture app and are not valid references. The runner never deletes anything outside the worktree,
 and waits while `.claude/bench.lock` exists.
 
-The reference is rendered twice, and the second render must match the first. It is cached
-(`capture.json`) only when every shot it declares rendered and reproduced. Otherwise the runner exits
-non-zero, and `check-visual-diffs` fails the run:
+The reference is rendered twice, and the second render must match the first exactly (no tolerance,
+whatever the comparison then uses). It is cached (`capture.json`) only when every shot it declares
+rendered and reproduced. Otherwise the runner exits non-zero, and `check-visual-diffs` fails the run:
 - a head shot is `added` only when the reference is complete and lacks it, else `unverified`
   (a failure unless `--allow-partial`);
 - a reference with no shots, or a platform with no committed baselines, fails outright: nothing was

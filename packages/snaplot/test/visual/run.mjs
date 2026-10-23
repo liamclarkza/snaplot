@@ -18,11 +18,12 @@
 // The reference cache lives outside the tracked tree: $SNAPLOT_SNAPSHOT_DIR, default
 // <main checkout>/.claude/visual-cache/<sha>/. A ref is extracted with `git archive` (no worktree)
 // and its own playwright config captures its own fixtures, so a fixture renamed between the two
-// sides compares like with like. The reference is rendered twice; it is cached (capture.json)
-// only when every shot it declares rendered and reproduced itself. meta.json records the
-// outcome (`against.complete`, the exit codes and the shot list), and check-visual-diffs fails
-// on an incomplete reference. Nothing is ever deleted outside this worktree (except a stale
-// node_modules symlink the runner itself made in the cache).
+// sides compares like with like. The reference is rendered twice, and the second render must
+// match the first exactly (SNAPLOT_VISUAL_STRICT), whatever tolerance the comparison then uses.
+// It is cached (capture.json) only when every shot it declares rendered and reproduced itself.
+// meta.json records the outcome (`against.complete`, the exit codes and the shot list), and
+// check-visual-diffs fails on an incomplete reference. Nothing is ever deleted outside this
+// worktree (except a stale node_modules symlink the runner itself made in the cache).
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -47,8 +48,11 @@ const OUT = join(PKG, 'test-results/visual');
 const BASELINES = join(HERE, '__screenshots__');
 const DEFAULT_PORT = 5333; // EXECUTION.md rule 6: M3a = 5300 + 33
 const LOCK_STALE_MS = 2 * 60 * 60 * 1000;
-/** capture.json format: 2 records the verified shot list. Older entries are captured again. */
-const CAPTURE_FORMAT = 2;
+/**
+ * capture.json format: 2 recorded the verified shot list; 3 means the second render matched the
+ * first exactly, not within the comparison tolerance. Older entries are captured again.
+ */
+const CAPTURE_FORMAT = 3;
 
 function git(args, cwd = PKG) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
@@ -236,8 +240,11 @@ function listPngs(dir, base = dir) {
   return out.sort();
 }
 
-/** One render of the reference's visual project into <shots>, reported to <reportPath>. */
-async function renderReference({ tree, port, shots, entry, update, reportPath }) {
+/**
+ * One render of the reference's visual project into <shots>, reported to <reportPath>. `exact`
+ * compares with no tolerance (the ref's SNAPLOT_VISUAL_STRICT), else with its default tolerance.
+ */
+async function renderReference({ tree, port, shots, entry, update, reportPath, exact }) {
   const refPkg = join(tree, 'packages/snaplot');
   // A run that dies before it reports must not leave an older report to be read.
   writeFileSync(reportPath, '{}\n');
@@ -260,6 +267,7 @@ async function renderReference({ tree, port, shots, entry, update, reportPath })
         PORT: String(port),
         SNAPLOT_VISUAL_EXPECTED_DIR: shots,
         SNAPLOT_VISUAL_OUTPUT_DIR: join(entry, 'out'),
+        SNAPLOT_VISUAL_STRICT: exact ? '1' : '',
         PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
       },
     },
@@ -269,7 +277,7 @@ async function renderReference({ tree, port, shots, entry, update, reportPath })
 
 /**
  * Extracts <sha> and renders its own fixture app into the cache, twice: the second render must
- * reproduce the first. Returns the reference outcome that meta.json records:
+ * reproduce the first exactly. Returns the reference outcome that meta.json records:
  * `{ ref, sha, dir, fingerprint, cached, exit, verifyExit, complete, declared, shots }`, where
  * `shots` lists the shot names that rendered and reproduced, and `complete` says whether that is
  * every shot the ref declares (only then is it cached).
@@ -356,12 +364,24 @@ async function captureReference(ref, port, givenTree, givenSha) {
   mkdirSync(join(entry, 'out'), { recursive: true });
   const render = { tree, port, shots, entry };
   const captureReport = join(entry, 'out/capture-report.json');
-  const capture = await renderReference({ ...render, update: 'all', reportPath: captureReport });
+  const capture = await renderReference({
+    ...render,
+    update: 'all',
+    reportPath: captureReport,
+    exact: false,
+  });
   const verifyReport = join(entry, 'out/verify-report.json');
   let verify = null;
   if (capture.code === 0 && capture.passed.length > 0) {
-    console.log('visual: rendering the reference again; every shot must reproduce');
-    verify = await renderReference({ ...render, update: 'none', reportPath: verifyReport });
+    // Exact, not within the tolerance: a shot that wobbles under 0.002 would otherwise be cached
+    // and then report a false change to every --strict run against it.
+    console.log('visual: rendering the reference again; every shot must reproduce exactly');
+    verify = await renderReference({
+      ...render,
+      update: 'none',
+      reportPath: verifyReport,
+      exact: true,
+    });
   }
   const onDisk = new Set(listPngs(shots).map((f) => f.split('\\').join('/').slice(0, -4)));
   const reproduced = verify ? new Set(verify.passed) : null;
