@@ -1,0 +1,41 @@
+{
+  "$comment": "Gzip budgets in bytes for `node scripts/size.mjs` (plan §11.3 G6): measured + 2% when set (`--update`). M14 ratchets them; target createChart <= 50 KiB. `fallback` names the export an entry measures until `import` exists.",
+  "imports": [
+    {
+      "label": "createChart",
+      "from": "snaplot",
+      "import": "createChart",
+      "measured": 60263,
+      "budget": 61469
+    },
+    {
+      "label": "Chart (react)",
+      "from": "snaplot/react",
+      "import": "Chart",
+      "measured": 60915,
+      "budget": 62134
+    },
+    {
+      "label": "Chart (solid)",
+      "from": "snaplot/solid",
+      "import": "Chart",
+      "measured": 61104,
+      "budget": 62327
+    },
+    {
+      "label": "histogram",
+      "from": "snaplot",
+      "import": "histogram",
+      "measured": 666,
+      "budget": 680
+    },
+    {
+      "label": "createLegendTable",
+      "from": "snaplot",
+      "import": "createLegendTable",
+      "fallback": "createLegendTablePlugin",
+      "measured": 2427,
+      "budget": 2476
+    }
+  ]
+}
