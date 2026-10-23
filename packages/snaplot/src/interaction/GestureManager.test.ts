@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../core/EventBus';
 import { GestureManager } from './GestureManager';
-import type { InteractionMode, Layout, PanConfig, TouchConfig, ZoomConfig } from '../types';
+import type { InteractionMode, Layout, PanConfig, TouchConfig, ZoomConfig } from '../engine/spec';
 
 class FakeTarget {
   readonly style: Record<string, string> = {};

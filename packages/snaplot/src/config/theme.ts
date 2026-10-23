@@ -1,4 +1,4 @@
-import type { ThemeConfig } from '../types';
+import type { ThemeConfig } from '../engine/spec';
 import {
   DEFAULT_THEME,
   DARK_THEME,

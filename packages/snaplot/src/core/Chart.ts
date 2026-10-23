@@ -1,9 +1,9 @@
 import type {
-  ChartConfig,
+  ChartSpec,
   ChartEventMap,
   ChartStats,
   AppendDataOptions,
-  AxisConfig,
+  AxisSpec,
   ColumnarData,
   CursorEventOrigin,
   CursorSnapshot,
@@ -16,13 +16,13 @@ import type {
   Scale,
   ScaleRange,
   SelectionRange,
-  SeriesConfig,
-  StreamingConfig,
+  SeriesSpec,
+  StreamingSpec,
   ThemeConfig,
   TooltipPoint,
   ZoomBoundsSpec,
-} from '../types';
-import { DirtyFlag } from '../types';
+} from '../engine/spec';
+import { DirtyFlag } from '../engine/spec';
 
 import { CanvasManager } from './CanvasManager';
 import { RenderScheduler } from './RenderScheduler';
@@ -77,8 +77,8 @@ import {
   normalizeScatterSizeBy,
   resolverFromEncodingState,
   type ScatterStyleResolver,
-  seriesYDataIndex,
-  scatterXDataIndex,
+  seriesYColumn,
+  scatterXColumn,
   type ScatterPalettes,
 } from '../renderers/scatterEncoding';
 import { renderBarsSegments } from '../renderers/BarRenderer';
@@ -135,7 +135,7 @@ function tickFormatId(fn: ((value: number) => string) | undefined): number {
 
 /** One visible series in the most recent data-layer pass. */
 interface DataPassSeries {
-  type: NonNullable<SeriesConfig['type']>;
+  type: NonNullable<SeriesSpec['type']>;
   xData: Float64Array;
   yData: Float64Array;
   /** Physical index runs handed to the mark, before any sampling. */
@@ -311,7 +311,7 @@ export class ChartCore implements EngineHost {
   private scatterEncodingCache = new Map<
     number,
     {
-      series: SeriesConfig;
+      series: SeriesSpec;
       theme: ThemeConfig;
       version: number;
       renderResolver: ScatterStyleResolver;
@@ -325,7 +325,7 @@ export class ChartCore implements EngineHost {
   private pluginManager: PluginManager;
 
   // Config
-  private config: ChartConfig;
+  private config: ChartSpec;
 
   // Cursor state
   private cursorX: number | null = null;
@@ -412,7 +412,7 @@ export class ChartCore implements EngineHost {
     { scale: Scale; min: number; max: number; ticks?: number[]; count?: number; decimals: number }
   >();
   private readonly readoutY = (value: number, seriesIndex: number): string =>
-    this.formatReadout(this.config.series[seriesIndex]?.yAxisKey ?? 'y', value);
+    this.formatReadout(this.config.series[seriesIndex]?.yAxis ?? 'y', value);
 
   /**
    * Per-axis "reset-zoom" extent, the scale's min/max after the last
@@ -425,7 +425,7 @@ export class ChartCore implements EngineHost {
 
   constructor(
     parent: HTMLElement,
-    config: ChartConfig,
+    config: ChartSpec,
     /** The data sources, and the source each series reads (one per series). */
     sources: { sources: readonly ColumnarData[]; seriesSources: readonly number[] },
     /**
@@ -441,7 +441,7 @@ export class ChartCore implements EngineHost {
     this.config = deepMerge(
       DEFAULT_CONFIG as unknown as Record<string, unknown>,
       config as unknown as Record<string, unknown>,
-    ) as unknown as ChartConfig;
+    ) as unknown as ChartSpec;
 
     // 1b. Apply interaction mode presets (if zoom/pan not explicitly configured)
     this.applyModePresets(config);
@@ -555,7 +555,7 @@ export class ChartCore implements EngineHost {
 
   /** Replace a prepared configuration and its independent sources as one transaction. */
   replaceSources(
-    config: ChartConfig,
+    config: ChartSpec,
     sources: readonly ColumnarData[],
     seriesSources: readonly number[],
   ): void {
@@ -564,9 +564,9 @@ export class ChartCore implements EngineHost {
     const resolved = deepMerge(
       DEFAULT_CONFIG as unknown as Record<string, unknown>,
       config as unknown as Record<string, unknown>,
-    ) as unknown as ChartConfig;
+    ) as unknown as ChartSpec;
     this.validateSources(resolved, sources, seriesSources);
-    const maxLen = resolved.streaming?.maxLen;
+    const maxLen = resolved.streaming?.maxPoints;
     if (maxLen !== undefined) validateMaxLen(maxLen);
     const stores = sources.map((data) =>
       maxLen === undefined
@@ -600,7 +600,7 @@ export class ChartCore implements EngineHost {
   }
 
   private validateSources(
-    config: ChartConfig,
+    config: ChartSpec,
     sources: readonly ColumnarData[],
     indices: readonly number[],
   ): void {
@@ -635,7 +635,7 @@ export class ChartCore implements EngineHost {
         ? this.sourceStores
         : new Set(
             this.config.series.flatMap((series, si) =>
-              series.visible !== false && (series.xAxisKey ?? 'x') === axisKey
+              series.visible !== false && (series.xAxis ?? 'x') === axisKey
                 ? [this.storeForSeries(si)]
                 : [],
             ),
@@ -697,7 +697,7 @@ export class ChartCore implements EngineHost {
   }
 
   private followWindow(): number | undefined {
-    const follow = (this.config.streaming as StreamingConfig | undefined)?.follow;
+    const follow = (this.config.streaming as StreamingSpec | undefined)?.followWindow;
     if (follow === undefined) return undefined;
     // A non-positive window is meaningless; treat it as "no window" so the
     // chart follows the full extent rather than collapsing to a zero span.
@@ -825,19 +825,19 @@ export class ChartCore implements EngineHost {
     return this.scales.get(key);
   }
 
-  setOptions(partial: DeepPartial<ChartConfig>): void {
+  setOptions(partial: DeepPartial<ChartSpec>): void {
     if (this.destroyed) return;
     // Plugins are object instances, deep-merge would corrupt them.
     // Handle plugin updates separately: destroy old, install new.
-    const newPlugins = (partial as Partial<ChartConfig>).plugins;
+    const newPlugins = (partial as Partial<ChartSpec>).plugins;
     if (newPlugins) {
       this.pluginManager.destroyAll(this);
       // Remove plugins from the merge input to avoid deep-merging instances
-      const { plugins: _, ...rest } = partial as Partial<ChartConfig>;
+      const { plugins: _, ...rest } = partial as Partial<ChartSpec>;
       this.config = deepMerge(
         this.config as unknown as Record<string, unknown>,
         rest as unknown as Record<string, unknown>,
-      ) as unknown as ChartConfig;
+      ) as unknown as ChartSpec;
       this.config.plugins = newPlugins;
       for (const plugin of newPlugins) {
         this.pluginManager.register(plugin);
@@ -847,7 +847,7 @@ export class ChartCore implements EngineHost {
       this.config = deepMerge(
         this.config as unknown as Record<string, unknown>,
         partial as unknown as Record<string, unknown>,
-      ) as unknown as ChartConfig;
+      ) as unknown as ChartSpec;
     }
 
     if (shouldValidateConfig()) {
@@ -860,13 +860,13 @@ export class ChartCore implements EngineHost {
     this.applyConfigSideEffects(partial, false);
   }
 
-  replaceOptions(config: ChartConfig): void {
+  replaceOptions(config: ChartSpec): void {
     if (this.destroyed) return;
     const previousPlugins = this.config.plugins ?? [];
     this.config = deepMerge(
       DEFAULT_CONFIG as unknown as Record<string, unknown>,
       config as unknown as Record<string, unknown>,
-    ) as unknown as ChartConfig;
+    ) as unknown as ChartSpec;
 
     const nextPlugins = this.config.plugins ?? [];
     // Compare by content, not reference: a fresh declarative config passes a
@@ -896,7 +896,7 @@ export class ChartCore implements EngineHost {
     this.applyConfigSideEffects(config, true);
   }
 
-  private applyConfigSideEffects(partial: DeepPartial<ChartConfig>, fullReplace: boolean): void {
+  private applyConfigSideEffects(partial: DeepPartial<ChartSpec>, fullReplace: boolean): void {
     let themeChanged = false;
     if (fullReplace || partial.interaction) {
       this.applyModePresets(partial);
@@ -926,7 +926,7 @@ export class ChartCore implements EngineHost {
     this.pluginManager.dispatch('onSetOptions', this);
   }
 
-  getOptions(): ChartConfig {
+  getOptions(): ChartSpec {
     return this.config;
   }
 
@@ -938,7 +938,7 @@ export class ChartCore implements EngineHost {
     const palette = this.categoricalPalette();
     return this.config.series.map((series, seriesIndex) => {
       const type = series.type ?? 'line';
-      const color = series.stroke ?? palette[seriesIndex % palette.length];
+      const color = series.color ?? palette[seriesIndex % palette.length];
       const configuredFill = typeof series.fill === 'string' ? series.fill : null;
       const fill =
         series.fill === null
@@ -952,7 +952,7 @@ export class ChartCore implements EngineHost {
         color,
         fill,
         lineWidth: series.lineWidth ?? 1.5,
-        lineDash: series.lineDash ? [...series.lineDash] : [],
+        lineDash: series.dash ? [...series.dash] : [],
         opacity: series.opacity ?? 1,
         meta: series.meta,
       };
@@ -1318,8 +1318,8 @@ export class ChartCore implements EngineHost {
       const sc = this.config.series[si];
       const store = this.storeForSeries(si);
       if (sc.visible === false || !store.length) continue;
-      const colIdx = seriesYDataIndex(sc);
-      const yScale = this.scales.get(sc.yAxisKey ?? 'y');
+      const colIdx = seriesYColumn(sc);
+      const yScale = this.scales.get(sc.yAxis ?? 'y');
       if (!yScale || colIdx < 1 || colIdx > store.seriesCount) continue;
       const yVal = store.yAt(colIdx - 1, store.nearestXIndex(dataX));
       if (Number.isFinite(yVal)) {
@@ -1424,7 +1424,7 @@ export class ChartCore implements EngineHost {
    * Mode presets provide default zoom/pan axes while preserving explicit
    * zoom/pan fields supplied by the caller.
    */
-  private applyModePresets(source?: DeepPartial<ChartConfig>): void {
+  private applyModePresets(source?: DeepPartial<ChartSpec>): void {
     const mode = this.config.interaction;
     if (!mode) return;
 
@@ -1493,7 +1493,7 @@ export class ChartCore implements EngineHost {
   }
 
   private streamingMaxLen(): number | undefined {
-    const maxLen = (this.config.streaming as StreamingConfig | undefined)?.maxLen;
+    const maxLen = (this.config.streaming as StreamingSpec | undefined)?.maxPoints;
     if (maxLen !== undefined) validateMaxLen(maxLen);
     return maxLen;
   }
@@ -1628,9 +1628,9 @@ export class ChartCore implements EngineHost {
       };
       let hasBoundSeries = false;
       for (const [si, s] of this.config.series.entries()) {
-        if ((s.xAxisKey ?? 'x') !== key || s.visible === false) continue;
+        if ((s.xAxis ?? 'x') !== key || s.visible === false) continue;
         hasBoundSeries = true;
-        includeXColumn(s.type === 'scatter' ? scatterXDataIndex(s) : 0, this.storeForSeries(si));
+        includeXColumn(s.type === 'scatter' ? scatterXColumn(s) : 0, this.storeForSeries(si));
       }
       if (!hasBoundSeries) includeXColumn(0, this.sourceStores[0]);
       if (!hasXValue) continue;
@@ -1641,17 +1641,17 @@ export class ChartCore implements EngineHost {
       const hasBarSeries = this.config.series.some(
         (s) =>
           s.visible !== false &&
-          (s.xAxisKey ?? 'x') === key &&
+          (s.xAxis ?? 'x') === key &&
           (s.type === 'bar' || s.type === 'histogram'),
       );
       const hasHistogramSeries = this.config.series.some(
-        (s) => s.visible !== false && (s.xAxisKey ?? 'x') === key && s.type === 'histogram',
+        (s) => s.visible !== false && (s.xAxis ?? 'x') === key && s.type === 'histogram',
       );
       const barStores = [
         ...new Set(
           this.config.series.flatMap((series, si) =>
             series.visible !== false &&
-            (series.xAxisKey ?? 'x') === key &&
+            (series.xAxis ?? 'x') === key &&
             (series.type === 'bar' || series.type === 'histogram')
               ? [this.storeForSeries(si)]
               : [],
@@ -1811,35 +1811,33 @@ export class ChartCore implements EngineHost {
       };
 
       for (const [si, s] of this.config.series.entries()) {
-        if ((s.yAxisKey ?? 'y') !== key || s.visible === false) continue;
+        if ((s.yAxis ?? 'y') !== key || s.visible === false) continue;
 
         const store = this.storeForSeries(si);
-        const xScale = this.scales.get(s.xAxisKey ?? 'x') ?? this.scales.get('x');
-        const xColumnIdx = s.type === 'scatter' ? scatterXDataIndex(s) : 0;
+        const xScale = this.scales.get(s.xAxis ?? 'x') ?? this.scales.get('x');
+        const xColumnIdx = s.type === 'scatter' ? scatterXColumn(s) : 0;
         let startIdx = 0;
         let endIdx = store.length - 1;
         if (xScale && xColumnIdx === 0) {
           [startIdx, endIdx] = store.getViewportIndices(xScale.min, xScale.max);
         }
 
-        const yColumnIdx = seriesYDataIndex(s) - 1;
+        const yColumnIdx = seriesYColumn(s) - 1;
         if (s.type === 'scatter' && xColumnIdx !== 0 && this.isValidColumn(xColumnIdx, store)) {
           includeColumnForScatterViewport(yColumnIdx, xColumnIdx, xScale, store);
         } else {
           includeColumnRange(yColumnIdx, startIdx, endIdx, store);
         }
         if (s.type === 'band') {
-          if (s.upperDataIndex != null)
-            includeColumnRange(s.upperDataIndex - 1, startIdx, endIdx, store);
-          if (s.lowerDataIndex != null)
-            includeColumnRange(s.lowerDataIndex - 1, startIdx, endIdx, store);
+          if (s.upperColumn != null) includeColumnRange(s.upperColumn - 1, startIdx, endIdx, store);
+          if (s.lowerColumn != null) includeColumnRange(s.lowerColumn - 1, startIdx, endIdx, store);
         }
       }
 
       // For bar/histogram series, always include 0 as the baseline
       const hasBarOrHist = this.config.series.some(
         (s) =>
-          (s.yAxisKey ?? 'y') === key &&
+          (s.yAxis ?? 'y') === key &&
           s.visible !== false &&
           (s.type === 'bar' || s.type === 'histogram'),
       );
@@ -1970,7 +1968,7 @@ export class ChartCore implements EngineHost {
     return out;
   }
 
-  private scatterResolvers(si: number, series: SeriesConfig, fallbackColor: string) {
+  private scatterResolvers(si: number, series: SeriesSpec, fallbackColor: string) {
     const store = this.storeForSeries(si);
     const cached = this.scatterEncodingCache.get(si);
     if (
@@ -2154,8 +2152,8 @@ export class ChartCore implements EngineHost {
         scale.type,
         scale.min,
         scale.max,
-        tickFormatId(ac?.tickFormat),
-        ac?.label ?? '',
+        tickFormatId(ac?.format),
+        ac?.title ?? '',
         // Tick config changes what layout measures for the gutter.
         ac?.tickCount ?? '',
         ac?.ticks ? ac.ticks.join(',') : '',
@@ -2481,8 +2479,8 @@ export class ChartCore implements EngineHost {
     for (const point of [...this.findBarTooltipPoints(), ...this.findHistogramTooltipPoints()]) {
       const series = this.config.series[point.seriesIndex];
       const store = this.storeForSeries(point.seriesIndex);
-      const xScale = this.scales.get(series.xAxisKey ?? 'x');
-      const yScale = this.scales.get(series.yAxisKey ?? 'y');
+      const xScale = this.scales.get(series.xAxis ?? 'x');
+      const yScale = this.scales.get(series.yAxis ?? 'y');
       if (!xScale || !yScale || !Number.isFinite(point.y)) continue;
       const top = yScale.dataToPixel(point.y);
       const base = yScale.dataToPixel(yScale.type === 'log' ? yScale.min : 0);
@@ -2534,7 +2532,7 @@ export class ChartCore implements EngineHost {
     anchorX: number,
     anchorY: number,
     axisControlsEnabled: boolean,
-    axisConfigs: NonNullable<ChartConfig['axes']>,
+    axisConfigs: NonNullable<ChartSpec['axes']>,
   ): boolean {
     if (axisControlsEnabled) return true;
     const { plot } = this.layout;
@@ -2674,7 +2672,7 @@ export class ChartCore implements EngineHost {
    */
   private isScatterOnlyAxis(scaleKey: string): boolean {
     const bound = this.config.series.filter(
-      (s) => (s.yAxisKey ?? 'y') === scaleKey && s.visible !== false,
+      (s) => (s.yAxis ?? 'y') === scaleKey && s.visible !== false,
     );
     return bound.length > 0 && bound.every((s) => s.type === 'scatter');
   }
@@ -2734,10 +2732,10 @@ export class ChartCore implements EngineHost {
     let min = Infinity;
     let max = -Infinity;
     this.config.series.forEach((series, si) => {
-      if ((series.yAxisKey ?? 'y') !== scaleKey || series.visible === false) return;
+      if ((series.yAxis ?? 'y') !== scaleKey || series.visible === false) return;
       const store = this.storeForSeries(si);
       const range = this.columnRange(
-        seriesYDataIndex(series) - 1,
+        seriesYColumn(series) - 1,
         0,
         store.length - 1,
         'linear',
@@ -2954,16 +2952,16 @@ export class ChartCore implements EngineHost {
       const series = this.config.series[si];
       if (!series || series.visible === false) return;
 
-      const color = series.stroke ?? palette[si % palette.length];
-      const xScale = this.scales.get(series.xAxisKey ?? 'x')!;
-      const yScale = this.scales.get(series.yAxisKey ?? 'y')!;
+      const color = series.color ?? palette[si % palette.length];
+      const xScale = this.scales.get(series.xAxis ?? 'x')!;
+      const yScale = this.scales.get(series.yAxis ?? 'y')!;
       if (!xScale || !yScale) return;
 
-      const colIdx = seriesYDataIndex(series);
+      const colIdx = seriesYColumn(series);
       if (colIdx < 1 || colIdx > store.seriesCount) return;
 
       const type = series.type ?? 'line';
-      const xColumnIdx = type === 'scatter' ? scatterXDataIndex(series) : 0;
+      const xColumnIdx = type === 'scatter' ? scatterXColumn(series) : 0;
       if (!this.isValidColumn(xColumnIdx, store)) return;
       const canCullByGlobalX = xColumnIdx === 0;
       const [startIdx, endIdx] = canCullByGlobalX
@@ -2979,11 +2977,11 @@ export class ChartCore implements EngineHost {
         segments,
         xData,
         yData,
-        colorBy && this.isValidColumn(colorBy.dataIndex, store)
-          ? store.getPhysicalColumn(colorBy.dataIndex)
+        colorBy && this.isValidColumn(colorBy.column, store)
+          ? store.getPhysicalColumn(colorBy.column)
           : undefined,
-        sizeBy && this.isValidColumn(sizeBy.dataIndex, store)
-          ? store.getPhysicalColumn(sizeBy.dataIndex)
+        sizeBy && this.isValidColumn(sizeBy.column, store)
+          ? store.getPhysicalColumn(sizeBy.column)
           : undefined,
       );
       const renderSeries =
@@ -3037,8 +3035,8 @@ export class ChartCore implements EngineHost {
           break;
         }
         case 'band': {
-          const upperIdx = series.upperDataIndex;
-          const lowerIdx = series.lowerDataIndex;
+          const upperIdx = series.upperColumn;
+          const lowerIdx = series.lowerColumn;
           if (
             upperIdx != null &&
             lowerIdx != null &&
@@ -3281,13 +3279,13 @@ export class ChartCore implements EngineHost {
       const sc = this.config.series[point.seriesIndex];
       if (!sc) continue;
 
-      const xScale = this.scales.get(sc.xAxisKey ?? 'x');
-      const yScale = this.scales.get(sc.yAxisKey ?? 'y');
+      const xScale = this.scales.get(sc.xAxis ?? 'x');
+      const yScale = this.scales.get(sc.yAxis ?? 'y');
       if (!xScale || !yScale) continue;
 
       if (sc.type === 'histogram') {
         // Highlight hovered bin, edges from X data, counts from Y data
-        const colIdx = seriesYDataIndex(sc);
+        const colIdx = seriesYColumn(sc);
         const binIdx = point.dataIndex;
         if (colIdx >= 1 && colIdx <= store.seriesCount && binIdx < store.length - 1) {
           const x1 = xScale.dataToPixel(store.xAt(binIdx));
@@ -3446,7 +3444,7 @@ export class ChartCore implements EngineHost {
     for (const point of this.tooltipPoints) {
       const sc = this.config.series[point.seriesIndex];
       if (!sc) continue;
-      const yScale = this.scales.get(sc.yAxisKey ?? 'y');
+      const yScale = this.scales.get(sc.yAxis ?? 'y');
       if (!yScale) continue;
       const py = yScale.dataToPixel(point.y);
       if (!Number.isFinite(py)) continue;
@@ -3501,7 +3499,7 @@ export class ChartCore implements EngineHost {
         this.stats.dataVersion,
         (si) => {
           const series = this.config.series[si];
-          const fallback = series.stroke ?? palette[si % palette.length];
+          const fallback = series.color ?? palette[si % palette.length];
           return this.scatterResolvers(si, series, fallback).logicalResolver;
         },
         { ...this.tooltipFormatters(), readout: this.readoutY },
@@ -3534,14 +3532,14 @@ export class ChartCore implements EngineHost {
       if (store.length === 0) continue;
       if (series.visible === false || series.type !== 'histogram') continue;
 
-      const xScale = this.scales.get(series.xAxisKey ?? 'x');
+      const xScale = this.scales.get(series.xAxis ?? 'x');
       if (!xScale) continue;
       const dataX = xScale.pixelToData(this.cursorX);
 
-      const colIdx = seriesYDataIndex(series);
+      const colIdx = seriesYColumn(series);
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
-      const color = series.stroke ?? palette[si % palette.length];
+      const color = series.color ?? palette[si % palette.length];
 
       // Find which bin the cursor X falls into. Edges are sorted, so
       // `upperBound` gives the largest b with edges[b] <= dataX in O(log n).
@@ -3564,9 +3562,7 @@ export class ChartCore implements EngineHost {
         y: count,
         color,
         formattedX: this.formatHistogramBinRange(binMin, binMax, si),
-        formattedY: fmt?.y
-          ? fmt.y(count, si)
-          : this.formatAxisReadout(series.yAxisKey ?? 'y', count),
+        formattedY: fmt?.y ? fmt.y(count, si) : this.formatAxisReadout(series.yAxis ?? 'y', count),
       });
     }
 
@@ -3588,7 +3584,7 @@ export class ChartCore implements EngineHost {
       if (store.length === 0) continue;
       if (series.visible === false || series.type !== 'bar') continue;
 
-      const xScale = this.scales.get(series.xAxisKey ?? 'x');
+      const xScale = this.scales.get(series.xAxis ?? 'x');
       if (!xScale) continue;
 
       const dataX = xScale.pixelToData(this.cursorX);
@@ -3601,13 +3597,13 @@ export class ChartCore implements EngineHost {
       );
       if (Math.abs(dataX - xVal) > categoryWidth * 0.6) continue;
 
-      const colIdx = seriesYDataIndex(series);
+      const colIdx = seriesYColumn(series);
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
       const yVal = store.yAt(colIdx - 1, idx);
       if (!Number.isFinite(yVal)) continue;
 
-      const color = series.stroke ?? palette[si % palette.length];
+      const color = series.color ?? palette[si % palette.length];
       const fmt = this.tooltipFormatters();
 
       points.push({
@@ -3617,8 +3613,8 @@ export class ChartCore implements EngineHost {
         x: xVal,
         y: yVal,
         color,
-        formattedX: fmt?.x ? fmt.x(xVal) : this.formatAxisValue(series.xAxisKey ?? 'x', xVal),
-        formattedY: fmt?.y ? fmt.y(yVal, si) : this.formatReadout(series.yAxisKey ?? 'y', yVal),
+        formattedX: fmt?.x ? fmt.x(xVal) : this.formatAxisValue(series.xAxis ?? 'x', xVal),
+        formattedY: fmt?.y ? fmt.y(yVal, si) : this.formatReadout(series.yAxis ?? 'y', yVal),
       });
     }
 
@@ -3694,15 +3690,15 @@ export class ChartCore implements EngineHost {
       const s = seriesList[si];
       if (s.visible === false) continue;
 
-      const colIdx = seriesYDataIndex(s);
+      const colIdx = seriesYColumn(s);
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
       const value = store.yAt(colIdx - 1, idx);
-      const yScale = this.scales.get(s.yAxisKey ?? 'y');
+      const yScale = this.scales.get(s.yAxis ?? 'y');
       const formattedValue = Number.isFinite(value)
-        ? this.formatReadout(s.yAxisKey ?? 'y', value)
+        ? this.formatReadout(s.yAxis ?? 'y', value)
         : '';
-      const color = s.stroke ?? palette[si % palette.length];
+      const color = s.color ?? palette[si % palette.length];
 
       let row = points[writeIdx];
       if (!row) {
@@ -3772,9 +3768,9 @@ export class ChartCore implements EngineHost {
     for (let si = 0; si < this.config.series.length; si++) {
       const series = this.config.series[si];
       const store = this.storeForSeries(si);
-      const column = seriesYDataIndex(series);
+      const column = seriesYColumn(series);
       if (series.visible === false || !store.length || !this.isValidColumn(column, store)) continue;
-      const seriesX = this.scales.get(series.xAxisKey ?? 'x');
+      const seriesX = this.scales.get(series.xAxis ?? 'x');
       const targetX =
         active && seriesX && this.cursorX !== null
           ? seriesX.pixelToData(this.cursorX)
@@ -3787,7 +3783,7 @@ export class ChartCore implements EngineHost {
             : series.type === 'histogram'
               ? this.histogramBinIndexForDataX(targetX, store)
               : store.nearestXIndex(targetX);
-      const xColumn = series.type === 'scatter' ? scatterXDataIndex(series) : 0;
+      const xColumn = series.type === 'scatter' ? scatterXColumn(series) : 0;
       if (active && xColumn !== 0) {
         let distance = Infinity;
         dataIndex = null;
@@ -3803,9 +3799,9 @@ export class ChartCore implements EngineHost {
       const range = series.type === 'histogram' ? this.histogramBinRange(dataIndex, store) : null;
       const dataX = range ? (range.min + range.max) / 2 : store.valueAt(xColumn, dataIndex);
       const value = store.valueAt(column, dataIndex);
-      const yScale = this.scales.get(series.yAxisKey ?? 'y');
+      const yScale = this.scales.get(series.yAxis ?? 'y');
       const formattedValue = Number.isFinite(value)
-        ? this.formatAxisReadout(series.yAxisKey ?? 'y', value)
+        ? this.formatAxisReadout(series.yAxis ?? 'y', value)
         : '';
       const point =
         target.points[count] ??
@@ -3821,14 +3817,14 @@ export class ChartCore implements EngineHost {
       point.dataIndex = dataIndex;
       point.dataX = dataX;
       point.label = series.label;
-      point.color = series.stroke ?? palette[si % palette.length];
+      point.color = series.color ?? palette[si % palette.length];
       point.value = value;
       point.formattedValue = formattedValue;
       point.meta = series.meta;
       if (count === 0) {
         target.dataIndex = dataIndex;
         target.dataX ??= dataX;
-        target.formattedX = this.formatAxisValue(series.xAxisKey ?? 'x', target.dataX);
+        target.formattedX = this.formatAxisValue(series.xAxis ?? 'x', target.dataX);
       }
       count++;
       if (active && this.cursorY !== null && yScale && Number.isFinite(value)) {
@@ -3874,7 +3870,7 @@ export class ChartCore implements EngineHost {
     if (this.sourceStores.length > 1) return false;
     return !this.config.series.some(
       (series) =>
-        series.visible !== false && series.type === 'scatter' && scatterXDataIndex(series) !== 0,
+        series.visible !== false && series.type === 'scatter' && scatterXColumn(series) !== 0,
     );
   }
 
@@ -3898,7 +3894,7 @@ export class ChartCore implements EngineHost {
     return [10 ** (logMin - logPad), 10 ** (logMax + logPad)];
   }
 
-  private shouldNiceAutoRange(scale: Scale, axis: AxisConfig, hasExactGeometry: boolean): boolean {
+  private shouldNiceAutoRange(scale: Scale, axis: AxisSpec, hasExactGeometry: boolean): boolean {
     if (hasExactGeometry || scale.type === 'time') return false;
     // Linear axes get clean 1/2/5 bounds by default. Log axes retain their
     // existing opt-in behavior because their padded powers-of-ten extent is
@@ -3935,12 +3931,12 @@ export class ChartCore implements EngineHost {
       const store = this.storeForSeries(si);
       if (store.length === 0) continue;
       if (series.visible === false || series.type !== 'scatter') continue;
-      const xColumnIdx = scatterXDataIndex(series);
-      const yColumnIdx = seriesYDataIndex(series);
+      const xColumnIdx = scatterXColumn(series);
+      const yColumnIdx = seriesYColumn(series);
       if (!this.isValidColumn(xColumnIdx, store) || !this.isValidColumn(yColumnIdx, store))
         continue;
 
-      const fallbackColor = series.stroke ?? palette[si % palette.length];
+      const fallbackColor = series.color ?? palette[si % palette.length];
       const style = this.scatterResolvers(si, series, fallbackColor).logicalResolver;
 
       for (let i = 0; i < store.length; i++) {
@@ -4074,7 +4070,7 @@ export class ChartCore implements EngineHost {
   private axisMarkCoordinates(type: 'bar' | 'histogram'): number[] {
     const stores = new Set(
       this.config.series.flatMap((series, si) =>
-        series.visible !== false && series.type === type && (series.xAxisKey ?? 'x') === 'x'
+        series.visible !== false && series.type === type && (series.xAxis ?? 'x') === 'x'
           ? [this.storeForSeries(si)]
           : [],
       ),
@@ -4089,7 +4085,7 @@ export class ChartCore implements EngineHost {
     // User-provided formatter on the X axis wins over the default numeric
     // one for categorical bar / histogram charts.
     const xAxisCfg = this.config.axes?.x;
-    const userFormat = xAxisCfg?.tickFormat;
+    const userFormat = xAxisCfg?.format;
     const defaultFormat = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
     // Category ticks are capped to what the plot width can label legibly
@@ -4228,12 +4224,12 @@ export class ChartCore implements EngineHost {
 
   /** A readout where the axis's own format already applied (histogram counts, multi-source rows). */
   private formatAxisReadout(axisKey: string, value: number): string {
-    const axisFormat = this.config.axes?.[axisKey]?.tickFormat;
+    const axisFormat = this.config.axes?.[axisKey]?.format;
     return axisFormat ? axisFormat(value) : this.formatReadout(axisKey, value);
   }
 
   private formatAxisValue(axisKey: string, value: number): string {
-    const axisFormat = this.config.axes?.[axisKey]?.tickFormat;
+    const axisFormat = this.config.axes?.[axisKey]?.format;
     if (axisFormat) return axisFormat(value);
     return this.scales.get(axisKey)?.tickFormat(value) ?? String(value);
   }
@@ -4243,7 +4239,7 @@ export class ChartCore implements EngineHost {
     if (tooltip?.rangeFormat) return tooltip.rangeFormat(min, max, seriesIndex);
 
     const series = this.config.series[seriesIndex];
-    const axisKey = series?.xAxisKey ?? 'x';
+    const axisKey = series?.xAxis ?? 'x';
     const format = tooltip?.xFormat ?? ((value: number) => this.formatAxisValue(axisKey, value));
     let formattedMin = format(min);
     let formattedMax = format(max);

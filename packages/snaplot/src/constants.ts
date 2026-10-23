@@ -1,4 +1,4 @@
-import type { ThemeConfig } from './types';
+import type { ThemeConfig } from './engine/spec';
 
 /**
  * Okabe-Ito palette, 8 colours optimised for colorblind accessibility.

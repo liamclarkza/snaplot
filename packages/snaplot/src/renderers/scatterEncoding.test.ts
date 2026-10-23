@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { SeriesConfig } from '../types';
+import type { SeriesSpec } from '../engine/spec';
 import { createScatterStyleResolver } from './scatterEncoding';
 
-function resolverFor(series: SeriesConfig, columns: Float64Array[]) {
+function resolverFor(series: SeriesSpec, columns: Float64Array[]) {
   return createScatterStyleResolver({
     series,
     fallbackColor: '#4e79a7',
@@ -20,10 +20,7 @@ describe('scatter style resolver maxRadius', () => {
   const size = Float64Array.from([1, 5, 10, 40]);
 
   it('reports the fallback radius when there is no size encoding', () => {
-    const resolver = resolverFor({ label: 's', type: 'scatter', xDataIndex: 0, yDataIndex: 1 }, [
-      x,
-      y,
-    ]);
+    const resolver = resolverFor({ label: 's', type: 'scatter', xColumn: 0, yColumn: 1 }, [x, y]);
     expect(resolver.variableRadius).toBe(false);
     expect(resolver.maxRadius).toBe(3);
   });
@@ -33,9 +30,9 @@ describe('scatter style resolver maxRadius', () => {
       {
         label: 's',
         type: 'scatter',
-        xDataIndex: 0,
-        yDataIndex: 1,
-        sizeBy: { dataIndex: 2, range: [4, 40] },
+        xColumn: 0,
+        yColumn: 1,
+        sizeBy: { column: 2, range: [4, 40] },
       },
       [x, y, size],
     );
@@ -49,7 +46,7 @@ describe('scatter style resolver maxRadius', () => {
 
   it('reports the default size range max when range is omitted', () => {
     const resolver = resolverFor(
-      { label: 's', type: 'scatter', xDataIndex: 0, yDataIndex: 1, sizeBy: 2 },
+      { label: 's', type: 'scatter', xColumn: 0, yColumn: 1, sizeBy: 2 },
       [x, y, size],
     );
     expect(resolver.maxRadius).toBe(7);
@@ -65,9 +62,9 @@ describe('scatter color bins match colorAt', () => {
       {
         label: 's',
         type: 'scatter',
-        xDataIndex: 0,
-        yDataIndex: 1,
-        colorBy: { dataIndex: 2, type: 'category' },
+        xColumn: 0,
+        yColumn: 1,
+        colorBy: { column: 2, type: 'category' },
       },
       [x, y, cat],
     );
@@ -79,12 +76,12 @@ describe('scatter color bins match colorAt', () => {
 
 describe('stable prepared categorical encodings', () => {
   it('keeps the palette slot when earlier categories leave retained data', () => {
-    const series: SeriesConfig = {
+    const series: SeriesSpec = {
       label: 'sample',
       type: 'scatter',
-      xDataIndex: 0,
-      yDataIndex: 1,
-      colorBy: { dataIndex: 2, type: 'category', categoryValues: [0, 1, 2] },
+      xColumn: 0,
+      yColumn: 1,
+      colorBy: { column: 2, type: 'category', categoryValues: [0, 1, 2] },
     };
     const before = resolverFor(series, [
       new Float64Array([0, 1, 2]),
@@ -107,9 +104,9 @@ describe('stable prepared categorical encodings', () => {
       {
         label: 'sample',
         type: 'scatter',
-        xDataIndex: 0,
-        yDataIndex: 1,
-        colorBy: { dataIndex: 2, type: 'category' },
+        xColumn: 0,
+        yColumn: 1,
+        colorBy: { column: 2, type: 'category' },
       },
       [values, values, values],
     );

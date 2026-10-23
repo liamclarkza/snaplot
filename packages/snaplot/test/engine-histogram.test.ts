@@ -16,7 +16,7 @@ describe('engine histogram cursor', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
-        series: [{ label: 'count', dataIndex: 1, type: 'histogram' }],
+        series: [{ label: 'count', yColumn: 1, type: 'histogram' }],
       },
       [f([0, 1, 2, 3]), f([10, 20, 30, 0])],
     );
@@ -46,7 +46,7 @@ describe('engine histogram cursor', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
-        series: [{ label: 'count', dataIndex: 1, type: 'histogram' }],
+        series: [{ label: 'count', yColumn: 1, type: 'histogram' }],
       },
       [f([0, 1, 2, 3]), f([10, 20, 30, 0])],
     );
@@ -67,10 +67,10 @@ describe('engine histogram cursor', () => {
     const chart = fakes.engine(
       {
         axes: {
-          x: { type: 'linear', nice: false, tickFormat: (value) => labels[value] ?? '' },
+          x: { type: 'linear', nice: false, format: (value) => labels[value] ?? '' },
           y: { type: 'linear' },
         },
-        series: [{ label: 'score', dataIndex: 1, type: 'bar' }],
+        series: [{ label: 'score', yColumn: 1, type: 'bar' }],
       },
       [f([0, 1, 2]), f([0.8, 0.7, 0.9])],
     );
@@ -87,7 +87,7 @@ describe('engine histogram cursor', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'count', dataIndex: 1, type: 'histogram' }],
+        series: [{ label: 'count', yColumn: 1, type: 'histogram' }],
       },
       [f([0, 1, 2, 3, 4]), f([0, 100, 120, 80, 0])],
     );
@@ -106,7 +106,7 @@ describe('engine histogram cursor', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
-        series: [{ label: 'count', dataIndex: 1, type: 'histogram' }],
+        series: [{ label: 'count', yColumn: 1, type: 'histogram' }],
       },
       [f([0, 1, 2, 3, 4]), f([0, 100, 120, 80, 0])],
     );

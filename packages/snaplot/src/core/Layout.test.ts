@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AXIS_LABEL_GAP, AXIS_TICK_LENGTH, EDGE_MARGIN } from '../constants';
-import type { ChartConfig, Scale } from '../types';
+import type { ChartSpec, Scale } from '../engine/spec';
 import { computeLayout } from './Layout';
 
 // Without a DOM, Layout measures text at 7px per character; these tests
@@ -23,7 +23,7 @@ function scale(key: string, ticks: number[]): Scale {
   };
 }
 
-function layoutFor(config: ChartConfig, scales: Map<string, Scale>) {
+function layoutFor(config: ChartSpec, scales: Map<string, Scale>) {
   return computeLayout(640, 240, config, scales, 1, 'sans-serif', FONT_SIZE);
 }
 
@@ -36,7 +36,7 @@ describe('computeLayout edge margin', () => {
   it('keeps EDGE_MARGIN between the widest left tick label and the canvas edge', () => {
     const layout = layoutFor(
       // Deliberately undersized padding: the measured gutter must win.
-      { series: [], axes: { x: {}, y: {} }, padding: { left: 8 } } as ChartConfig,
+      { series: [], axes: { x: {}, y: {} }, padding: { left: 8 } } as ChartSpec,
       scales,
     );
     const maxLabelWidth = '16000'.length * CHAR_W;
@@ -47,15 +47,15 @@ describe('computeLayout edge margin', () => {
 
   it('reserves a full title strip when a vertical axis has a label', () => {
     const base = layoutFor(
-      { series: [], axes: { x: {}, y: {} }, padding: { left: 8 } } as ChartConfig,
+      { series: [], axes: { x: {}, y: {} }, padding: { left: 8 } } as ChartSpec,
       scales,
     );
     const titled = layoutFor(
       {
         series: [],
-        axes: { x: {}, y: { label: 'Validation loss' } },
+        axes: { x: {}, y: { title: 'Validation loss' } },
         padding: { left: 8 },
-      } as ChartConfig,
+      } as ChartSpec,
       scales,
     );
     expect(titled.plot.left).toBeGreaterThan(base.plot.left);
@@ -63,9 +63,9 @@ describe('computeLayout edge margin', () => {
   });
 
   it('reserves a full title strip below a labelled bottom axis', () => {
-    const base = layoutFor({ series: [], axes: { x: {}, y: {} } } as ChartConfig, scales);
+    const base = layoutFor({ series: [], axes: { x: {}, y: {} } } as ChartSpec, scales);
     const titled = layoutFor(
-      { series: [], axes: { x: { label: 'Learning rate' }, y: {} } } as ChartConfig,
+      { series: [], axes: { x: { title: 'Learning rate' }, y: {} } } as ChartSpec,
       scales,
     );
     expect(base.axes.x.area.height).toBe(44);
@@ -77,9 +77,9 @@ describe('computeLayout edge margin', () => {
     const layout = layoutFor(
       {
         series: [],
-        axes: { x: { tickFormat: (value) => `${value} ms` } },
+        axes: { x: { format: (value: number) => `${value} ms` } },
         padding: { left: 4, right: 4 },
-      } as ChartConfig,
+      } as ChartSpec,
       edgeScales,
     );
     expect(layout.plot.left).toBeGreaterThanOrEqual(('10 ms'.length * CHAR_W) / 2 + EDGE_MARGIN);
@@ -102,11 +102,14 @@ describe('computeLayout edge margin', () => {
       {
         series: [],
         axes: {
-          x: { ticks: [0, 1, 2, 3], tickFormat: (value) => ['JHB', 'FRA', 'IAD', 'SIN'][value] },
-          y: { tickFormat: (value) => `${value.toFixed(1)}%` },
+          x: {
+            ticks: [0, 1, 2, 3],
+            format: (value: number) => ['JHB', 'FRA', 'IAD', 'SIN'][value],
+          },
+          y: { format: (value: number) => `${value.toFixed(1)}%` },
         },
         padding: { left: 12, right: 12 },
-      } as ChartConfig,
+      } as ChartSpec,
       categoryScales,
     );
 

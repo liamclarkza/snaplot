@@ -1,4 +1,4 @@
-import type { Scale, ScaleType } from '../types';
+import type { Scale, ScaleType } from '../engine/spec';
 import { LinearScale } from './LinearScale';
 import { LogScale } from './LogScale';
 import { TimeScale } from './TimeScale';

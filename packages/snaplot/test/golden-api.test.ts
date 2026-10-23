@@ -13,7 +13,7 @@ const manifest = JSON.parse(manifestText) as {
 };
 
 /** P4: public declarations never name these engine types. */
-const FORBIDDEN = ['EngineConfig', 'ChartCore', 'SeriesConfig', 'ChartInstance'];
+const FORBIDDEN = ['EngineConfig', 'ChartCore', 'SeriesSpec', 'ChartInstance'];
 
 describe('golden public declarations (api/*.d.ts)', () => {
   it('exist for exactly the entries the exports map types', () => {

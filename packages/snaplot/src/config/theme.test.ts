@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PALETTE_SEQUENTIAL_DARK, PALETTE_SEQUENTIAL_LIGHT } from '../constants';
-import type { ThemeConfig } from '../types';
+import type { ThemeConfig } from '../engine/spec';
 import {
   resolveTheme,
   lightTheme,

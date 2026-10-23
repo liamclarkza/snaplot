@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderHistogramSegments } from './HistogramRenderer';
-import type { Layout, Scale, SeriesConfig } from '../types';
+import type { Layout, Scale, SeriesSpec } from '../engine/spec';
 
 const f = (xs: number[]) => Float64Array.from(xs);
 
@@ -54,7 +54,7 @@ describe('renderHistogramSegments baseline', () => {
       max: 100,
       dataToPixel: (value: number) => (value > 0 ? 100 - value : Number.NaN),
     };
-    const series: SeriesConfig = { label: 'hist', dataIndex: 1, type: 'histogram' };
+    const series: SeriesSpec = { label: 'hist', yColumn: 1, type: 'histogram' };
 
     // 3 edges → 2 bins (last count is padding).
     renderHistogramSegments(

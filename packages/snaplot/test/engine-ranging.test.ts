@@ -17,7 +17,7 @@ describe('engine auto-range and log interactions', () => {
     const exactChart = fakes.engine(
       {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
-        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+        series: [{ label: 'value', type: 'line', yColumn: 1 }],
       },
       [f([3, 50, 97]), f([0.2, 0.3, 0.4])],
     );
@@ -29,7 +29,7 @@ describe('engine auto-range and log interactions', () => {
     const defaultChart = fakes.engine(
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+        series: [{ label: 'value', type: 'line', yColumn: 1 }],
       },
       [f([3, 50, 97]), f([0.2, 0.3, 0.4])],
     );
@@ -41,7 +41,7 @@ describe('engine auto-range and log interactions', () => {
     const niceChart = fakes.engine(
       {
         axes: { x: { type: 'linear', nice: true }, y: { type: 'linear' } },
-        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+        series: [{ label: 'value', type: 'line', yColumn: 1 }],
       },
       [f([3, 50, 97]), f([0.2, 0.3, 0.4])],
     );
@@ -54,7 +54,7 @@ describe('engine auto-range and log interactions', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear', tickCount: 3 }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+        series: [{ label: 'value', type: 'line', yColumn: 1 }],
       },
       [f([-100, -89]), f([0, 1])],
     );
@@ -68,7 +68,7 @@ describe('engine auto-range and log interactions', () => {
     const sparseChart = fakes.engine(
       {
         axes: { x: { type: 'linear', tickCount: 2 }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+        series: [{ label: 'value', type: 'line', yColumn: 1 }],
       },
       [f([-1000, 1]), f([0, 1])],
     );
@@ -84,7 +84,7 @@ describe('engine auto-range and log interactions', () => {
           x: { type: 'linear', nice: false },
           y: { type: 'linear', nice: false, padding: 0 },
         },
-        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+        series: [{ label: 'value', type: 'line', yColumn: 1 }],
       },
       [f([0, 1, 2]), f([10, 10, 10])],
     );
@@ -102,7 +102,7 @@ describe('engine auto-range and log interactions', () => {
           x: { type: 'linear', min: 13, tickCount: 6 },
           y: { type: 'linear', nice: false },
         },
-        series: [{ label: 'value', type: 'line', dataIndex: 1 }],
+        series: [{ label: 'value', type: 'line', yColumn: 1 }],
       },
       [f([13, 47]), f([0, 1])],
     );
@@ -116,7 +116,7 @@ describe('engine auto-range and log interactions', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'value', type: 'bar', dataIndex: 1 }],
+        series: [{ label: 'value', type: 'bar', yColumn: 1 }],
       },
       [f([7, 9, 11]), f([1, 2, 3])],
     );
@@ -130,7 +130,7 @@ describe('engine auto-range and log interactions', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'log', padding: 0.1 }, y: { type: 'linear' } },
-        series: [{ label: 'loss', type: 'line', dataIndex: 1 }],
+        series: [{ label: 'loss', type: 'line', yColumn: 1 }],
       },
       [f([1e-4, 1e-3, 1e-2]), f([0.2, 0.3, 0.4])],
     );
@@ -146,7 +146,7 @@ describe('engine auto-range and log interactions', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' }, y: { type: 'log', padding: 0.1 } },
-        series: [{ label: 'loss', type: 'line', dataIndex: 1 }],
+        series: [{ label: 'loss', type: 'line', yColumn: 1 }],
       },
       [f([0, 1, 2, 3]), f([0, 1e-2, 1, 1e2])],
     );
@@ -163,7 +163,7 @@ describe('engine auto-range and log interactions', () => {
       {
         axes: { x: { type: 'log', min: 1e-5, max: 1e-1 }, y: { type: 'linear' } },
         zoom: { enabled: true, x: true, bounds: 'unbounded', wheelStep: 1 },
-        series: [{ label: 'points', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
+        series: [{ label: 'points', type: 'scatter', xColumn: 1, yColumn: 2 }],
       },
       [f([0, 1, 2]), f([1e-5, 1e-3, 1e-1]), f([0.2, 0.3, 0.4])],
     );
@@ -197,7 +197,7 @@ describe('engine auto-range and log interactions', () => {
           bounds: { x: 'data', y: 'unbounded' },
         },
         pan: { enabled: true, x: true, y: true },
-        series: [{ label: 'points', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
+        series: [{ label: 'points', type: 'scatter', xColumn: 1, yColumn: 2 }],
       },
       [f([0, 1, 2]), f([1e-5, 1e-3, 1e-1]), f([0.2, 0.3, 0.4])],
     );
@@ -225,7 +225,7 @@ describe('engine auto-range and log interactions', () => {
             y: { min: 0, max: 10 },
           },
         },
-        series: [{ label: 'points', dataIndex: 1 }],
+        series: [{ label: 'points', yColumn: 1 }],
       },
       [f([0, 100]), f([0, 10])],
     );
@@ -247,7 +247,7 @@ describe('engine auto-range and log interactions', () => {
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear' } },
         zoom: { enabled: true, x: true, bounds: 'unbounded' },
-        series: [{ label: 'value', dataIndex: 1 }],
+        series: [{ label: 'value', yColumn: 1 }],
       },
       [f([0, 100]), f([0, 10])],
     );

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RingColumnarStore } from './RingColumnarStore';
-import type { ColumnarData } from '../types';
+import type { ColumnarData } from '../engine/spec';
 
 const f = (xs: number[]) => Float64Array.from(xs);
 
@@ -80,7 +80,7 @@ describe('RingColumnarStore', () => {
   });
 
   it('rejects invalid maxLen values', () => {
-    expect(() => new RingColumnarStore([f([1]), f([10])], -1)).toThrow(/streaming\.maxLen/);
-    expect(() => new RingColumnarStore([f([1]), f([10])], 1.5)).toThrow(/streaming\.maxLen/);
+    expect(() => new RingColumnarStore([f([1]), f([10])], -1)).toThrow(/streaming\.maxPoints/);
+    expect(() => new RingColumnarStore([f([1]), f([10])], 1.5)).toThrow(/streaming\.maxPoints/);
   });
 });

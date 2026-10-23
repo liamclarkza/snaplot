@@ -1,4 +1,4 @@
-import type { Scale, ScaleType } from '../types';
+import type { Scale, ScaleType } from '../engine/spec';
 import { niceTicks, niceRange, niceStep } from './niceNumbers';
 import { DEFAULT_TICK_COUNT } from '../constants';
 

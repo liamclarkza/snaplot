@@ -1,4 +1,4 @@
-import type { ColumnarData } from '../types';
+import type { ColumnarData } from '../engine/spec';
 
 export interface ColumnarSegment {
   logicalStart: number;
@@ -40,6 +40,8 @@ export interface DataStore {
 
 export function validateMaxLen(maxLen: number): void {
   if (!Number.isInteger(maxLen) || maxLen < 0) {
-    throw new Error(`streaming.maxLen must be a non-negative integer, received ${maxLen}.`);
+    throw new Error(
+      `snaplot: streaming.maxPoints must be a non-negative integer, received ${maxLen}.`,
+    );
   }
 }

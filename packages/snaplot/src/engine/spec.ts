@@ -8,7 +8,7 @@ export type {
   ScatterRenderMode,
   SelectionRange,
   ThemeConfig,
-} from './public/types';
+} from '../public/types';
 import type {
   AxisPosition,
   InterpolationMode,
@@ -17,7 +17,7 @@ import type {
   ScatterRenderMode,
   SelectionRange,
   ThemeConfig,
-} from './public/types';
+} from '../public/types';
 
 // ============================================================
 // DATA TYPES
@@ -49,7 +49,7 @@ export type ScaleType = 'linear' | 'log' | 'time';
 export interface Scale {
   /** Scale kind. Fixed at creation; changing an axis type rebuilds the scale. */
   readonly type: ScaleType;
-  /** The axis key this scale is bound to (the key in `ChartConfig.axes`). */
+  /** The axis key this scale is bound to (the key in `ChartSpec.axes`). */
   readonly key: string;
   /**
    * Current domain lower bound in data units. Writable: assigning bypasses
@@ -110,8 +110,8 @@ export type ScatterPointShape = 'circle' | 'square' | 'diamond';
 export type ScatterColorEncodingType = 'auto' | 'category' | 'continuous' | 'diverging';
 
 export interface ScatterColorEncoding {
-  /** Absolute data column index. Column 0 is the default X column. */
-  dataIndex: number;
+  /** The source column of the encoded field. Column 0 is the X column. */
+  column: number;
   /**
    * `auto` treats low-cardinality integer columns as categories and
    * otherwise uses a continuous ramp. Default: `auto`.
@@ -132,8 +132,8 @@ export interface ScatterColorEncoding {
 }
 
 export interface ScatterSizeEncoding {
-  /** Absolute data column index. Column 0 is the default X column. */
-  dataIndex: number;
+  /** The source column of the encoded field. Column 0 is the X column. */
+  column: number;
   /** Numeric input domain. Defaults to the visible data extent. */
   domain?: [number, number];
   /** Radius range in CSS pixels. Default: [2, 7]. */
@@ -147,35 +147,34 @@ export interface ScatterSizeEncoding {
 }
 
 export interface ScatterTooltipField {
-  /** Absolute data column index whose value is shown for the hovered point. */
-  dataIndex: number;
+  /** The source column whose value is shown for the hovered point. */
+  column: number;
   /** Row label in the tooltip. Defaults to `column N`. */
   label?: string;
   /** Value formatter. Defaults to the number's default string form. */
   format?: (value: number) => string;
 }
 
-export interface SeriesConfig<TMeta = unknown> {
+export interface SeriesSpec<TMeta = unknown> {
   /** Chart type for this series */
   type?: ChartType;
   /** Display label */
   label: string;
   /**
-   * Primary value column in `ColumnarData`.
-   * Required for line, area, band, bar, and histogram series. Scatter series
-   * should prefer `yDataIndex`, with `dataIndex` kept as a fallback alias.
+   * The source column of the series' value (`y`; the counts of a histogram).
+   * Required for every mark.
    */
-  dataIndex?: number;
+  yColumn?: number;
 
   // Visual
   /**
    * Line / mark outline color (any CSS color). Defaults to the theme's
    * categorical palette entry for this series' index.
    */
-  stroke?: string;
+  color?: string;
   /**
    * Area / bar fill color. `null` forces no fill (useful to draw an
-   * `area` series as a bare outline). Defaults to a translucent `stroke`
+   * `area` series as a bare outline). Defaults to a translucent `color`
    * for areas and the series color for bars.
    *
    * Bar series also accept a per-datum callback `(value, index) => color`
@@ -222,18 +221,18 @@ export interface SeriesConfig<TMeta = unknown> {
    *
    * @example
    * ```ts
-   * { lineDash: [6, 3] }       // standard dash
-   * { lineDash: [2, 2] }       // dotted
-   * { lineDash: [10, 4, 2, 4] } // dash-dot
+   * { dash: [6, 3] }       // standard dash
+   * { dash: [2, 2] }       // dotted
+   * { dash: [10, 4, 2, 4] } // dash-dot
    * ```
    */
-  lineDash?: number[];
+  dash?: number[];
 
   // Area
   /**
    * Vertical fill gradient for `area` series, `top` at the line, `bottom`
    * at the baseline. Overrides `fill`. Each stop is a full CSS color
-   * including its own alpha. Default: a translucent `stroke` ramp.
+   * including its own alpha. Default: a translucent `color` ramp.
    */
   fillGradient?: { top: string; bottom: string };
   // Band (confidence interval / error band)
@@ -241,26 +240,26 @@ export interface SeriesConfig<TMeta = unknown> {
    * Column index for the upper bound of a `type: 'band'` series.
    * Required when `type` is `'band'`. Ignored for other chart types.
    */
-  upperDataIndex?: number;
+  upperColumn?: number;
   /**
    * Column index for the lower bound of a `type: 'band'` series.
    * Required when `type` is `'band'`. Ignored for other chart types.
    *
    * A band series renders three elements as a single visual unit:
-   * 1. Filled region between `upperDataIndex` and `lowerDataIndex`
-   * 2. Center line at `dataIndex` (used for tooltip values and cursor snapping)
+   * 1. Filled region between `upperColumn` and `lowerColumn`
+   * 2. Center line at `yColumn` (used for tooltip values and cursor snapping)
    *
    * @example
    * ```ts
    * // data = [x, yMean, yUpper, yLower]
    * series: [
    *   { label: 'Loss', type: 'band', dataIndex: 1,
-   *     upperDataIndex: 2, lowerDataIndex: 3,
-   *     stroke: '#4f8fea', fill: '#4f8fea', opacity: 0.15 },
+   *     upperColumn: 2, lowerColumn: 3,
+   *     color: '#4f8fea', fill: '#4f8fea', opacity: 0.15 },
    * ]
    * ```
    */
-  lowerDataIndex?: number;
+  lowerColumn?: number;
 
   // Bar
   /** Fraction of the category width each bar occupies (0–1). Default 0.8. */
@@ -272,9 +271,7 @@ export interface SeriesConfig<TMeta = unknown> {
    * Useful for tabular datasets where several scatter views share the same
    * row identity but use different X/Y metric columns.
    */
-  xDataIndex?: number;
-  /** Absolute column index for scatter Y values. Preferred over `dataIndex`. */
-  yDataIndex?: number;
+  xColumn?: number;
   /** Preferred scatter render path. `auto` uses points until the density threshold. */
   renderMode?: ScatterRenderMode;
   /** Point shape for non-density scatter rendering. Default: 'circle'. */
@@ -297,13 +294,13 @@ export interface SeriesConfig<TMeta = unknown> {
   heatmapGradient?: string[];
 
   // Axis binding
-  /** Key of the X axis in `ChartConfig.axes` this series maps onto. Defaults to `'x'`. */
-  xAxisKey?: string;
+  /** Key of the X axis in `ChartSpec.axes` this series maps onto. Defaults to `'x'`. */
+  xAxis?: string;
   /**
    * Key of the Y axis this series maps onto. Defaults to `'y'`. Point a
    * second series at a different key (e.g. `'y2'`) for a dual-axis chart.
    */
-  yAxisKey?: string;
+  yAxis?: string;
 
   // Visibility
   /**
@@ -358,8 +355,8 @@ export interface AxisTickMarksConfig {
   color?: string;
 }
 
-/** Configuration for an axis entry in ChartConfig.axes */
-export interface AxisConfig {
+/** Configuration for an axis entry in ChartSpec.axes */
+export interface AxisSpec {
   /** Scale kind for this axis. Default: `'linear'`. */
   type?: ScaleType;
   /**
@@ -367,7 +364,7 @@ export interface AxisConfig {
    * rotated alongside a left/right axis. Layout reserves the extra gutter
    * space automatically.
    */
-  label?: string;
+  title?: string;
   /** Fixed lower bound. Pinned, auto-range will restore to this value on reset. */
   min?: number;
   /** Fixed upper bound. Pinned, auto-range will restore to this value on reset. */
@@ -404,7 +401,7 @@ export interface AxisConfig {
    * for axis labels (including bar / histogram category labels). Return
    * the label as a string; return `''` to hide a specific tick.
    */
-  tickFormat?: (value: number) => string;
+  format?: (value: number) => string;
   /**
    * Target tick density. Scales treat it as a hint (nice-number rounding
    * still applies on linear axes, including automatic bar grids). Default: 6.
@@ -417,7 +414,7 @@ export interface AxisConfig {
    * Explicit tick values in data space. Overrides `tickCount` and the
    * scale's own generation; values outside the current domain are not
    * rendered. Gridlines follow these ticks, so this also controls the
-   * grid density. Format labels with `tickFormat`.
+   * grid density. Format labels with `format`.
    */
   ticks?: number[];
   /**
@@ -594,7 +591,7 @@ export interface SelectionConfig {
 
 /** A single scatter point captured inside a box selection. */
 export interface SelectedPoint<TMeta = unknown> {
-  /** Index of the owning series in `ChartConfig.series`. */
+  /** Index of the owning series in `ChartSpec.series`. */
   seriesIndex: number;
   /** Row index into the series' columns. */
   dataIndex: number;
@@ -685,7 +682,7 @@ export interface TouchConfig {
 
 /** One row passed to a custom `tooltip.render`. */
 export interface TooltipPoint {
-  /** Index of the owning series in `ChartConfig.series`. */
+  /** Index of the owning series in `ChartSpec.series`. */
   seriesIndex: number;
   /** Row index into the series' columns. */
   dataIndex: number;
@@ -699,9 +696,9 @@ export interface TooltipPoint {
   y: number;
   /** Resolved mark color for the swatch. */
   color: string;
-  /** X value pre-formatted via the x-axis `tickFormat`. */
+  /** X value pre-formatted via the X axis `format`. */
   formattedX: string;
-  /** Y value pre-formatted via the y-axis `tickFormat`. */
+  /** Y value pre-formatted via the Y axis `format`. */
   formattedY: string;
   /** Mark radius in CSS pixels; present for scatter points only. */
   radius?: number;
@@ -744,7 +741,7 @@ export interface LegendItem<TMeta = unknown> {
 export interface CursorSeriesPoint<TMeta = unknown> {
   /** Actual X coordinate sampled from this series source. */
   dataX?: number;
-  /** Index of this series in `ChartConfig.series` (stable across cursor moves). */
+  /** Index of this series in `ChartSpec.series` (stable across cursor moves). */
   seriesIndex: number;
   /** X-column index this row was sampled at (same for every row in a snapshot). */
   dataIndex: number;
@@ -754,7 +751,7 @@ export interface CursorSeriesPoint<TMeta = unknown> {
   color: string;
   /** Raw y value, NaN when missing at this index */
   value: number;
-  /** Pre-formatted via the y-axis tickFormat (or `''` for missing values) */
+  /** Pre-formatted via the Y axis format (or `''` for missing values) */
   formattedValue: string;
   meta?: TMeta;
 }
@@ -842,31 +839,31 @@ export interface DebugConfig {
 // STREAMING
 // ============================================================
 
-export interface StreamingConfig {
+export interface StreamingSpec {
   /**
    * Retain at most this many points after appendData(). When set, snaplot
    * uses an internal ring buffer so streaming updates do not allocate a new
    * full-window dataset on every tick.
    */
-  maxLen?: number;
+  maxPoints?: number;
   /**
    * Live-follow window width in X data units. When set and the chart is
    * "following" (the default until the user pans or zooms X), each
-   * `appendData` keeps the X viewport at `[latestX - follow, latestX]`, so
+   * `appendData` keeps the X viewport at `[latestX - followWindow, latestX]`, so
    * the view scrolls with the newest data. Panning or zooming X pauses
-   * following; `chart.scrollToLatest()` or a double-click reset resumes it.
+   * following; `resumeFollow()` or a double-click reset resumes it.
    * Without this, a following chart tracks the full data extent instead of a
    * fixed trailing window. Follows the default `x` axis (and any horizontal
    * axis).
    */
-  follow?: number;
+  followWindow?: number;
 }
 
 // ============================================================
 // CHART CONFIGURATION (top-level)
 // ============================================================
 
-export interface ChartConfig<TMeta = unknown> {
+export interface ChartSpec<TMeta = unknown> {
   /** Fixed CSS-pixel width. Omit and set `autoResize` to fill the container. */
   width?: number;
   /** Fixed CSS-pixel height. Omit and set `autoResize` to fill the container. */
@@ -894,9 +891,9 @@ export interface ChartConfig<TMeta = unknown> {
    * keys (e.g. `'y2'`) create additional axes that series bind to via
    * `xAxisKey`/`yAxisKey`. Omitted axes default to a linear scale.
    */
-  axes?: Record<string, AxisConfig>;
+  axes?: Record<string, AxisSpec>;
   /** Series to draw, in paint order (later series draw on top). Required. */
-  series: SeriesConfig<TMeta>[];
+  series: SeriesSpec<TMeta>[];
 
   /** Interaction mode preset, sets default gesture mappings. Default: `'timeseries'`. */
   interaction?: InteractionMode;
@@ -916,7 +913,7 @@ export interface ChartConfig<TMeta = unknown> {
   /** Series highlight + dim config. */
   highlight?: HighlightConfig;
   /** Ring-buffer window for `appendData` streaming. */
-  streaming?: StreamingConfig;
+  streaming?: StreamingSpec;
   /** Large-dataset interaction tuning. */
   performance?: PerformanceConfig;
   /** Timing diagnostics. Off by default. */
@@ -1045,7 +1042,7 @@ export interface ChartEventMap {
   /** Data replaced or appended. The payload is the live store, do not mutate it. */
   'data:update': (data: ColumnarData) => void;
   /** Config changed via `setOptions`/`replaceOptions`, with the resolved config. */
-  'options:update': (config: ChartConfig) => void;
+  'options:update': (config: ChartSpec) => void;
   /** The resolved theme changed through config, CSS variables, or color scheme. */
   'theme:update': (theme: ThemeConfig) => void;
   /**

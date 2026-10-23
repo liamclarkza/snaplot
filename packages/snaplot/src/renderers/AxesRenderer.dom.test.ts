@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_THEME } from '../constants';
-import type { Layout } from '../types';
+import type { Layout } from '../engine/spec';
 import { updateDOMLabels } from './AxesRenderer';
 
 describe('axis text appearance', () => {

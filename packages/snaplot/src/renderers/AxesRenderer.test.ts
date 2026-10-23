@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { axisTickValues, renderAxes, thinTicks } from './AxesRenderer';
-import type { ChartConfig, Layout, Scale, ThemeConfig } from '../types';
+import type { ChartSpec, Layout, Scale, ThemeConfig } from '../engine/spec';
 
 function linearScale(min: number, max: number, generated: number[]): Scale {
   return {
@@ -76,7 +76,7 @@ describe('renderAxes vertical label filtering', () => {
       setPixelRange: () => {},
     };
     const scales = new Map<string, Scale>([['y', yScale]]);
-    const config = { series: [], axes: { y: { position: 'left' } } } as unknown as ChartConfig;
+    const config = { series: [], axes: { y: { position: 'left' } } } as unknown as ChartSpec;
 
     const result = renderAxes(context(), layout(), scales, theme, config);
     const labels = result.labels.get('y') ?? [];
@@ -127,7 +127,7 @@ describe('thinTicks', () => {
 
 describe('per-axis grid config', () => {
   const gridConfig = (grid: unknown) =>
-    ({ series: [], axes: { y: { position: 'left', grid } } }) as unknown as ChartConfig;
+    ({ series: [], axes: { y: { position: 'left', grid } } }) as unknown as ChartSpec;
 
   it('grid: false suppresses this axis gridlines but keeps its labels', () => {
     const scale = linearScale(0, 100, [25, 50, 75]);
@@ -148,7 +148,7 @@ describe('per-axis grid config', () => {
     const config = {
       series: [],
       axes: { y: { position: 'left', grid: false, tickMarks: false } },
-    } as unknown as ChartConfig;
+    } as unknown as ChartSpec;
 
     const result = renderAxes(ctx, layout(), scales, theme, config);
 
@@ -188,10 +188,10 @@ describe('axis title placement', () => {
     const config = {
       series: [],
       axes: {
-        x: { position: 'bottom', label: 'Learning rate' },
-        y: { position: 'left', label: 'Validation loss' },
+        x: { position: 'bottom', title: 'Learning rate' },
+        y: { position: 'left', title: 'Validation loss' },
       },
-    } as unknown as ChartConfig;
+    } as unknown as ChartSpec;
     const fullLayout: Layout = {
       width: 200,
       height: 140,
@@ -242,7 +242,7 @@ describe('axis corner collision handling', () => {
     const result = renderAxes(context(), fullLayout, scales, theme, {
       series: [],
       axes: { x: { position: 'bottom' }, y: { position: 'left' } },
-    } as ChartConfig);
+    } as ChartSpec);
 
     expect(result.labels.get('x')?.[0].x).toBeGreaterThan(20);
   });

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ChartConfig, SeriesConfig } from '../src/types';
+import type { ChartSpec, SeriesSpec } from '../src/engine/spec';
 import {
   drag,
   type EngineFakes,
@@ -42,7 +42,7 @@ describe('engine brush selection', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
-        series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
+        series: [{ label: 'v', yColumn: 1 }] as SeriesSpec[],
         selection: { mode: 'brush' as const },
       },
       ramp(),
@@ -72,7 +72,7 @@ describe('engine brush selection', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
-        series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
+        series: [{ label: 'v', yColumn: 1 }] as SeriesSpec[],
         selection: { mode: 'brush' as const },
       },
       ramp(),
@@ -91,7 +91,7 @@ describe('engine brush selection', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
-        series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
+        series: [{ label: 'v', yColumn: 1 }] as SeriesSpec[],
         selection: { mode: 'brush' as const },
       },
       [f([0, 50, 100]), f([1, 2, 3])],
@@ -110,9 +110,9 @@ describe('engine brush selection', () => {
 
   it('clears a brush that no longer overlaps replaced data by default', () => {
     const onBrush = vi.fn();
-    const config: ChartConfig = {
+    const config: ChartSpec = {
       axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-      series: [{ label: 'v', dataIndex: 1 }],
+      series: [{ label: 'v', yColumn: 1 }],
       selection: { mode: 'brush', onBrush },
     };
     const chart = fakes.engine(config, [f([0, 1, 2]), f([1, 2, 3])]);
@@ -124,9 +124,9 @@ describe('engine brush selection', () => {
   });
 
   it('can clamp a brush to the extent of replaced data', () => {
-    const config: ChartConfig = {
+    const config: ChartSpec = {
       axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-      series: [{ label: 'v', dataIndex: 1 }],
+      series: [{ label: 'v', yColumn: 1 }],
       selection: { mode: 'brush', dataChange: 'clamp' },
     };
     const chart = fakes.engine(config, [f([0, 5, 10]), f([1, 2, 3])]);

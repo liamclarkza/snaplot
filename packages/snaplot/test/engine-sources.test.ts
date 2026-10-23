@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ColumnarData } from '../src/types';
+import type { ColumnarData } from '../src/engine/spec';
 import { dataPoint, drag, type EngineFakes, f, installEngineFakes, tapAt } from './fakes/engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2).
@@ -19,8 +19,8 @@ const config = () => ({
   autoResize: false,
   axes: { x: { nice: false }, y: { nice: false, padding: 0 } },
   series: [
-    { label: 'a', dataIndex: 1 },
-    { label: 'b', dataIndex: 1 },
+    { label: 'a', yColumn: 1 },
+    { label: 'b', yColumn: 1 },
   ],
 });
 
@@ -68,7 +68,7 @@ describe('engine independent data sources', () => {
 
   it('appends to only the chosen bounded source and follows the newest source', () => {
     const chart = fakes.engine(
-      { ...config(), streaming: { maxLen: 3, follow: 4 } },
+      { ...config(), streaming: { maxPoints: 3, followWindow: 4 } },
       { sources: sources(), seriesSources: [0, 1] },
     );
     chart.appendToSource(1, [f([10, 12]), f([100, 120])]);
@@ -101,8 +101,8 @@ describe('engine independent data sources', () => {
         zoom: { enabled: false, x: true, y: true },
         selection: { onSelect },
         series: [
-          { label: 'a', type: 'scatter', xDataIndex: 1, yDataIndex: 2 },
-          { label: 'b', type: 'scatter', xDataIndex: 1, yDataIndex: 2 },
+          { label: 'a', type: 'scatter', xColumn: 1, yColumn: 2 },
+          { label: 'b', type: 'scatter', xColumn: 1, yColumn: 2 },
         ],
       },
       {

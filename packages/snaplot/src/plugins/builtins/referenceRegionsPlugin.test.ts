@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { lightTheme } from '../../config/theme';
-import type { EngineHost } from '../../types';
+import type { EngineHost } from '../../engine/spec';
 import { createReferenceRegionsPlugin } from './referenceRegionsPlugin';
 
 function chart(redraw = vi.fn()): EngineHost {

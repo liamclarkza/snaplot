@@ -47,7 +47,7 @@ describe('public data preparation', () => {
     expect([...result.sources[0][0]]).toEqual([0, 2]);
     expect([...result.sources[1][0]]).toEqual([1, 1.5, 4]);
     expect(result.sourceInputs).toEqual([a, b]);
-    expect(result.config.series.map((series) => series.dataIndex)).toEqual([1, 2, 1]);
+    expect(result.config.series.map((series) => series.yColumn)).toEqual([1, 2, 1]);
   });
 
   it('retains unordered scatter coordinates and original identity', () => {
@@ -57,7 +57,7 @@ describe('public data preparation', () => {
     ];
     const result = prepareChart({ data, x: 'x', series: [{ type: 'scatter', y: 'y' }] });
     expect([...result.sources[0][0]]).toEqual([0, 1]);
-    expect([...result.sources[0][result.config.series[0].xDataIndex!]]).toEqual([9, 2]);
+    expect([...result.sources[0][result.config.series[0].xColumn!]]).toEqual([9, 2]);
     expect(result.identities[0].rows).toEqual(data);
   });
 
@@ -74,8 +74,8 @@ describe('public data preparation', () => {
     const series = result.config.series[0];
     expect([...result.sources[0][0]]).toEqual([0, 1, 2]);
     expect(result.sourceFields[0][0]).toBeNull();
-    expect(result.sources[0][series.xDataIndex!]).toBe(columns.embeddingX);
-    expect(result.sources[0][series.yDataIndex!]).toBe(columns.embeddingY);
+    expect(result.sources[0][series.xColumn!]).toBe(columns.embeddingX);
+    expect(result.sources[0][series.yColumn!]).toBe(columns.embeddingY);
     expect(result.identities[0].rowIds).toEqual(['a', 'b', 'c']);
     expect(() =>
       prepareChart<Record<string, number>>({
@@ -136,7 +136,7 @@ describe('public data preparation', () => {
     const encoding = batch.config.series[0].colorBy;
     expect(typeof encoding).toBe('object');
     if (typeof encoding !== 'object') throw new Error('expected encoding');
-    expect([...batch.sources[0][encoding.dataIndex]]).toEqual([1, 2]);
+    expect([...batch.sources[0][encoding.column]]).toEqual([1, 2]);
     expect(encoding.format?.(2)).toBe('Sage');
     expect(encoding).toMatchObject({ categoryValues: [0, 1, 2] });
     expect(first.encodingCategories.get('field:family')).toEqual(['Atlas', 'Nova']);
@@ -287,7 +287,7 @@ describe('public data preparation', () => {
     });
     expect(result.sources).toHaveLength(1);
     expect(result.sources[0].map((column) => column.length)).toEqual([0, 0, 0]);
-    expect(result.config.axes?.x).toMatchObject({ type: 'time', label: 'Time' });
+    expect(result.config.axes?.x).toMatchObject({ type: 'time', title: 'Time' });
   });
 
   it('reuses all referenced typed columns and validates their schema', () => {
@@ -410,7 +410,7 @@ describe('public data preparation', () => {
       padding: 0,
       ticks: [0, 1, 2],
     });
-    expect(result.config.axes?.x.tickFormat?.(0)).toBe('B');
+    expect(result.config.axes?.x.format?.(0)).toBe('B');
   });
 
   it('preserves authoritative empty categories and formats labels', () => {
@@ -423,7 +423,7 @@ describe('public data preparation', () => {
       } as never,
     });
     expect(result.categories.get('x')).toEqual(['A', 'B', 'C']);
-    expect(result.config.axes?.x.tickFormat?.(1)).toBe('Group B');
+    expect(result.config.axes?.x.format?.(1)).toBe('Group B');
     expect(result.config.axes?.x.max).toBe(2.5);
     expect(() =>
       prepareChart({
@@ -485,7 +485,7 @@ describe('public data preparation', () => {
       new Map([['x', ['A', 'B']]]),
     );
     expect(result.config.axes?.x.ticks).toEqual([0, 1]);
-    expect(result.config.axes?.x.tickFormat?.(1)).toBe('B');
+    expect(result.config.axes?.x.format?.(1)).toBe('B');
     expect(result.config.axes?.x.max).toBe(1.5);
   });
 
@@ -574,8 +574,8 @@ describe('public data preparation', () => {
       ],
     });
     const band = result.config.series[0];
-    expect([...result.sources[0][band.lowerDataIndex!]]).toEqual([1, 2]);
-    expect([...result.sources[0][band.upperDataIndex!]]).toEqual([3, 4]);
+    expect([...result.sources[0][band.lowerColumn!]]).toEqual([1, 2]);
+    expect([...result.sources[0][band.upperColumn!]]).toEqual([3, 4]);
     const scatter = result.config.series[1];
     expect(scatter.colorBy).toMatchObject({ type: 'category' });
     expect(typeof scatter.colorBy === 'object' && scatter.colorBy.format?.(1)).toBe('two');
@@ -623,8 +623,8 @@ describe('public data preparation', () => {
       referenceRegions: [{ axis: 'x', from: 'A', to: 'B' }],
       tooltip: { yFormat },
     });
-    expect(result.config.axes?.right).toMatchObject({ label: 'Metric', nice: false, padding: 0.1 });
-    expect(result.config.streaming).toEqual({ maxLen: 40, follow: 10 });
+    expect(result.config.axes?.right).toMatchObject({ title: 'Metric', nice: false, padding: 0.1 });
+    expect(result.config.streaming).toEqual({ maxPoints: 40, followWindow: 10 });
     expect(result.referenceLines[0]).toMatchObject({ axis: 'y', axisKey: 'right', value: 3 });
     expect(result.referenceRegions[0]).toMatchObject({ axis: 'x', axisKey: 'x', from: 0, to: 1 });
     expect(result.config.tooltip?.yFormat?.(2, 0)).toBe('y:2');
@@ -642,7 +642,7 @@ describe('public data preparation', () => {
     });
     expect(result.config.tooltip?.yFormat?.(40, 0)).toBe('40%');
     expect(result.config.tooltip?.yFormat?.(21, 1)).toBe('21 °C');
-    expect(result.config.axes?.right.tickFormat?.(21)).toBe('21 °C');
+    expect(result.config.axes?.right.format?.(21)).toBe('21 °C');
   });
 
   it('keeps numeric bar defaults unchanged and only applies explicit public settings', () => {
@@ -655,7 +655,7 @@ describe('public data preparation', () => {
       series: [{ type: 'bar', y: 'y' }],
     });
     expect(result.config.axes).toEqual({});
-    expect(result.config.series[0]).toEqual({ type: 'bar', label: 'y', dataIndex: 1 });
+    expect(result.config.series[0]).toEqual({ type: 'bar', label: 'y', yColumn: 1 });
   });
 
   it('validates axis options before an invalid update can reach the renderer', () => {

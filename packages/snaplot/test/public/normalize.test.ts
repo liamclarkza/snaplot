@@ -144,7 +144,7 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
     );
   });
 
-  it.fails('[arch-11] invalid streaming options throw in public vocabulary', () => {
+  it('[arch-11] invalid streaming options throw in public vocabulary', () => {
     const message = thrown(() =>
       mount({ data: rows, x: 't', series: [{ y: 'cpu' }], streaming: { maxPoints: -5 } }),
     );
@@ -341,7 +341,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(chart.getLegendItems().map((item) => item.color)).toEqual(['#d55e00', '#0072b2']);
   });
 
-  it.fails('[arch-15] series color and dash style the series', () => {
+  it('[arch-15] series color and dash style the series', () => {
     const chart = mount({
       data: rows,
       x: 't',

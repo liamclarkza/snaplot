@@ -1,4 +1,4 @@
-import type { AxisConfig, ChartConfig, ColumnarData, SeriesConfig, ScaleType } from '../types';
+import type { AxisSpec, ChartSpec, ColumnarData, SeriesSpec, ScaleType } from '../engine/spec';
 import type { ReferenceLine } from '../plugins/builtins/referenceLinesPlugin';
 import type { ReferenceRegion } from '../plugins/builtins/referenceRegionsPlugin';
 import type { ChartOptions, DataSource } from '../public/types';
@@ -22,7 +22,7 @@ export interface SeriesIdentity<Row = unknown> {
 }
 
 export interface PreparedChart<Row = unknown> {
-  config: ChartConfig;
+  config: ChartSpec;
   sources: ColumnarData[];
   sourceInputs: DataSource<Row>[];
   /** Ordered schema descriptors, including null for a synthetic storage-X column. */
@@ -102,7 +102,7 @@ export function prepareChart<Row>(
   const encodingCategories = new Map(
     Array.from(preparation.previousEncodingCategories ?? [], ([key, labels]) => [key, [...labels]]),
   );
-  const axes: Record<string, AxisConfig> = {};
+  const axes: Record<string, AxisSpec> = {};
   const axisKinds = new Map<string, 'number' | 'date' | 'category'>();
   const explicitCategories = new Set<string>();
   for (const [key, value] of Object.entries(opts.axes ?? {}) as Array<
@@ -138,10 +138,10 @@ export function prepareChart<Row>(
     axes[key] = {
       ...rest,
       ...(type === undefined ? {} : { type: type === 'category' ? 'linear' : type }),
-      ...(title === undefined ? {} : { label: title }),
+      ...(title === undefined ? {} : { title }),
       ...(roundBounds === undefined ? {} : { nice: roundBounds }),
       ...(rangePadding === undefined ? {} : { padding: rangePadding }),
-      ...(format === undefined ? {} : { tickFormat: format }),
+      ...(format === undefined ? {} : { format }),
     };
     if (type === 'category' || labels !== undefined) {
       axisKinds.set(key, 'category');
@@ -204,7 +204,7 @@ export function prepareChart<Row>(
   const sources: ColumnarData[] = [];
   const sourceFields: Array<Array<Accessor | null>> = [];
   const identities: SeriesIdentity<Row>[] = [];
-  const seriesConfig: SeriesConfig[] = [];
+  const seriesConfig: SeriesSpec[] = [];
 
   for (const plan of plans) {
     const source: ColumnarData = [new Float64Array(0)];
@@ -396,11 +396,14 @@ export function prepareChart<Row>(
         tooltipFields,
         ...style
       } = spec;
-      const config: SeriesConfig = {
-        ...style,
+      const { stroke, lineDash, ...rest } = style;
+      const config: SeriesSpec = {
+        ...rest,
+        ...(rest.color === undefined && stroke !== undefined ? { color: stroke } : {}),
+        ...(rest.dash === undefined && lineDash !== undefined ? { dash: lineDash } : {}),
         label: spec.label ?? (typeof y === 'string' ? y : seriesIds[si]),
-        ...(xAxis === undefined ? {} : { xAxisKey: xAxis }),
-        ...(yAxis === undefined ? {} : { yAxisKey: yAxis }),
+        ...(xAxis === undefined ? {} : { xAxis }),
+        ...(yAxis === undefined ? {} : { yAxis }),
       };
       if (bins) {
         const counts =
@@ -413,18 +416,17 @@ export function prepareChart<Row>(
               `histogram counts in series "${seriesIds[si]}", bin ${i}, must be finite and nonnegative.`,
             );
         }
-        config.dataIndex = source.length;
+        config.yColumn = source.length;
         source.push(counts);
         fields.push(null);
       } else {
-        config.dataIndex = column(y, si);
+        config.yColumn = column(y, si);
         if (spec.type === 'band') {
-          config.lowerDataIndex = column(lower, si);
-          config.upperDataIndex = column(upper, si);
+          config.lowerColumn = column(lower, si);
+          config.upperColumn = column(upper, si);
         }
         if (spec.type === 'scatter') {
-          config.yDataIndex = config.dataIndex;
-          if (source[0] === actualX) config.xDataIndex = 0;
+          if (source[0] === actualX) config.xColumn = 0;
           else {
             let xi = fieldColumns.get(plan.x!);
             if (xi === undefined) {
@@ -433,7 +435,7 @@ export function prepareChart<Row>(
               fields.push(plan.x!);
               fieldColumns.set(plan.x!, xi);
             }
-            config.xDataIndex = xi;
+            config.xColumn = xi;
           }
           const encoding = (value: any, acceptsText: boolean, role: string): any => {
             const simple = typeof value === 'string' || typeof value === 'function';
@@ -487,12 +489,16 @@ export function prepareChart<Row>(
                   format: (encoded: number) => labels[encoded] ?? '',
                   ...(role === 'color' ? { categoryValues: labels.map((_, index) => index) } : {}),
                   ...rest,
-                  dataIndex: textColumn.index,
+                  column: textColumn.index,
                 };
               }
             }
-            const dataIndex = column(field, si);
-            return { ...(typeof field === 'string' ? { label: field } : {}), ...rest, dataIndex };
+            const index = column(field, si);
+            return {
+              ...(typeof field === 'string' ? { label: field } : {}),
+              ...rest,
+              column: index,
+            };
           };
           if (colorBy !== undefined) config.colorBy = encoding(colorBy, true, 'color');
           if (sizeBy !== undefined) config.sizeBy = encoding(sizeBy, false, 'size');
@@ -594,7 +600,7 @@ export function prepareChart<Row>(
           axis.max ??
           (isBar || labels.length < 2 ? Math.max(0.5, labels.length - 0.5) : labels.length - 1),
         ticks: axis.ticks ?? labels.map((_, index) => index),
-        tickFormat: (index) =>
+        format: (index) =>
           labels[index] === undefined ? '' : format ? format(labels[index]) : labels[index],
       };
     }
@@ -634,7 +640,7 @@ export function prepareChart<Row>(
     onSelect: _onSelect,
     ...rest
   } = opts;
-  const config: ChartConfig = { ...rest, axes, series: seriesConfig };
+  const config: ChartSpec = { ...rest, axes, series: seriesConfig };
   if (opts.tooltip) {
     // The public controller supplies row-aware points to custom renderers.
     const { render: _render, ...tooltip } = opts.tooltip;
@@ -661,8 +667,8 @@ export function prepareChart<Row>(
     const { maxPoints, followWindow, ...other } = streaming;
     config.streaming = {
       ...other,
-      ...(maxPoints === undefined ? {} : { maxLen: maxPoints }),
-      ...(followWindow === undefined ? {} : { follow: followWindow }),
+      ...(maxPoints === undefined ? {} : { maxPoints }),
+      ...(followWindow === undefined ? {} : { followWindow }),
     };
   }
   if (
@@ -674,9 +680,7 @@ export function prepareChart<Row>(
       yFormat: (value, index) => {
         const series: Record<string, any> = opts.series[index];
         return (
-          series?.format?.(value) ??
-          axes[series?.yAxis ?? 'y']?.tickFormat?.(value) ??
-          String(value)
+          series?.format?.(value) ?? axes[series?.yAxis ?? 'y']?.format?.(value) ?? String(value)
         );
       },
     };

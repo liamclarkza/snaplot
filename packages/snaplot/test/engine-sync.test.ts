@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ColumnarData } from '../src/types';
+import type { ColumnarData } from '../src/engine/spec';
 import {
   dragStart,
   type EngineFakes,
@@ -28,7 +28,7 @@ const data = (): ColumnarData => [f([0, 50, 100]), f([0, 1, 0])];
 
 describe('engine cursor sync', () => {
   it('clears synced peers when the local cursor moves outside the plot area', () => {
-    const chart = fakes.engine({ series: [{ label: 'value', dataIndex: 1 }] }, data());
+    const chart = fakes.engine({ series: [{ label: 'value', yColumn: 1 }] }, data());
     const moves: Array<[number | null, number | null, string]> = [];
     chart.on('cursor:move', (dataX, dataIdx, origin) => moves.push([dataX, dataIdx, origin]));
 
@@ -46,7 +46,7 @@ describe('engine cursor sync', () => {
 
   it('emits cursor events from synced peers so reactive snapshots refresh', () => {
     // A group moves a peer's cursor with setCursorDataX.
-    const peer = fakes.engine({ series: [{ label: 'value', dataIndex: 1 }] }, data());
+    const peer = fakes.engine({ series: [{ label: 'value', yColumn: 1 }] }, data());
     const moves: Array<[number | null, number | null, string]> = [];
     peer.on('cursor:move', (dataX, dataIdx, origin) => {
       moves.push([dataX, dataIdx, origin]);
@@ -68,7 +68,7 @@ describe('engine cursor sync', () => {
   });
 
   it('keeps synced peer cursor anchored at box-selection start', () => {
-    const chart = fakes.engine({ series: [{ label: 'value', dataIndex: 1 }] }, data());
+    const chart = fakes.engine({ series: [{ label: 'value', yColumn: 1 }] }, data());
     const moves: Array<number | null> = [];
     chart.on('cursor:move', (dataX) => moves.push(dataX));
 
@@ -85,7 +85,7 @@ describe('engine cursor sync', () => {
 
 describe('engine zoom sync', () => {
   it('keeps a zoom-synced peer in sync across appendData', () => {
-    const config = { zoom: { x: true, enabled: true }, series: [{ label: 'v', dataIndex: 1 }] };
+    const config = { zoom: { x: true, enabled: true }, series: [{ label: 'v', yColumn: 1 }] };
     const chartA = fakes.engine(config, [f([0, 25, 50, 75, 100]), f([1, 2, 3, 2, 1])]);
     const chartB = fakes.engine(config, [f([0, 25, 50, 75, 100]), f([1, 2, 3, 2, 1])]);
     // A group applies the driver's horizontal viewport to its peers with setAxis.

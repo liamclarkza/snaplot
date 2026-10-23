@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ColumnarData, Plugin } from '../src/types';
+import type { ColumnarData, Plugin } from '../src/engine/spec';
 import { type EngineFakes, f, installEngineFakes, replaceData } from './fakes/engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2): the engine is built
@@ -24,7 +24,7 @@ describe('engine appendData', () => {
       },
     };
 
-    const chart = fakes.engine({ series: [{ label: 'value', dataIndex: 1 }], plugins: [plugin] }, [
+    const chart = fakes.engine({ series: [{ label: 'value', yColumn: 1 }], plugins: [plugin] }, [
       f([1, 2]),
       f([10, 20]),
     ]);
@@ -48,7 +48,7 @@ describe('engine appendData', () => {
   it('tracks setData and render counters in chart stats', () => {
     const config = {
       debug: { stats: true },
-      series: [{ label: 'value', dataIndex: 1 }],
+      series: [{ label: 'value', yColumn: 1 }],
     };
     const chart = fakes.engine(config, [f([1, 2]), f([10, 20])]);
 
@@ -69,8 +69,8 @@ describe('engine appendData', () => {
     const seenEvents: number[] = [];
     const chart = fakes.engine(
       {
-        streaming: { maxLen: 3 },
-        series: [{ label: 'value', dataIndex: 1 }],
+        streaming: { maxPoints: 3 },
+        series: [{ label: 'value', yColumn: 1 }],
       },
       [f([1, 2]), f([10, 20])],
     );

@@ -1,13 +1,13 @@
-import type { Scale, SeriesConfig, TooltipPoint } from '../types';
+import type { Scale, SeriesSpec, TooltipPoint } from '../engine/spec';
 import type { DataStore } from '../data/DataStore';
 import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
 import { formatValue, scaleStepDecimals } from '../engine/format';
 import {
   createScatterStyleResolver,
   type ScatterStyleResolver,
-  seriesYDataIndex,
+  seriesYColumn,
   scatterTooltipFields,
-  scatterXDataIndex,
+  scatterXColumn,
   type ScatterPalettes,
 } from '../renderers/scatterEncoding';
 
@@ -90,7 +90,7 @@ export class HitTester {
   findPoints(
     store: DataStore,
     scales: Map<string, Scale>,
-    seriesConfigs: SeriesConfig[],
+    seriesConfigs: SeriesSpec[],
     pixelX: number,
     pixelY: number,
     mode: 'nearest' | 'index' | 'x',
@@ -144,7 +144,7 @@ export class HitTester {
   private pointsAtIndex(
     defaultStore: DataStore,
     scales: Map<string, Scale>,
-    seriesConfigs: SeriesConfig[],
+    seriesConfigs: SeriesSpec[],
     pixelX: number,
     pixelY: number,
     palette: string[],
@@ -163,14 +163,14 @@ export class HitTester {
       const sc = seriesConfigs[si];
       if (sc.visible === false) continue;
 
-      const colIdx = seriesYDataIndex(sc);
+      const colIdx = seriesYColumn(sc);
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
-      const xScale = scales.get(sc.xAxisKey ?? 'x');
+      const xScale = scales.get(sc.xAxis ?? 'x');
       if (!xScale) continue;
 
       const targetX = xScale.pixelToData(pixelX);
-      const xColumn = sc.type === 'scatter' ? scatterXDataIndex(sc) : 0;
+      const xColumn = sc.type === 'scatter' ? scatterXColumn(sc) : 0;
       let idx = store.nearestXIndex(targetX);
       if (xColumn !== 0) {
         let closest = Infinity;
@@ -185,7 +185,7 @@ export class HitTester {
       const yVal = store.yAt(colIdx - 1, idx);
       if (!Number.isFinite(yVal)) continue;
 
-      const yAxisKey = sc.yAxisKey ?? 'y';
+      const yAxisKey = sc.yAxis ?? 'y';
       const yScale = scales.get(yAxisKey);
       if (yScale) {
         const py = yScale.dataToPixel(yVal);
@@ -201,7 +201,7 @@ export class HitTester {
         label: sc.label,
         x: xVal,
         y: yVal,
-        color: sc.stroke ?? palette[si % palette.length],
+        color: sc.color ?? palette[si % palette.length],
         formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
         formattedY: formatY(formatters, yScale, yVal, si),
       });
@@ -216,7 +216,7 @@ export class HitTester {
   private nearestPoint(
     defaultStore: DataStore,
     scales: Map<string, Scale>,
-    seriesConfigs: SeriesConfig[],
+    seriesConfigs: SeriesSpec[],
     pixelX: number,
     pixelY: number,
     palette: string[],
@@ -261,13 +261,13 @@ export class HitTester {
         continue;
       }
 
-      const colIdx = seriesYDataIndex(sc);
+      const colIdx = seriesYColumn(sc);
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
-      const xScale = scales.get(sc.xAxisKey ?? 'x');
+      const xScale = scales.get(sc.xAxis ?? 'x');
       if (!xScale) continue;
 
-      const yAxisKey = sc.yAxisKey ?? 'y';
+      const yAxisKey = sc.yAxis ?? 'y';
       const yScale = scales.get(yAxisKey);
       if (!yScale) continue;
 
@@ -296,7 +296,7 @@ export class HitTester {
             label: sc.label,
             x: xVal,
             y: yVal,
-            color: sc.stroke ?? palette[si % palette.length],
+            color: sc.color ?? palette[si % palette.length],
             formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
             formattedY: formatY(formatters, yScale, yVal, si),
           };
@@ -314,7 +314,7 @@ export class HitTester {
   private nearestScatterPoint(
     store: DataStore,
     scales: Map<string, Scale>,
-    sc: SeriesConfig,
+    sc: SeriesSpec,
     seriesIndex: number,
     pixelX: number,
     pixelY: number,
@@ -325,12 +325,12 @@ export class HitTester {
     getResolver?: (seriesIndex: number) => ScatterStyleResolver,
     formatters?: TooltipFormatters,
   ): { point: TooltipPoint; pixelX: number; pixelY: number } | null {
-    const xScale = scales.get(sc.xAxisKey ?? 'x');
-    const yScale = scales.get(sc.yAxisKey ?? 'y');
+    const xScale = scales.get(sc.xAxis ?? 'x');
+    const yScale = scales.get(sc.yAxis ?? 'y');
     if (!xScale || !yScale) return null;
 
-    const yCol = seriesYDataIndex(sc);
-    const xCol = scatterXDataIndex(sc);
+    const yCol = seriesYColumn(sc);
+    const xCol = scatterXColumn(sc);
     if (xCol < 0 || xCol > store.seriesCount || yCol < 1 || yCol > store.seriesCount) return null;
 
     const grid = this.getScatterGrid(
@@ -401,15 +401,15 @@ export class HitTester {
 
   private getScatterGrid(
     store: DataStore,
-    sc: SeriesConfig,
+    sc: SeriesSpec,
     seriesIndex: number,
     xScale: Scale,
     yScale: Scale,
     cellSize: number,
     dataVersion: number,
   ): ScatterGridCache {
-    const xCol = scatterXDataIndex(sc);
-    const yCol = seriesYDataIndex(sc);
+    const xCol = scatterXColumn(sc);
+    const yCol = seriesYColumn(sc);
     const key = [
       dataVersion,
       seriesIndex,

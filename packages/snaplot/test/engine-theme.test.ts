@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { SeriesConfig } from '../src/types';
+import type { SeriesSpec } from '../src/engine/spec';
 import { type EngineFakes, f, installEngineFakes } from './fakes/engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2). CSS custom properties
@@ -17,7 +17,7 @@ describe('engine live theme refresh', () => {
     fakes.style.set('--chart-bg', '#ffffff');
     fakes.style.set('--chart-text', '#111111');
 
-    const chart = fakes.engine({ series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[] }, [
+    const chart = fakes.engine({ series: [{ label: 'v', yColumn: 1 }] as SeriesSpec[] }, [
       f([1, 2]),
       f([10, 20]),
     ]);
@@ -33,7 +33,7 @@ describe('engine live theme refresh', () => {
   });
 
   it('refreshTheme is a no-op when the resolved theme is unchanged', () => {
-    const chart = fakes.engine({ series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[] }, [
+    const chart = fakes.engine({ series: [{ label: 'v', yColumn: 1 }] as SeriesSpec[] }, [
       f([1, 2]),
       f([10, 20]),
     ]);

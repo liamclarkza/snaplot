@@ -9,12 +9,12 @@
  * so they survive the engine moves of M9a and M9b.
  *
  *   const fakes = installEngineFakes();
- *   const chart = fakes.engine({ series: [{ label: 'v', dataIndex: 1 }] }, [f([1, 2]), f([3, 4])]);
+ *   const chart = fakes.engine({ series: [{ label: 'v', yColumn: 1 }] }, [f([1, 2]), f([3, 4])]);
  *   hoverAt(chart, plotPoint(chart));
  *   fakes.uninstall(); // destroys every engine it built, then restores the globals
  */
 import { ChartCore, type DebugSnapshot } from '../../src/core/Chart';
-import type { ChartConfig, ColumnarData } from '../../src/types';
+import type { ChartSpec, ColumnarData } from '../../src/engine/spec';
 import { type FakeOptions, type Fakes, installFakes, type MountOptions } from './index';
 
 /** A Float64Array column from plain numbers. */
@@ -33,7 +33,7 @@ export interface EngineFakes extends Fakes {
    * every series, or explicit `{ sources, seriesSources }`. The config object
    * is passed through unchanged, so tests can check it is not mutated.
    */
-  engine(config: ChartConfig, data: ColumnarData | EngineSources, size?: MountOptions): ChartCore;
+  engine(config: ChartSpec, data: ColumnarData | EngineSources, size?: MountOptions): ChartCore;
 }
 
 export function installEngineFakes(options: FakeOptions = {}): EngineFakes {
@@ -64,7 +64,7 @@ function isSources(data: ColumnarData | EngineSources): data is EngineSources {
 }
 
 /** Replace every source with one shared source, keeping `config`. */
-export function replaceData(chart: ChartCore, config: ChartConfig, data: ColumnarData): void {
+export function replaceData(chart: ChartCore, config: ChartSpec, data: ColumnarData): void {
   chart.replaceSources(
     config,
     [data],

@@ -1,4 +1,4 @@
-import type { Scale, ScaleType } from '../types';
+import type { Scale, ScaleType } from '../engine/spec';
 
 /**
  * Logarithmic scale: maps data values to pixel coordinates via log10.

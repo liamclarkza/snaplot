@@ -1,6 +1,6 @@
 import { affineParams } from '../scales/affine';
 import { withAlpha } from '../utils/color';
-import type { Scale, Layout, SeriesConfig } from '../types';
+import type { Scale, Layout, SeriesSpec } from '../engine/spec';
 
 export interface LineRenderSegment {
   xData: Float64Array;
@@ -37,7 +37,7 @@ export function renderLineSegments(
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
-  series: SeriesConfig,
+  series: SeriesSpec,
   color: string,
   /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
@@ -61,8 +61,8 @@ export function renderLineSegments(
   ctx.globalAlpha = (series.opacity ?? 1) * opacityMultiplier;
 
   // Apply dash pattern (if configured)
-  if (series.lineDash && series.lineDash.length > 0) {
-    ctx.setLineDash(series.lineDash);
+  if (series.dash && series.dash.length > 0) {
+    ctx.setLineDash(series.dash);
   }
 
   const spanGaps = series.spanGaps === true;
@@ -84,7 +84,7 @@ export function renderAreaSegments(
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
-  series: SeriesConfig,
+  series: SeriesSpec,
   color: string,
   /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
@@ -208,8 +208,8 @@ export function renderAreaSegments(
   ctx.strokeStyle = color;
   ctx.lineWidth = series.lineWidth ?? 1.5;
   ctx.lineJoin = 'round';
-  if (series.lineDash && series.lineDash.length > 0) {
-    ctx.setLineDash(series.lineDash);
+  if (series.dash && series.dash.length > 0) {
+    ctx.setLineDash(series.dash);
   }
   ctx.stroke();
 
@@ -221,7 +221,7 @@ export function renderAreaSegments(
  * with a center line drawn on top. A single visual unit for confidence
  * intervals, error bands, and min/max ranges.
  *
- * Tooltip and cursor snapping use `dataIndex` (the center line). The
+ * Tooltip and cursor snapping use `yColumn` (the center line). The
  * upper/lower fill is purely decorative.
  */
 export function renderBandSegments(
@@ -230,7 +230,7 @@ export function renderBandSegments(
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
-  series: SeriesConfig,
+  series: SeriesSpec,
   color: string,
   opacityMultiplier: number = 1,
 ): void {
@@ -357,8 +357,8 @@ export function renderBandSegments(
     ctx.lineWidth = strokeWidth;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    if (series.lineDash && series.lineDash.length > 0) {
-      ctx.setLineDash(series.lineDash);
+    if (series.dash && series.dash.length > 0) {
+      ctx.setLineDash(series.dash);
     }
     ctx.stroke();
   }

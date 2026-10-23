@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ColumnarStore } from './ColumnarStore';
-import type { ColumnarData } from '../types';
+import type { ColumnarData } from '../engine/spec';
 
 const f = (xs: number[]) => Float64Array.from(xs);
 

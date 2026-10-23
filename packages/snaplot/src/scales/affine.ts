@@ -1,4 +1,4 @@
-import type { Scale } from '../types';
+import type { Scale } from '../engine/spec';
 
 /**
  * Resolve a scale's dataToPixel to `px = value * k + b` when the mapping

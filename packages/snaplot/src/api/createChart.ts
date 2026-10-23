@@ -8,7 +8,7 @@ import type {
   ScaleRange,
   SelectionRange,
   TooltipPoint,
-} from '../types';
+} from '../engine/spec';
 import { prepareChart, type PreparedChart } from './prepare';
 import { equivalent, patchOptions } from './options';
 import type {
@@ -543,7 +543,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         seriesIndices.every(
           (index) =>
             batch.config.series[index].type === 'scatter' &&
-            (batch.config.series[index].xDataIndex ?? 0) !== 0,
+            (batch.config.series[index].xColumn ?? 0) !== 0,
         )
       ) {
         const offset = currentLength
@@ -564,7 +564,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       const hasCategoryBars = seriesIndices.some(
         (index) =>
           batch.config.series[index].type === 'bar' &&
-          batch.categories.has(batch.config.series[index].xAxisKey ?? 'x'),
+          batch.categories.has(batch.config.series[index].xAxis ?? 'x'),
       );
       if (
         hasCategoryBars &&
@@ -771,18 +771,16 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const series = this.prepared.config.series[si];
     const identity = this.prepared.identities[si];
     const position = index + (this.identityHeads[si] ?? 0);
-    const x = values?.x ?? this.engine.getSourceValue(source, series.xDataIndex ?? 0, index);
-    const y =
-      values?.y ??
-      this.engine.getSourceValue(source, series.yDataIndex ?? series.dataIndex ?? 1, index);
-    const axis = series.xAxisKey ?? 'x';
+    const x = values?.x ?? this.engine.getSourceValue(source, series.xColumn ?? 0, index);
+    const y = values?.y ?? this.engine.getSourceValue(source, series.yColumn ?? 1, index);
+    const axis = series.xAxis ?? 'x';
     const actualX = this.prepared.categories.get(axis)?.[Math.round(x)] ?? x;
     const fieldIndices = values?.fields
       ? [
           ...new Set(
             [series.colorBy, series.sizeBy, ...(series.tooltipFields ?? [])]
               .filter((field) => field !== undefined)
-              .map((field) => (typeof field === 'number' ? field : field!.dataIndex)),
+              .map((field) => (typeof field === 'number' ? field : field!.column)),
           ),
         ].filter((column) => column >= 0 && column < this.prepared.sourceFields[source].length)
       : [];
@@ -803,7 +801,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       x: actualX,
       y,
       formattedX: values?.formattedX ?? this.format(axis, x),
-      formattedY: values?.formattedY ?? this.readout(series.yAxisKey ?? 'y', y),
+      formattedY: values?.formattedY ?? this.readout(series.yAxis ?? 'y', y),
       color: values?.color ?? this.engine.getLegendItems()[si]?.color ?? '',
       meta: series.meta,
       ...(values?.xRange ? { xRange: { ...values.xRange } } : {}),
@@ -822,12 +820,12 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   /** A value readout at value precision (plan P9); the axis format still wins here. */
   private readout(axis: string, value: number): string {
     if (!Number.isFinite(value)) return '';
-    const formatter = this.prepared.config.axes?.[axis]?.tickFormat;
+    const formatter = this.prepared.config.axes?.[axis]?.format;
     return formatter ? formatter(value) : this.engine.formatReadout(axis, value);
   }
   private format(axis: string, value: number): string {
     if (!Number.isFinite(value)) return '';
-    const formatter = this.prepared.config.axes?.[axis]?.tickFormat;
+    const formatter = this.prepared.config.axes?.[axis]?.format;
     return formatter
       ? formatter(value)
       : (this.engine.getAxis(axis)?.tickFormat(value) ?? String(value));

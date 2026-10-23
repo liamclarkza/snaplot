@@ -1,4 +1,4 @@
-import type { Layout, ChartConfig, Scale, AxisPosition } from '../types';
+import type { Layout, ChartSpec, Scale, AxisPosition } from '../engine/spec';
 import {
   AXIS_LABEL_GAP,
   AXIS_TICK_LENGTH,
@@ -71,7 +71,7 @@ function horizontalFraction(scale: Scale, value: number): number {
 export function computeLayout(
   containerWidth: number,
   containerHeight: number,
-  config: ChartConfig,
+  config: ChartSpec,
   scales: Map<string, Scale>,
   dpr: number,
   fontFamily: string,
@@ -127,7 +127,7 @@ export function computeLayout(
         ac.ticks && ac.ticks.length > 0
           ? ac.ticks.filter((t) => Number.isFinite(t) && t >= lo && t <= hi)
           : scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT);
-      const format = ac.tickFormat ?? ((v: number) => scale.tickFormat(v));
+      const format = ac.format ?? ((v: number) => scale.tickFormat(v));
       let maxWidth = 0;
       for (const t of ticks) {
         const width = measureTextWidth(format(t), fontFamily, fontSize);
@@ -137,7 +137,7 @@ export function computeLayout(
       // up to an 8px step. Quantizing keeps the gutter stable while tick
       // labels shift by a character during pan/zoom, so the plot rect does
       // not jitter and the layout stays reusable across gesture frames.
-      const titleSpace = ac.label ? titleStrip : EDGE_MARGIN;
+      const titleSpace = ac.title ? titleStrip : EDGE_MARGIN;
       const needed = Math.ceil((maxWidth + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + titleSpace) / 8) * 8;
       if (pos === 'left') {
         leftAxisWidth = Math.max(leftAxisWidth, needed);
@@ -151,7 +151,7 @@ export function computeLayout(
         ac.ticks && ac.ticks.length > 0
           ? ac.ticks.filter((t) => Number.isFinite(t) && t >= lo && t <= hi).sort((a, b) => a - b)
           : scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT).sort((a, b) => a - b);
-      const format = ac.tickFormat ?? ((value: number) => scale.tickFormat(value));
+      const format = ac.format ?? ((value: number) => scale.tickFormat(value));
       if (ticks.length > 0) {
         horizontalEdges.push({
           firstHalf: measureTextWidth(format(ticks[0]), fontFamily, fontSize) / 2,
@@ -164,7 +164,7 @@ export function computeLayout(
         AXIS_TICK_LENGTH +
           AXIS_LABEL_GAP +
           lineHeight +
-          (ac.label ? AXIS_TITLE_GAP + lineHeight : 0) +
+          (ac.title ? AXIS_TITLE_GAP + lineHeight : 0) +
           EDGE_MARGIN,
       );
       if (pos === 'bottom') bottomAxisHeight = Math.max(bottomAxisHeight, needed);

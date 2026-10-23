@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderAreaSegments, renderBandSegments, renderLineSegments } from './LineRenderer';
-import type { Layout, Scale, SeriesConfig } from '../types';
+import type { Layout, Scale, SeriesSpec } from '../engine/spec';
 
 const f = (xs: number[]) => Float64Array.from(xs);
 
@@ -58,7 +58,7 @@ describe('filled line renderers', () => {
     const ctx = createContext();
     const scale = createScale();
     const layout = createLayout();
-    const series: SeriesConfig = { label: 'area', dataIndex: 1, type: 'area' };
+    const series: SeriesSpec = { label: 'area', yColumn: 1, type: 'area' };
 
     renderAreaSegments(
       ctx,
@@ -84,7 +84,7 @@ describe('filled line renderers', () => {
     });
     const scale = createScale();
     const layout = createLayout();
-    const series: SeriesConfig = { label: 'area', dataIndex: 1, type: 'area' };
+    const series: SeriesSpec = { label: 'area', yColumn: 1, type: 'area' };
 
     // A named color (not #rrggbb) previously yielded 'rgba(NaN,NaN,NaN,...)'.
     renderAreaSegments(
@@ -107,7 +107,7 @@ describe('filled line renderers', () => {
     const ctx = createContext();
     const scale = createScale();
     const layout = createLayout();
-    const series: SeriesConfig = { label: 'band', dataIndex: 1, type: 'band' };
+    const series: SeriesSpec = { label: 'band', yColumn: 1, type: 'band' };
 
     renderBandSegments(
       ctx,
@@ -138,9 +138,9 @@ describe('line gap rendering', () => {
     const ctx = createContext();
     const scale = createScale();
     const layout = createLayout();
-    const series: SeriesConfig = {
+    const series: SeriesSpec = {
       label: 'line',
-      dataIndex: 1,
+      yColumn: 1,
       type: 'line',
       interpolation: 'monotone',
     };
@@ -175,7 +175,7 @@ describe('line gap rendering', () => {
       dataToPixel: (value: number) => (value > 0 ? value : Number.NaN),
     };
     const layout = createLayout();
-    const series: SeriesConfig = { label: 'loss', dataIndex: 1, type: 'line' };
+    const series: SeriesSpec = { label: 'loss', yColumn: 1, type: 'line' };
 
     renderLineSegments(
       ctx,

@@ -1,4 +1,4 @@
-import type { Layout, CursorConfig } from '../types';
+import type { Layout, CursorConfig } from '../engine/spec';
 import { prefersReducedMotion } from '../utils/motion';
 
 /**

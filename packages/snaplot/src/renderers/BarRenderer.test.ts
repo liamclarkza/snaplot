@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderBarsSegments } from './BarRenderer';
-import type { Layout, Scale, SeriesConfig } from '../types';
+import type { Layout, Scale, SeriesSpec } from '../engine/spec';
 
 const f = (xs: number[]) => Float64Array.from(xs);
 
@@ -52,7 +52,7 @@ function context() {
   return { ctx, fill, stroke };
 }
 
-const series: SeriesConfig = { label: 'bar', dataIndex: 1, type: 'bar' };
+const series: SeriesSpec = { label: 'bar', yColumn: 1, type: 'bar' };
 
 describe('renderBarsSegments baseline', () => {
   it('anchors bars to the scale minimum on a log Y axis', () => {
@@ -91,7 +91,7 @@ describe('renderBarsSegments baseline', () => {
       linearScale('x'),
       linearScale('y'),
       layout(),
-      { ...series, stroke: '#223344' },
+      { ...series, color: '#223344' },
       '#4e79a7',
       0,
       1,
@@ -258,7 +258,7 @@ describe('renderBarsSegments per-datum fill', () => {
   it('offsets callback indices to logical positions for wrapped ring segments', () => {
     const { ctx } = context();
     const seen: number[] = [];
-    const barSeries: SeriesConfig = {
+    const barSeries: SeriesSpec = {
       ...series,
       fill: (_v, index) => {
         seen.push(index);

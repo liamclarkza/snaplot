@@ -1,4 +1,4 @@
-import type { Scale, ScaleType } from '../types';
+import type { Scale, ScaleType } from '../engine/spec';
 
 /**
  * Time scale: linear on epoch milliseconds with hierarchical interval

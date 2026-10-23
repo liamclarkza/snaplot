@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ChartCore } from '../src/core/Chart';
-import type { SeriesConfig } from '../src/types';
+import type { SeriesSpec } from '../src/engine/spec';
 import { type EngineFakes, f, installEngineFakes, press } from './fakes/engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2).
@@ -14,8 +14,8 @@ afterEach(() => fakes.uninstall());
 
 const streamConfig = {
   axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
-  series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
-  streaming: { follow: 10 },
+  series: [{ label: 'v', yColumn: 1 }] as SeriesSpec[],
+  streaming: { followWindow: 10 },
 };
 
 /** A horizontal zoom-in at the plot centre (the `+` key). */
@@ -95,7 +95,7 @@ describe('engine live-follow viewport', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
-        series: [{ label: 'v', dataIndex: 1 }] as SeriesConfig[],
+        series: [{ label: 'v', yColumn: 1 }] as SeriesSpec[],
       },
       [f([0, 1, 2]), f([5, 6, 7])],
     );

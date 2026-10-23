@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RenderScheduler } from './RenderScheduler';
-import { DirtyFlag } from '../types';
+import { DirtyFlag } from '../engine/spec';
 
 describe('RenderScheduler', () => {
   afterEach(() => {

@@ -1,4 +1,4 @@
-import type { Plugin, EngineHost } from '../types';
+import type { Plugin, EngineHost } from '../engine/spec';
 
 /**
  * Manages plugin registration and lifecycle hook dispatch.

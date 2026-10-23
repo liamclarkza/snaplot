@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ColumnarStore } from '../data/ColumnarStore';
-import type { Scale, SeriesConfig } from '../types';
+import type { Scale, SeriesSpec } from '../engine/spec';
 import { HitTester } from './HitTester';
 
 const f = (xs: number[]) => Float64Array.from(xs);
@@ -32,9 +32,9 @@ describe('HitTester', () => {
       ['x2', scale('x2', 0, 200)],
       ['y', scale('y', 0, 400)],
     ]);
-    const series: SeriesConfig[] = [
-      { label: 'primary', dataIndex: 1 },
-      { label: 'secondary', dataIndex: 2, xAxisKey: 'x2' },
+    const series: SeriesSpec[] = [
+      { label: 'primary', yColumn: 1 },
+      { label: 'secondary', yColumn: 2, xAxis: 'x2' },
     ];
 
     const points = new HitTester(1_000).findPoints(
@@ -61,9 +61,9 @@ describe('HitTester', () => {
       ['x2', scale('x2', 0, 200)],
       ['y', scale('y', 0, 400)],
     ]);
-    const series: SeriesConfig[] = [
-      { label: 'primary', dataIndex: 1, visible: false },
-      { label: 'secondary', dataIndex: 2, xAxisKey: 'x2' },
+    const series: SeriesSpec[] = [
+      { label: 'primary', yColumn: 1, visible: false },
+      { label: 'secondary', yColumn: 2, xAxis: 'x2' },
     ];
 
     const points = new HitTester(1_000).findPoints(
@@ -94,20 +94,20 @@ describe('HitTester', () => {
       ['x', scale('x', 0, 10)],
       ['y', scale('y', 0, 40)],
     ]);
-    const series: SeriesConfig[] = [
+    const series: SeriesSpec[] = [
       {
         label: 'runs',
         type: 'scatter',
-        xDataIndex: 1,
-        yDataIndex: 2,
+        xColumn: 1,
+        yColumn: 2,
         colorBy: {
-          dataIndex: 3,
+          column: 3,
           type: 'category',
           palette: ['#111111', '#eeeeee'],
           label: 'family',
         },
-        sizeBy: { dataIndex: 4, domain: [4, 16], range: [2, 8], label: 'runtime' },
-        tooltipFields: [{ dataIndex: 1, label: 'lr' }],
+        sizeBy: { column: 4, domain: [4, 16], range: [2, 8], label: 'runtime' },
+        tooltipFields: [{ column: 1, label: 'lr' }],
       },
     ];
 
@@ -147,7 +147,7 @@ describe('HitTester tooltip formatters', () => {
       ['x', scale('x', 0, 100)],
       ['y', scale('y', 0, 100)],
     ]);
-    const series: SeriesConfig[] = [{ label: 'v', dataIndex: 1 }];
+    const series: SeriesSpec[] = [{ label: 'v', yColumn: 1 }];
 
     const points = new HitTester(1_000).findPoints(
       store,
@@ -174,7 +174,7 @@ describe('HitTester tooltip formatters', () => {
       ['x', scale('x', 0, 100)],
       ['y', scale('y', 0, 100)],
     ]);
-    const series: SeriesConfig[] = [{ label: 'v', dataIndex: 1 }];
+    const series: SeriesSpec[] = [{ label: 'v', yColumn: 1 }];
 
     const points = new HitTester(1_000).findPoints(
       store,
@@ -201,7 +201,7 @@ describe('HitTester tooltip formatters', () => {
     const points = new HitTester(1_000).findPoints(
       store,
       scales,
-      [{ label: 'v', dataIndex: 1 }],
+      [{ label: 'v', yColumn: 1 }],
       50,
       50,
       'index',
@@ -221,9 +221,9 @@ describe('HitTester independent sources', () => {
     ['x', scale('x', 0, 10)],
     ['y', scale('y', 0, 100)],
   ]);
-  const series: SeriesConfig[] = [
-    { label: 'one', dataIndex: 1 },
-    { label: 'two', dataIndex: 1 },
+  const series: SeriesSpec[] = [
+    { label: 'one', yColumn: 1 },
+    { label: 'two', yColumn: 1 },
   ];
 
   it('resolves grouped points independently while retaining global series indices', () => {

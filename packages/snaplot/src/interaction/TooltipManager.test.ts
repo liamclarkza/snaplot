@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { computeTooltipPosition, TooltipManager, tooltipMeasurementKey } from './TooltipManager';
-import type { TooltipPoint } from '../types';
+import type { TooltipPoint } from '../engine/spec';
 import { lightTheme } from '../config/theme';
 
 describe('computeTooltipPosition', () => {

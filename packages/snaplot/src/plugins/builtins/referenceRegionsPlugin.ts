@@ -1,4 +1,4 @@
-import type { EngineHost, Plugin } from '../../types';
+import type { EngineHost, Plugin } from '../../engine/spec';
 import { withAlpha } from '../../utils/color';
 
 /** A labelled X or Y interval rendered beneath the series marks. */

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SeriesConfig } from '../src/types';
+import type { SeriesSpec } from '../src/engine/spec';
 import {
   type EngineFakes,
   engineDebug,
@@ -41,7 +41,7 @@ describe('engine interaction sampling', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
-        series: [{ label: 'v', dataIndex: 1, type: 'line' }] as SeriesConfig[],
+        series: [{ label: 'v', yColumn: 1, type: 'line' }] as SeriesSpec[],
       },
       [xs, ys],
     );
@@ -80,7 +80,7 @@ describe('engine interaction sampling', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-        series: [{ label: 'points', type: 'scatter', xDataIndex: 0, yDataIndex: 1 }],
+        series: [{ label: 'points', type: 'scatter', xColumn: 0, yColumn: 1 }],
       },
       [xs, ys],
       { width: 400, height: 300 },

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Plugin } from '../src/types';
+import type { Plugin } from '../src/engine/spec';
 import { type EngineFakes, f, inputLayer, installEngineFakes } from './fakes/engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2).
@@ -20,13 +20,13 @@ describe('engine runtime options', () => {
           {
             label: 'Forecast',
             type: 'band',
-            dataIndex: 1,
-            upperDataIndex: 2,
-            lowerDataIndex: 3,
-            stroke: '#f90',
-            lineDash: [4, 2],
+            yColumn: 1,
+            upperColumn: 2,
+            lowerColumn: 3,
+            color: '#f90',
+            dash: [4, 2],
           },
-          { label: 'Observed', type: 'line', dataIndex: 1, visible: false },
+          { label: 'Observed', type: 'line', yColumn: 1, visible: false },
         ],
       },
       [f([0, 1]), f([2, 3]), f([3, 4]), f([1, 2])],
@@ -49,16 +49,16 @@ describe('engine runtime options', () => {
     const chart = fakes.engine(
       {
         series: [
-          { label: 'loss', dataIndex: 1 },
-          { label: 'accuracy', dataIndex: 2 },
+          { label: 'loss', yColumn: 1 },
+          { label: 'accuracy', yColumn: 2 },
         ],
       },
       [f([1, 2]), f([10, 20]), f([0.5, 0.6])],
     );
 
-    chart.setOptions({ series: [{ label: 'loss only', dataIndex: 1 }] });
+    chart.setOptions({ series: [{ label: 'loss only', yColumn: 1 }] });
 
-    expect(chart.getOptions().series).toEqual([{ label: 'loss only', dataIndex: 1 }]);
+    expect(chart.getOptions().series).toEqual([{ label: 'loss only', yColumn: 1 }]);
   });
 
   it('replaceOptions drops config keys omitted from the next declarative config', () => {
@@ -66,12 +66,12 @@ describe('engine runtime options', () => {
       {
         axes: { y2: { position: 'right', type: 'linear' } },
         cursor: { color: '#ff0000' },
-        series: [{ label: 'loss', dataIndex: 1, yAxisKey: 'y2' }],
+        series: [{ label: 'loss', yColumn: 1, yAxis: 'y2' }],
       },
       [f([1, 2]), f([10, 20])],
     );
 
-    chart.replaceOptions({ series: [{ label: 'loss', dataIndex: 1 }] });
+    chart.replaceOptions({ series: [{ label: 'loss', yColumn: 1 }] });
 
     expect(chart.getOptions().axes?.y2).toBeUndefined();
     expect(chart.getAxis('y2')).toBeUndefined();
@@ -79,7 +79,7 @@ describe('engine runtime options', () => {
   });
 
   it('emits options:update after runtime config changes', () => {
-    const chart = fakes.engine({ series: [{ label: 'value', dataIndex: 1 }] }, [
+    const chart = fakes.engine({ series: [{ label: 'value', yColumn: 1 }] }, [
       f([1, 2]),
       f([10, 20]),
     ]);
@@ -88,18 +88,18 @@ describe('engine runtime options', () => {
 
     chart.setOptions({
       series: [
-        { label: 'a', dataIndex: 1 },
-        { label: 'b', dataIndex: 1 },
+        { label: 'a', yColumn: 1 },
+        { label: 'b', yColumn: 1 },
       ],
     });
-    chart.replaceOptions({ series: [{ label: 'a', dataIndex: 1 }] });
+    chart.replaceOptions({ series: [{ label: 'a', yColumn: 1 }] });
 
     expect(seen).toEqual([2, 1]);
   });
 
   it('returns false when registering a duplicate plugin id at runtime', () => {
     const plugin: Plugin = { id: 'runtime-plugin', install: vi.fn() };
-    const chart = fakes.engine({ series: [{ label: 'value', dataIndex: 1 }] }, [
+    const chart = fakes.engine({ series: [{ label: 'value', yColumn: 1 }] }, [
       f([1, 2]),
       f([10, 20]),
     ]);
@@ -115,7 +115,7 @@ describe('engine runtime options', () => {
         axes: { x: { type: 'linear' }, y: { type: 'linear' } },
         zoom: { enabled: true, x: true },
         pan: { enabled: true, x: true },
-        series: [{ label: 'value', dataIndex: 1 }],
+        series: [{ label: 'value', yColumn: 1 }],
       },
       [f([0, 1]), f([10, 20])],
     );
@@ -135,7 +135,7 @@ describe('engine runtime options', () => {
         axes: { x: { type: 'linear' }, y: { type: 'linear' } },
         zoom: { enabled: true, x: true },
         pan: { enabled: true, x: true },
-        series: [{ label: 'value', dataIndex: 1 }],
+        series: [{ label: 'value', yColumn: 1 }],
       },
       [f([0, 1]), f([10, 20])],
     );
@@ -156,7 +156,7 @@ describe('engine runtime options', () => {
         interaction: 'analytical',
         zoom: { enabled: false },
         pan: { y: false },
-        series: [{ label: 'value', dataIndex: 1 }],
+        series: [{ label: 'value', yColumn: 1 }],
       },
       [f([1, 2]), f([10, 20])],
     );

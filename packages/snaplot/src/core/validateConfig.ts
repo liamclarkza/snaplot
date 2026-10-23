@@ -1,4 +1,4 @@
-import type { ChartConfig, ChartType, ColumnarData, SeriesConfig } from '../types';
+import type { ChartSpec, ChartType, ColumnarData, SeriesSpec } from '../engine/spec';
 import {
   normalizeScatterColorBy,
   normalizeScatterSizeBy,
@@ -51,7 +51,7 @@ function warnOnce(message: string): void {
   console.warn(message);
 }
 
-function describeSeries(series: SeriesConfig, index: number): string {
+function describeSeries(series: SeriesSpec, index: number): string {
   return series.label ? `series "${series.label}"` : `series at index ${index}`;
 }
 
@@ -73,7 +73,7 @@ function describeSeries(series: SeriesConfig, index: number): string {
  * Column bounds are only checked when `data` is present, since the valid
  * range derives from the column count.
  */
-export function validateChartConfig(config: ChartConfig, data?: ColumnarData): void {
+export function validateChartConfig(config: ChartSpec, data?: ColumnarData): void {
   if (!shouldValidateConfig()) return;
 
   const hasData = !!data && data.length > 0;
@@ -99,8 +99,8 @@ export function validateChartConfig(config: ChartConfig, data?: ColumnarData): v
     // required regardless of whether data is present.
     if (series.type === 'band') {
       const missing: string[] = [];
-      if (series.upperDataIndex == null) missing.push('upperDataIndex');
-      if (series.lowerDataIndex == null) missing.push('lowerDataIndex');
+      if (series.upperColumn == null) missing.push('upperDataIndex');
+      if (series.lowerColumn == null) missing.push('lowerDataIndex');
       if (missing.length > 0) {
         throw new TypeError(
           `snaplot: band ${who} must declare both upperDataIndex and lowerDataIndex ` +
@@ -110,15 +110,15 @@ export function validateChartConfig(config: ChartConfig, data?: ColumnarData): v
     }
 
     // Unknown axis key degrades to the implicit axis at runtime, so warn.
-    if (series.xAxisKey !== undefined && !validAxisKeys.has(series.xAxisKey)) {
+    if (series.xAxis !== undefined && !validAxisKeys.has(series.xAxis)) {
       warnOnce(
-        `snaplot: ${who} references unknown xAxisKey "${series.xAxisKey}". ` +
+        `snaplot: ${who} references unknown xAxisKey "${series.xAxis}". ` +
           `Declare it in config.axes or use one of: ${[...validAxisKeys].join(', ')}.`,
       );
     }
-    if (series.yAxisKey !== undefined && !validAxisKeys.has(series.yAxisKey)) {
+    if (series.yAxis !== undefined && !validAxisKeys.has(series.yAxis)) {
       warnOnce(
-        `snaplot: ${who} references unknown yAxisKey "${series.yAxisKey}". ` +
+        `snaplot: ${who} references unknown yAxisKey "${series.yAxis}". ` +
           `Declare it in config.axes or use one of: ${[...validAxisKeys].join(', ')}.`,
       );
     }
@@ -135,21 +135,21 @@ export function validateChartConfig(config: ChartConfig, data?: ColumnarData): v
       }
     };
 
-    checkIndex(series.dataIndex, 'dataIndex');
-    checkIndex(series.yDataIndex, 'yDataIndex');
-    checkIndex(series.xDataIndex, 'xDataIndex');
-    checkIndex(series.upperDataIndex, 'upperDataIndex');
-    checkIndex(series.lowerDataIndex, 'lowerDataIndex');
+    checkIndex(series.yColumn, 'dataIndex');
+    checkIndex(series.yColumn, 'yDataIndex');
+    checkIndex(series.xColumn, 'xDataIndex');
+    checkIndex(series.upperColumn, 'upperDataIndex');
+    checkIndex(series.lowerColumn, 'lowerDataIndex');
 
     const colorBy = normalizeScatterColorBy(series.colorBy);
-    if (colorBy) checkIndex(colorBy.dataIndex, 'colorBy dataIndex');
+    if (colorBy) checkIndex(colorBy.column, 'colorBy dataIndex');
 
     const sizeBy = normalizeScatterSizeBy(series.sizeBy);
-    if (sizeBy) checkIndex(sizeBy.dataIndex, 'sizeBy dataIndex');
+    if (sizeBy) checkIndex(sizeBy.column, 'sizeBy dataIndex');
 
     for (const rawField of series.tooltipFields ?? []) {
       const field = normalizeScatterTooltipField(rawField);
-      checkIndex(field.dataIndex, 'tooltipFields dataIndex');
+      checkIndex(field.column, 'tooltipFields dataIndex');
     }
   });
 

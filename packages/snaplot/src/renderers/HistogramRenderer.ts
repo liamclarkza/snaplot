@@ -1,4 +1,4 @@
-import type { Scale, Layout, SeriesConfig } from '../types';
+import type { Scale, Layout, SeriesSpec } from '../engine/spec';
 
 export interface HistogramRenderSegment {
   xData: Float64Array;
@@ -24,7 +24,7 @@ export function renderHistogramSegments(
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
-  series: SeriesConfig,
+  series: SeriesSpec,
   color: string,
   /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,

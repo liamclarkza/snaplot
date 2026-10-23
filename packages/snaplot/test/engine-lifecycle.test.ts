@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ColumnarData, Plugin } from '../src/types';
+import type { ColumnarData, Plugin } from '../src/engine/spec';
 import { type EngineFakes, f, installEngineFakes, replaceData } from './fakes/engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2).
@@ -13,7 +13,7 @@ afterEach(() => fakes.uninstall());
 
 describe('engine lifecycle + config integrity', () => {
   it('does not mutate the caller config object when constructing a chart', () => {
-    const config = { series: [{ label: 'value', dataIndex: 1 }] };
+    const config = { series: [{ label: 'value', yColumn: 1 }] };
     fakes.engine(config, [f([1, 2]), f([10, 20])]);
 
     // initAxes writes x/y into config.axes; that must land on the chart's own
@@ -22,7 +22,7 @@ describe('engine lifecycle + config integrity', () => {
   });
 
   it('two charts built from one config object do not share axis state', () => {
-    const config = { series: [{ label: 'value', dataIndex: 1 }] };
+    const config = { series: [{ label: 'value', yColumn: 1 }] };
     const data: ColumnarData = [f([1, 2]), f([10, 20])];
     const a = fakes.engine(config, data);
     const b = fakes.engine(config, data);
@@ -32,7 +32,7 @@ describe('engine lifecycle + config integrity', () => {
   });
 
   it('ignores mutating public calls after destroy()', () => {
-    const config = { series: [{ label: 'v', dataIndex: 1 }] };
+    const config = { series: [{ label: 'v', yColumn: 1 }] };
     const chart = fakes.engine(config, [f([1, 2]), f([10, 20])]);
 
     chart.destroy();
@@ -51,7 +51,7 @@ describe('engine lifecycle + config integrity', () => {
       {
         debug: { stats: true },
         plugins: [{ id: 'veto-data', beforeDrawData: () => false }],
-        series: [{ label: 'v', dataIndex: 1 }],
+        series: [{ label: 'v', yColumn: 1 }],
       },
       [f([1, 2]), f([10, 20])],
     );
@@ -63,10 +63,7 @@ describe('engine lifecycle + config integrity', () => {
   });
 
   it('delivers the data payload to a variadic (...args) listener', () => {
-    const chart = fakes.engine({ series: [{ label: 'v', dataIndex: 1 }] }, [
-      f([1, 2]),
-      f([10, 20]),
-    ]);
+    const chart = fakes.engine({ series: [{ label: 'v', yColumn: 1 }] }, [f([1, 2]), f([10, 20])]);
 
     let received: unknown[] = [];
     chart.on('data:update', (...args) => {
@@ -82,7 +79,7 @@ describe('engine lifecycle + config integrity', () => {
 
   it('does not snap a synced cursor to column 0 for an off-axis scatter', () => {
     const chart = fakes.engine(
-      { series: [{ label: 'pts', type: 'scatter', dataIndex: 2, xDataIndex: 1 }] },
+      { series: [{ label: 'pts', type: 'scatter', yColumn: 2, xColumn: 1 }] },
       [f([0, 1, 2]), f([0, 10, 20]), f([5, 6, 7])],
     );
     const moves: Array<[number | null, number | null]> = [];
@@ -95,10 +92,7 @@ describe('engine lifecycle + config integrity', () => {
   });
 
   it('adds use()-installed plugins to config.plugins', () => {
-    const chart = fakes.engine({ series: [{ label: 'v', dataIndex: 1 }] }, [
-      f([1, 2]),
-      f([10, 20]),
-    ]);
+    const chart = fakes.engine({ series: [{ label: 'v', yColumn: 1 }] }, [f([1, 2]), f([10, 20])]);
 
     chart.use({ id: 'runtime-added', install: vi.fn() });
 
@@ -109,7 +103,7 @@ describe('engine lifecycle + config integrity', () => {
     const install = vi.fn();
     const destroy = vi.fn();
     const plugin: Plugin = { id: 'stable', install, destroy };
-    const chart = fakes.engine({ plugins: [plugin], series: [{ label: 'v', dataIndex: 1 }] }, [
+    const chart = fakes.engine({ plugins: [plugin], series: [{ label: 'v', yColumn: 1 }] }, [
       f([1, 2]),
       f([10, 20]),
     ]);
@@ -118,7 +112,7 @@ describe('engine lifecycle + config integrity', () => {
 
     // Fresh config object + fresh array literal, same plugin instance: the
     // plugin set is unchanged, so no destroy/reinstall churn.
-    chart.replaceOptions({ plugins: [plugin], series: [{ label: 'v', dataIndex: 1 }] });
+    chart.replaceOptions({ plugins: [plugin], series: [{ label: 'v', yColumn: 1 }] });
 
     expect(install).toHaveBeenCalledTimes(1);
     expect(destroy).not.toHaveBeenCalled();

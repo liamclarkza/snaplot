@@ -1,4 +1,4 @@
-import type { TooltipPoint, TooltipConfig, ThemeConfig } from '../types';
+import type { TooltipPoint, TooltipConfig, ThemeConfig } from '../engine/spec';
 import { TOOLTIP_OFFSET } from '../constants';
 import { isDarkColor } from '../utils/color';
 import { prefersReducedMotion } from '../utils/motion';
@@ -154,7 +154,7 @@ export class TooltipManager {
     }
 
     // Render content. When the caller returns a string it is treated as
-    // trusted HTML (fast path, matches ChartConfig.tooltip.render's documented
+    // trusted HTML (fast path, matches ChartSpec.tooltip.render's documented
     // contract). Callers rendering user-controlled data should return a DOM
     // node or pre-escape their string. The default renderer already escapes.
     //

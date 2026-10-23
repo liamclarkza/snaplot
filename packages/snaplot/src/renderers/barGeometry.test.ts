@@ -24,14 +24,14 @@ describe('bar geometry helpers', () => {
     const left = barRectForCategory({
       centerX: 100,
       categoryWidth: 40,
-      series: { label: 'a', dataIndex: 1, type: 'bar' },
+      series: { label: 'a', yColumn: 1, type: 'bar' },
       barSeriesIndex: 0,
       totalBarSeries: 2,
     });
     const right = barRectForCategory({
       centerX: 100,
       categoryWidth: 40,
-      series: { label: 'b', dataIndex: 2, type: 'bar' },
+      series: { label: 'b', yColumn: 2, type: 'bar' },
       barSeriesIndex: 1,
       totalBarSeries: 2,
     });

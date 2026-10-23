@@ -30,9 +30,9 @@ describe('engine scatter selection', () => {
           {
             label: 'runs',
             type: 'scatter',
-            xDataIndex: 1,
-            yDataIndex: 2,
-            colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
+            xColumn: 1,
+            yColumn: 2,
+            colorBy: { column: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
           },
         ],
       },
@@ -61,9 +61,9 @@ describe('engine scatter selection', () => {
           {
             label: 'cohorts',
             type: 'scatter',
-            xDataIndex: 1,
-            yDataIndex: 2,
-            colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
+            xColumn: 1,
+            yColumn: 2,
+            colorBy: { column: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
           },
         ],
       },
@@ -84,7 +84,7 @@ describe('engine scatter selection', () => {
       {
         axes: { x: { type: 'linear', padding: 0 }, y: { type: 'linear', padding: 0 } },
         tooltip: { show: true, mode: 'nearest' },
-        series: [{ label: 'points', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
+        series: [{ label: 'points', type: 'scatter', xColumn: 1, yColumn: 2 }],
       },
       [f([0, 1, 2]), f([0, 10, 20]), f([0, 10, 20])],
     );

@@ -218,7 +218,7 @@ describe('[dataapi-20][arch-11] messages use the public vocabulary (P16)', () =>
     }
   };
 
-  it.fails(
+  it(
     '[dataapi-20][arch-11] negative maxPoints reads in public names',
     publicNames(() => mount({ ...base, streaming: { maxPoints: -1 } })),
   );

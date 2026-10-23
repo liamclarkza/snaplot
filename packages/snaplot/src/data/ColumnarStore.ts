@@ -1,4 +1,4 @@
-import type { ColumnarData } from '../types';
+import type { ColumnarData } from '../engine/spec';
 import type { ColumnarSegment, DataStore } from './DataStore';
 import { lowerBound, nearestIndex, upperBound, viewportIndices } from './binarySearch';
 

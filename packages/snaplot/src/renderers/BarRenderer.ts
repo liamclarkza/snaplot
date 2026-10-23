@@ -1,4 +1,4 @@
-import type { Scale, Layout, SeriesConfig } from '../types';
+import type { Scale, Layout, SeriesSpec } from '../engine/spec';
 import { barRectForCategory, categoryWidthFromCenters } from './barGeometry';
 
 export interface BarRenderSegment {
@@ -30,7 +30,7 @@ export function renderBarsSegments(
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
-  series: SeriesConfig,
+  series: SeriesSpec,
   color: string,
   /** Index of this series among bar-type series */
   barSeriesIndex: number,
@@ -55,7 +55,7 @@ export function renderBarsSegments(
   // color. `fill: null` keeps the series color; bars cannot be fill-less.
   const fillFn = typeof series.fill === 'function' ? series.fill : null;
   ctx.fillStyle = typeof series.fill === 'string' ? series.fill : color;
-  ctx.strokeStyle = series.stroke ?? color;
+  ctx.strokeStyle = series.color ?? color;
   ctx.lineWidth = 1;
   ctx.globalAlpha = (series.opacity ?? 0.75) * opacityMultiplier;
 

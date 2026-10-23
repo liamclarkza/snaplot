@@ -1,4 +1,4 @@
-import type { Plugin, EngineHost } from '../../types';
+import type { Plugin, EngineHost } from '../../engine/spec';
 
 /**
  * Configuration for a single reference line, a horizontal or vertical

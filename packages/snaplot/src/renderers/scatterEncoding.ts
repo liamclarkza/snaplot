@@ -2,9 +2,9 @@ import type {
   ScatterColorEncoding,
   ScatterSizeEncoding,
   ScatterTooltipField,
-  SeriesConfig,
+  SeriesSpec,
   TooltipFieldValue,
-} from '../types';
+} from '../engine/spec';
 
 export interface IndexRange {
   startIdx: number;
@@ -58,32 +58,30 @@ export interface ScatterEncodingState {
   fallbackRadius: number;
 }
 
-export function scatterXDataIndex(series: SeriesConfig): number {
-  return series.type === 'scatter' ? (series.xDataIndex ?? 0) : 0;
+export function scatterXColumn(series: SeriesSpec): number {
+  return series.type === 'scatter' ? (series.xColumn ?? 0) : 0;
 }
 
-export function seriesYDataIndex(series: SeriesConfig): number {
-  return series.type === 'scatter'
-    ? (series.yDataIndex ?? series.dataIndex ?? -1)
-    : (series.dataIndex ?? -1);
+export function seriesYColumn(series: SeriesSpec): number {
+  return series.yColumn ?? -1;
 }
 
 export function normalizeScatterColorBy(
-  colorBy: SeriesConfig['colorBy'],
+  colorBy: SeriesSpec['colorBy'],
 ): ScatterColorEncoding | null {
-  if (typeof colorBy === 'number') return { dataIndex: colorBy, type: 'auto' };
+  if (typeof colorBy === 'number') return { column: colorBy, type: 'auto' };
   return colorBy ?? null;
 }
 
-export function normalizeScatterSizeBy(sizeBy: SeriesConfig['sizeBy']): ScatterSizeEncoding | null {
-  if (typeof sizeBy === 'number') return { dataIndex: sizeBy };
+export function normalizeScatterSizeBy(sizeBy: SeriesSpec['sizeBy']): ScatterSizeEncoding | null {
+  if (typeof sizeBy === 'number') return { column: sizeBy };
   return sizeBy ?? null;
 }
 
 export function normalizeScatterTooltipField(
   field: number | ScatterTooltipField,
 ): ScatterTooltipField {
-  return typeof field === 'number' ? { dataIndex: field } : field;
+  return typeof field === 'number' ? { column: field } : field;
 }
 
 export function formatScatterValue(value: number): string {
@@ -96,7 +94,7 @@ export function formatScatterValue(value: number): string {
 }
 
 export function scatterTooltipFields(
-  series: SeriesConfig,
+  series: SeriesSpec,
   index: number,
   columnCount: number,
   valueAt: (columnIdx: number, index: number) => number,
@@ -118,13 +116,13 @@ export function scatterTooltipFields(
   const out: TooltipFieldValue[] = [];
   const seen = new Set<number>();
   for (const field of fields) {
-    if (field.dataIndex < 0 || field.dataIndex >= columnCount || seen.has(field.dataIndex)) {
+    if (field.column < 0 || field.column >= columnCount || seen.has(field.column)) {
       continue;
     }
-    seen.add(field.dataIndex);
-    const value = valueAt(field.dataIndex, index);
+    seen.add(field.column);
+    const value = valueAt(field.column, index);
     out.push({
-      label: field.label ?? `col ${field.dataIndex}`,
+      label: field.label ?? `col ${field.column}`,
       value,
       formatted: field.format ? field.format(value) : formatScatterValue(value),
     });
@@ -134,7 +132,7 @@ export function scatterTooltipFields(
 }
 
 export function buildScatterEncodingState(params: {
-  series: SeriesConfig;
+  series: SeriesSpec;
   fallbackColor: string;
   fallbackRadius: number;
   palettes: ScatterPalettes;
@@ -145,9 +143,9 @@ export function buildScatterEncodingState(params: {
   const { series, fallbackColor, fallbackRadius, palettes, columnCount, ranges, valueAt } = params;
 
   const colorBy = normalizeScatterColorBy(series.colorBy);
-  const colorValid = !!colorBy && colorBy.dataIndex >= 0 && colorBy.dataIndex < columnCount;
+  const colorValid = !!colorBy && colorBy.column >= 0 && colorBy.column < columnCount;
   const sizeBy = normalizeScatterSizeBy(series.sizeBy);
-  const sizeValid = !!sizeBy && sizeBy.dataIndex >= 0 && sizeBy.dataIndex < columnCount;
+  const sizeValid = !!sizeBy && sizeBy.column >= 0 && sizeBy.column < columnCount;
 
   return {
     colorBy: colorValid ? colorBy : null,
@@ -189,7 +187,7 @@ export function resolverFromEncodingState(
 
   const colorBinAt = (index: number): number => {
     if (!colorState || !colorBy) return -1;
-    const value = valueAt(colorBy.dataIndex, index);
+    const value = valueAt(colorBy.column, index);
     if (!Number.isFinite(value)) return -1;
     if (colorState.type === 'category') {
       return colorState.categoryIndex.get(value) ?? -1;
@@ -212,7 +210,7 @@ export function resolverFromEncodingState(
     colorForBin,
     colorAt(index: number): string {
       if (!colorState || !colorBy) return fallbackColor;
-      const value = valueAt(colorBy.dataIndex, index);
+      const value = valueAt(colorBy.column, index);
       if (!Number.isFinite(value)) return colorBy.nullColor ?? fallbackColor;
 
       if (colorState.type === 'category') {
@@ -227,7 +225,7 @@ export function resolverFromEncodingState(
     },
     radiusAt(index: number): number {
       if (!sizeState || !sizeBy) return fallbackRadius;
-      const value = valueAt(sizeBy.dataIndex, index);
+      const value = valueAt(sizeBy.column, index);
       if (!Number.isFinite(value)) return fallbackRadius;
       const [min, max] = sizeState.domain;
       const [rMin, rMax] = sizeState.range;
@@ -240,7 +238,7 @@ export function resolverFromEncodingState(
 }
 
 export function createScatterStyleResolver(params: {
-  series: SeriesConfig;
+  series: SeriesSpec;
   fallbackColor: string;
   fallbackRadius: number;
   palettes: ScatterPalettes;
@@ -278,7 +276,7 @@ function buildColorState(
   palettes: ScatterPalettes,
   fallbackColor: string,
 ): ColorState {
-  const stats = scanColumn(colorBy.dataIndex, ranges, valueAt, colorBy.type === 'category');
+  const stats = scanColumn(colorBy.column, ranges, valueAt, colorBy.type === 'category');
   const requestedType = colorBy.type ?? 'auto';
   const type =
     requestedType === 'auto'
@@ -329,7 +327,7 @@ function buildSizeState(
   ranges: IndexRange[],
   valueAt: (columnIdx: number, index: number) => number,
 ): SizeState {
-  const stats = scanColumn(sizeBy.dataIndex, ranges, valueAt);
+  const stats = scanColumn(sizeBy.column, ranges, valueAt);
   let domain = sizeBy.domain ?? ([stats.min, stats.max] as [number, number]);
   if (!Number.isFinite(domain[0]) || !Number.isFinite(domain[1])) domain = [0, 1];
   return {

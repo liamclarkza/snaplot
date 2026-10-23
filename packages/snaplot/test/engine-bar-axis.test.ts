@@ -29,7 +29,7 @@ describe('engine bar X-axis planning', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
+        series: [{ label: 'departures', type: 'bar', yColumn: 1 }],
       },
       [
         f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),
@@ -48,7 +48,7 @@ describe('engine bar X-axis planning', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'score', type: 'bar', dataIndex: 1 }],
+        series: [{ label: 'score', type: 'bar', yColumn: 1 }],
       },
       [f([0, 1, 2]), f([4, 5, 6])],
     );
@@ -65,8 +65,8 @@ describe('engine bar X-axis planning', () => {
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
         series: [
-          { label: 'A', type: 'bar', dataIndex: 1 },
-          { label: 'B', type: 'bar', dataIndex: 2 },
+          { label: 'A', type: 'bar', yColumn: 1 },
+          { label: 'B', type: 'bar', yColumn: 2 },
         ],
       },
       [f([7, 8, 9]), f([1, 2, 3]), f([2, 3, 4])],
@@ -81,7 +81,7 @@ describe('engine bar X-axis planning', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'value', type: 'bar', dataIndex: 1 }],
+        series: [{ label: 'value', type: 'bar', yColumn: 1 }],
       },
       [f([0, 1, 100]), f([1, 2, 3])],
     );
@@ -98,7 +98,7 @@ describe('engine bar X-axis planning', () => {
     const optOut = fakes.engine(
       {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
+        series: [{ label: 'departures', type: 'bar', yColumn: 1 }],
       },
       [
         f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),
@@ -115,7 +115,7 @@ describe('engine bar X-axis planning', () => {
     const explicitTicks = fakes.engine(
       {
         axes: { x: { type: 'linear', ticks: [7, 12, 18] }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
+        series: [{ label: 'departures', type: 'bar', yColumn: 1 }],
       },
       [
         f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),
@@ -129,7 +129,7 @@ describe('engine bar X-axis planning', () => {
     const zoomed = fakes.engine(
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
-        series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
+        series: [{ label: 'departures', type: 'bar', yColumn: 1 }],
       },
       [
         f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),

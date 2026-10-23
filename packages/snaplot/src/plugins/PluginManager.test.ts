@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PluginManager } from './PluginManager';
-import type { EngineHost, Plugin } from '../types';
+import type { EngineHost, Plugin } from '../engine/spec';
 
 describe('PluginManager', () => {
   it('returns false for duplicate plugin ids and keeps the original', () => {

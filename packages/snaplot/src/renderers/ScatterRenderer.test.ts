@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderScatterSegments, ScatterSeriesCache } from './ScatterRenderer';
 import type { ScatterStyleResolver } from './scatterEncoding';
-import type { Layout, Scale, SeriesConfig } from '../types';
+import type { Layout, Scale, SeriesSpec } from '../engine/spec';
 
 let createImageDataCalls = 0;
 
@@ -94,9 +94,9 @@ describe('renderScatterSegments cache keys', () => {
     const xScale = createScale(0, 3, 0, 20);
     const yScale = createScale(0, 4, 0, 20);
     const layout = createLayout();
-    const series: SeriesConfig = {
+    const series: SeriesSpec = {
       label: 'heat',
-      yDataIndex: 1,
+      yColumn: 1,
       type: 'scatter',
       heatmap: true,
     };
@@ -156,9 +156,9 @@ describe('renderScatterSegments cache keys', () => {
     const xScale = createScale(0, 3, 0, 20);
     const yScale = createScale(0, 4, 0, 20);
     const layout = createLayout();
-    const series: SeriesConfig = {
+    const series: SeriesSpec = {
       label: 'heat',
-      yDataIndex: 1,
+      yColumn: 1,
       type: 'scatter',
       heatmap: true,
     };
@@ -227,9 +227,9 @@ describe('renderScatterSegments cache keys', () => {
     const xScale = createScale(0, 2, 0, 20);
     const yScale = createScale(0, 2, 0, 20);
     const layout = createLayout();
-    const baseSeries: SeriesConfig = {
+    const baseSeries: SeriesSpec = {
       label: 'points',
-      yDataIndex: 1,
+      yColumn: 1,
       type: 'scatter',
       pointRadius: 3,
     };
@@ -286,7 +286,7 @@ describe('renderScatterSegments cache keys', () => {
       scale,
       scale,
       createLayout(),
-      { label: 'variable', type: 'scatter', yDataIndex: 1, opacity: 0.5 },
+      { label: 'variable', type: 'scatter', yColumn: 1, opacity: 0.5 },
       '#f00',
       1,
       { categorical: [] },
@@ -313,7 +313,7 @@ describe('renderScatterSegments cache keys', () => {
       scale,
       scale,
       createLayout(),
-      { label: 'constant', type: 'scatter', yDataIndex: 1, opacity: 0.5 },
+      { label: 'constant', type: 'scatter', yColumn: 1, opacity: 0.5 },
       '#f00',
       1,
       { categorical: [] },

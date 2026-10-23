@@ -1,9 +1,9 @@
-import type { ChartConfig } from '../types';
+import type { ChartSpec } from '../engine/spec';
 import { DEFAULT_THEME, DEFAULT_PADDING } from '../constants';
 
 export { DEFAULT_THEME };
 
-export const DEFAULT_CONFIG: ChartConfig = {
+export const DEFAULT_CONFIG: ChartSpec = {
   autoResize: true,
   padding: { ...DEFAULT_PADDING },
   series: [],

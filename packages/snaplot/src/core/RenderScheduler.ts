@@ -1,4 +1,4 @@
-import { DirtyFlag } from '../types';
+import { DirtyFlag } from '../engine/spec';
 
 /**
  * Batches all rendering into a single requestAnimationFrame per frame.

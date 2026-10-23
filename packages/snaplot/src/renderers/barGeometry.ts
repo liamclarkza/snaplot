@@ -1,4 +1,4 @@
-import type { SeriesConfig } from '../types';
+import type { SeriesSpec } from '../engine/spec';
 
 export interface BarRect {
   left: number;
@@ -52,7 +52,7 @@ export function categoryWidthFromData(
 export function barRectForCategory(params: {
   centerX: number;
   categoryWidth: number;
-  series: SeriesConfig;
+  series: SeriesSpec;
   barSeriesIndex: number;
   totalBarSeries: number;
 }): BarRect {

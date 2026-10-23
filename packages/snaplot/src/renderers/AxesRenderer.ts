@@ -1,4 +1,4 @@
-import type { AxisConfig, Layout, Scale, ThemeConfig, AxisPosition, ChartConfig } from '../types';
+import type { AxisSpec, Layout, Scale, ThemeConfig, AxisPosition, ChartSpec } from '../engine/spec';
 import {
   AXIS_CORNER_GAP,
   AXIS_LABEL_GAP,
@@ -37,7 +37,7 @@ export interface AxesRenderResult {
  * domain) beat generated ticks at the `ac.tickCount` density. Shared by
  * the renderer and layout measurement so gutters match the labels drawn.
  */
-export function axisTickValues(scale: Scale, ac: AxisConfig): number[] {
+export function axisTickValues(scale: Scale, ac: AxisSpec): number[] {
   if (ac.ticks && ac.ticks.length > 0) {
     const lo = Math.min(scale.min, scale.max);
     const hi = Math.max(scale.min, scale.max);
@@ -68,7 +68,7 @@ export function thinTicks(values: number[], maxCount: number, preserveEnds = fal
 
 /** Resolve an axis's grid config to concrete draw values, or null when hidden. */
 function resolveGrid(
-  ac: AxisConfig,
+  ac: AxisSpec,
   theme: ThemeConfig,
 ): { color: string; opacity: number; dash: number[] } | null {
   const grid = ac.grid;
@@ -87,7 +87,7 @@ export function renderAxes(
   layout: Layout,
   scales: Map<string, Scale>,
   theme: ThemeConfig,
-  config: ChartConfig,
+  config: ChartSpec,
   /** Override X-axis ticks with explicit values (e.g. bin edges, category values) */
   customXTicks?: { values: number[]; format?: (v: number) => string; gridValues?: number[] },
 ): AxesRenderResult {
@@ -149,7 +149,7 @@ export function renderAxes(
     const formatTick =
       useCustomTicks && customXTicks!.format
         ? customXTicks!.format
-        : (ac.tickFormat ?? ((v: number) => scale.tickFormat(v)));
+        : (ac.format ?? ((v: number) => scale.tickFormat(v)));
 
     // Width fit pass: generated tick counts are density targets that know
     // nothing about the rendered strings, so measure the actual labels and
@@ -287,7 +287,7 @@ export function renderAxes(
       }
     }
 
-    if (ac.label) {
+    if (ac.title) {
       const area = layout.axes[key]?.area;
       if (area) {
         // Center of the title glyph sits EDGE_MARGIN + half a line in from
@@ -297,7 +297,7 @@ export function renderAxes(
         switch (pos) {
           case 'left':
             labels.push({
-              text: ac.label,
+              text: ac.title,
               x: area.left + inset,
               y: plot.top + plot.height / 2,
               anchor: 'middle',
@@ -306,7 +306,7 @@ export function renderAxes(
             break;
           case 'right':
             labels.push({
-              text: ac.label,
+              text: ac.title,
               x: area.left + area.width - inset,
               y: plot.top + plot.height / 2,
               anchor: 'middle',
@@ -315,7 +315,7 @@ export function renderAxes(
             break;
           case 'bottom':
             labels.push({
-              text: ac.label,
+              text: ac.title,
               x: plot.left + plot.width / 2,
               y: area.top + area.height - inset,
               anchor: 'middle',
@@ -324,7 +324,7 @@ export function renderAxes(
             break;
           case 'top':
             labels.push({
-              text: ac.label,
+              text: ac.title,
               x: plot.left + plot.width / 2,
               y: area.top + inset,
               anchor: 'middle',

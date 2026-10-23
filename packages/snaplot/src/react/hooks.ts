@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore, useRef } from 'react';
 import { createChartGroup } from '../api/createChart';
 import type { ChartHandle, ChartGroupOptions } from '../public/types';
-import type { CursorSnapshotOptions } from '../types';
+import type { CursorSnapshotOptions } from '../engine/spec';
 const emptySubscribe = () => () => {};
 const emptySnapshot = () => undefined;
 /** The chart's state; re-renders on every state change. */

@@ -50,9 +50,9 @@ describe('deepMerge', () => {
   it('does not merge individual series objects by index', () => {
     const result = deepMerge(
       obj({ series: [{ label: 'a' }] }),
-      obj({ series: [{ label: 'a', stroke: '#fff' }, { label: 'b' }] }),
+      obj({ series: [{ label: 'a', color: '#fff' }, { label: 'b' }] }),
     );
-    expect(result.series).toEqual([{ label: 'a', stroke: '#fff' }, { label: 'b' }]);
+    expect(result.series).toEqual([{ label: 'a', color: '#fff' }, { label: 'b' }]);
   });
 
   it('does not descend into Float64Array (treats it as opaque)', () => {

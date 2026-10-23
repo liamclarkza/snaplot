@@ -1,4 +1,4 @@
-import type { InteractionMode, Layout, PanConfig, TouchConfig, ZoomConfig } from '../types';
+import type { InteractionMode, Layout, PanConfig, TouchConfig, ZoomConfig } from '../engine/spec';
 import type { EventBus } from '../core/EventBus';
 import {
   MIN_DRAG_DISTANCE,

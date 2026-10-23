@@ -1,11 +1,11 @@
-import type { Scale, Layout, SeriesConfig } from '../types';
+import type { Scale, Layout, SeriesSpec } from '../engine/spec';
 import { affineParams } from '../scales/affine';
 import {
   createScatterStyleResolver,
   type IndexRange,
   parseHex,
   type ScatterStyleResolver,
-  seriesYDataIndex,
+  seriesYColumn,
   type ScatterPalettes,
 } from './scatterEncoding';
 
@@ -38,7 +38,7 @@ const stampCacheMap = new Map<string, OffscreenCanvas | HTMLCanvasElement>();
 const STAMP_CACHE_MAX = 512;
 export const SCATTER_DENSITY_THRESHOLD = 200_000;
 
-export function isDensityScatterSeries(series: SeriesConfig, pointCount: number): boolean {
+export function isDensityScatterSeries(series: SeriesSpec, pointCount: number): boolean {
   const renderMode = series.renderMode ?? (series.heatmap ? 'density' : 'auto');
   return (
     renderMode === 'density' || (renderMode === 'auto' && pointCount > SCATTER_DENSITY_THRESHOLD)
@@ -119,7 +119,7 @@ export function renderScatterSegments(
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
-  series: SeriesConfig,
+  series: SeriesSpec,
   color: string,
   /** Multiplied with the per-point alpha. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
@@ -189,7 +189,7 @@ function drawStampedSegments(
   scaleX: Scale,
   scaleY: Scale,
   layout: Layout,
-  series: SeriesConfig,
+  series: SeriesSpec,
   color: string,
   palettes: ScatterPalettes,
   cache?: ScatterSeriesCache,
@@ -213,7 +213,7 @@ function drawStampedSegments(
   const constantOffset = constantRadius + 1;
 
   // Points outside the plot rect are clipped away anyway; skipping them
-  // here saves the drawImage call. Matters for arbitrary-xDataIndex series,
+  // here saves the drawImage call. Matters for arbitrary-xColumn series,
   // which reach this loop unculled. The margin must cover the largest marker
   // the resolver can produce (a sizeBy range max well above the base radius),
   // or a big edge-straddling bubble whose body overlaps the plot gets dropped.
@@ -380,7 +380,7 @@ function drawBatchedInteractionPoints(
  */
 function buildSegmentResolver(
   segments: ScatterRenderSegment[],
-  series: SeriesConfig,
+  series: SeriesSpec,
   color: string,
   radius: number,
   palettes: ScatterPalettes,
@@ -392,11 +392,11 @@ function buildSegmentResolver(
   const colorData = segments[0]?.colorData;
   const sizeData = segments[0]?.sizeData;
   const colorBy = series.colorBy;
-  const colorIdx = typeof colorBy === 'number' ? colorBy : colorBy?.dataIndex;
+  const colorIdx = typeof colorBy === 'number' ? colorBy : colorBy?.column;
   const sizeBy = series.sizeBy;
-  const sizeIdx = typeof sizeBy === 'number' ? sizeBy : sizeBy?.dataIndex;
+  const sizeIdx = typeof sizeBy === 'number' ? sizeBy : sizeBy?.column;
 
-  let columnCount = Math.max(series.xDataIndex ?? 0, seriesYDataIndex(series)) + 1;
+  let columnCount = Math.max(series.xColumn ?? 0, seriesYColumn(series)) + 1;
   if (colorData && colorIdx !== undefined) columnCount = Math.max(columnCount, colorIdx + 1);
   if (sizeData && sizeIdx !== undefined) columnCount = Math.max(columnCount, sizeIdx + 1);
 
@@ -408,8 +408,8 @@ function buildSegmentResolver(
     columnCount,
     ranges,
     valueAt(columnIdx, index) {
-      if (columnIdx === series.xDataIndex) return segments[0]?.xData[index] ?? Number.NaN;
-      if (columnIdx === seriesYDataIndex(series)) return segments[0]?.yData[index] ?? Number.NaN;
+      if (columnIdx === series.xColumn) return segments[0]?.xData[index] ?? Number.NaN;
+      if (columnIdx === seriesYColumn(series)) return segments[0]?.yData[index] ?? Number.NaN;
       if (columnIdx === colorIdx) return colorData?.[index] ?? Number.NaN;
       if (columnIdx === sizeIdx) return sizeData?.[index] ?? Number.NaN;
       return Number.NaN;
