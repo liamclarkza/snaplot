@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "bench"
+    "bench",
+    "site"
   ],
   "scripts": {
     "build": "npm run build -w packages/snaplot",

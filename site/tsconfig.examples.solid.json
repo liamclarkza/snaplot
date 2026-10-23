@@ -1,0 +1,9 @@
+{
+  // The Solid examples: tsconfig.examples.json with Solid's JSX.
+  "extends": "./tsconfig.examples.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js"
+  },
+  "include": ["src/examples/**/*.solid.tsx", ".generated/examples/**/*.solid.tsx"]
+}

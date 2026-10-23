@@ -1,0 +1,42 @@
+---
+title: Performance and limits
+description: Typed columns, density, decimation, many charts, offscreen charts and scale limits.
+---
+
+{/* Outline only: plan §8.1 drafts this page in M15b. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## Typed columns
+
+`Float64Array` columns skip row extraction.
+
+## Density
+
+Large scatter sets render as density.
+
+## Decimation
+
+Lines draw at most a few points per pixel.
+
+## Many charts
+
+Dashboards with dozens of charts on one page.
+
+## Offscreen charts
+
+Charts outside the viewport keep their state and skip painting.
+
+## What scales with the view
+
+Which costs grow with the visible points and which with all the data.
+
+## Memory and scale limits
+
+How much data a chart can hold.
+
+## The scale promise
+
+The dashboard sizes snaplot is measured against.

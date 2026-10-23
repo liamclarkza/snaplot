@@ -1,0 +1,50 @@
+---
+title: Data
+description: Rows or columns, fields or accessors, axis inference, gaps and per-series data.
+---
+
+{/* Outline only: plan §8.1 drafts this page in M15a. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## Rows or columns
+
+Pass an array of rows, or typed columns for large and streaming data.
+
+## Fields or accessors
+
+Name a field, or pass a function that reads the value from a row.
+
+## Row order
+
+Rows are sorted by x; typed columns must already be sorted.
+
+## Axis inference
+
+Dates and ISO strings give a time axis, strings a category axis, and numbers a linear axis.
+
+## Gaps
+
+A missing or null value breaks the line.
+
+## Per-series data
+
+A series can bring its own data and x field.
+
+## Row ids
+
+Give rows a `rowId` to keep track of them in events and callbacks.
+
+## Histograms
+
+`histogram()` bins values into counts for a histogram series.
+
+## Pivoting long rows
+
+Turn long rows with a series column into one field per series.
+
+## Memoising derived data
+
+Keep derived data stable in React (`useMemo`) and Solid (`createMemo`).

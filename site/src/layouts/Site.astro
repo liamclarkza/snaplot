@@ -1,0 +1,83 @@
+---
+/**
+ * The layout for pages outside the docs: the homepage and the examples hub (plan §9, §10.3).
+ * No Starlight chrome. Nav, page and footer share one 72rem container with 24px gutters, so every
+ * row starts at the same left edge (uisite-12). The theme script is the docs' own, so a choice
+ * made in either place holds in both.
+ */
+import '../styles/fonts.css';
+import '../styles/tokens.css';
+import '../styles/site.css';
+import ThemeProvider from '../components/ThemeProvider.astro';
+import ThemeSelect from '../components/ThemeSelect.astro';
+import { version } from '../lib/version';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Which nav item is the current page. */
+  current?: 'home' | 'examples';
+}
+
+const { title, description, current } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const href = (path: string) => `${base}${path}`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const GITHUB = 'https://github.com/liamclarkza/snaplot';
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={href('favicon.svg')} type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:site_name" content="snaplot" />
+    <ThemeProvider />
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="container site-header-row">
+        <a class="brand" href={base} aria-current={current === 'home' ? 'page' : undefined}>snaplot</a>
+        <nav aria-label="Site">
+          <ul class="site-nav">
+            <li><a href={href('introduction/')}>Docs</a></li>
+            <li>
+              <a href={href('examples/')} aria-current={current === 'examples' ? 'page' : undefined}>
+                Examples
+              </a>
+            </li>
+            <li><a href={href('reference/api/readme/')}>API</a></li>
+            <li><a href={GITHUB}>GitHub</a></li>
+          </ul>
+        </nav>
+        <ThemeSelect />
+      </div>
+    </header>
+    <main id="main" class="container" tabindex="-1">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="container">
+        <ul class="site-footer-links">
+          <li><a href={href('introduction/')}>Docs</a></li>
+          <li><a href={href('examples/')}>Examples</a></li>
+          <li><a href={href('reference/api/readme/')}>API</a></li>
+          <li><a href={`${GITHUB}/blob/main/CHANGELOG.md`}>Changelog</a></li>
+          <li><a href={GITHUB}>GitHub</a></li>
+          <li><a href={`${GITHUB}/blob/main/LICENSE`}>MIT licence</a></li>
+          <li class="num">v{version}</li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>

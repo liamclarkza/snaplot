@@ -1,0 +1,34 @@
+---
+title: Sizing and layout
+description: How a chart takes its size from its container or from the height option.
+---
+
+{/* Outline only: plan §8.1 drafts this page in M15b. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## The height contract
+
+An explicit `height` always sets the chart height. Without it, the chart fills the height of its container.
+
+## The 300 px fallback
+
+A container with no height gets a 300 px chart and one warning.
+
+## Aspect ratio with CSS
+
+Use CSS `aspect-ratio` on the container to keep a chart in proportion.
+
+## Flex and grid pitfalls
+
+Stretched flex items and grid cells, and the minimum sizes that stop a chart from shrinking.
+
+## Device pixel ratio
+
+Canvases render at the device pixel ratio and follow it when a window moves between screens.
+
+## Printing
+
+Charts repaint for print at the printed size.

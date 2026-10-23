@@ -1,0 +1,30 @@
+{
+  // Every example on the site, type-checked as a user would compile it (plan §8.3): strict,
+  // bundler resolution, browser globals only, and `snaplot` resolved through its package exports
+  // to the built dist/*.d.ts. Covers the option-level and vanilla/React example files, the docs
+  // data slices, and the per-tab files that scripts/check-examples.mjs generates. Solid files
+  // compile with Solid's JSX in tsconfig.examples.solid.json.
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "types": [],
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/examples/**/*.ts",
+    "src/examples/**/*.react.tsx",
+    ".generated/examples/**/*.ts",
+    ".generated/examples/**/*.react.tsx"
+  ]
+}

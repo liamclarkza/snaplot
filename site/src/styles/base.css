@@ -1,0 +1,28 @@
+/*
+ * Rules shared by the docs and the custom pages (plan §9). Classes and element selectors only: no
+ * inline presentational styles and no !important anywhere on the site (uisite-19).
+ */
+
+body {
+  font-family: var(--snaplot-font);
+}
+
+/* Focus: one visible ring everywhere, and the system highlight in forced colours (uisite-04). */
+:focus-visible {
+  outline: 2px solid var(--snaplot-accent);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+/* Tabular figures only where numbers line up (uisite-07). */
+table,
+code,
+pre,
+kbd,
+.num {
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,42 @@
+---
+title: Troubleshooting
+description: Blank charts, field errors, a 1970 axis, types, SSR and jsdom.
+---
+
+{/* Outline only: plan §8.1 drafts this page in M15b. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## A blank chart
+
+Check the container size and the field names.
+
+## Field errors
+
+What the error messages for unknown fields mean.
+
+## An axis that starts in 1970
+
+Seconds passed where milliseconds were expected.
+
+## Literal widening and satisfies
+
+Use `satisfies ChartOptions<Row>` so field names keep their literal types.
+
+## Format types
+
+The value types a `format` function receives.
+
+## Server rendering
+
+Charts mount in the browser; the server renders the host.
+
+## jsdom
+
+Rendering charts in tests without a canvas.
+
+## Data replaced on a streamed source
+
+Why passing new `data` discards appended rows, and how to avoid it.

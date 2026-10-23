@@ -1,0 +1,50 @@
+---
+title: React
+description: The Chart component, refs, hooks, state options and LegendTable in React 18 and 19.
+---
+
+{/* Outline only: plan §8.1 drafts this page in M15a. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## The Chart component
+
+`<Chart>` from `snaplot/react` takes the chart options as props.
+
+## Refs
+
+A plain `useRef` gives you the chart handle.
+
+## Hooks with selectors
+
+`useChartState` and `useCursor` re-render only when the value they select changes.
+
+## State options
+
+`viewport`, `selection`, `hiddenSeries` and `highlight` are props, with an `on*Change` callback each.
+
+## LegendTable
+
+`<LegendTable chart={ref} columns={…} />` shows a table of series values.
+
+## Streaming through the ref
+
+Call `appendData` on the handle instead of rebuilding the data prop.
+
+## Derived data with useMemo
+
+Memoise derived rows so a re-render does not re-ingest them.
+
+## React 18 and 19
+
+The adapter supports React 18.3 and React 19.
+
+## Next.js
+
+Charts are client components; `snaplot/react` carries `'use client'`.
+
+## Testing in jsdom
+
+What to stub to render a chart in jsdom.

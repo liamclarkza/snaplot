@@ -1,0 +1,34 @@
+---
+title: Updating and live data
+description: update, setOptions and appendData, streaming, and the follow window.
+---
+
+{/* Outline only: plan §8.1 drafts this page in M15a. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## update, setOptions and appendData
+
+Which call to use for a patch, a full set of options, or new rows.
+
+## Streaming
+
+`streaming.maxPoints` bounds the retained data.
+
+## The follow window
+
+`streaming.followWindow` keeps the latest data in view.
+
+## Pausing and resuming follow
+
+Zooming or `update({ viewport })` pauses following; `resumeFollow()` resumes it.
+
+## Updating the last point
+
+`updateLast` replaces the newest row in place.
+
+## Patterns per framework
+
+Streaming through the handle in vanilla JS, React and Solid.

@@ -1,0 +1,38 @@
+---
+title: Solid
+description: The Chart component, refs, primitives, LegendTable and server rendering in Solid.
+---
+
+{/* Outline only: plan §8.1 drafts this page in M15a. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## The Chart component
+
+`<Chart>` from `snaplot/solid` takes the chart options as props.
+
+## Refs
+
+Pass a setter as `ref` to receive the chart handle.
+
+## Primitives with accessors
+
+`createChartState` and `createCursor` take the handle or an accessor for it.
+
+## LegendTable
+
+`<LegendTable chart={chart} columns={…} />` shows a table of series values.
+
+## Derived data with createMemo
+
+Memoise derived rows so a change elsewhere does not re-ingest them.
+
+## SolidStart and SSR
+
+Server rendering emits the host element; the chart mounts on hydration.
+
+## The solid export condition
+
+Solid tooling compiles snaplot's JSX source through the `solid` condition.

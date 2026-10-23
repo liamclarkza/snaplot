@@ -1,0 +1,36 @@
+---
+title: Introduction
+description: What snaplot is for, how to install it, its entry points and the browsers it supports.
+---
+
+import Install from '../../components/Install.astro';
+
+{/* Outline only: plan §8.1 drafts this page in M15a. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## What snaplot is for
+
+Canvas charts for live data, with one options object for vanilla JS, React and Solid.
+
+## What it is not for
+
+Stacked marks, horizontal bars, animation and OHLC charts are not supported in 1.0.
+
+## Install
+
+<Install />
+
+## Entry points
+
+`snaplot` for vanilla JS, `snaplot/react` for React and `snaplot/solid` for Solid. Each entry exports `createChart` or a `<Chart>` component that takes the same options.
+
+## Browser support
+
+Chrome and Edge 111+, Firefox 115+, Safari and iOS 16.4+. The build targets ES2022 and ships no polyfills.
+
+## Bundle size
+
+The gzip size of each entry, generated from `scripts/size.mjs`.

@@ -1,0 +1,297 @@
+---
+/**
+ * <Example name="start/minimal" /> renders one example from src/examples/ in Vanilla, React and
+ * Solid tabs (plan §8.3). Each tab shows the runnable file (Copy copies all of it) and mounts it
+ * live when the tab is visible. The chosen framework is shared by every example and remembered;
+ * storage is optional, so blocked storage never breaks the page (uisite-01).
+ */
+import { Code } from '@astrojs/starlight/components';
+import { EXAMPLE_HEIGHT, FRAMEWORKS, exampleKind, tabFileName, tabSource } from '../lib/examples';
+import ExampleReact from './ExampleReact.react.tsx';
+import ExampleSolid from './ExampleSolid.solid.tsx';
+
+interface Props {
+  /** The example's path under src/examples/, without the suffix, e.g. "start/minimal". */
+  name: string;
+}
+
+const { name } = Astro.props;
+
+const sources = import.meta.glob<string>(
+  ['../examples/**/*.ts', '../examples/**/*.tsx', '!../examples/data/**'],
+  { query: '?raw', import: 'default', eager: true },
+);
+const files = new Map(
+  Object.entries(sources).map(([path, source]) => [path.replace('../examples/', ''), source]),
+);
+const kind = exampleKind(name, new Set(files.keys()));
+const input = {
+  options: files.get(`${name}.options.ts`),
+  files: {
+    vanilla: files.get(`${name}.ts`),
+    react: files.get(`${name}.react.tsx`),
+    solid: files.get(`${name}.solid.tsx`),
+  },
+};
+
+// Per-page state, shared by every <Example> on the page: a counter for unique ids (an example may
+// appear twice) and whether the restore script has been emitted.
+const COUNT = Symbol.for('snaplot:example-count');
+const RESTORE = Symbol.for('snaplot:example-restore-script');
+const page = Astro.locals as unknown as { [COUNT]?: number; [RESTORE]?: boolean };
+page[COUNT] = (page[COUNT] ?? 0) + 1;
+const id = `example-${page[COUNT]}`;
+const firstOnPage = !page[RESTORE];
+page[RESTORE] = true;
+
+const tabs = FRAMEWORKS.map((framework) => ({
+  ...framework,
+  source: tabSource(kind, framework.id, input),
+  fileName: tabFileName(name, kind, framework.id),
+}));
+---
+
+{
+  firstOnPage && (
+    <script is:inline>
+      (() => {
+        // Shows the remembered framework tab before the example paints; storage may be blocked.
+        let framework = null;
+        try { framework = localStorage.getItem('snaplot-site-framework'); } catch {}
+        if (!/^(vanilla|react|solid)$/.test(framework || '')) framework = null;
+        customElements.define('snaplot-example-restore', class extends HTMLElement {
+          connectedCallback() {
+            const example = this.closest('snaplot-example');
+            const tab = example && example.querySelector(':scope > [role="tablist"] > [data-framework="' + framework + '"]');
+            if (!tab) return;
+            example.setAttribute('data-framework', framework);
+            for (const t of example.querySelectorAll(':scope > [role="tablist"] > [role="tab"]')) {
+              t.setAttribute('aria-selected', String(t === tab));
+              t.tabIndex = t === tab ? 0 : -1;
+            }
+            for (const p of example.querySelectorAll(':scope > [role="tabpanel"]')) {
+              p.hidden = p.getAttribute('data-framework') !== framework;
+            }
+          }
+        });
+      })();
+    </script>
+  )
+}
+
+<snaplot-example class="example not-content" data-example={name} data-kind={kind} data-framework="vanilla">
+  <div class="example-tabs" role="tablist" aria-label="Framework">
+    {
+      tabs.map((tab, i) => (
+        <button
+          type="button"
+          role="tab"
+          id={`${id}-tab-${tab.id}`}
+          aria-controls={`${id}-panel-${tab.id}`}
+          aria-selected={i === 0 ? 'true' : 'false'}
+          tabindex={i === 0 ? 0 : -1}
+          data-framework={tab.id}
+        >
+          {tab.label}
+        </button>
+      ))
+    }
+  </div>
+  {
+    tabs.map((tab, i) => (
+      <div
+        class="example-panel"
+        role="tabpanel"
+        id={`${id}-panel-${tab.id}`}
+        aria-labelledby={`${id}-tab-${tab.id}`}
+        data-framework={tab.id}
+        hidden={i !== 0}
+      >
+        <div class="example-output" data-example-output>
+          {tab.id === 'vanilla' && (
+            <snaplot-vanilla-mount class="example-chart" data-name={name} data-kind={kind} />
+          )}
+          {tab.id === 'react' && <ExampleReact client:visible name={name} kind={kind} />}
+          {tab.id === 'solid' && <ExampleSolid client:visible name={name} kind={kind} />}
+        </div>
+        <div data-example-code data-file={tab.fileName}>
+          <Code code={tab.source} lang={tab.lang} title={tab.fileName} />
+        </div>
+      </div>
+    ))
+  }
+  <snaplot-example-restore />
+</snaplot-example>
+
+<style define:vars={{ chartHeight: `${EXAMPLE_HEIGHT}px` }}>
+  .example {
+    display: block;
+    margin-block: 1.5rem;
+  }
+  .example-tabs {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--snaplot-rule);
+  }
+  .example-tabs [role='tab'] {
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--snaplot-ink-secondary);
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+  }
+  .example-tabs [role='tab']:hover {
+    color: var(--snaplot-ink);
+    border-bottom-color: var(--snaplot-rule);
+  }
+  .example-tabs [role='tab'][aria-selected='true'] {
+    color: var(--snaplot-ink);
+    font-weight: 600;
+    border-bottom-color: var(--snaplot-accent);
+  }
+  .example-output {
+    padding-block: 1rem;
+    min-height: var(--chartHeight);
+  }
+  .example-chart {
+    display: block;
+    height: var(--chartHeight);
+  }
+  /* An option-level example mounts <Chart {...options} height={280} />. The adapters do not size
+     their host from height yet (frameworks-15, D26), so the island's wrapper gives the host's
+     height: 100% something to fill. Remove once the adapters set the host height themselves. */
+  .example[data-kind='options'] :global(.example-island) {
+    height: var(--chartHeight);
+  }
+</style>
+
+<script>
+  import type { ChartHandle, ChartOptions } from 'snaplot';
+
+  const STORAGE_KEY = 'snaplot-site-framework';
+  const FRAMEWORKS = ['vanilla', 'react', 'solid'] as const;
+  type Framework = (typeof FRAMEWORKS)[number];
+  const isFramework = (value: unknown): value is Framework =>
+    FRAMEWORKS.includes(value as Framework);
+
+  function remember(framework: Framework): void {
+    try {
+      localStorage.setItem(STORAGE_KEY, framework);
+    } catch {
+      // Blocked storage: the choice lasts for this page only.
+    }
+  }
+
+  class SnaplotExample extends HTMLElement {
+    #tabs: HTMLButtonElement[] = [];
+    #panels: HTMLElement[] = [];
+
+    connectedCallback(): void {
+      this.#tabs = [...this.querySelectorAll<HTMLButtonElement>(':scope > [role="tablist"] > [role="tab"]')];
+      this.#panels = [...this.querySelectorAll<HTMLElement>(':scope > [role="tabpanel"]')];
+      this.#tabs.forEach((tab, i) => {
+        tab.addEventListener('click', () => this.#choose(i));
+        tab.addEventListener('keydown', (event) => {
+          const last = this.#tabs.length - 1;
+          const next =
+            event.key === 'ArrowRight'
+              ? (i + 1) % this.#tabs.length
+              : event.key === 'ArrowLeft'
+                ? (i + last) % this.#tabs.length
+                : event.key === 'Home'
+                  ? 0
+                  : event.key === 'End'
+                    ? last
+                    : -1;
+          if (next < 0) return;
+          event.preventDefault();
+          this.#choose(next);
+          this.#tabs[next]?.focus();
+        });
+      });
+      const restored = this.dataset.framework;
+      this.show(isFramework(restored) ? restored : 'vanilla');
+    }
+
+    /** Shows one framework's panel without touching storage or other examples. */
+    show(framework: Framework): void {
+      this.dataset.framework = framework;
+      this.#tabs.forEach((tab) => {
+        const selected = tab.dataset.framework === framework;
+        tab.setAttribute('aria-selected', String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+      });
+      for (const panel of this.#panels) panel.hidden = panel.dataset.framework !== framework;
+    }
+
+    #choose(index: number): void {
+      const framework = this.#tabs[index]?.dataset.framework;
+      if (!isFramework(framework)) return;
+      // Keep the example under the pointer still while the others change height.
+      const top = this.getBoundingClientRect().top;
+      for (const example of document.querySelectorAll<SnaplotExample>('snaplot-example')) {
+        example.show(framework);
+      }
+      window.scrollBy({ top: this.getBoundingClientRect().top - top, behavior: 'instant' });
+      remember(framework);
+    }
+  }
+
+  // Vanilla examples mount on first sight, the way the islands do with client:visible.
+  const optionModules = import.meta.glob<{ default: ChartOptions<any> }>(
+    '../examples/**/*.options.ts',
+  );
+  const vanillaModules = import.meta.glob<{ default: (el: HTMLElement) => ChartHandle<any> }>([
+    '../examples/**/*.ts',
+    '!../examples/**/*.options.ts',
+    '!../examples/data/**',
+  ]);
+
+  class SnaplotVanillaMount extends HTMLElement {
+    #chart: ChartHandle<any> | undefined;
+    #observer: IntersectionObserver | undefined;
+    #disconnected = false;
+
+    connectedCallback(): void {
+      this.#disconnected = false;
+      this.#observer = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        this.#observer?.disconnect();
+        void this.#mount();
+      });
+      this.#observer.observe(this);
+    }
+
+    disconnectedCallback(): void {
+      this.#disconnected = true;
+      this.#observer?.disconnect();
+      this.#chart?.destroy();
+      this.#chart = undefined;
+    }
+
+    async #mount(): Promise<void> {
+      const { name, kind } = this.dataset;
+      if (kind === 'options') {
+        const load = optionModules[`../examples/${name}.options.ts`];
+        if (!load) throw new Error(`snaplot site: no options example "${name}"`);
+        const [{ createChart }, { default: options }] = await Promise.all([
+          import('snaplot'),
+          load(),
+        ]);
+        if (!this.#disconnected) this.#chart = createChart(this, options);
+      } else {
+        const load = vanillaModules[`../examples/${name}.ts`];
+        if (!load) throw new Error(`snaplot site: no vanilla example "${name}"`);
+        const { default: mount } = await load();
+        if (!this.#disconnected) this.#chart = mount(this);
+      }
+    }
+  }
+
+  customElements.define('snaplot-example', SnaplotExample);
+  customElements.define('snaplot-vanilla-mount', SnaplotVanillaMount);
+</script>

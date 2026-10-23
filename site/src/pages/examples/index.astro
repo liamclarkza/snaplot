@@ -1,0 +1,40 @@
+---
+/**
+ * The examples hub (plan §10.3), a skeleton until M16a: an index, not a landing page. M16a adds
+ * each row's thumbnail and its Open and Source links as the demo pages land.
+ */
+import Site from '../../layouts/Site.astro';
+import { DEMOS } from '../../lib/demos';
+---
+
+<Site
+  title="Examples · snaplot"
+  description="Each example answers one question with real or documented data."
+  current="examples"
+>
+  <h1>Examples</h1>
+  <p>Each example answers one question with real or documented data.</p>
+  <ul class="demo-list">
+    {
+      DEMOS.map((demo) => (
+        <li data-demo={demo.slug}>
+          <h2 class="demo-question">{demo.question}</h2>
+          <p>{demo.task}</p>
+          <p class="demo-meta">
+            {demo.framework} · {demo.dataset} ({demo.licence})
+          </p>
+        </li>
+      ))
+    }
+  </ul>
+</Site>
+
+<style>
+  .demo-question {
+    font-size: 1.125rem;
+    margin: 0;
+  }
+  .demo-list p {
+    margin: 0;
+  }
+</style>

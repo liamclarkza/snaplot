@@ -1,0 +1,34 @@
+---
+title: Linked charts
+description: Groups that share the cursor, the x viewport and highlights across charts.
+---
+
+{/* Outline only: plan §8.1 drafts this page in M15a. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## Groups
+
+Create a group with `createChartGroup()` and pass it to each chart.
+
+## What a group shares
+
+The cursor, the x viewport and the highlighted series.
+
+## Sharing the y range
+
+`yRange: true` gives every chart in the group the same y range.
+
+## Aligning plots
+
+`alignPlots` lines up the plot edges.
+
+## Leaving a group
+
+Remove a chart with `update({ group: undefined })` or `destroy()`.
+
+## Shared options
+
+Spread one options object into every chart in a group.

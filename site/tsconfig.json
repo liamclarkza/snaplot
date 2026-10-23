@@ -1,0 +1,13 @@
+{
+  // The site's own code: Astro components, islands, scripts and tests. React JSX by default;
+  // Solid islands set `@jsxImportSource solid-js` per file. The examples have their own
+  // configs (tsconfig.examples.json and tsconfig.examples.solid.json), run by check:examples.
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "types": ["node"]
+  },
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist", ".generated", "src/examples", "src/content/docs/reference/api"]
+}

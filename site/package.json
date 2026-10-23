@@ -1,0 +1,44 @@
+{
+  "name": "snaplot-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "node scripts/typedoc-validate.mjs && astro build --force",
+    "preview": "astro preview --ignore-lock",
+    "test": "vitest run",
+    "test:smoke": "playwright test",
+    "check:examples": "astro check && tsc -p tsconfig.json && node --experimental-strip-types scripts/check-examples.mjs",
+    "old-routes": "node scripts/old-routes.mjs",
+    "typedoc:list": "node scripts/typedoc-validate.mjs --list"
+  },
+  "dependencies": {
+    "@astrojs/react": "7.0.1",
+    "@astrojs/solid-js": "7.0.2",
+    "@astrojs/starlight": "0.42.6",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/libre-caslon-text": "5.3.0",
+    "@fontsource/libre-franklin": "5.3.0",
+    "@fontsource/roboto": "5.3.0",
+    "@fontsource/source-serif-4": "5.3.0",
+    "astro": "7.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "snaplot": "*",
+    "solid-js": "1.9.17",
+    "starlight-typedoc": "0.23.1",
+    "typedoc": "0.28.20",
+    "typedoc-plugin-markdown": "4.13.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.61.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.4"
+  }
+}

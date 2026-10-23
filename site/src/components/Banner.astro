@@ -1,0 +1,36 @@
+---
+/**
+ * Replaces Starlight's Banner. Prerelease builds say which docs these are (D1); a page may still
+ * set its own `banner` in frontmatter.
+ */
+import Default from '@astrojs/starlight/components/Banner.astro';
+import { isPrerelease, releaseLine, version } from '../lib/version';
+
+const { banner } = Astro.locals.starlightRoute.entry.data;
+---
+
+{
+  banner ? (
+    <Default />
+  ) : (
+    isPrerelease && (
+      <div class="sl-banner" data-prerelease={version}>
+        {releaseLine} beta docs. 0.12 docs:{' '}
+        <a href="https://github.com/liamclarkza/snaplot/tree/v0.12.0#readme">README at tag v0.12.0</a>.
+      </div>
+    )
+  )
+}
+
+<style>
+  .sl-banner {
+    padding: 0.5rem var(--sl-nav-pad-x);
+    background-color: var(--snaplot-surface);
+    border-bottom: 1px solid var(--snaplot-rule);
+    color: var(--snaplot-ink);
+    font-size: var(--sl-text-sm);
+  }
+  .sl-banner a {
+    color: var(--snaplot-accent);
+  }
+</style>

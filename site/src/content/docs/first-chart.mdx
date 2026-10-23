@@ -1,0 +1,31 @@
+---
+title: Your first chart
+description: Mount a chart in vanilla JS, React or Solid, and see what you get by default.
+---
+
+import Example from '../../components/Example.astro';
+import Install from '../../components/Install.astro';
+
+{/* Outline only: plan §8.1 drafts this page in M15a. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## Install
+
+<Install />
+
+## Mount a chart
+
+Give `createChart` an element and the options: the rows, the field for the x axis, and one series per y field. The React and Solid `<Chart>` components take the same options as props.
+
+<Example name="start/minimal" />
+
+## Size the container
+
+The chart fills its container. Give the container a height, or pass `height`.
+
+## What you get by default
+
+The theme follows the page, axes and ticks come from the data, and the tooltip follows the pointer.

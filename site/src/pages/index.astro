@@ -1,0 +1,54 @@
+---
+/**
+ * The homepage (plan §9, D34), a skeleton until M16a: the sentence, the generated install string,
+ * a code and chart pair in three tabs, the fact line, the examples list and the footer. M16a
+ * replaces the pair with the streaming hero (src/examples/home/hero.*) and adds the thumbnails.
+ */
+import Example from '../components/Example.astro';
+import Install from '../components/Install.astro';
+import Site from '../layouts/Site.astro';
+import { DEMOS } from '../lib/demos';
+import routes from '../lib/old-routes.json';
+import { dependencyCount, version } from '../lib/version';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+---
+
+<Site
+  title="snaplot: canvas charts for live data"
+  description="Canvas charts for live data. One options object for vanilla JS, React and Solid."
+  current="home"
+>
+  <script slot="head" is:inline define:vars={{ routes, base }}>
+    // Old hash links, /snaplot/#/docs/<group>/<section>, land on their new pages (plan §8.2).
+    const route = /^#\/([^?#]*)/.exec(location.hash);
+    if (route) {
+      const [page, group, section] = route[1].split('/');
+      const target =
+        page === 'docs' && group
+          ? (routes.docs[`${group}/${section}`] ?? routes.docs[group] ?? routes.pages.docs)
+          : routes.pages[page];
+      if (target) location.replace(base + target);
+      else if (target === '') history.replaceState(null, '', base);
+    }
+  </script>
+
+  <h1 class="lede">Canvas charts for live data. One options object for vanilla JS, React and Solid.</h1>
+  <Install />
+  <Example name="start/minimal" />
+  <p class="facts num">v{version} · {dependencyCount} dependencies</p>
+
+  <h2>Examples</h2>
+  <ul class="demo-list">
+    {
+      DEMOS.map((demo) => (
+        <li>
+          <h3>{demo.question}</h3>
+          <p class="demo-meta">
+            {demo.framework} · {demo.dataset} ({demo.licence})
+          </p>
+        </li>
+      ))
+    }
+  </ul>
+</Site>

@@ -1,0 +1,41 @@
+---
+/** Replaces Starlight's ThemeSelect with the three-state toggle of ThemeProvider.astro. */
+import Select from '@astrojs/starlight/components/Select.astro';
+---
+
+<snaplot-theme-select>
+  <Select
+    icon="laptop"
+    label="Theme"
+    options={[
+      { label: 'System', selected: true, value: 'auto' },
+      { label: 'Light', selected: false, value: 'light' },
+      { label: 'Dark', selected: false, value: 'dark' },
+    ]}
+    width="6.5em"
+  />
+</snaplot-theme-select>
+
+{/* Inline, so the select shows the stored choice before it paints. */}
+<script is:inline>
+  SnaplotTheme.sync();
+</script>
+
+<script>
+  declare global {
+    interface Window {
+      SnaplotTheme: { get(): string; set(value: string): void; sync(): void };
+    }
+  }
+
+  class SnaplotThemeSelect extends HTMLElement {
+    connectedCallback(): void {
+      this.querySelector('select')?.addEventListener('change', (event) => {
+        if (event.currentTarget instanceof HTMLSelectElement) {
+          window.SnaplotTheme.set(event.currentTarget.value);
+        }
+      });
+    }
+  }
+  customElements.define('snaplot-theme-select', SnaplotThemeSelect);
+</script>

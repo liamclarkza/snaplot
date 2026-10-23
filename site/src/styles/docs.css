@@ -1,0 +1,58 @@
+/* Starlight-specific rules on top of base.css (plan §9). */
+
+/* Sentence case, left aligned, measured headings. */
+.sl-markdown-content h1,
+h1#_top {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sl-markdown-content :is(h2, h3, h4) {
+  font-weight: 600;
+}
+
+/* A readable measure (≤ 68ch) for prose (uisite-06). */
+.sl-markdown-content > :is(p, ul, ol, blockquote) {
+  max-width: 68ch;
+}
+
+/* Links: accent, underlined on hover. */
+.sl-markdown-content a:not(.not-content *) {
+  color: var(--snaplot-accent);
+}
+.sl-markdown-content a:not(.not-content *):hover {
+  text-decoration-thickness: 2px;
+}
+
+/* The current page: accent text on the surface, not a filled accent pill. */
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  color: var(--snaplot-accent);
+  background-color: var(--snaplot-surface);
+}
+
+/* Visible hover on the sidebar, header, TOC and footer (uisite-05). */
+.sidebar-content a:not([aria-current="page"]):hover {
+  color: var(--snaplot-ink);
+  background-color: var(--snaplot-surface);
+}
+.sidebar-content summary:hover {
+  color: var(--snaplot-ink);
+  background-color: var(--snaplot-surface);
+}
+starlight-toc a:hover,
+mobile-starlight-toc a:hover {
+  color: var(--snaplot-accent);
+}
+.social-icons a:hover,
+.pagination-links a:hover {
+  color: var(--snaplot-accent);
+}
+
+/* Hairlines instead of cards; radius at most 6px. */
+.sl-markdown-content :is(pre, .expressive-code .frame) {
+  border-radius: var(--snaplot-radius);
+}
+.pagination-links a {
+  border-radius: var(--snaplot-radius);
+}

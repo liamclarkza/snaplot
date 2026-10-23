@@ -1,0 +1,38 @@
+---
+title: Vanilla JS
+description: createChart, its lifecycle, events, groups, the legend table and the no-build path.
+---
+
+{/* Outline only: plan §8.1 drafts this page in M15a. */}
+
+:::note[Draft]
+This page is an outline of what it will cover.
+:::
+
+## Lifecycle
+
+Create a chart with `createChart(el, options)` and remove it with `destroy()`.
+
+## update or setOptions
+
+`update` applies a patch; `setOptions` replaces the options and changes only what differs.
+
+## Events and on options
+
+Listen with `chart.on(name, fn)` or pass the matching `on*` option.
+
+## Groups
+
+Link charts with `createChartGroup()`.
+
+## Legend table
+
+Show values for the cursor position with `createLegendTable`.
+
+## Cleanup
+
+What `destroy()` removes, and what stays on the host element.
+
+## Without a bundler
+
+Load snaplot from a CDN with `<script type="module">` and an import.

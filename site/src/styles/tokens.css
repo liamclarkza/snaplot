@@ -1,0 +1,78 @@
+/*
+ * The site's design tokens (plan §9, D35) and their mapping onto Starlight's variables. One set
+ * for the docs, the homepage, the examples hub and the 404 page. Plain white and near-black
+ * surfaces; the accent is the library's own first series colour and is used only for links, focus
+ * and the current page. Contrast on the background: ink ≥ 15:1, secondary ink ≥ 7:1, accent 5.2:1
+ * (light) and 8.2:1 (dark).
+ *
+ * Starlight renders dark by default and switches on [data-theme='light'], which the head script in
+ * ThemeProvider.astro sets before the first paint.
+ */
+:root {
+  --snaplot-background: #111113;
+  --snaplot-surface: #1a1a1d;
+  --snaplot-ink: #eceae6;
+  --snaplot-ink-secondary: #a6a4ab;
+  --snaplot-rule: #2c2c30;
+  --snaplot-accent: #56b4e9;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --snaplot-background: #ffffff;
+  --snaplot-surface: #f6f7f9;
+  --snaplot-ink: #1c1c1e;
+  --snaplot-ink-secondary: #55565e;
+  --snaplot-rule: #e3e4e8;
+  --snaplot-accent: #0072b2;
+  color-scheme: light;
+}
+
+:root,
+:root[data-theme="light"] {
+  --snaplot-container: 72rem;
+  --snaplot-gutter: 24px;
+  --snaplot-radius: 6px;
+  --snaplot-font: "IBM Plex Sans", var(--sl-font-system);
+  --snaplot-font-mono: "IBM Plex Mono", var(--sl-font-system-mono);
+
+  /* Colours. Starlight's "white" is the highest-contrast ink and "black" the background. */
+  --sl-color-white: var(--snaplot-ink);
+  --sl-color-gray-1: var(--snaplot-ink);
+  --sl-color-gray-2: var(--snaplot-ink-secondary);
+  --sl-color-gray-3: var(--snaplot-ink-secondary);
+  --sl-color-gray-4: var(--snaplot-ink-secondary);
+  --sl-color-gray-5: var(--snaplot-rule);
+  --sl-color-gray-6: var(--snaplot-surface);
+  --sl-color-gray-7: var(--snaplot-surface);
+  --sl-color-black: var(--snaplot-background);
+  --sl-color-accent-low: var(--snaplot-surface);
+  --sl-color-accent: var(--snaplot-accent);
+  --sl-color-accent-high: var(--snaplot-accent);
+  --sl-color-text: var(--snaplot-ink);
+  --sl-color-text-accent: var(--snaplot-accent);
+  --sl-color-text-invert: var(--snaplot-background);
+  --sl-color-bg: var(--snaplot-background);
+  --sl-color-bg-nav: var(--snaplot-background);
+  --sl-color-bg-sidebar: var(--snaplot-background);
+  --sl-color-bg-inline-code: var(--snaplot-surface);
+  --sl-color-bg-accent: var(--snaplot-accent);
+  --sl-color-hairline-light: var(--snaplot-rule);
+  --sl-color-hairline: var(--snaplot-rule);
+  --sl-color-hairline-shade: var(--snaplot-rule);
+
+  /* No shadows, glows or gradients anywhere (plan §9). */
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: none;
+
+  /* Type: Plex, body 16/1.6, h1 40, h2 24, h3 18, small text 14. */
+  --sl-font: "IBM Plex Sans";
+  --sl-font-mono: "IBM Plex Mono";
+  --sl-line-height: 1.6;
+  --sl-text-h1: 2.5rem;
+  --sl-text-h2: 1.5rem;
+  --sl-text-h3: 1.125rem;
+  --sl-text-h4: 1rem;
+  --sl-text-h5: 1rem;
+}
