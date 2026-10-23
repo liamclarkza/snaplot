@@ -248,6 +248,16 @@ function finiteOption(value: unknown, path: string, min = 0, max = Infinity): nu
   return undefined;
 }
 
+/** An annotation colour: a string, or a warning (whether a string is a colour is M11's parser). */
+function colorOption(value: unknown, path: string): string | undefined {
+  if (value === undefined || typeof value === 'string') return value;
+  warnOnce(
+    'invalid-option',
+    `${path} ${describe(value)} is not valid and is ignored; it must be a CSS colour string.`,
+  );
+  return undefined;
+}
+
 function dashOption(value: unknown, path: string): number[] | undefined {
   if (value === undefined) return undefined;
   if (
@@ -816,11 +826,12 @@ function normalizeLine(value: unknown, path: string): NormalizedLine {
   if (value.value === undefined) fail(`${path} needs a value.`);
   const dash = dashOption(value.dash, `${path}.dash`);
   const lineWidth = finiteOption(value.lineWidth, `${path}.lineWidth`);
+  const color = colorOption(value.color, `${path}.color`);
   return {
     axis: value.axis,
     value: value.value,
     ...(value.label === undefined ? {} : { label: String(value.label) }),
-    ...(typeof value.color === 'string' ? { color: value.color } : {}),
+    ...(color === undefined ? {} : { color }),
     ...(dash ? { dash } : {}),
     ...(lineWidth === undefined ? {} : { lineWidth }),
   };
@@ -832,13 +843,13 @@ function normalizeRegion(value: unknown, path: string): NormalizedRegion {
   if (typeof value.axis !== 'string') fail(`${path}.axis must be an axis key such as 'x'.`);
   if (value.from === undefined || value.to === undefined) fail(`${path} needs from and to.`);
   const opacity = finiteOption(value.opacity, `${path}.opacity`, 0, 1);
-  const color = value.color;
+  const color = colorOption(value.color, `${path}.color`);
   return {
     axis: value.axis,
     from: value.from,
     to: value.to,
     ...(value.label === undefined ? {} : { label: String(value.label) }),
-    ...(typeof color === 'string' ? { fill: color } : {}),
+    ...(color === undefined ? {} : { fill: color }),
     ...(opacity === undefined ? {} : { opacity }),
   };
 }

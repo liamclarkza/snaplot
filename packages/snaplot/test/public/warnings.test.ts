@@ -302,6 +302,19 @@ describe('[gap-annotations-extensibility-13] annotation values and styles', () =
     expect(text).toMatch(/referenceRegions\[0\]\.opacity -0\.5 is not valid and is ignored/);
   });
 
+  it('[gap-annotations-extensibility-13] a colour that is not a string warns and is ignored', () => {
+    mount({
+      ...base,
+      referenceLines: [{ axis: 'y', value: 11, color: 42 }],
+      referenceRegions: [{ axis: 'x', from: 2, to: 4, color: { r: 255 } }],
+    });
+    const text = warnings().join('\n');
+    expect(text).toMatch(
+      /referenceLines\[0\]\.color 42 is not valid and is ignored; it must be a CSS colour string/,
+    );
+    expect(text).toMatch(/referenceRegions\[0\]\.color an object is not valid and is ignored/);
+  });
+
   it('a category label and an in-range slot do not warn (control)', () => {
     mount({
       data: [

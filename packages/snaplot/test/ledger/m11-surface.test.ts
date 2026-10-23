@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Known M11 defects in the surface, sizing and scheduling (plan §5.7, D26,
-// D37, RC10). Public API, fakes and debug() only.
+// D37, RC10) and in colour parsing (RC7). Public API, fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createChart } from '../../src/index';
 import type { ChartHandle } from '../../src/index';
@@ -138,6 +138,21 @@ describe('[gap-scale-longevity-02][gap-scale-longevity-06:visibility][gap-scale-
     expect(observers.mock.calls.length).toBeLessThanOrEqual(1);
     const distinct = new Set(queries.mock.calls.map((call) => call[0]));
     expect(queries.mock.calls.length).toBeLessThanOrEqual(distinct.size);
+  });
+});
+
+describe('[gap-annotations-extensibility-13:colour-parse] colour strings (RC7)', () => {
+  // M7 warns about a colour that is not a string; the one colour parser (M11) also knows
+  // when a string is not a colour.
+  it.fails('[gap-annotations-extensibility-13:colour-parse] an annotation colour that is not a CSS colour warns', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fakes.mount<Row>({
+      ...options,
+      referenceLines: [{ axis: 'y', value: 12, color: 'not-a-colour' }],
+    });
+    expect(warn.mock.calls.map((call) => String(call[0])).join('\n')).toMatch(
+      /referenceLines\[0\]\.color "not-a-colour"/,
+    );
   });
 });
 

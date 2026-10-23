@@ -2507,12 +2507,24 @@
       "category": "dx",
       "title": "Annotation validation gives misleading messages and silently coerces Dates, category indices and style values",
       "required": false,
-      "owners": ["M7"],
+      "owners": ["M7", "M11"],
+      "wholeOwners": ["M7"],
       "rootCauses": ["RC15"],
       "status": "tracked",
       "lock": {
         "kind": "test",
         "title": "[gap-annotations-extensibility-13]"
+      },
+      "lockNote": "M7: axis-kind messages, Date and slot warnings, style values and non-string colours; M11: a colour string that is not a colour (the one parser, RC7)",
+      "parts": {
+        "colour-parse": {
+          "owners": ["M11"],
+          "status": "tracked",
+          "lock": {
+            "kind": "test",
+            "title": "[gap-annotations-extensibility-13:colour-parse]"
+          }
+        }
       }
     },
     "gap-annotations-extensibility-14": {
@@ -2549,7 +2561,8 @@
           "lock": {
             "kind": "gate",
             "name": "bench ingest-cols-1m ≤ 40/135 ms"
-          }
+          },
+          "lockNote": "provisional: M7 met its 0.5x ratio, but the absolute 40/135 ms budget blocks only in M14's quiet run (EXECUTION rule 3); M14 reopens this id if it misses"
         },
         "paint": {
           "owners": ["M11"],
@@ -3049,7 +3062,8 @@
       "lock": {
         "kind": "gate",
         "name": "bench ingest-cols-1m ≤ 40/135 ms"
-      }
+      },
+      "lockNote": "provisional: M7 met its 0.5x ratio, but the absolute 40/135 ms budget blocks only in M14's quiet run (EXECUTION rule 3); M14 reopens this id if it misses"
     },
     "gap-perf-gate-05": {
       "severity": "high",
