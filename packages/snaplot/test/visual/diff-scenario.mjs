@@ -6,7 +6,16 @@
 // Scenarios live under test-results/diff-scenarios/ (gitignored, inside this package) and are
 // removed afterwards.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXACT, headInputs, TOLERANCE } from './record.mjs';
@@ -138,12 +147,23 @@ export function runScenario(scenario) {
     const suffix = mode === 'against' ? '' : '-darwin';
     const reference = join(dir, 'reference');
     mkdirSync(reference, { recursive: true });
+    const imageOf = (name) => join(reference, `${name}${suffix}.png`);
     for (const name of scenario.referenceFiles ?? []) {
-      const file = join(reference, `${name}${suffix}.png`);
-      mkdirSync(dirname(file), { recursive: true });
-      writeFileSync(file, '');
+      mkdirSync(dirname(imageOf(name)), { recursive: true });
+      writeFileSync(imageOf(name), `captured ${name}\n`);
     }
     const shots = scenario.referenceShots ?? scenario.referenceFiles ?? [];
+    // What run.mjs records at capture: the SHA-256 of each usable shot's image.
+    const hashes = Object.fromEntries(
+      shots
+        .filter((name) => existsSync(imageOf(name)))
+        .map((name) => [
+          name,
+          createHash('sha256')
+            .update(readFileSync(imageOf(name)))
+            .digest('hex'),
+        ]),
+    );
     const against =
       mode !== 'against'
         ? null
@@ -157,6 +177,7 @@ export function runScenario(scenario) {
             complete: true,
             shots,
             declared: shots.length,
+            ...(scenario.legacyHashes ? {} : { hashes }),
             ...scenario.against,
           });
 
@@ -196,6 +217,15 @@ export function runScenario(scenario) {
       date: new Date(0).toISOString(),
     };
     writeFileSync(join(results, 'meta.json'), JSON.stringify(meta));
+    // Writes into the reference after its capture (a head run with -u or --update-snapshots).
+    for (const name of scenario.rewriteAfterCapture ?? []) {
+      writeFileSync(imageOf(name), `rewritten ${name}\n`);
+    }
+    for (const name of scenario.addAfterCapture ?? []) {
+      mkdirSync(dirname(imageOf(name)), { recursive: true });
+      writeFileSync(imageOf(name), `written ${name}\n`);
+    }
+    for (const name of scenario.removeAfterCapture ?? []) unlinkSync(imageOf(name));
     // Edits made after the run, before the check (a stale report, or a row added after the run).
     for (const [path, text] of Object.entries(scenario.editAfterRun ?? {})) {
       mkdirSync(dirname(join(dir, path)), { recursive: true });

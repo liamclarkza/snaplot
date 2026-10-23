@@ -292,3 +292,60 @@ describe('check-visual-diffs: visual-ledger rows', () => {
     expect(r.status).toBe(1);
   });
 });
+
+// M3a review #3: `--against <ref> -u` wrote the head's screenshots into the shared reference
+// cache, and the next run against that cache reported 0 changed shots and OK.
+describe('check-visual-diffs: a reference written after capture', () => {
+  it.fails('[repo-10] fails a reference image that changed after capture, even with --allow-partial', () => {
+    for (const args of [[], ['--allow-partial']]) {
+      const r = runScenario({
+        head: unchanged,
+        referenceFiles: SHOTS,
+        rewriteAfterCapture: ['marks/a'],
+        args,
+      });
+      expect(r.output).toContain('changed after capture: marks/a');
+      expect(r.status).toBe(1);
+    }
+  });
+
+  it.fails('[repo-10] fails the row rule too when a reference image changed after capture', () => {
+    const r = runScenario({
+      head: unchanged,
+      referenceFiles: SHOTS,
+      milestone: 'M11',
+      rows: { 'V50.md': row('V50', 'M11', ['marks/*']) },
+      rewriteAfterCapture: ['marks/b'],
+    });
+    expect(r.output).toContain('changed after capture: marks/b');
+    expect(r.status).toBe(1);
+  });
+
+  it.fails('[repo-10] fails a reference image that the capture did not produce', () => {
+    const r = runScenario({
+      head: [...unchanged, { name: 'marks/new' }],
+      referenceFiles: SHOTS,
+      addAfterCapture: ['marks/new'],
+      milestone: 'M11',
+    });
+    expect(r.output).toContain('not captured: marks/new');
+    expect(r.status).toBe(1);
+  });
+
+  it.fails('[repo-10] fails a captured reference image that is gone, even with --allow-partial', () => {
+    const r = runScenario({
+      head: [{ name: 'marks/a' }, missing('marks/b'), { name: 'marks/c' }],
+      referenceFiles: SHOTS,
+      removeAfterCapture: ['marks/b'],
+      args: ['--allow-partial'],
+    });
+    expect(r.output).toContain('missing: marks/b');
+    expect(r.status).toBe(1);
+  });
+
+  it.fails('[repo-10] refuses a meta.json that does not record the reference image hashes', () => {
+    const r = runScenario({ head: unchanged, referenceFiles: SHOTS, legacyHashes: true });
+    expect(r.output).toContain('does not record the reference image hashes');
+    expect(r.status).toBe(1);
+  });
+});

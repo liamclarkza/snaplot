@@ -32,4 +32,34 @@ describe('the visual runner command line', () => {
     expect(() => parseArgs(['--against'])).toThrow('--against needs a ref');
     expect(() => parseArgs(['--against', 'HEAD', '--update'])).toThrow('exclusive');
   });
+
+  // M3a review #3: `-u` after `--update-snapshots=none` made Playwright write the head's
+  // screenshots into the reference, and the next run against it passed.
+  it.fails('[repo-10] refuses the Playwright flags that write or skip the expected images', () => {
+    const flags = [
+      ['-u'],
+      ['--update-snapshots'],
+      ['--update-snapshots=all'],
+      ['--update-snapshots', 'changed'],
+      ['--update-source-method=overwrite'],
+      ['--ignore-snapshots'],
+      ['-xu'],
+      ['--config', 'other.config.ts'],
+      ['-c', 'other.config.ts'],
+    ];
+    for (const extra of flags) {
+      for (const argv of [
+        ['--against', 'HEAD', ...extra],
+        ['--against', 'HEAD', '--', ...extra],
+        ['--', ...extra],
+      ]) {
+        expect(() => parseArgs(argv), argv.join(' ')).toThrow(/expected images/);
+      }
+    }
+  });
+
+  it('keeps a --grep pattern that looks like a flag', () => {
+    expect(parseArgs(['--grep', '-u']).passthrough).toEqual(['--grep', '-u']);
+    expect(parseArgs(['--', '-g', '-u']).passthrough).toEqual(['-g', '-u']);
+  });
 });

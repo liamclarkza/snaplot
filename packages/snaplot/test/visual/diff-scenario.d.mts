@@ -36,6 +36,14 @@ export interface Scenario {
   editAfterRun?: Record<string, string>;
   /** Omit `head.inputs` from meta.json, as an older run.mjs did. */
   legacyHead?: boolean;
+  /** Omit `against.hashes` (the captured images' SHA-256) from meta.json, as an older run.mjs did. */
+  legacyHashes?: boolean;
+  /** Reference images overwritten after the capture, as a head run with `-u` would. */
+  rewriteAfterCapture?: string[];
+  /** Reference images written after the capture that it never captured. */
+  addAfterCapture?: string[];
+  /** Reference images deleted after the capture. */
+  removeAfterCapture?: string[];
   /** Extra arguments for check-visual-diffs.mjs. */
   args?: string[];
 }
