@@ -52,8 +52,3 @@ export const SHOTS: readonly Shot[] = FIXTURES.flatMap((fixture) => {
   if (fixture.dpr2) shots.push(shot(fixture, '@2x', 2, 'light'));
   return shots;
 });
-
-/** The fixture id a screenshot name belongs to (`axes/titles-320@2x` → `axes/titles-320`). */
-export function fixtureOfShot(name: string): string {
-  return name.split('@')[0] ?? name;
-}

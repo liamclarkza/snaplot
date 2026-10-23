@@ -161,6 +161,17 @@ async function captureReference(ref, port, givenTree, givenSha) {
     console.log(`visual: reference ${ref} (${sha.slice(0, 10)}) from cache ${shots}`);
     return { ref, sha, shots };
   }
+  const refHasHarness = givenTree
+    ? existsSync(join(givenTree, 'packages/snaplot/test/visual/visual.spec.ts'))
+    : spawnSync('git', ['cat-file', '-e', `${sha}:packages/snaplot/test/visual/visual.spec.ts`], {
+        cwd: repoRoot,
+      }).status === 0;
+  if (!refHasHarness) {
+    throw new Error(
+      `${ref} (${sha.slice(0, 10)}) has no visual fixture app: refs older than the M3a merge ` +
+        'are not valid references (plan §11.3 G10)',
+    );
+  }
   const tree = givenTree ?? join(entry, 'tree');
   if (!givenTree) {
     mkdirSync(tree, { recursive: true });
@@ -174,12 +185,6 @@ async function captureReference(ref, port, givenTree, givenSha) {
     if (untar.status !== 0) throw new Error(`tar -x failed: ${untar.stderr}`);
   }
   const refPkg = join(tree, 'packages/snaplot');
-  if (!existsSync(join(refPkg, 'test/visual/visual.spec.ts'))) {
-    throw new Error(
-      `${ref} (${sha.slice(0, 10)}) has no visual fixture app: refs older than the M3a merge ` +
-        'are not valid references (plan §11.3 G10)',
-    );
-  }
   const refLock = join(tree, 'package-lock.json');
   const headLock = join(repoRoot, 'package-lock.json');
   const sameLock =
@@ -221,10 +226,14 @@ async function captureReference(ref, port, givenTree, givenSha) {
   );
   const captured = listPngs(shots);
   if (code !== 0) {
+    // Not cached: a transient failure must not freeze a partial reference. The shots that did
+    // render are compared; a fixture with no reference is reported as added.
     console.warn(
-      `visual: the reference run exited ${code}; its failing fixtures have no reference and ` +
-        'will be reported as added',
+      `visual: WARNING: the reference run exited ${code} (${captured.length} shots captured); ` +
+        `see ${join(entry, 'out/capture-report.json')}. Fixtures it could not render will be ` +
+        'reported as added.',
     );
+    return { ref, sha, shots };
   }
   writeFileSync(
     marker,
