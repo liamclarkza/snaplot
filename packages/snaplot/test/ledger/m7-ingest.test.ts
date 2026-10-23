@@ -105,7 +105,7 @@ describe('[dataapi-07][dxtrial-08] ISO date strings', () => {
     visits: 100 + day,
   }));
 
-  it.fails('[dataapi-07][dxtrial-08] ISO-8601 strings infer a time axis', () => {
+  it('[dataapi-07][dxtrial-08] ISO-8601 strings infer a time axis', () => {
     const chart = fakes.mount({ data: rows, x: 'time', series: [{ y: 'visits' }] });
     expect(chart.getAxis('x')?.type).toBe('time');
     expect(chart.getAxis('x')?.min).toBe(Date.UTC(2026, 0, 1));

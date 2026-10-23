@@ -711,15 +711,20 @@ function ingestRows<Row>(
   const raw = new Array<unknown>(count);
   let present = typeof xField !== 'string';
   let strings = 0;
+  let iso = 0;
   let dates = 0;
+  let numbers = 0;
   for (let i = 0; i < count; i++) {
     const row = rows[i];
     const value = read(xField, row, original(i), `${path} x`);
     raw[i] = value;
     if (!present && (value !== undefined || (row && (xField as string) in (row as object))))
       present = true;
-    if (typeof value === 'string') strings++;
-    else if (value instanceof Date) dates++;
+    if (typeof value === 'string') {
+      strings++;
+      if (ISO.test(value)) iso++;
+    } else if (value instanceof Date) dates++;
+    else if (typeof value === 'number') numbers++;
   }
   if (!present && count > 0)
     fail(
@@ -731,6 +736,9 @@ function ingestRows<Row>(
   if (type === 'time') kind = 'date';
   else if (type === 'category' || prior === 'category') kind = 'category';
   else if (type === 'linear' || type === 'log') kind = 'number';
+  // D18: an X of only ISO-8601 strings (with Dates or alone) is a time axis.
+  else if (strings > 0 && iso === strings && (dates > 0 || numbers === 0) && prior !== 'number')
+    kind = 'date';
   else if (strings > 0) kind = 'category';
   else if (dates > 0) kind = 'date';
   else kind = prior ?? 'number';

@@ -154,7 +154,7 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
 });
 
 describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
-  it.fails('[dataapi-07] date-only strings are calendar dates in the viewer’s time zone', () => {
+  it('[dataapi-07] date-only strings are calendar dates in the viewer’s time zone', () => {
     const chart = mount({
       data: [
         { day: '2026-03-01', v: 1 },
@@ -166,7 +166,7 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
     expect(chart.getAxis('x')).toMatchObject({ type: 'time', min: new Date(2026, 2, 1).getTime() });
   });
 
-  it.fails("[dataapi-07] date-only strings are UTC dates with timeZone: 'UTC'", () => {
+  it("[dataapi-07] date-only strings are UTC dates with timeZone: 'UTC'", () => {
     const chart = mount({
       data: [
         { day: '2026-03-01', v: 1 },
@@ -179,7 +179,7 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
     expect(chart.getAxis('x')).toMatchObject({ type: 'time', min: Date.UTC(2026, 2, 1) });
   });
 
-  it.fails('[dataapi-07] strings with an offset are absolute instants', () => {
+  it('[dataapi-07] strings with an offset are absolute instants', () => {
     const chart = mount({
       data: [
         { at: '2026-01-01T00:00:00+02:00', v: 1 },

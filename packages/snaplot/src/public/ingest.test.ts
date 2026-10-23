@@ -202,6 +202,23 @@ describe('ingest (plan §3.2, D18, D23)', () => {
     expect(parseIso('2026-13-01', 'UTC')).toBeNaN();
   });
 
+  it('infers time from ISO-8601 strings unless the axis is a category axis', () => {
+    const data = [
+      { day: '2026-03-02', y: 2 },
+      { day: '2026-03-01', y: 1 },
+    ];
+    const inferred = run({ data, x: 'day', series: [{ y: 'y' }], timeZone: 'UTC' });
+    expect(inferred.spec.axes?.x.type).toBe('time');
+    expect(values(inferred.sources[0].columns[0])).toEqual([
+      Date.UTC(2026, 2, 1),
+      Date.UTC(2026, 2, 2),
+    ]);
+    const labels = run({ data, x: 'day', series: [{ y: 'y' }], axes: { x: { type: 'category' } } });
+    expect(labels.categories.get('x')?.list()).toEqual(['2026-03-02', '2026-03-01']);
+    const mixed = run({ data: [...data, { day: 'later', y: 3 }], x: 'day', series: [{ y: 'y' }] });
+    expect(mixed.kinds.get('x')).toBe('category');
+  });
+
   it('keeps an inferred time axis across empty data, unless the type is explicit', () => {
     const previousTypes = new Map([['x', 'time' as const]]);
     const options: ChartOptions<{ x: Date; y: number }> = {

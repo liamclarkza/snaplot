@@ -257,7 +257,7 @@ const edges: Fixture[] = [
   },
   {
     id: 'axes/iso-strings',
-    title: 'ISO date strings infer a category axis that draws every label (dataapi-07)',
+    title: 'ISO date strings infer a time axis (dataapi-07)',
     width: 640,
     height: 240,
     options: () => ({

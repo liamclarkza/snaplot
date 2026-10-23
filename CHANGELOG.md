@@ -54,8 +54,10 @@ to [Semantic Versioning](https://semver.org/).
 - Inferred categories follow the data: replacing the data rebuilds them, and a label leaves once
   its last row has streamed out of the window.
 - A field that no row has throws with the closest field name. Numbers on an inferred linear X
-  that look like epoch milliseconds warn once and suggest `axes.x.type: 'time'`, which also
-  accepts ISO-8601 strings.
+  that look like epoch milliseconds warn once and suggest `axes.x.type: 'time'`.
+- An X of ISO-8601 strings (`'2026-03-01'`, `'2026-03-01T09:30:00Z'`) is a time axis, not
+  categories (visual V17). A date-only or offset-free string is a wall time in the chart's
+  `timeZone`; a string with `Z` or an offset is an instant.
 
 ### Types (1.0)
 
