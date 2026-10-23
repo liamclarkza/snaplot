@@ -476,6 +476,34 @@ describe('appends are validated before anything changes', () => {
   });
 });
 
+// Streaming keeps to the layered canvases (plan §3.4): an append repaints the data layer, and
+// the grid and overlay only when the axes or the series change.
+describe('[gap-scale-longevity-03:ingest] appends do no work they do not need', () => {
+  it.fails('[gap-scale-longevity-03:ingest] appends with known colorBy labels repaint the data layer only', () => {
+    const kinds = ['a', 'b', 'c', 'd'];
+    const n = 3_000;
+    const chart = mount(
+      {
+        data: Array.from({ length: n }, (_, i) => ({ x: i, y: Math.sin(i / 50), k: kinds[i % 4] })),
+        x: 'x',
+        series: [{ type: 'scatter', y: 'y', colorBy: 'k', tooltipFields: ['k'] }],
+        streaming: { maxPoints: n },
+      },
+      { width: 800, height: 400 },
+    );
+    fakes.frames.flush();
+    const before = { ...debug(chart).renderCount };
+    for (let i = 0; i < 20; i++) {
+      chart.appendData([{ x: n + i, y: 0.5, k: kinds[i % 4] }]);
+      fakes.frames.flush();
+    }
+    const after = debug(chart).renderCount;
+    expect(after.grid).toBe(before.grid);
+    expect(after.overlay).toBe(before.overlay);
+    expect(after.data).toBeGreaterThan(before.data);
+  });
+});
+
 // Category codes are positions on the axis. A cursor, a pinned or controlled viewport and a
 // group's X range hold codes, so a label keeps its code while its rows are retained (D23).
 describe('[dataapi-05] category codes stay with their labels', () => {
