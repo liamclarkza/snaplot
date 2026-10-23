@@ -68,10 +68,10 @@
     "recipes/recipe-gaps": "guides/data/#gaps",
     "recipes/recipe-ticks": "guides/axes/#explicit-ticks",
     "recipes/recipe-axis-titles": "guides/axes/#titles",
-    "api": "reference/api/readme/",
-    "api/api-methods": "reference/api/readme/",
-    "api/api-events": "reference/api/readme/",
-    "api/api-scatter-options": "reference/api/readme/",
-    "api/api-types": "reference/api/readme/"
+    "api": "reference/api/",
+    "api/api-methods": "reference/api/",
+    "api/api-events": "reference/api/",
+    "api/api-scatter-options": "reference/api/",
+    "api/api-types": "reference/api/"
   }
 }

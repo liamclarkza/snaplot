@@ -24,7 +24,7 @@ const GROUPS = {
   data: 'guides/updating/',
   plugins: 'guides/annotations-plugins/',
   recipes: 'introduction/',
-  api: 'reference/api/readme/',
+  api: 'reference/api/',
 };
 const SECTIONS = {
   'getting-started/install': 'introduction/#install',
@@ -77,10 +77,10 @@ const SECTIONS = {
   'recipes/recipe-gaps': 'guides/data/#gaps',
   'recipes/recipe-ticks': 'guides/axes/#explicit-ticks',
   'recipes/recipe-axis-titles': 'guides/axes/#titles',
-  'api/api-methods': 'reference/api/readme/',
-  'api/api-events': 'reference/api/readme/',
-  'api/api-scatter-options': 'reference/api/readme/',
-  'api/api-types': 'reference/api/readme/',
+  'api/api-methods': 'reference/api/',
+  'api/api-events': 'reference/api/',
+  'api/api-scatter-options': 'reference/api/',
+  'api/api-types': 'reference/api/',
 };
 // The other old top-level hash routes (site/src/App.tsx at the baseline).
 const PAGES = {

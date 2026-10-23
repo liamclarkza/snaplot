@@ -465,7 +465,6 @@ test.describe('layout and chrome', () => {
 
   // The route tests load each page and its subresources, not the pages its links go to.
   test('every internal link resolves to a page, a file or a heading (G11)', () => {
-    test.fail(true, '[uisite-17] the API landing page links to module pages that are not built');
     const ids = new Map<string, Set<string>>();
     const idsOf = (file: string) => {
       const found =
@@ -498,7 +497,6 @@ test.describe('layout and chrome', () => {
   test('[uisite-17] the API link opens a reference that links to each entry point', async ({
     page,
   }) => {
-    test.fail(true, '[uisite-17] the API landing page links to module pages that are not built');
     const problems = watch(page);
     await page.goto(BASE);
     await page.locator('.site-nav').getByRole('link', { name: 'API', exact: true }).click();

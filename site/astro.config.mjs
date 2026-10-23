@@ -107,7 +107,17 @@ export default defineConfig({
           sidebar: { label: 'API reference', collapsed: true },
           // The plugin renders but never validates; scripts/typedoc-validate.mjs runs TypeDoc's
           // notDocumented check before every build (a warning until M7, plan §8.4).
-          typeDoc: { excludeInternal: true },
+          typeDoc: {
+            excludeInternal: true,
+            // With several entry points and no `readme`, the plugin deletes every
+            // `<module>/README.md`, the default entry file, while the landing page still links
+            // to them. Named `index`, the landing page is /reference/api/ (the URL the site's API
+            // links use, whatever the modules are called) and each module keeps its overview.
+            entryFileName: 'index',
+            name: 'API reference',
+            // Modules named after their import paths; `index` would collide with the landing page.
+            plugin: [fileURLToPath(new URL('./scripts/typedoc-module-names.mjs', import.meta.url))],
+          },
         }),
       ],
     }),
