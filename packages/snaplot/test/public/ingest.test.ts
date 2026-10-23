@@ -466,7 +466,7 @@ describe('[dataapi-05] category codes stay with their labels', () => {
     expect(pointsAt(chart, 'D')).toContainEqual(['s2', 'D', 4]);
   });
 
-  it.fails('[dataapi-05] a streamed category axis keeps its codes through an unrelated update', () => {
+  it('[dataapi-05] a streamed category axis keeps its codes through an unrelated update', () => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
     const chart = mount({
       data: [{ m: 'Jan', y: 1 }],
@@ -502,7 +502,7 @@ describe('[dataapi-05] category codes stay with their labels', () => {
     expect(chart.getAxis('x')).toMatchObject({ min: 0, max: 1 });
   });
 
-  it.fails('[dataapi-05] sources on one axis keep their slot order through an update', () => {
+  it('[dataapi-05] sources on one axis keep their slot order through an update', () => {
     const chart = mount({
       data: [{ a: 'P', b: 'Q', y1: 1, y2: 2 }],
       x: 'a',

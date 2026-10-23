@@ -59,11 +59,21 @@ export class CategoryAxis {
     return this.next;
   }
 
+  /**
+   * `previous` is the registry of the ingest before, for an axis whose streamed data is read
+   * again: inferred labels keep its codes and the codes it would give next, and prune() drops
+   * the labels no row holds any more.
+   */
   constructor(
     readonly key: string,
     readonly explicit: readonly string[] | undefined,
+    previous?: CategoryAxis,
   ) {
     for (const label of explicit ?? []) this.code(label);
+    if (previous && !explicit) {
+      for (const [code, label] of previous.labels) this.define(label, code);
+      this.next = Math.max(this.next, previous.next);
+    }
   }
 
   /** The error for a label that is not one of the explicit categories. */
@@ -215,6 +225,8 @@ export interface IngestContext<Row> {
     x: AccessorLike | undefined,
   ) => Retained<Row> | undefined;
   previousEncodings?: ReadonlyMap<string, readonly string[]>;
+  /** The previous ingest's X category registries, kept by axes whose streamed data is retained. */
+  previousCategories?: ReadonlyMap<string, CategoryAxis>;
   /** Axis types to keep for inferred axes that now hold no data. */
   previousTypes?: ReadonlyMap<string, AxisSpec['type']>;
   /** Scatter sources (by input and axis) to store unsorted even if X is sorted. */

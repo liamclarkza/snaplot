@@ -246,6 +246,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     return {
       counters: this.counters,
       previousEncodings: previous?.encodings,
+      previousCategories: previous?.categories,
       previousTypes,
       unsorted: this.unsorted,
       retained: (input, axis, x) => {

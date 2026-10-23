@@ -13,8 +13,9 @@
  * - Rows, original indices and row ids are retained beside the engine's
  *   columns, bounded by `streaming.maxPoints`, so an accessor change
  *   re-reads retained rows and appended rows survive updates.
- * - String X builds a category registry per axis: rebuilt on every full
- *   ingest, and labels leave it with their last row.
+ * - String X builds a category registry per axis, and labels leave it with
+ *   their last row. An axis whose streamed data is read again from what the
+ *   chart retains keeps its codes; replaced data builds them from 0.
  */
 import { fail, hint, warnOnce } from '../engine/errors';
 import type { AxisSpec, ChartSpec, ColumnarData, SeriesSpec } from '../engine/spec';
@@ -34,6 +35,7 @@ import {
   isRowId,
   numeric,
   parseIso,
+  type Retained,
   read,
   type SourceState,
   sourceKey,
@@ -55,14 +57,7 @@ interface Plan {
 export function ingest<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>): Ingested<Row> {
   const axisSpecs: Record<string, AxisSpec> = {};
   for (const [key, axis] of Object.entries(n.axes)) axisSpecs[key] = { ...axis.spec };
-  const categories = new Map<string, CategoryAxis>();
   const kinds = new Map<string, XKind>();
-  for (const [key, axis] of Object.entries(n.axes)) {
-    if (axis.type === 'category' || axis.categories) {
-      categories.set(key, new CategoryAxis(key, axis.categories));
-      kinds.set(key, 'category');
-    }
-  }
   const encodings = new Map(
     Array.from(ctx.previousEncodings ?? [], ([key, labels]) => [key, [...labels]]),
   );
@@ -89,16 +84,41 @@ export function ingest<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>):
     seriesSources[s.index] = pi;
   }
 
-  const sources = plans.map((plan, index) =>
-    ingestSource(plan, index, n, ctx, categories, kinds, encodings),
+  // Streamed sources are read again from what the chart retains, unless their data is replaced.
+  const retained = plans.map((plan) =>
+    isBins(plan.input) ? undefined : ctx.retained?.(plan.input, plan.axis, plan.x),
   );
-  // Count category references now that every source is read.
+  // An axis with retained data keeps its category codes (D23): cursors, pinned and controlled
+  // viewports and a group's X range hold codes. Its codes start from 0 only on replacement.
+  const kept = new Set(plans.flatMap((plan, i) => (retained[i] ? [plan.axis] : [])));
+  const categories = new Map<string, CategoryAxis>();
+  const categoryAxis = (key: string, explicit?: readonly string[]) => {
+    let registry = categories.get(key);
+    if (!registry) {
+      const previous = kept.has(key) ? ctx.previousCategories?.get(key) : undefined;
+      registry = new CategoryAxis(key, explicit, previous);
+      categories.set(key, registry);
+    }
+    return registry;
+  };
+  for (const [key, axis] of Object.entries(n.axes)) {
+    if (axis.type === 'category' || axis.categories) {
+      categoryAxis(key, axis.categories);
+      kinds.set(key, 'category');
+    }
+  }
+
+  const sources = plans.map((plan, index) =>
+    ingestSource(plan, index, n, ctx, retained[index], categoryAxis, kinds, encodings),
+  );
+  // Count category references now that every source is read; kept labels no row holds leave.
   for (const source of sources) {
     const registry = categories.get(source.axis);
     if (!registry || source.xKind !== 'category') continue;
     const xi = source.sortedX ? 0 : xColumnOf(source);
     for (const code of source.columns[xi]) registry.count(code, 1);
   }
+  for (const registry of categories.values()) registry.prune();
 
   // Axis types: inferred kinds, category geometry, kept types for empty inferred axes.
   for (const [key, kind] of kinds) {
@@ -203,13 +223,13 @@ function ingestSource<Row>(
   index: number,
   n: NormalizedOptions<Row>,
   ctx: IngestContext<Row>,
-  categories: Map<string, CategoryAxis>,
+  retained: Retained<Row> | undefined,
+  categoryAxis: (key: string) => CategoryAxis,
   kinds: Map<string, XKind>,
   encodings: Map<string, string[]>,
 ): SourceState<Row> {
   const name = n.series[plan.series[0]].id;
   const path = `series "${name}"`;
-  const retained = ctx.retained?.(plan.input, plan.axis, plan.x);
   const forceUnsorted = ctx.unsorted?.has(sourceKey(index, plan.axis)) ?? false;
 
   if (isBins(plan.input)) return ingestBins(plan, plan.input, path, n, kinds);
@@ -238,7 +258,7 @@ function ingestSource<Row>(
     n,
     ctx,
     kinds,
-    categories,
+    categoryAxis,
     forceUnsorted,
   );
   if (retained) {
@@ -447,7 +467,7 @@ function ingestRows<Row>(
   n: NormalizedOptions<Row>,
   ctx: IngestContext<Row>,
   kinds: Map<string, XKind>,
-  categories: Map<string, CategoryAxis>,
+  categoryAxis: (key: string) => CategoryAxis,
   forceUnsorted: boolean,
 ): SourceState<Row> {
   const count = rows.length;
@@ -494,11 +514,7 @@ function ingestRows<Row>(
   else kind = prior;
 
   const x = new Float64Array(count);
-  let registry = categories.get(plan.axis);
-  if (kind === 'category' && !registry) {
-    registry = new CategoryAxis(plan.axis, undefined);
-    categories.set(plan.axis, registry);
-  }
+  const registry = kind === 'category' ? categoryAxis(plan.axis) : undefined;
   // Messages are built only for a row that fails: this loop runs once per row.
   const where = (i: number) => `${path}: x of row ${original(i)}`;
   for (let i = 0; i < count; i++) {
