@@ -39,6 +39,19 @@ function reactHost(): HTMLElement {
   return host;
 }
 
+type Group = ReturnType<typeof createChartGroup>;
+
+/**
+ * A group made inside the component, as the audit's repro does. Today's
+ * `useChartGroup` destroys it in the effect cleanup that `<Activity>` runs on
+ * hide. M8 deletes the hook; this then falls back to the final pattern of
+ * plan §4.2, `useState(() => createChartGroup())[0]`, so the marker below
+ * passes unexpectedly and M8 flips it in the commit that deletes the hook.
+ */
+const useComponentGroup: () => Group =
+  (hooks as { useChartGroup?: () => Group }).useChartGroup ??
+  (() => useState(() => createChartGroup())[0]);
+
 /** The final hook takes a selector; today's ignores it. */
 const useChartState = hooks.useChartState as unknown as <T>(
   chart: ChartHandle<Row> | null | undefined,
@@ -115,7 +128,35 @@ describe('[frameworks-03][arch-04] React', () => {
     expect(named).toContain('CPU');
   });
 
-  it('[frameworks-07] two grouped charts survive an <Activity> hide and show', async () => {
+  it.fails('[frameworks-07] two charts grouped inside a component survive an <Activity> hide and show', async () => {
+    let setMode: (mode: 'visible' | 'hidden') => void = () => {};
+    const errors: unknown[] = [];
+    function Grouped() {
+      const group = useComponentGroup();
+      return h(
+        'div',
+        null,
+        h(Chart<Row>, { data: rows, x: 't', series: [{ y: 'cpu' }], group }),
+        h(Chart<Row>, { data: rows, x: 't', series: [{ y: 'cpu' }], group }),
+      );
+    }
+    function App() {
+      const [mode, set] = useState<'visible' | 'hidden'>('visible');
+      setMode = set;
+      // createElement passes children separately; ActivityProps types them as required.
+      return h(Activity, { mode } as ComponentProps<typeof Activity>, h(Grouped));
+    }
+    root = createRoot(reactHost(), { onUncaughtError: (error) => errors.push(error) });
+    await act(async () => root?.render(h(App)));
+    await act(async () => setMode('hidden'));
+    await act(async () => setMode('visible'));
+    expect(errors.map(String)).toEqual([]);
+  });
+
+  // Control: a module-scope group (the other final pattern) already survives.
+  // It carries no id, so it cannot lock frameworks-07 while the marker above
+  // is open.
+  it('two charts sharing a module-scope group survive an <Activity> hide and show', async () => {
     const group = createChartGroup();
     let setMode: (mode: 'visible' | 'hidden') => void = () => {};
     const errors: unknown[] = [];
