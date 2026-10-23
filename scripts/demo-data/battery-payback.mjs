@@ -154,6 +154,8 @@ async function main() {
   }
   if (!chosen) throw new Error('no household-year meets the coverage rule');
   const { household, names, year, ps, measured } = chosen;
+  // Cumulative meters never run backwards: count the hours where one would (they become gaps).
+  const decreasing = ps.filter((p) => p.deltas.some((d) => d !== null && d < 0)).length;
 
   // Cumulative check: the deltas of each column sum to its last minus its first reading.
   const firstReading = ps[0].first;
@@ -298,7 +300,7 @@ async function main() {
     rows: [
       `Raw: ${rows.length} hourly rows, ${rows[0][0]} to ${rows.at(-1)[0]}.`,
       `Households with PV, grid import and grid export: ${households.join(', ')}. Whole years considered (measured / hours): ${considered.map((c) => `${c.household} ${c.year} ${c.measured}/${c.hours}`).join('; ')}.`,
-      `Chosen: ${household}, ${year}: ${hours.length} hours, ${measured} measured (${round((100 * measured) / hours.length, 2)}%), ${meta.interpolatedHours} interpolated by OPSD (kept, flagged), ${meta.gapHours} gaps.`,
+      `Chosen: ${household}, ${year}: ${hours.length} hours, ${measured} measured (${round((100 * measured) / hours.length, 2)}%), ${meta.interpolatedHours} interpolated by OPSD (kept, flagged), ${meta.gapHours} gaps; ${decreasing} hours where a meter reading decreased (the columns are cumulative).`,
       `\`hourly.csv\`: ${hours.length} rows. Year totals: PV ${meta.totals.pv} kWh, import ${meta.totals.import} kWh, export ${meta.totals.export} kWh.`,
     ],
     files: sizeOf([hourlyPath, metaPath]),

@@ -33,7 +33,7 @@ npm run demo-data -- battery-payback --offline  # rebuild from that cache
 
 - Raw: 38454 hourly rows, 2014-12-11T17:00:00Z to 2019-05-01T22:00:00Z.
 - Households with PV, grid import and grid export: DE_KN_residential3, DE_KN_residential4, DE_KN_residential6. Whole years considered (measured / hours): DE_KN_residential3 2015 0/8760; DE_KN_residential3 2016 7148/8784; DE_KN_residential3 2017 4029/8760; DE_KN_residential3 2018 0/8760; DE_KN_residential4 2015 1243/8760; DE_KN_residential4 2016 6125/8784; DE_KN_residential4 2017 8704/8760; DE_KN_residential4 2018 832/8760.
-- Chosen: DE_KN_residential4, 2017: 8760 hours, 8704 measured (99.36%), 56 interpolated by OPSD (kept, flagged), 0 gaps.
+- Chosen: DE_KN_residential4, 2017: 8760 hours, 8704 measured (99.36%), 56 interpolated by OPSD (kept, flagged), 0 gaps; 0 hours where a meter reading decreased (the columns are cumulative).
 - `hourly.csv`: 8760 rows. Year totals: PV 11710.034 kWh, import 4396.358 kWh, export 9363.408 kWh.
 
 ## Files
