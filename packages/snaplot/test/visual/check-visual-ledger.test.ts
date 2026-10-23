@@ -75,4 +75,35 @@ describe('check-visual-ledger', () => {
       expect(r.status).toBe(1);
     }
   });
+
+  it.fails('[repo-10] fails a field left empty above the next one', () => {
+    const empty = FULL_ROW.replace(/- \*\*Finding:\*\*.*/, '- **Finding:**');
+    const r = runLedgerScenario({
+      commits: [
+        {
+          subject: SUBJECT,
+          files: { [SHOT]: 'png', 'docs/decisions/visual-ledger/V50.md': empty },
+        },
+      ],
+    });
+    expect(r.output).toContain('**Finding:** missing');
+    expect(r.status).toBe(1);
+  });
+
+  it('accepts a field whose value is a nested list (V0.md)', () => {
+    const nested = FULL_ROW.replace(
+      /- \*\*Before → after:\*\*.*/,
+      '- **Before → after:**\n  - Before: 1.5 px lines.\n  - After: 2 px lines.',
+    );
+    const r = runLedgerScenario({
+      commits: [
+        {
+          subject: SUBJECT,
+          files: { [SHOT]: 'png', 'docs/decisions/visual-ledger/V50.md': nested },
+        },
+      ],
+    });
+    expect(r.output).toContain('check-visual-ledger: OK');
+    expect(r.status).toBe(0);
+  });
 });
