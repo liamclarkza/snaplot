@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { RingColumnarStore } from '../src/data/RingColumnarStore';
 import type { ChartHandle, ChartOptions } from '../src/index';
 import { debug, type Fakes, installFakes } from './fakes';
 
 type Row = { x: number; y: number };
+const f = (values: number[]) => Float64Array.from(values);
 
 let fakes: Fakes;
 beforeEach(() => {
@@ -57,18 +59,34 @@ describe('debug counters (plan D31)', () => {
     expect(debug(chart).drawnPoints).toBe(4);
   });
 
-  it('counts ring materializations, which a data plugin triggers on every append', () => {
-    const plain = make({ streaming: { maxPoints: 5 } });
-    for (let x = 10; x < 20; x++) plain.appendData([{ x, y: x }]);
-    expect(debug(plain).materializeCount).toBe(0);
+  it('counts ring materializations: cache misses only', () => {
+    const sink = { materializeCount: 0 };
+    const ring = new RingColumnarStore([f([0, 1, 2]), f([0, 2, 4])], 3, sink);
+    ring.append([f([3]), f([6])]);
+    ring.getData();
+    ring.getData();
+    expect(sink.materializeCount).toBe(1);
+    ring.append([f([4]), f([8])]);
+    ring.getData();
+    expect(sink.materializeCount).toBe(2);
+  });
 
+  it('streaming appends without plugins materialize nothing', () => {
+    const plain = make({ streaming: { maxPoints: 5 } });
+    for (let x = 10; x < 110; x++) plain.appendData([{ x, y: x }]);
+    expect(debug(plain).materializeCount).toBe(0);
+  });
+
+  // Plan §3.4 guard, owned by M8: today every append copies the ring for
+  // the plugin host, whose payload is then ignored.
+  it.fails('[arch-01] 100 appends with a data plugin materialize the ring 0 times', () => {
     const withPlugin = make({
       streaming: { maxPoints: 5 },
       plugins: [{ id: 'listener', onDataUpdate() {} }],
     });
     const before = debug(withPlugin).materializeCount;
-    for (let x = 10; x < 20; x++) withPlugin.appendData([{ x, y: x }]);
-    expect(debug(withPlugin).materializeCount).toBe(before + 10);
+    for (let x = 10; x < 110; x++) withPlugin.appendData([{ x, y: x }]);
+    expect(debug(withPlugin).materializeCount - before).toBe(0);
   });
 
   it('lists the axis labels of the last grid paint', () => {
