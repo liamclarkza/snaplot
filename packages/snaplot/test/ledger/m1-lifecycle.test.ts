@@ -132,4 +132,21 @@ describe('[gap-scale-longevity-01] resize paints synchronously', () => {
     expect(plot.top + plot.height).toBeLessThanOrEqual(200);
     expectPainted(chart);
   });
+
+  it.fails('[gap-scale-longevity-01] observing an unchanged box paints nothing more', () => {
+    // The constructor already painted this box; the first observation of it
+    // (every mount) must not paint the whole chart a second time in the
+    // same frame.
+    const chart = mount(2);
+    const painted = debug(chart).renderCount;
+    fakes.resizeObserver.deliver();
+    expect(debug(chart).renderCount).toEqual(painted);
+
+    // Hidden and shown again with nothing changed: the canvases kept their
+    // pixels and the layout is current.
+    fakes.resizeObserver.resize(chart.container, 0, 0);
+    fakes.resizeObserver.resize(chart.container, 400, 200);
+    expect(debug(chart).renderCount).toEqual(painted);
+    expectPainted(chart);
+  });
 });
