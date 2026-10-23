@@ -37,9 +37,17 @@
 //   reference (Playwright's -u, which run.mjs refuses) would otherwise compare the head with
 //   itself and pass (M3a review #3).
 //
+// - On a milestone branch (`ovh/m<N>-…`), a run against a ref must have compared against the
+//   branch's merge base with `overhaul`, the merge gate's reference. Once a milestone has committed
+//   its changes, `--against HEAD` compares them with themselves and passes either rule (M3a review
+//   #3). An explicit --base judges another reference deliberately, with a note. A merge base that
+//   predates the fixture app (M3a's own branch) and a clone without a local `overhaul` get a note.
+//
 // The milestone defaults to the branch name (`ovh/m10-…` → M10); <base> defaults to the ref the
-// run compared against, else `overhaul`. With a milestone, the actual, reference and diff images
-// of every changed shot are copied to <main checkout>/notes/overhaul-audit/visual-diffs/<M>/.
+// run compared against, else `overhaul`. A base that does not resolve exits 2 and asks for --base,
+// except under the zero-change rule, which reads no rows. With a milestone, the actual,
+// reference and diff images of every changed shot are copied to
+// <main checkout>/notes/overhaul-audit/visual-diffs/<M>/.
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
@@ -57,6 +65,55 @@ const normalize = (id) => `M${id.slice(1).toLowerCase()}`;
 const LEDGER_DIR = 'docs/decisions/visual-ledger';
 
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+
+/** Git's output, or null when the command fails (its error output is dropped). */
+function tryGit(args, cwd) {
+  try {
+    return execFileSync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * On a milestone branch, whether the run compared against the branch's merge base with
+ * `overhaul` (see the header): `{ fail }`, `{ note }` or `{}`.
+ */
+function mergeBaseCheck(repoRoot, meta, onMilestoneBranch, explicitBase) {
+  if (meta.mode !== 'against' || !onMilestoneBranch) return {};
+  const ref = meta.against?.ref ?? '<ref>';
+  const sha = String(meta.against?.sha);
+  const mergeBase = tryGit(['merge-base', 'HEAD', 'overhaul'], repoRoot);
+  if (!mergeBase) {
+    return {
+      note: 'no local overhaul branch, so the reference was not checked against the merge base',
+    };
+  }
+  if (mergeBase === sha) return {};
+  const short = mergeBase.slice(0, 10);
+  if (explicitBase) {
+    return {
+      note: `--base given: the reference is not this branch's merge base with overhaul (${short}); judged as asked`,
+    };
+  }
+  const spec = `${mergeBase}:packages/snaplot/test/visual/visual.spec.ts`;
+  if (tryGit(['cat-file', '-e', spec], repoRoot) === null) {
+    return {
+      note: `the merge base with overhaul (${short}) predates the fixture app (M3a's own branch), so the reference is not checked against it`,
+    };
+  }
+  return {
+    fail:
+      `the run compared against ${ref} (${sha.slice(0, 10)}), but this branch's merge base with ` +
+      `overhaul is ${short}. Against the branch's own commits, a change compares with itself. ` +
+      `Run npm run test:visual -- --against ${short} (the merge gate), or pass --base ${ref} to ` +
+      `judge against ${ref} deliberately`,
+  };
+}
 
 function parseArgs(argv) {
   const opts = {
@@ -253,6 +310,14 @@ function main() {
   const milestone = raw ? normalize(raw) : null;
   const zero = opts.zero || (milestone !== null && ZERO_CHANGE.has(milestone));
   const base = opts.base ?? meta.against?.sha ?? 'overhaul';
+  const baseResolves = tryGit(['rev-parse', '--verify', '--quiet', `${base}^{commit}`], repoRoot);
+  if (!baseResolves && !zero) {
+    throw new Error(
+      `the base ${base} does not resolve${base === 'overhaul' ? ' (a clone without a local overhaul branch?)' : ''}, ` +
+        'so the row files cannot be read: pass --base <ref>, the commit the milestone branched from',
+    );
+  }
+  const mergeBase = mergeBaseCheck(repoRoot, meta, Boolean(fromBranch), opts.base !== null);
 
   const { visual, geometry } = collect(report);
   const expectedDir = resolve(repoRoot, 'packages/snaplot', meta.expectedDir);
@@ -281,7 +346,8 @@ function main() {
     (t) => t.status === 'unexpected' || t.status === 'flaky',
   );
 
-  const changedRows = rowFiles(repoRoot, base);
+  // The zero-change rule reads no rows, so it needs no base.
+  const changedRows = baseResolves ? rowFiles(repoRoot, base) : [];
   const v0Edited = changedRows.some((r) => basename(r.path) === 'V0.md' && r.change === 'edited');
   const rows = [];
   const ignoredRows = [];
@@ -314,6 +380,10 @@ function main() {
     .map(([what, shots]) => `${what}: ${shots.join(', ')}`)
     .join('; ');
   if (written) console.log(`  reference images differ from the capture: ${written}`);
+  if (mergeBase.note) console.log(`  note: ${mergeBase.note}`);
+  if (!baseResolves) {
+    console.log(`  note: the base ${base} does not resolve; the zero-change rule reads no rows`);
+  }
   if (stale && opts.anyHead) {
     console.log(
       `  note: --any-head: the report is stale (${INPUT_PATHS.join(', ')} changed since the run); ` +
@@ -383,6 +453,7 @@ function main() {
   }
   // Not overridable: a run that compared nothing proves nothing.
   if (reference.shots.size === 0) failures.push(reference.empty);
+  if (mergeBase.fail) failures.push(mergeBase.fail);
   // Not overridable either: the head may have been compared with its own screenshots.
   if (written) {
     failures.push(

@@ -355,7 +355,7 @@ describe('check-visual-diffs: a reference written after capture', () => {
 describe('check-visual-diffs: the merge base', () => {
   const branch = { branch: 'ovh/m11-marks', branchCommit: true, milestone: 'M11' } as const;
 
-  it.fails('[repo-10] fails a run against a ref other than the merge base with overhaul', () => {
+  it('[repo-10] fails a run against a ref other than the merge base with overhaul', () => {
     const r = runScenario({
       ...branch,
       head: unchanged,
@@ -385,7 +385,7 @@ describe('check-visual-diffs: the merge base', () => {
     expect(r.status).toBe(0);
   });
 
-  it.fails('[repo-10] notes a merge base that predates the fixture app (M3a itself)', () => {
+  it('[repo-10] notes a merge base that predates the fixture app (M3a itself)', () => {
     const r = runScenario({
       ...branch,
       preHarnessBase: true,
@@ -398,7 +398,7 @@ describe('check-visual-diffs: the merge base', () => {
     expect(r.status).toBe(0);
   });
 
-  it.fails('[repo-10] notes that the merge base was not checked without a local overhaul', () => {
+  it('[repo-10] notes that the merge base was not checked without a local overhaul', () => {
     const r = runScenario({
       ...branch,
       noOverhaul: true,
@@ -415,7 +415,7 @@ describe('check-visual-diffs: the merge base', () => {
 // M3a review #3: in a clone without a local `overhaul`, a committed-baseline run exited 2 with
 // git's "bad revision 'overhaul'", even under the zero-change rule, which reads no rows.
 describe('check-visual-diffs: a base that does not resolve', () => {
-  it.fails('[repo-10] applies the zero-change rule without reading rows', () => {
+  it('[repo-10] applies the zero-change rule without reading rows', () => {
     const r = runScenario({
       mode: 'baselines',
       comparison: 'exact',
@@ -427,7 +427,7 @@ describe('check-visual-diffs: a base that does not resolve', () => {
     expect(r.status).toBe(0);
   });
 
-  it.fails('[repo-10] asks for --base under the row rule', () => {
+  it('[repo-10] asks for --base under the row rule', () => {
     const r = runScenario({
       mode: 'baselines',
       head: unchanged,
