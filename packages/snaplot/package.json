@@ -55,7 +55,8 @@
     "api:update": "node scripts/check-api.mjs --update",
     "test:tz": "TZ=America/Los_Angeles vitest run time Time .tz. && TZ=Asia/Kathmandu vitest run time Time .tz. && TZ=UTC vitest run time Time .tz.",
     "conformance:install": "node test/conformance/install.mjs",
-    "test:conformance": "node test/conformance/run.mjs"
+    "test:conformance": "node test/conformance/run.mjs",
+    "test:visual": "node test/visual/run.mjs"
   },
   "peerDependencies": {
     "react": "^19.0.0",
