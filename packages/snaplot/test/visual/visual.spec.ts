@@ -1,7 +1,8 @@
 /**
- * The visual gate (plan §11.3 G10): one screenshot per fixture shot, compared at
- * `maxDiffPixelRatio: 0.002` against the committed `-<platform>` baselines, or against a
- * reference rendered from another ref (`npm run test:visual -- --against <ref>`).
+ * The visual gate (plan §11.3 G10): one screenshot per fixture shot, compared exactly against a
+ * reference rendered from another ref (`npm run test:visual -- --against <ref>`), or at
+ * `threshold: 0`, `maxDiffPixelRatio: 0.002` against the committed `-<platform>` baselines
+ * (record.mjs).
  *
  * Each test carries two annotations that `scripts/overhaul/check-visual-diffs.mjs` reads from the
  * JSON report: `screenshot` (the shot name) and `fixture` (its fixture id).

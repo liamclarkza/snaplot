@@ -12,22 +12,20 @@
  *   `test/visual/__screenshots__/<name>-<platform>.png` set (the `--against` reference cache).
  * - `SNAPLOT_VISUAL_OUTPUT_DIR`: artifacts and the JSON report (default `test-results/visual`).
  * - `SNAPLOT_VISUAL_WORKERS`: worker count (default 4).
- * - `SNAPLOT_VISUAL_STRICT=1`: compare exactly (no per-pixel colour tolerance and no differing
- *   pixel allowed; pixelmatch still skips pixels it classifies as anti-aliasing) instead of the
- *   plan's `maxDiffPixelRatio: 0.002` (`test:visual --strict`).
+ * - `SNAPLOT_VISUAL_STRICT=1`: compare exactly (`threshold: 0`, `maxDiffPixels: 0`; pixelmatch
+ *   still skips pixels it classifies as anti-aliasing). run.mjs sets it for every `--against` run
+ *   and for `--strict`. Otherwise (committed baselines, CI) the plan's `maxDiffPixelRatio: 0.002`
+ *   applies, with `threshold: 0` so that every pixel whose colour differs counts
+ *   (test/visual/record.mjs has the measurements behind both).
  */
 import { defineConfig } from '@playwright/test';
+import { screenshotSettings } from './test/visual/record.mjs';
 
 const PORT = Number(process.env.PORT || 5333);
 const expectedDir = process.env.SNAPLOT_VISUAL_EXPECTED_DIR;
 const outputRoot = process.env.SNAPLOT_VISUAL_OUTPUT_DIR || 'test-results/visual';
 const appConfig = 'test/visual/vite.config.mjs';
-// Local Chromium renders byte-identical PNGs run after run, so exact comparison is usable where
-// the tolerance would hide a real change (a short title edit stays under 0.2 % of the pixels).
-const tolerance =
-  process.env.SNAPLOT_VISUAL_STRICT === '1'
-    ? { threshold: 0, maxDiffPixels: 0 }
-    : { maxDiffPixelRatio: 0.002 };
+const tolerance = screenshotSettings(process.env);
 
 export default defineConfig({
   testDir: 'test',

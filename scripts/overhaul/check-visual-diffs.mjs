@@ -23,6 +23,10 @@
 //   difference (the fixture threw, timed out), fails the check. So do unverified shots, an
 //   incomplete reference, and a run without both projects or narrowed by --grep, unless
 //   --allow-partial.
+// - The comparison must be exact for a run against a ref (run.mjs always compares those exactly)
+//   and for the zero-change rule. A tolerance hides library-wide default changes: at the plan's
+//   0.002, a theme-wide grid colour change gave 0 changed shots (M3a review #2). A committed-
+//   baseline run within the tolerance passes the row rule with a note: it is not the merge gate.
 //
 // The milestone defaults to the branch name (`ovh/m10-…` → M10); <base> defaults to the ref the
 // run compared against, else `overhaul`. With a milestone, the actual, reference and diff images
@@ -37,6 +41,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
+import { describeComparison } from '../../packages/snaplot/test/visual/record.mjs';
 
 const ZERO_CHANGE = new Set(['M2', 'M9a', 'M9b']);
 /** `m9a`, `M9A` → `M9a`. */
@@ -214,6 +219,15 @@ function main() {
   }
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
   const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+  if (typeof meta.comparison?.exact !== 'boolean') {
+    console.error(
+      'check-visual-diffs: FAIL: meta.json does not record the comparison (it was written by an ' +
+        'older run.mjs): run npm run test:visual again',
+    );
+    process.exit(1);
+  }
+  const exact = meta.comparison.exact;
+  const comparison = describeComparison(meta.comparison);
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], repoRoot);
   const fromBranch = /^ovh\/(m\d+[a-z]?)-/.exec(branch)?.[1];
   const raw = opts.milestone ?? fromBranch;
@@ -271,13 +285,11 @@ function main() {
   console.log(
     `check-visual-diffs: head ${String(meta.head?.sha).slice(0, 10)}${meta.head?.dirty ? ' + working tree' : ''} vs ${against}`,
   );
-  console.log(
-    `  reference: ${reference.summary}; ${meta.strict ? 'exact comparison (--strict)' : 'tolerance maxDiffPixelRatio 0.002'}`,
-  );
-  if (zero && !meta.strict) {
+  console.log(`  reference: ${reference.summary}; comparison ${comparison}`);
+  if (meta.mode !== 'against' && !exact && !zero) {
     console.log(
-      '  note: the tolerance can hide a small change (a short title edit); run test:visual with ' +
-        '--strict for the zero-change rule',
+      '  note: a committed-baseline run within the tolerance is not the merge gate. The gate is ' +
+        'npm run test:visual -- --against <merge-base>, which compares exactly',
     );
   }
   console.log(
@@ -330,6 +342,19 @@ function main() {
   const failures = [];
   // Not overridable: a run that compared nothing proves nothing.
   if (reference.shots.size === 0) failures.push(reference.empty);
+  // Not overridable either: a tolerance hides library-wide default changes (header comment).
+  if (meta.mode === 'against' && !exact) {
+    failures.push(
+      `the run compared within a tolerance, ${comparison}, which can hide a library-wide ` +
+        'default change; a run against a ref must compare exactly. Run npm run test:visual -- ' +
+        `--against ${meta.against?.ref ?? '<ref>'} again: it compares exactly`,
+    );
+  } else if (zero && !exact) {
+    failures.push(
+      `the zero-change rule needs an exact comparison, and this committed-baseline run used a ` +
+        `${comparison}: run npm run test:visual -- --against <merge-base>`,
+    );
+  }
   if (!opts.allowPartial && (!reference.complete || unverified.length > 0)) {
     failures.push(
       `${reference.complete ? 'the reference is missing images it lists' : `the reference capture did not complete (${reference.outcome})`}: ` +

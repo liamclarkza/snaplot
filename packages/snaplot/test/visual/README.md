@@ -3,7 +3,8 @@
 The pixel and geometry safety net of the overhaul (plan §11.3 G10, M3a). Two Playwright projects run
 over one fixture app:
 
-- **`visual`**: one screenshot per fixture shot, compared at `maxDiffPixelRatio: 0.002`.
+- **`visual`**: one screenshot per fixture shot. A run against a ref compares exactly; a run against
+  the committed baselines allows the plan's `maxDiffPixelRatio: 0.002` (see Comparison).
 - **`geometry`**: five platform-independent checks over DOM label boxes and data-layer ink. They are
   blocking on every platform.
 
@@ -16,9 +17,9 @@ produce the `-linux` set.
 | Command | What it does |
 |---|---|
 | `npm run test:visual` | Both projects against the committed `__screenshots__/<area>/<name>-<platform>.png` |
-| `npm run test:visual -- --against <ref>` | Renders `<ref>`'s own fixture app into the reference cache (twice: it must reproduce itself exactly), then compares the working tree with it |
-| `npm run test:visual -- --strict` | Compares exactly instead of `maxDiffPixelRatio: 0.002`; use it for the zero-change milestones (M2, M9a, M9b) |
-| `node scripts/overhaul/check-visual-diffs.mjs` | Judges the last run: zero changes for M2/M9a/M9b, else every changed fixture needs a visual-ledger row from this milestone |
+| `npm run test:visual -- --against <ref>` | Renders `<ref>`'s own fixture app into the reference cache (twice: it must reproduce itself exactly), then compares the working tree with it exactly. This is the merge gate |
+| `npm run test:visual -- --strict` | Compares the committed baselines exactly too (a run against a ref always does) |
+| `node scripts/overhaul/check-visual-diffs.mjs` | Judges the last run: zero changes for M2/M9a/M9b, else every changed fixture needs a visual-ledger row from this milestone. It fails a run against a ref that was not exact |
 | `node scripts/overhaul/check-visual-ledger.mjs` | P13: every commit that touches screenshots or has a `visual:` paragraph adds or edits its row file |
 | `npm run test:visual -- --update` | Rewrites the committed baselines and prunes stale ones (M3a and M14 only) |
 | `npm run test:visual -- --serve` | Serves the fixture app; open `/index.html` for the list, `?fixture=<id>` for one |
@@ -49,6 +50,31 @@ rendered and reproduced. Otherwise the runner exits non-zero, and `check-visual-
 
 Row files count for a milestone only when they differ from the base and their `**Milestone:**` line
 names it. `V0.md` never covers a change, and editing it fails the check.
+
+## Comparison
+
+`record.mjs` holds the settings; `meta.json` records them as `comparison`.
+
+| Run | Settings | Why |
+|---|---|---|
+| `--against <ref>` | `threshold: 0`, `maxDiffPixels: 0` (exact) | Both sides render on this machine in one session, and the reference's second render must already reproduce exactly, so exactness adds no flakiness |
+| Committed baselines (and CI) | `threshold: 0`, `maxDiffPixelRatio: 0.002` | The plan's ratio, for baselines rendered on another machine, but every pixel whose colour differs counts |
+| Committed baselines with `--strict` | exact | Local re-checks of the darwin set |
+
+This departs from plan §11.3 G10, which sets only `maxDiffPixelRatio: 0.002` and so leaves
+Playwright's per-pixel colour `threshold` at 0.2. M3a review #2 measured what that hides:
+- a theme-wide light `gridColor` change: 0 changed shots of 137 (127 when exact);
+- the default line width 1.5 → 2: 1 changed shot (72 when exact);
+- `layout/axis-titles` `lineWidth` 2 → 3: none (2 shots of 72 px each when exact).
+
+`threshold: 0` with the ratio catches the first two (127 and 42 shots) but not the third, so only
+an exact comparison catches all three.
+
+`check-visual-diffs` therefore fails a run against a ref that was not exact, and applies the
+zero-change rule only to an exact run. A committed-baseline run within the tolerance passes the row
+rule with a note: it is not the merge gate. Pixelmatch's anti-alias detection stays on even when
+exact (Playwright does not expose it), so a change made only of pixels it classifies as
+anti-aliasing would pass.
 
 ## Fixtures
 
@@ -123,6 +149,6 @@ A check that today's code fails is listed in `expected/m<N>.ts` for its owning m
 | `SNAPLOT_VISUAL_EXPECTED_DIR` | Expected screenshots, instead of the committed set |
 | `SNAPLOT_VISUAL_OUTPUT_DIR` | Artifacts and report |
 | `SNAPLOT_VISUAL_WORKERS` | The worker count |
-| `SNAPLOT_VISUAL_STRICT` | `1` compares exactly (`--strict`) |
+| `SNAPLOT_VISUAL_STRICT` | `1` compares exactly; run.mjs sets it for `--against` and `--strict`, and for the reference's second render |
 
 Keep these stable: `--against` drives an older ref's config through them.

@@ -145,13 +145,13 @@ describe('check-visual-diffs: the comparison', () => {
     ...unchanged.slice(1),
   ];
 
-  it.fails('[repo-10] fails an --against run within a tolerance under the zero-change rule', () => {
+  it('[repo-10] fails an --against run within a tolerance under the zero-change rule', () => {
     const r = runScenario({ head: unchanged, referenceFiles: SHOTS, comparison: 'tolerance' });
     expect(r.output).toContain('must compare exactly');
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] fails an --against run within a tolerance under the row rule', () => {
+  it('[repo-10] fails an --against run within a tolerance under the row rule', () => {
     const r = runScenario({
       head: changedA,
       referenceFiles: SHOTS,
@@ -163,13 +163,13 @@ describe('check-visual-diffs: the comparison', () => {
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] refuses a meta.json that does not record the comparison', () => {
+  it('[repo-10] refuses a meta.json that does not record the comparison', () => {
     const r = runScenario({ head: unchanged, referenceFiles: SHOTS, comparison: 'legacy' });
     expect(r.output).toContain('does not record the comparison');
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] fails the zero-change rule on a committed-baseline run within the tolerance', () => {
+  it('[repo-10] fails the zero-change rule on a committed-baseline run within the tolerance', () => {
     const r = runScenario({ mode: 'baselines', head: unchanged, referenceFiles: SHOTS });
     expect(r.output).toContain('needs an exact comparison');
     expect(r.status).toBe(1);
@@ -186,7 +186,7 @@ describe('check-visual-diffs: the comparison', () => {
     expect(r.status).toBe(0);
   });
 
-  it.fails('[repo-10] says a committed-baseline run within the tolerance is not the merge gate', () => {
+  it('[repo-10] says a committed-baseline run within the tolerance is not the merge gate', () => {
     const r = runScenario({
       mode: 'baselines',
       head: unchanged,

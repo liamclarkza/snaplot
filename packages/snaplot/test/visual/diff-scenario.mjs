@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { EXACT, TOLERANCE } from './record.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = resolve(HERE, '../..');
@@ -97,8 +98,8 @@ function visualSuite(shot) {
  * committed-baseline default), or `legacy`, the shape an older run.mjs wrote (no `comparison`).
  */
 const COMPARISONS = {
-  exact: { exact: true, threshold: 0, maxDiffPixels: 0 },
-  tolerance: { exact: false, threshold: 0, maxDiffPixelRatio: 0.002 },
+  exact: { exact: true, ...EXACT },
+  tolerance: { exact: false, ...TOLERANCE },
 };
 
 const geometrySuite = {

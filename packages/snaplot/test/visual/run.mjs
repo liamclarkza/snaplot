@@ -4,10 +4,11 @@
 //
 //   npm run test:visual                       compare against the committed -<platform> baselines
 //   npm run test:visual -- --against <ref>    render <ref>'s own fixture app into the reference
-//                                             cache, then compare the working tree against it
+//                                             cache, then compare the working tree against it,
+//                                             exactly (threshold 0, maxDiffPixels 0)
 //   npm run test:visual -- --update           rewrite the committed baselines (M3a and M14 only)
-//   npm run test:visual -- --strict           compare exactly instead of maxDiffPixelRatio 0.002
-//                                             (recommended for the zero-change milestones)
+//   npm run test:visual -- --strict           compare the committed baselines exactly too, instead
+//                                             of threshold 0 and maxDiffPixelRatio 0.002
 //   npm run test:visual -- --serve            serve the fixture app for a look in a browser
 //   --against-tree <dir> [--against-sha <sha>] use an already extracted ref (scripts/visual-docker.sh)
 //
@@ -19,8 +20,8 @@
 // <main checkout>/.claude/visual-cache/<sha>/. A ref is extracted with `git archive` (no worktree)
 // and its own playwright config captures its own fixtures, so a fixture renamed between the two
 // sides compares like with like. The reference is rendered twice, and the second render must
-// match the first exactly (SNAPLOT_VISUAL_STRICT), whatever tolerance the comparison then uses.
-// It is cached (capture.json) only when every shot it declares rendered and reproduced itself.
+// match the first exactly (SNAPLOT_VISUAL_STRICT), and the head is then compared with it exactly
+// too (record.mjs says why). It is cached (capture.json) only when every shot it declares rendered and reproduced itself.
 // meta.json records the outcome (`against.complete`, the exit codes and the shot list), and
 // check-visual-diffs fails on an incomplete reference. Nothing is ever deleted outside this
 // worktree (except a stale node_modules symlink the runner itself made in the cache).
@@ -41,6 +42,7 @@ import { createServer } from 'node:net';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeContactSheet } from './contact-sheet.mjs';
+import { comparisonFor, describeComparison, STRICT_ENV } from './record.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = resolve(HERE, '../..');
@@ -243,6 +245,7 @@ function listPngs(dir, base = dir) {
 /**
  * One render of the reference's visual project into <shots>, reported to <reportPath>. `exact`
  * compares with no tolerance (the ref's SNAPLOT_VISUAL_STRICT), else with its default tolerance.
+ * The ref's own config reads the variable, so this works for every ref from M3a on.
  */
 async function renderReference({ tree, port, shots, entry, update, reportPath, exact }) {
   const refPkg = join(tree, 'packages/snaplot');
@@ -267,7 +270,7 @@ async function renderReference({ tree, port, shots, entry, update, reportPath, e
         PORT: String(port),
         SNAPLOT_VISUAL_EXPECTED_DIR: shots,
         SNAPLOT_VISUAL_OUTPUT_DIR: join(entry, 'out'),
-        SNAPLOT_VISUAL_STRICT: exact ? '1' : '',
+        [STRICT_ENV]: exact ? '1' : '',
         PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
       },
     },
@@ -374,7 +377,7 @@ async function captureReference(ref, port, givenTree, givenSha) {
   let verify = null;
   if (capture.code === 0 && capture.passed.length > 0) {
     // Exact, not within the tolerance: a shot that wobbles under 0.002 would otherwise be cached
-    // and then report a false change to every --strict run against it.
+    // and then report a false change to every exact run against it.
     console.log('visual: rendering the reference again; every shot must reproduce exactly');
     verify = await renderReference({
       ...render,
@@ -481,7 +484,10 @@ async function main() {
     ...opts.passthrough,
   );
   const env = { ...process.env, PORT: String(port) };
-  if (opts.strict) env.SNAPLOT_VISUAL_STRICT = '1';
+  // Exact for every run against a ref: a tolerance hides library-wide default changes.
+  const comparison = comparisonFor({ against: Boolean(reference), strict: opts.strict });
+  env[STRICT_ENV] = comparison.exact ? '1' : '';
+  console.log(`visual: comparing ${describeComparison(comparison)}`);
   if (reference) env.SNAPLOT_VISUAL_EXPECTED_DIR = reference.dir;
   else delete env.SNAPLOT_VISUAL_EXPECTED_DIR;
   delete env.SNAPLOT_VISUAL_OUTPUT_DIR;
@@ -515,7 +521,10 @@ async function main() {
     suffix: reference ? '' : `-${process.platform}`,
     projects,
     filtered,
-    strict: env.SNAPLOT_VISUAL_STRICT === '1',
+    // `strict` is kept for readers of the older format; `comparison` is what check-visual-diffs
+    // judges.
+    strict: comparison.exact,
+    comparison,
     exit: code,
     date: new Date().toISOString(),
   };
