@@ -33,14 +33,14 @@ describe('Node loads every entry point', () => {
     for (const spec of jsEntries) expect(loaded[spec].length, spec).toBeGreaterThan(0);
   });
 
-  it.fails('[repo-07] require() of every entry, through require(esm)', () => {
+  it('[repo-07] require() of every entry, through require(esm)', () => {
     const loaded = loadAll('require');
     expect(loaded.snaplot).toContain('createChart');
     expect(loaded['snaplot/react']).toContain('Chart');
     expect(loaded['snaplot/solid']).toContain('Chart');
   });
 
-  it.fails('[repo-07] the exports map exposes ./package.json', () => {
+  it('[repo-07] the exports map exposes ./package.json', () => {
     const result = node([
       '--input-type=module',
       '-e',

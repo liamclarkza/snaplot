@@ -85,6 +85,6 @@ function expectClean(mode) {
 
 describe('TypeScript consumers resolve real types without skipLibCheck', () => {
   it('bundler resolution', () => expectClean('bundler'));
-  it.fails('[frameworks-10][repo-01] node16 resolution', () => expectClean('node16'));
-  it.fails('[frameworks-10][repo-01] nodenext resolution', () => expectClean('nodenext'));
+  it('[frameworks-10][repo-01] node16 resolution', () => expectClean('node16'));
+  it('[frameworks-10][repo-01] nodenext resolution', () => expectClean('nodenext'));
 });

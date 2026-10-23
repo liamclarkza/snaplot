@@ -55,7 +55,7 @@ function side(path) {
 }
 
 describe('Solid export conditions', () => {
-  it.fails('[repo-07] snaplot/solid and solid-js/web pick the same side under every condition set', async () => {
+  it('[repo-07] snaplot/solid and solid-js/web pick the same side under every condition set', async () => {
     const rows = [];
     for (const [platform, conditions] of SIDES) {
       const snaplot = await resolveWith('snaplot/solid', platform, conditions);
@@ -71,7 +71,7 @@ describe('Solid export conditions', () => {
     expect(mismatched).toEqual([]);
   });
 
-  it.fails('[repo-07] a worker bundle (workerd, worker) server-renders snaplot/solid', async () => {
+  it('[repo-07] a worker bundle (workerd, worker) server-renders snaplot/solid', async () => {
     write(
       'worker-entry.js',
       [
@@ -96,12 +96,12 @@ describe('Solid export conditions', () => {
     expect(render()).toMatch(/aria-label="Edge chart"/);
   });
 
-  it.fails('[repo-07] the solid condition serves JSX source', async () => {
+  it('[repo-07] the solid condition serves JSX source', async () => {
     const path = await resolveWith('snaplot/solid', 'browser', ['solid']);
     expect(path).toBe(join(packageDir, 'dist/solid.jsx'));
   });
 
-  it.fails('[repo-07] vite-plugin-solid compiles that source for the server and the browser', async () => {
+  it('[repo-07] vite-plugin-solid compiles that source for the server and the browser', async () => {
     write(
       'solid-app.jsx',
       [

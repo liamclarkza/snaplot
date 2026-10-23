@@ -2,42 +2,45 @@
   "name": "snaplot",
   "version": "0.12.0",
   "type": "module",
-  "description": "High-performance charts that actually look good",
+  "description": "Canvas charts for live data. One options object for vanilla JS, React and Solid.",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./core": {
-      "import": "./dist/core.js",
-      "types": "./dist/core.d.ts"
-    },
-    "./solid": {
-      "types": "./dist/solid.d.ts",
-      "browser": "./dist/solid.js",
-      "node": "./dist/solid.server.js",
-      "default": "./dist/solid.js"
-    },
-    "./legend-table.css": {
-      "import": "./dist/legend-table.css",
-      "default": "./dist/legend-table.css"
+      "types": "./dist/core.d.ts",
+      "default": "./dist/core.js"
     },
     "./react": {
       "types": "./dist/react.d.ts",
-      "import": "./dist/react.js"
-    }
+      "default": "./dist/react.js"
+    },
+    "./solid": {
+      "types": "./dist/solid.d.ts",
+      "solid": "./dist/solid.jsx",
+      "worker": "./dist/solid.server.js",
+      "browser": "./dist/solid.js",
+      "deno": "./dist/solid.server.js",
+      "node": "./dist/solid.server.js",
+      "default": "./dist/solid.js"
+    },
+    "./legend-table.css": "./dist/legend-table.css",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
+  "engines": {
+    "node": ">=22.12"
+  },
   "sideEffects": [
-    "*.css",
-    "dist/*.css"
+    "*.css"
   ],
   "scripts": {
     "build": "vite build && vite build --config vite.ssr.config.ts",
@@ -45,7 +48,9 @@
     "dev": "vite build --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:package": "node scripts/check-consumers.mjs"
+    "prepack": "node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').copyFileSync('../../' + f, f)\"",
+    "postpack": "node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').rmSync(f, { force: true })\"",
+    "check:package": "publint --strict && attw --pack . --profile esm-only --exclude-entrypoints ./legend-table.css && node scripts/check-consumers.mjs"
   },
   "peerDependencies": {
     "solid-js": "^1.9.0",
@@ -91,17 +96,13 @@
     "url": "https://github.com/liamclarkza/snaplot/issues"
   },
   "keywords": [
-    "solidjs",
     "chart",
+    "charts",
     "canvas",
-    "visualization",
-    "dashboard",
-    "heatmap",
-    "scatter",
-    "histogram",
-    "line-chart",
-    "bar-chart",
-    "time-series",
-    "plotting"
+    "time series",
+    "streaming",
+    "react",
+    "solid",
+    "plot"
   ]
 }

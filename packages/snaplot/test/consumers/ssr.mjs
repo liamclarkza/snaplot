@@ -142,17 +142,22 @@ describe('module graph', () => {
     }
   });
 
-  it('browser builds of every entry share one engine', () => {
-    const graph = moduleGraph(['snaplot', 'snaplot/react', 'snaplot/solid'], ['browser', 'import']);
-    expect(engineCopies(graph)).toHaveLength(1);
+  it('browser builds and the Solid JSX source share one engine with the core', () => {
+    const entries = ['snaplot', 'snaplot/react', 'snaplot/solid'];
+    for (const conditions of [
+      ['browser', 'import'],
+      ['solid', 'browser', 'import'],
+      ['solid', 'node', 'import'],
+    ]) {
+      expect(engineCopies(moduleGraph(entries, conditions)), conditions.join(',')).toHaveLength(1);
+    }
   });
 
-  it.fails('[frameworks-19] SSR, worker and Solid-source graphs share one engine', () => {
+  it.fails('[frameworks-19] the Solid server build shares one engine with the core', () => {
     const entries = ['snaplot', 'snaplot/react', 'snaplot/solid'];
     for (const conditions of [
       ['node', 'import'],
       ['worker', 'import'],
-      ['solid', 'browser', 'import'],
     ]) {
       expect(engineCopies(moduleGraph(entries, conditions)), conditions.join(',')).toHaveLength(1);
     }

@@ -1,6 +1,11 @@
+// dist/solid.server.js: the Solid entry compiled for server rendering (the `node`, `deno` and
+// `worker` export conditions). It still inlines the engine until M13 points the adapters at
+// 'snaplot', which is external here as in the browser build ([frameworks-19] in check-consumers).
+import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import solid from 'vite-plugin-solid';
-import { resolve } from 'path';
+import { external, target } from './vite.config';
+
 export default defineConfig({
   plugins: [solid({ ssr: true, solid: { generate: 'ssr', hydratable: true } })],
   build: {
@@ -10,8 +15,8 @@ export default defineConfig({
       formats: ['es'],
       fileName: () => 'solid.server.js',
     },
-    rollupOptions: { external: ['solid-js', 'solid-js/web', 'solid-js/store'] },
-    target: 'esnext',
+    rollupOptions: { external, output: { sourcemapExcludeSources: true } },
+    target,
     sourcemap: true,
   },
 });
