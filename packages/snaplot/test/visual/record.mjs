@@ -5,8 +5,8 @@
 //
 // Plan §11.3 G10 sets `maxDiffPixelRatio: 0.002`, with Playwright's per-pixel colour `threshold`
 // left at 0.2. M3a review #2 measured what that hides: a theme-wide grid colour change gave
-// 0 changed shots of 137, a default line width change 1, and a 72-pixel lineWidth edit to one
-// fixture none. So this departs from the plan:
+// 0 changed shots of 137, a default line width change 1, and a lineWidth edit to one fixture
+// (246 and 72 pixels) none. So this departs from the plan:
 // - `--against <ref>` always compares exactly. Both sides render on the same machine in one
 //   session, and the reference's second render must already reproduce exactly, so this adds no
 //   flakiness.

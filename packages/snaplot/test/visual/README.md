@@ -84,10 +84,12 @@ This departs from plan §11.3 G10, which sets only `maxDiffPixelRatio: 0.002` an
 Playwright's per-pixel colour `threshold` at 0.2. M3a review #2 measured what that hides:
 - a theme-wide light `gridColor` change: 0 changed shots of 137 (127 when exact);
 - the default line width 1.5 → 2: 1 changed shot (72 when exact);
-- `layout/axis-titles` `lineWidth` 2 → 3: none (2 shots of 72 px each when exact).
+- `layout/axis-titles` `lineWidth` 2 → 3: none (both shots when exact: 246 px at DPR 1, 72 px at
+  DPR 2).
 
-`threshold: 0` with the ratio catches the first two (127 and 42 shots) but not the third, so only
-an exact comparison catches all three.
+`threshold: 0` with the ratio catches more (127 shots for the grid colour, 42 for the line width,
+and the DPR 1 shot of the fixture edit), but the fixture edit's 72-pixel `@2x` shot still passes.
+Only an exact comparison catches all three.
 
 `check-visual-diffs` therefore fails a run against a ref that was not exact, and applies the
 zero-change rule only to an exact run. A committed-baseline run within the tolerance passes the row
