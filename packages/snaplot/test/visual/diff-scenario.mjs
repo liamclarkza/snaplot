@@ -92,6 +92,15 @@ function visualSuite(shot) {
   };
 }
 
+/**
+ * The comparison a run records in meta.json: `exact` (the `--against` default), `tolerance` (the
+ * committed-baseline default), or `legacy`, the shape an older run.mjs wrote (no `comparison`).
+ */
+const COMPARISONS = {
+  exact: { exact: true, threshold: 0, maxDiffPixels: 0 },
+  tolerance: { exact: false, threshold: 0, maxDiffPixelRatio: 0.002 },
+};
+
 const geometrySuite = {
   title: 'visual/geometry.spec.ts',
   specs: [
@@ -166,6 +175,7 @@ export function runScenario(scenario) {
       stats: {},
     };
     writeFileSync(join(results, 'report.json'), JSON.stringify(report));
+    const comparison = scenario.comparison ?? (mode === 'against' ? 'exact' : 'tolerance');
     const meta = {
       mode,
       head: { sha: base, dirty: false },
@@ -175,6 +185,8 @@ export function runScenario(scenario) {
       suffix,
       projects: ['visual', 'geometry'],
       filtered: false,
+      strict: comparison === 'exact',
+      ...(comparison === 'legacy' ? {} : { comparison: COMPARISONS[comparison] }),
       exit: 1,
       date: new Date(0).toISOString(),
     };

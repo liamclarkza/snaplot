@@ -110,7 +110,12 @@ describe('check-visual-diffs: the reference', () => {
 
 describe('check-visual-diffs: committed baselines', () => {
   it('passes when every shot matches its committed baseline', () => {
-    const r = runScenario({ mode: 'baselines', head: unchanged, referenceFiles: SHOTS });
+    const r = runScenario({
+      mode: 'baselines',
+      head: unchanged,
+      referenceFiles: SHOTS,
+      milestone: 'M11',
+    });
     expect(r.status).toBe(0);
   });
 
@@ -119,6 +124,7 @@ describe('check-visual-diffs: committed baselines', () => {
       mode: 'baselines',
       head: [...unchanged, missing('marks/new')],
       referenceFiles: SHOTS,
+      milestone: 'M11',
     });
     expect(r.output).toContain('added    marks/new');
     expect(r.status).toBe(0);
@@ -128,6 +134,67 @@ describe('check-visual-diffs: committed baselines', () => {
     const r = runScenario({ mode: 'baselines', head: SHOTS.map(missing), referenceFiles: [] });
     expect(r.output).toContain('nothing was compared');
     expect(r.status).toBe(1);
+  });
+});
+
+// M3a review #2: at the tolerance, a theme-wide grid colour change gave "0 changed" and a
+// fixture's lineWidth edit passed the self-test, so the merge gate must compare exactly.
+describe('check-visual-diffs: the comparison', () => {
+  const changedA = [
+    { name: 'marks/a', status: 'unexpected' as const, error: ERRORS.changed },
+    ...unchanged.slice(1),
+  ];
+
+  it.fails('[repo-10] fails an --against run within a tolerance under the zero-change rule', () => {
+    const r = runScenario({ head: unchanged, referenceFiles: SHOTS, comparison: 'tolerance' });
+    expect(r.output).toContain('must compare exactly');
+    expect(r.status).toBe(1);
+  });
+
+  it.fails('[repo-10] fails an --against run within a tolerance under the row rule', () => {
+    const r = runScenario({
+      head: changedA,
+      referenceFiles: SHOTS,
+      comparison: 'tolerance',
+      milestone: 'M11',
+      rows: { 'V50.md': row('V50', 'M11', ['marks/a']) },
+    });
+    expect(r.output).toContain('must compare exactly');
+    expect(r.status).toBe(1);
+  });
+
+  it.fails('[repo-10] refuses a meta.json that does not record the comparison', () => {
+    const r = runScenario({ head: unchanged, referenceFiles: SHOTS, comparison: 'legacy' });
+    expect(r.output).toContain('does not record the comparison');
+    expect(r.status).toBe(1);
+  });
+
+  it.fails('[repo-10] fails the zero-change rule on a committed-baseline run within the tolerance', () => {
+    const r = runScenario({ mode: 'baselines', head: unchanged, referenceFiles: SHOTS });
+    expect(r.output).toContain('needs an exact comparison');
+    expect(r.status).toBe(1);
+  });
+
+  it('passes the zero-change rule on an exact committed-baseline run (--strict)', () => {
+    const r = runScenario({
+      mode: 'baselines',
+      head: unchanged,
+      referenceFiles: SHOTS,
+      comparison: 'exact',
+    });
+    expect(r.output).toContain('check-visual-diffs: OK');
+    expect(r.status).toBe(0);
+  });
+
+  it.fails('[repo-10] says a committed-baseline run within the tolerance is not the merge gate', () => {
+    const r = runScenario({
+      mode: 'baselines',
+      head: unchanged,
+      referenceFiles: SHOTS,
+      milestone: 'M11',
+    });
+    expect(r.output).toContain('not the merge gate');
+    expect(r.status).toBe(0);
   });
 });
 

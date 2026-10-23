@@ -21,6 +21,11 @@ export interface Scenario {
   against?: Record<string, unknown>;
   /** Replaces `meta.against` entirely (e.g. the shape an older run.mjs wrote). */
   againstExact?: Record<string, unknown>;
+  /**
+   * The comparison meta.json records. Default: `exact` for `against`, `tolerance` for `baselines`
+   * (run.mjs's defaults). `legacy` omits it, as an older run.mjs did.
+   */
+  comparison?: 'exact' | 'tolerance' | 'legacy';
   /** `--milestone` (default `M2`, which applies the zero-change rule). */
   milestone?: string;
   /** Row files in the base commit, by file name. Default: `V0.md`. */
