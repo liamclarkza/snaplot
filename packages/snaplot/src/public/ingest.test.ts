@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { type IngestContext, ingest, parseIso } from './ingest';
+import { ingest } from './ingest';
+import { type IngestContext, parseIso } from './sources';
 import { normalize } from './normalize';
 import type { ChartOptions } from './types';
 

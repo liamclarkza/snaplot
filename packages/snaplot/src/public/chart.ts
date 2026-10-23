@@ -26,18 +26,15 @@ import {
   groups,
   validateGroup,
 } from './group';
+import { categoryLabels, commitAppend, planAppend, refreshCategoryAxis } from './append';
+import { ingest } from './ingest';
 import {
-  categoryLabels,
-  commitAppend,
   type Ingested,
   type IngestContext,
-  ingest,
-  planAppend,
   type Retained,
-  refreshCategoryAxis,
   type SourceState,
   sourceKey,
-} from './ingest';
+} from './sources';
 import { type NormalizedOptions, type NormalizedState, normalize } from './normalize';
 import { equivalent, patchOptions } from './options';
 import type {

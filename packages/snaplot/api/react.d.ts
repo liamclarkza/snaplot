@@ -93,14 +93,6 @@ declare interface AxisState extends ScaleRange {
 declare type AxisType = 'linear' | 'log' | 'time' | 'category';
 
 /**
- * The public contract of snaplot: every type a user can name. These types are
- * written by hand and documented here; nothing in this file is derived from
- * the internal engine, so an engine change can never widen the public API by
- * accident (plan §4, P4).
- *
- * @module
- */
-/**
  * A value on an axis: a number, a `Date`, an ISO-8601 date string (read as a time) or a category
  * label.
  */
