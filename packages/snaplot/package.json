@@ -41,7 +41,7 @@
   ],
   "scripts": {
     "build": "vite build && vite build --config vite.ssr.config.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "dev": "vite build --watch",
     "test": "vitest run",
     "test:watch": "vitest",

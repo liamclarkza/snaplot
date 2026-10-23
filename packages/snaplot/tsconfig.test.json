@@ -1,0 +1,14 @@
+{
+  // Type-checks the tests outside src/ (test/**) together with the library source.
+  // The build config (tsconfig.json) keeps rootDir ./src for declaration output.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["src", "test"],
+  "exclude": ["node_modules", "dist", "dev"]
+}

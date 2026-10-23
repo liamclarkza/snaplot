@@ -25,8 +25,9 @@ export default defineConfig({
   },
   test: {
     server: { deps: { inline: ['solid-js'] } },
+    // DOM tests opt in per file with `// @vitest-environment jsdom`.
     environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: ['src/**/*.test.{ts,tsx}', 'test/**/*.test.{ts,tsx}'],
     coverage: {
       reporter: ['text', 'html'],
       include: ['src/**/*.ts', 'src/**/*.tsx'],
