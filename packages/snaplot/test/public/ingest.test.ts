@@ -236,6 +236,45 @@ describe('appends are validated before anything changes', () => {
     expect(() => chart.update({ axes: { y: { title: 'Load' } } })).not.toThrow();
   });
 
+  // rowId is an accessor like y (D16): an update re-reads it over the retained rows.
+  const keyed = () =>
+    mount({
+      data: [
+        { x: 0, y: 1, id: 'a', key: 'A' },
+        { x: 1, y: 2, id: 'b', key: 'B' },
+      ],
+      x: 'x',
+      rowId: 'id',
+      series: [{ y: 'y' }],
+    });
+
+  it.fails('[dataapi-02][dataapi-03] removing rowId from a streamed row source drops its ids', () => {
+    const chart = keyed();
+    chart.appendData([{ x: 2, y: 3, id: 'c', key: 'C' }]);
+    chart.update({ rowId: undefined });
+    expect(latest(chart)).toMatchObject({ x: 2, rowIndex: 2 });
+    expect(latest(chart).rowId).toBeUndefined();
+    expect(() => chart.appendData([{ x: 3, y: 4, id: 'd', key: 'D' }])).not.toThrow();
+    expect(latest(chart)).toMatchObject({ x: 3, rowIndex: 3 });
+    expect(latest(chart).rowId).toBeUndefined();
+  });
+
+  it.fails('[dataapi-02][dataapi-03] changing rowId on a streamed row source reads every id again', () => {
+    const chart = keyed();
+    chart.appendData([{ x: 2, y: 3, id: 'c', key: 'C' }]);
+    chart.update({ rowId: 'key' });
+    expect(first(chart)).toMatchObject({ x: 0, rowId: 'A' });
+    expect(latest(chart)).toMatchObject({ x: 2, rowId: 'C' });
+    chart.appendData([{ x: 3, y: 4, id: 'd', key: 'D' }]);
+    expect(latest(chart)).toMatchObject({ x: 3, rowId: 'D' });
+    // Ids are unique under the new field: 'A' is taken, the old id 'a' is not an id any more.
+    expect(thrown(() => chart.appendData([{ x: 4, y: 5, id: 'e', key: 'A' }]))).toMatch(
+      /rowId "A" is already in the chart/,
+    );
+    chart.appendData([{ x: 4, y: 5, id: 'f', key: 'a' }]);
+    expect(latest(chart)).toMatchObject({ x: 4, rowId: 'a' });
+  });
+
   it('[dataapi-03] duplicate rowIds inside one batch throw before any mutation', () => {
     const chart = mount({
       data: [{ id: 'a', t: 1, v: 1 }],
