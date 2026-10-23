@@ -252,8 +252,9 @@ function ingestSource<Row>(
     state.rowIds = [...retained.rowIds];
   } else if (rowIdField !== undefined) {
     const ids = new Array<RowId>(state.rows!.length);
+    const idPath = `${path} rowId`;
     for (let i = 0; i < ids.length; i++) {
-      const value = read(rowIdField, state.rows![i], state.index![i], `${path} rowId`);
+      const value = read(rowIdField, state.rows![i], state.index![i], idPath);
       if (!isRowId(value))
         fail(
           `${path}: the rowId of row ${state.index![i]} is ${describe(value)}; row ids must be strings or finite numbers.`,
@@ -460,9 +461,10 @@ function ingestRows<Row>(
   let iso = 0;
   let dates = 0;
   let numbers = 0;
+  const xPath = `${path} x`;
   for (let i = 0; i < count; i++) {
     const row = rows[i];
-    const value = read(xField, row, original(i), `${path} x`);
+    const value = read(xField, row, original(i), xPath);
     raw[i] = value;
     if (!present && (value !== undefined || (row && (xField as string) in (row as object))))
       present = true;
@@ -497,15 +499,16 @@ function ingestRows<Row>(
     registry = new CategoryAxis(plan.axis, undefined);
     categories.set(plan.axis, registry);
   }
+  // Messages are built only for a row that fails: this loop runs once per row.
+  const where = (i: number) => `${path}: x of row ${original(i)}`;
   for (let i = 0; i < count; i++) {
     const value = raw[i];
-    const where = `${path}: x of row ${original(i)}`;
     if (kind === 'category') {
       if (typeof value !== 'string')
         fail(
-          `${where} is ${describe(value)}, but axis "${plan.axis}" is a category axis of labels.`,
+          `${where(i)} is ${describe(value)}, but axis "${plan.axis}" is a category axis of labels.`,
         );
-      x[i] = registry!.code(value, where);
+      x[i] = registry!.codes.get(value) ?? registry!.code(value, where(i));
     } else if (kind === 'date') {
       const ms =
         value instanceof Date
@@ -518,13 +521,15 @@ function ingestRows<Row>(
       if (!Number.isFinite(ms))
         fail(
           typeof value === 'string'
-            ? `${where} is "${value}", which is not an ISO-8601 date such as 2026-03-01 or 2026-03-01T09:30:00Z.`
-            : `${where} is ${describe(value)}; a time axis takes Dates, epoch milliseconds or ISO-8601 strings.`,
+            ? `${where(i)} is "${value}", which is not an ISO-8601 date such as 2026-03-01 or 2026-03-01T09:30:00Z.`
+            : `${where(i)} is ${describe(value)}; a time axis takes Dates, epoch milliseconds or ISO-8601 strings.`,
         );
       x[i] = ms;
     } else {
       if (typeof value !== 'number' || !Number.isFinite(value))
-        fail(`${where} is ${describe(value)}; x values must be finite numbers, Dates or labels.`);
+        fail(
+          `${where(i)} is ${describe(value)}; x values must be finite numbers, Dates or labels.`,
+        );
       x[i] = value;
     }
   }
@@ -664,7 +669,10 @@ export function column<Row>(
     const value = read(field, row, state.index![i], path);
     if (!present && (value !== undefined || (row && (field as string) in (row as object))))
       present = true;
-    values[i] = numeric(value, `${path}: ${fieldLabel(field)} of row ${state.index![i]}`);
+    values[i] =
+      typeof value === 'number' && Number.isFinite(value)
+        ? value
+        : numeric(value, `${path}: ${fieldLabel(field)} of row ${state.index![i]}`);
   }
   if (!present && rows.length > 0)
     fail(

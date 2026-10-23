@@ -118,10 +118,12 @@ function planRows<Row>(
   const newLabels: string[] = [];
   const pending = new Map<string, number>();
   let nextCode = registry?.nextCode ?? 0;
-  const code = (label: string, where: string) => {
+  // Messages are built only for a row that fails: the loops below run once per row.
+  const where = (i: number) => `${path}: x of appended row ${i}`;
+  const code = (label: string, row: number) => {
     const known = registry!.codes.get(label);
     if (known !== undefined) return known;
-    if (registry!.explicit) registry!.unknown(where, label);
+    if (registry!.explicit) registry!.unknown(where(row), label);
     let c = pending.get(label);
     if (c === undefined) {
       c = nextCode++;
@@ -132,15 +134,15 @@ function planRows<Row>(
   };
   // X, in the source's kind.
   const x = new Float64Array(count);
+  const xPath = `${path} x`;
   for (let i = 0; i < count; i++) {
-    const value = read(source.x!, batch[i], start + i, `${path} x`);
-    const where = `${path}: x of appended row ${i}`;
+    const value = read(source.x!, batch[i], start + i, xPath);
     if (source.xKind === 'category') {
       if (typeof value !== 'string')
         fail(
-          `${where} is ${describe(value)}, but axis "${source.axis}" is a category axis of labels.`,
+          `${where(i)} is ${describe(value)}, but axis "${source.axis}" is a category axis of labels.`,
         );
-      x[i] = code(value, where);
+      x[i] = code(value, i);
     } else if (source.xKind === 'date') {
       const ms =
         value instanceof Date
@@ -152,13 +154,13 @@ function planRows<Row>(
               : Number.NaN;
       if (!Number.isFinite(ms))
         fail(
-          `${where} is ${describe(value)}, but axis "${source.axis}" is a time axis: append Dates, epoch milliseconds or ISO-8601 strings.`,
+          `${where(i)} is ${describe(value)}, but axis "${source.axis}" is a time axis: append Dates, epoch milliseconds or ISO-8601 strings.`,
         );
       x[i] = ms;
     } else {
       if (typeof value !== 'number' || !Number.isFinite(value))
         fail(
-          `${where} is ${describe(value)}, but axis "${source.axis}" is a numeric axis: append finite numbers.`,
+          `${where(i)} is ${describe(value)}, but axis "${source.axis}" is a numeric axis: append finite numbers.`,
         );
       x[i] = value;
     }
@@ -192,8 +194,9 @@ function planRows<Row>(
   if (source.rowIds) {
     if (source.rowIdField === undefined)
       fail(`${path}: this data has row ids; append { columns, rowIds } with one id per row.`);
+    const idPath = `${path} rowId`;
     rowIds = rows.map((row, i) => {
-      const value = read(source.rowIdField!, row, index[i], `${path} rowId`);
+      const value = read(source.rowIdField!, row, index[i], idPath);
       if (!isRowId(value))
         fail(
           `${path}: appended row ${i} has rowId ${describe(value)}; this data needs a unique rowId on every row.`,
@@ -212,11 +215,13 @@ function planRows<Row>(
       void c;
     } else if (field.kind === 'field' || field.kind === 'accessor') {
       const reader = field.kind === 'field' ? field.name : field.read;
-      for (let i = 0; i < count; i++)
-        out[i] = numeric(
-          read(reader, rows[i], index[i], path),
-          `${path}: ${fieldLabel(reader)} of appended row ${i}`,
-        );
+      for (let i = 0; i < count; i++) {
+        const value = read(reader, rows[i], index[i], path);
+        out[i] =
+          typeof value === 'number' && Number.isFinite(value)
+            ? value
+            : numeric(value, `${path}: ${fieldLabel(reader)} of appended row ${i}`);
+      }
     } else if (field.kind === 'encoding') {
       let labels = encodings.get(field.key);
       if (!labels) {
