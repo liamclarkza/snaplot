@@ -74,7 +74,7 @@ describe('[gap-environments-01] print keeps the canvases', () => {
 });
 
 describe('[gap-scale-longevity-01] resize paints synchronously', () => {
-  it.fails('[gap-scale-longevity-01] resize paints synchronously', () => {
+  it('[gap-scale-longevity-01] resize paints synchronously', () => {
     const chart = mount(2);
     fakes.resizeObserver.deliver();
     fakes.frames.flush();
@@ -91,7 +91,7 @@ describe('[gap-scale-longevity-01] resize paints synchronously', () => {
     }
   });
 
-  it.fails('[gap-scale-longevity-01] a no-op resize does not reallocate', () => {
+  it('[gap-scale-longevity-01] a no-op resize does not reallocate', () => {
     const chart = mount(2);
     // The constructor painted at 400 × 200; the initial observation reports
     // the same box.

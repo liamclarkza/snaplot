@@ -459,8 +459,13 @@ export class ChartCore implements ChartInstance {
     else if (shouldValidateConfig()) validateChartConfig(this.config, data);
 
     // 2. Create canvas layers
+    // Resize and DPR callbacks run outside the frame loop (a ResizeObserver
+    // delivers after this frame's rAF callbacks and before paint), and the
+    // reallocation cleared every layer. Paint now, or the cleared, opaque grid
+    // is composited as a black frame (gap-scale-longevity-01).
     this.canvasManager = new CanvasManager(parent, (w, h) => {
       this.onResize(w, h);
+      this.scheduler.flush();
     });
 
     // 3. Resolve theme, and keep it live: token-driven apps flip themes by

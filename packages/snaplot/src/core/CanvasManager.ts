@@ -23,6 +23,8 @@ export class CanvasManager {
 
   private resizeObserver: ResizeObserver | null = null;
   private _dpr = 1;
+  /** The CSS size and dpr the backing stores were last allocated for. */
+  private allocated: { width: number; height: number; dpr: number } | null = null;
   private dprMediaQuery: MediaQueryList | null = null;
   private boundDprChange: (() => void) | null = null;
 
@@ -86,8 +88,7 @@ export class CanvasManager {
       const entry = entries[0];
       if (!entry) return;
       const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) {
-        this.resize(width, height);
+      if (width > 0 && height > 0 && this.resize(width, height)) {
         this.onResize?.(width, height);
       }
     });
@@ -116,8 +117,10 @@ export class CanvasManager {
     const dpr = window.devicePixelRatio || 1;
     this.dprMediaQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
     this.boundDprChange = () => {
-      if ((window.devicePixelRatio || 1) !== this._dpr) {
-        this.resize(this.cssWidth, this.cssHeight);
+      if (
+        (window.devicePixelRatio || 1) !== this._dpr &&
+        this.resize(this.cssWidth, this.cssHeight)
+      ) {
         this.onResize?.(this.cssWidth, this.cssHeight);
       }
       // The query is pinned to the dpr it was armed with; re-arm for the current one.
@@ -137,9 +140,18 @@ export class CanvasManager {
   /**
    * Resize all canvases. HiDPI: physical pixels = CSS pixels × dpr.
    * Called once on init + on ResizeObserver callback, never per frame.
+   *
+   * Assigning a canvas's width or height clears its bitmap even when the
+   * value is unchanged, so a call with the same CSS size and dpr as the last
+   * allocation does nothing (gap-scale-longevity-01). Returns whether the
+   * backing stores were reallocated (and so need a repaint).
    */
-  resize(width: number, height: number): void {
-    this._dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  resize(width: number, height: number): boolean {
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const last = this.allocated;
+    if (last && last.width === width && last.height === height && last.dpr === dpr) return false;
+    this._dpr = dpr;
+    this.allocated = { width, height, dpr };
 
     for (const canvas of [this.gridCanvas, this.dataCanvas, this.overlayCanvas]) {
       canvas.width = width * this._dpr;
@@ -152,6 +164,7 @@ export class CanvasManager {
     this.gridCtx.scale(this._dpr, this._dpr);
     this.dataCtx.scale(this._dpr, this._dpr);
     this.overlayCtx.scale(this._dpr, this._dpr);
+    return true;
   }
 
   /** Clear a specific layer or all layers */
