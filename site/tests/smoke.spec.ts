@@ -146,6 +146,8 @@ test.describe('every route', () => {
 
       const allowed = expectedWarnings(examples.map((e) => e.name));
       expect(problems.filter((p) => !allowed.some((code) => p.includes(code)))).toEqual([]);
+      // The "Copied!" tooltips fade out and leave within 2.5s; axe would measure a half-faded one.
+      await expect(page.locator('.expressive-code .feedback')).toHaveCount(0, { timeout: 5_000 });
       expect(await seriousViolations(page)).toEqual([]);
     });
   }
