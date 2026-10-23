@@ -347,7 +347,7 @@ describe('appends are validated before anything changes', () => {
     { x: 2, y: 1, rowIndex: 2, rowId: 'b2' },
   ];
 
-  it.fails('[dataapi-03] updateLast on empty data keeps original row indices', () => {
+  it('[dataapi-03] updateLast on empty data keeps original row indices', () => {
     const chart = mount({ data: [], x: 'x', rowId: 'id', series: [{ y: 'y' }] });
     for (const batch of bucket) chart.appendData(batch, { updateLast: true });
     expect([0, 1, 2].map((x) => at(chart, x))).toMatchObject(formed);

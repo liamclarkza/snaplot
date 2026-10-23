@@ -363,19 +363,21 @@ function pushAll<T>(target: T[], items: readonly T[]): void {
  * rows leave from the front, and category labels follow their rows. Returns
  * whether an X category registry changed. It runs after the engine has taken
  * the batch, so nothing here may throw: every check belongs in the plan.
+ *
+ * `replaced` says whether the engine replaced its latest row: an `updateLast`
+ * append to a source that held one. On an empty source it appends, so the
+ * retained arrays and the next row index grow by the whole batch.
  */
 export function commitAppend<Row>(
   ingested: Ingested<Row>,
   plan: SourceAppend<Row>,
-  options: AppendOptions,
+  replaced: boolean,
   evicted: number,
   evictedCodes: number[],
 ): boolean {
   const source = ingested.sources[plan.source];
   const count = plan.columns[0].length;
-  const replace =
-    !!options.updateLast && (source.rows?.length ?? source.rowIds?.length ?? 1) > source.head;
-  if (replace) {
+  if (replaced) {
     source.rows?.pop();
     source.index?.pop();
     const id = source.rowIds?.pop();
@@ -387,7 +389,7 @@ export function commitAppend<Row>(
     pushAll(source.rowIds!, plan.rowIds);
     for (const id of plan.rowIds) source.idSet!.add(id);
   }
-  source.nextIndex += count - (options.updateLast ? 1 : 0);
+  source.nextIndex += count - (replaced ? 1 : 0);
   source.streamed = true;
   for (const [key, labels] of plan.encodings ?? []) ingested.encodings.set(key, labels);
   // Eviction from the front.

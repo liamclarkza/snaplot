@@ -538,7 +538,7 @@ describe('[dataapi-20] an append plan changes nothing until it is committed (D23
     const { ingested, plan } = setup();
     const [planned] = plan([{ t: 1, v: 1, k: 'new', w: 2 }]);
     expect(ingested.encodings.get('field:k')).toEqual(['a']);
-    commitAppend(ingested, planned, {}, 0, []);
+    commitAppend(ingested, planned, false, 0, []);
     expect(ingested.encodings.get('field:k')).toEqual(['a', 'new']);
   });
 });

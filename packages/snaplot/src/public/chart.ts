@@ -681,6 +681,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         const count = plan.columns[0].length;
         if (!count) continue;
         const length = this.engine.getSourceLength(plan.source);
+        // updateLast replaces the latest row if there is one; on empty data it appends.
         const replace = options.updateLast && length > 0 ? 1 : 0;
         const evicted =
           maxPoints === undefined ? 0 : Math.max(0, length + count - replace - maxPoints);
@@ -694,7 +695,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           for (let i = 0; i < fromBatch; i++) evictedCodes.push(plan.codes![i]);
         }
         this.engine.appendToSource(plan.source, plan.columns, options, /* trusted */ true);
-        if (commitAppend(this.ingested, plan, options, evicted, evictedCodes))
+        if (commitAppend(this.ingested, plan, replace > 0, evicted, evictedCodes))
           changedAxes.add(source.axis);
       }
       if (plans.some((plan) => plan.rows) && this.ingested.encodings.size) {
