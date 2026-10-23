@@ -179,6 +179,63 @@ describe('appends are validated before anything changes', () => {
     expect(latest(chart)).toMatchObject({ x: 2, y: 2 });
   });
 
+  // A bar series holds one bar per category. An append that repeats a category throws at the
+  // append, so a later update() never inherits a source it would reject (the dataapi-03 crash).
+  it.fails('[dataapi-03] a bar append that repeats a category throws and changes nothing', () => {
+    const bars = () =>
+      mount({
+        data: [
+          { m: 'A', v: 1 },
+          { m: 'B', v: 2 },
+        ],
+        x: 'm',
+        series: [{ type: 'bar', y: 'v' }],
+      });
+    const cases: Array<[Record<string, unknown>[], { updateLast?: boolean }]> = [
+      // A new category twice, an earlier one twice, and the latest bar twice by updateLast.
+      [
+        [
+          { m: 'D', v: 3 },
+          { m: 'D', v: 4 },
+        ],
+        {},
+      ],
+      [
+        [
+          { m: 'C', v: 3 },
+          { m: 'C', v: 4 },
+        ],
+        {},
+      ],
+      [
+        [
+          { m: 'B', v: 3 },
+          { m: 'B', v: 4 },
+        ],
+        { updateLast: true },
+      ],
+      // The latest bar again without updateLast.
+      [[{ m: 'B', v: 3 }], {}],
+    ];
+    for (const [batch, options] of cases) {
+      const chart = bars();
+      expect(thrown(() => chart.appendData(batch, options))).toMatch(
+        /^snaplot: appendData\(\) to series "v": bar series "v" has the same category twice/,
+      );
+      expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 1.5 });
+      expect(latest(chart)).toMatchObject({ x: 'B', y: 2 });
+      expect(() => chart.update({ axes: { y: { title: 'Load' } } })).not.toThrow();
+      chart.appendData([{ m: 'E', v: 5 }]);
+      expect(latest(chart)).toMatchObject({ x: 'E', y: 5 });
+      expect(() => chart.update({ axes: { y: { title: 'Load 2' } } })).not.toThrow();
+    }
+    // Control: updateLast corrects the latest bar.
+    const chart = bars();
+    chart.appendData([{ m: 'B', v: 7 }], { updateLast: true });
+    expect(latest(chart)).toMatchObject({ x: 'B', y: 7 });
+    expect(() => chart.update({ axes: { y: { title: 'Load' } } })).not.toThrow();
+  });
+
   it('[dataapi-03] duplicate rowIds inside one batch throw before any mutation', () => {
     const chart = mount({
       data: [{ id: 'a', t: 1, v: 1 }],
