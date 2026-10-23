@@ -15,6 +15,7 @@ import type { ChartHandle, ChartOptions } from '../../src/index';
 import { createChart, histogram } from '../../src/index';
 import { FIXTURES, type Fixture, findFixture } from './fixtures';
 import { FONT_FAMILY, FONT_WEIGHTS, type FixturePageApi } from './page-api';
+import { paintReady } from './paint';
 import { collectGeometry } from './probe';
 
 const DEBUG = Symbol.for('snaplot.debug');
@@ -54,11 +55,12 @@ function inkOf(canvas: HTMLCanvasElement | undefined): number {
 }
 
 /**
- * Resolves once the grid and data layers have painted: both rendered at least once, and the
- * data layer holds ink (the grid layer for a fixture declared `blankData`). Under load a capture
- * once showed the DOM labels over blank canvases; that state must fail the fixture loudly, never
- * become a reference. It only waits: it never asks the chart to redraw, which would hide a
- * missing paint (such as the reference lines that are not painted at mount).
+ * Resolves once the grid and data layers have painted (paint.ts): both rendered at least once,
+ * and the data layer holds ink (the grid layer for a fixture declared `blankData`, neither with
+ * `blankGrid` too). Under load a capture once showed the DOM labels over blank canvases; that
+ * state must fail the fixture loudly, never become a reference. It only waits: it never asks the
+ * chart to redraw, which would hide a missing paint (such as the reference lines that are not
+ * painted at mount).
  */
 async function painted(chart: ChartHandle<any>, fixture: Fixture): Promise<void> {
   const deadline = performance.now() + PAINT_TIMEOUT_MS;
@@ -67,8 +69,7 @@ async function painted(chart: ChartHandle<any>, fixture: Fixture): Promise<void>
     const counts = view?.renderCount;
     const grid = inkOf(view?.layers?.grid);
     const data = inkOf(view?.layers?.data);
-    const rendered = (counts?.grid ?? 0) >= 1 && (counts?.data ?? 0) >= 1;
-    if (rendered && (fixture.blankData ? grid > 0 : data > 0)) return;
+    if (paintReady(fixture, { renderCount: counts ?? null, gridInk: grid, dataInk: data })) return;
     if (performance.now() > deadline) {
       throw new Error(
         `the chart did not paint within ${PAINT_TIMEOUT_MS} ms: renderCount ` +

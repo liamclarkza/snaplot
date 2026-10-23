@@ -58,6 +58,12 @@ export interface Fixture {
    * fix that paints the layer drops the field.
    */
   blankData?: string;
+  /**
+   * With `blankData`: why the grid layer is blank too, such as plan §5.1's empty state (no ticks,
+   * no grid; M10, visuals-23). The app then reports ready once both layers have rendered, with no
+   * ink on either. Without it, a fixture whose canvases stay blank fails as "did not paint".
+   */
+  blankGrid?: string;
 }
 
 export type ColorScheme = 'light' | 'dark';
