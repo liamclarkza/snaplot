@@ -194,7 +194,1079 @@ that may change committed screenshots without a row are listed in `visual-ledger
 
 ## 4. Baseline metrics
 
-Measured by `node scripts/overhaul/metrics.mjs` (added in M0 commit 8). Filled in by M0 commit 8.
+Measured by `node scripts/overhaul/metrics.mjs` (`npm run metrics`; definitions in the script header). Two
+measurements:
+
+- **`overhaul-baseline` (pre-format):** `git archive overhaul-baseline packages/snaplot`, built from its own
+  sources, measured with `--pkg`. This is the tree the plan's "Now" column describes.
+- **M0 tip (formatted):** the library after M0 (Biome formatter on, strict flags on; no code changes). Later
+  milestones measure against this one.
+
+| Metric | Plan §0 "Now" | `overhaul-baseline` | M0 tip | Plan target |
+|---|---:|---:|---:|---:|
+| Library code lines (non-test, non-comment) | 13,243 | 13,062 | 15,084 | ≤ 10,500 |
+| Library physical lines | 18,086 | 17,779 | 19,800 | ≤ 14,000 |
+| Library source files (`.ts`/`.tsx`, non-test) | 69 | 68 | 68 | — |
+| Largest source file | 4,077 | 4,077 (`core/Chart.ts`) | 4,287 (`core/Chart.ts`) | ≤ 850 (cap 900) |
+| Runtime exports `snaplot` / `react` / `solid` | 35 / 12 / 13 | 35 / 12 / 13 (`./core` 35) | 35 / 12 / 13 (`./core` 35) | 4 / 4 (+2) / 4 (+2) |
+| Package entry points | 5 | 5 | 5 | 3 |
+| Public option leaves | about 159 + 12 controlled props | 169 | 169 | ≤ 110 |
+| `ChartHandle` members / events | 24 / 13 | 24 / 13 | 24 / 13 | 14 / 7 |
+| Legend implementations | 4 | 4 | 4 | 1 list + 1 table |
+| Stylesheet lines (`.css`) | — | 238 | 238 | — |
+
+**Reading the differences.**
+
+- *Line counts.* The plan's 18,086 / 13,243 came from the planning session with an unrecorded method.
+  `metrics.mjs` counts non-test `.ts`/`.tsx` (excluding `*.typecheck.ts`); its 17,779 physical lines match the
+  architecture audit's count. Code lines come from a parser token walk that skips comments and JSDoc.
+- *Formatting.* M0's reformat (commit `style: enable biome formatter and reformat`) adds 2,021 physical and
+  2,022 code lines (+11% and +15%) without changing behaviour, and grows `core/Chart.ts` from 4,077 to 4,287.
+  The line targets were set against unformatted code. The same relative cut from the formatted M0 tip is
+  ≤ 12,125 code lines and ≤ 15,600 physical lines. The plan's targets stay as written; M14 reports against
+  both and explains any miss with a per-module table (plan §0).
+- *Option leaves.* The audit's hand tally (~159) counted `tooltip` and `theme` both as leaves and by their
+  contents (−2 here), did not enter intersection types, so `colorBy` and `sizeBy` object forms were single
+  leaves (+11 here), and listed 14 reference-line and -region fields where the types have 15 (+1). 159 − 2 +
+  11 + 1 = 169. Framework-only controlled props are not part of the public option types and are not counted.
+
+<details>
+<summary><code>overhaul-baseline</code> metrics JSON</summary>
+
+```json
+{
+  "generatedAt": "2026-10-23T03:07:00.325Z",
+  "pkg": "node_modules/.cache/m0-baseline/packages/snaplot",
+  "gitHead": null,
+  "source": {
+    "files": 68,
+    "physicalLines": 17779,
+    "codeLines": 13062,
+    "largestFile": {
+      "file": "core/Chart.ts",
+      "physicalLines": 4077
+    },
+    "top5": [
+      {
+        "file": "core/Chart.ts",
+        "physicalLines": 4077
+      },
+      {
+        "file": "types.ts",
+        "physicalLines": 1456
+      },
+      {
+        "file": "interaction/GestureManager.ts",
+        "physicalLines": 989
+      },
+      {
+        "file": "api/createChart.ts",
+        "physicalLines": 705
+      },
+      {
+        "file": "renderers/ScatterRenderer.ts",
+        "physicalLines": 691
+      }
+    ],
+    "byDir": {
+      "api": {
+        "files": 5,
+        "physical": 1797,
+        "code": 1654
+      },
+      "config": {
+        "files": 3,
+        "physical": 544,
+        "code": 401
+      },
+      ".": {
+        "files": 6,
+        "physical": 2175,
+        "code": 960
+      },
+      "core": {
+        "files": 6,
+        "physical": 4877,
+        "code": 3705
+      },
+      "data": {
+        "files": 5,
+        "physical": 912,
+        "code": 653
+      },
+      "data/downsampling": {
+        "files": 2,
+        "physical": 336,
+        "code": 248
+      },
+      "interaction": {
+        "files": 3,
+        "physical": 1740,
+        "code": 1334
+      },
+      "plugins": {
+        "files": 1,
+        "physical": 63,
+        "code": 41
+      },
+      "plugins/builtins": {
+        "files": 7,
+        "physical": 1044,
+        "code": 730
+      },
+      "react": {
+        "files": 4,
+        "physical": 221,
+        "code": 214
+      },
+      "renderers": {
+        "files": 8,
+        "physical": 2815,
+        "code": 2199
+      },
+      "scales": {
+        "files": 6,
+        "physical": 767,
+        "code": 543
+      },
+      "solid": {
+        "files": 9,
+        "physical": 193,
+        "code": 191
+      },
+      "utils": {
+        "files": 3,
+        "physical": 295,
+        "code": 189
+      }
+    }
+  },
+  "styles": {
+    "files": 1,
+    "physicalLines": 238
+  },
+  "testFiles": 43,
+  "runtimeExports": {
+    "entryPoints": 5,
+    "entryPointNames": [
+      ".",
+      "./core",
+      "./solid",
+      "./legend-table.css",
+      "./react"
+    ],
+    "perEntry": {
+      ".": {
+        "file": "./dist/index.js",
+        "count": 35,
+        "names": [
+          "CHART_CSS_VARS",
+          "SNAPLOT_THEME_CSS_VARS",
+          "applyThemeToElement",
+          "column",
+          "createChart",
+          "createChartGroup",
+          "createLegendPlugin",
+          "createLegendTablePlugin",
+          "createTheme",
+          "darkTheme",
+          "fogTheme",
+          "forestTheme",
+          "histogram",
+          "ivoryTheme",
+          "lightTheme",
+          "lowerBound",
+          "lttb",
+          "m4",
+          "marsTheme",
+          "metricColumn",
+          "midnightTheme",
+          "mintTheme",
+          "nameColumn",
+          "nearestIndex",
+          "oceanTheme",
+          "refinedDarkTheme",
+          "resolveTheme",
+          "studioTheme",
+          "sunsetTheme",
+          "swatchColumn",
+          "tokyoTheme",
+          "upperBound",
+          "valueColumn",
+          "viewportIndices",
+          "violetTheme"
+        ]
+      },
+      "./core": {
+        "file": "./dist/core.js",
+        "count": 35,
+        "names": [
+          "CHART_CSS_VARS",
+          "SNAPLOT_THEME_CSS_VARS",
+          "applyThemeToElement",
+          "column",
+          "createChart",
+          "createChartGroup",
+          "createLegendPlugin",
+          "createLegendTablePlugin",
+          "createTheme",
+          "darkTheme",
+          "fogTheme",
+          "forestTheme",
+          "histogram",
+          "ivoryTheme",
+          "lightTheme",
+          "lowerBound",
+          "lttb",
+          "m4",
+          "marsTheme",
+          "metricColumn",
+          "midnightTheme",
+          "mintTheme",
+          "nameColumn",
+          "nearestIndex",
+          "oceanTheme",
+          "refinedDarkTheme",
+          "resolveTheme",
+          "studioTheme",
+          "sunsetTheme",
+          "swatchColumn",
+          "tokyoTheme",
+          "upperBound",
+          "valueColumn",
+          "viewportIndices",
+          "violetTheme"
+        ]
+      },
+      "./solid": {
+        "file": "./dist/solid.js",
+        "count": 13,
+        "names": [
+          "Chart",
+          "LegendTable",
+          "SeriesLegend",
+          "column",
+          "createChart",
+          "createChartGroup",
+          "createChartState",
+          "createCursorSnapshot",
+          "createHighlight",
+          "metricColumn",
+          "nameColumn",
+          "swatchColumn",
+          "valueColumn"
+        ]
+      },
+      "./react": {
+        "file": "./dist/react.js",
+        "count": 12,
+        "names": [
+          "Chart",
+          "LegendTable",
+          "SeriesLegend",
+          "column",
+          "metricColumn",
+          "nameColumn",
+          "swatchColumn",
+          "useChartGroup",
+          "useChartState",
+          "useCursorSnapshot",
+          "useHighlight",
+          "valueColumn"
+        ]
+      }
+    }
+  },
+  "optionLeaves": {
+    "total": 169,
+    "surfaces": {
+      "ChartOptions": {
+        "count": 87,
+        "leaves": [
+          "ariaLabel",
+          "autoResize",
+          "axes",
+          "cursor.color",
+          "cursor.dash",
+          "cursor.indicators",
+          "cursor.show",
+          "cursor.snap",
+          "cursor.syncTooltip",
+          "cursor.xLine",
+          "cursor.yLine",
+          "data",
+          "debug.stats",
+          "group",
+          "height",
+          "highlight.dimOpacity",
+          "highlight.enabled",
+          "highlight.proximity",
+          "interaction",
+          "onPointClick",
+          "onSelect",
+          "padding.bottom",
+          "padding.left",
+          "padding.right",
+          "padding.top",
+          "pan.axis",
+          "pan.enabled",
+          "pan.x",
+          "pan.y",
+          "performance.interactionSampling",
+          "plugins",
+          "referenceLines",
+          "referenceRegions",
+          "rowId",
+          "selection.dataChange",
+          "selection.mode",
+          "series",
+          "streaming.followWindow",
+          "streaming.maxPoints",
+          "theme.axisLabelColor",
+          "theme.axisLineColor",
+          "theme.backgroundColor",
+          "theme.borderColor",
+          "theme.borderOpacity",
+          "theme.categoricalPalette",
+          "theme.crosshairColor",
+          "theme.divergingPalette",
+          "theme.fontFamily",
+          "theme.fontSize",
+          "theme.gridColor",
+          "theme.gridOpacity",
+          "theme.heatmapGradient",
+          "theme.palette",
+          "theme.sequentialPalette",
+          "theme.textColor",
+          "theme.tickColor",
+          "theme.tooltipBackground",
+          "theme.tooltipBorderColor",
+          "theme.tooltipTextColor",
+          "tooltip.mode",
+          "tooltip.offset",
+          "tooltip.rangeFormat",
+          "tooltip.render",
+          "tooltip.show",
+          "tooltip.xFormat",
+          "tooltip.yFormat",
+          "touch.drag",
+          "touch.hitRadius",
+          "touch.longPressMs",
+          "touch.selectionGesture",
+          "width",
+          "x",
+          "zoom.axis",
+          "zoom.bounds.max",
+          "zoom.bounds.min",
+          "zoom.bounds.x.max",
+          "zoom.bounds.x.min",
+          "zoom.bounds.y.max",
+          "zoom.bounds.y.min",
+          "zoom.enabled",
+          "zoom.maxRange",
+          "zoom.minRange",
+          "zoom.onZoom",
+          "zoom.pinchMode",
+          "zoom.wheelStep",
+          "zoom.x",
+          "zoom.y"
+        ]
+      },
+      "SeriesOptions": {
+        "count": 42,
+        "leaves": [
+          "barWidthRatio",
+          "colorBy.domain",
+          "colorBy.field",
+          "colorBy.format",
+          "colorBy.label",
+          "colorBy.nullColor",
+          "colorBy.palette",
+          "colorBy.type",
+          "data",
+          "fill",
+          "fillGradient.bottom",
+          "fillGradient.top",
+          "format",
+          "heatmapBinSize",
+          "heatmapGradient",
+          "id",
+          "interpolation",
+          "label",
+          "lineDash",
+          "lineWidth",
+          "lower",
+          "meta",
+          "opacity",
+          "pointRadius",
+          "pointShape",
+          "renderMode",
+          "rowId",
+          "sizeBy.domain",
+          "sizeBy.field",
+          "sizeBy.format",
+          "sizeBy.label",
+          "sizeBy.range",
+          "sizeBy.scale",
+          "spanGaps",
+          "stroke",
+          "tooltipFields",
+          "type",
+          "upper",
+          "x",
+          "xAxis",
+          "y",
+          "yAxis"
+        ]
+      },
+      "AxisOptions": {
+        "count": 19,
+        "leaves": [
+          "auto",
+          "categories",
+          "format",
+          "grid.color",
+          "grid.dash",
+          "grid.opacity",
+          "grid.show",
+          "max",
+          "min",
+          "position",
+          "rangePadding",
+          "roundBounds",
+          "tickCount",
+          "tickMarks.color",
+          "tickMarks.direction",
+          "tickMarks.length",
+          "ticks",
+          "title",
+          "type"
+        ]
+      },
+      "ReferenceLine": {
+        "count": 6,
+        "leaves": [
+          "axis",
+          "color",
+          "dash",
+          "label",
+          "lineWidth",
+          "value"
+        ]
+      },
+      "ReferenceRegion": {
+        "count": 9,
+        "leaves": [
+          "axis",
+          "edgeColor",
+          "edgeDash",
+          "edges",
+          "fill",
+          "from",
+          "label",
+          "opacity",
+          "to"
+        ]
+      },
+      "ChartGroupOptions": {
+        "count": 6,
+        "leaves": [
+          "alignPlots",
+          "cursor",
+          "highlight",
+          "viewport",
+          "yAxis",
+          "yRange"
+        ]
+      }
+    },
+    "missing": []
+  },
+  "handle": {
+    "members": 24,
+    "memberNames": [
+      "appendData",
+      "container",
+      "destroy",
+      "getAxis",
+      "getCursorSnapshot",
+      "getLayout",
+      "getLegendItems",
+      "getOptions",
+      "getState",
+      "getStats",
+      "getTheme",
+      "on",
+      "redraw",
+      "refreshTheme",
+      "resetViewport",
+      "resize",
+      "resumeFollow",
+      "setCursor",
+      "setHighlight",
+      "setSelection",
+      "setSeriesVisible",
+      "setViewport",
+      "subscribe",
+      "update"
+    ],
+    "events": 13,
+    "eventNames": [
+      "cursor:change",
+      "data:update",
+      "follow:change",
+      "highlight:change",
+      "options:update",
+      "point:click",
+      "resize",
+      "select",
+      "selection:change",
+      "state:change",
+      "theme:update",
+      "viewport:change",
+      "visibility:change"
+    ]
+  },
+  "legendImplementations": {
+    "count": 4,
+    "directories": [
+      "api",
+      "plugins/builtins",
+      "react",
+      "solid"
+    ],
+    "files": [
+      "api/legend.ts",
+      "plugins/builtins/legendPlugin.ts",
+      "plugins/builtins/legendTableColumns.ts",
+      "plugins/builtins/legendTablePlugin.ts",
+      "react/legends.ts",
+      "solid/LegendTable.tsx"
+    ]
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>M0 tip metrics JSON</summary>
+
+```json
+{
+  "generatedAt": "2026-10-23T03:07:01.089Z",
+  "pkg": "packages/snaplot",
+  "gitHead": "a5f9b32",
+  "source": {
+    "files": 68,
+    "physicalLines": 19800,
+    "codeLines": 15084,
+    "largestFile": {
+      "file": "core/Chart.ts",
+      "physicalLines": 4287
+    },
+    "top5": [
+      {
+        "file": "core/Chart.ts",
+        "physicalLines": 4287
+      },
+      {
+        "file": "types.ts",
+        "physicalLines": 1452
+      },
+      {
+        "file": "api/createChart.ts",
+        "physicalLines": 1054
+      },
+      {
+        "file": "interaction/GestureManager.ts",
+        "physicalLines": 1023
+      },
+      {
+        "file": "api/prepare.ts",
+        "physicalLines": 735
+      }
+    ],
+    "byDir": {
+      "api": {
+        "files": 5,
+        "physical": 2623,
+        "code": 2480
+      },
+      "config": {
+        "files": 3,
+        "physical": 544,
+        "code": 401
+      },
+      ".": {
+        "files": 6,
+        "physical": 2247,
+        "code": 1032
+      },
+      "core": {
+        "files": 6,
+        "physical": 5109,
+        "code": 3937
+      },
+      "data": {
+        "files": 5,
+        "physical": 919,
+        "code": 660
+      },
+      "data/downsampling": {
+        "files": 2,
+        "physical": 373,
+        "code": 285
+      },
+      "interaction": {
+        "files": 3,
+        "physical": 1780,
+        "code": 1374
+      },
+      "plugins": {
+        "files": 1,
+        "physical": 60,
+        "code": 38
+      },
+      "plugins/builtins": {
+        "files": 7,
+        "physical": 1029,
+        "code": 715
+      },
+      "react": {
+        "files": 4,
+        "physical": 573,
+        "code": 566
+      },
+      "renderers": {
+        "files": 8,
+        "physical": 2928,
+        "code": 2312
+      },
+      "scales": {
+        "files": 6,
+        "physical": 767,
+        "code": 543
+      },
+      "solid": {
+        "files": 9,
+        "physical": 541,
+        "code": 539
+      },
+      "utils": {
+        "files": 3,
+        "physical": 307,
+        "code": 202
+      }
+    }
+  },
+  "styles": {
+    "files": 1,
+    "physicalLines": 238
+  },
+  "testFiles": 43,
+  "runtimeExports": {
+    "entryPoints": 5,
+    "entryPointNames": [
+      ".",
+      "./core",
+      "./solid",
+      "./legend-table.css",
+      "./react"
+    ],
+    "perEntry": {
+      ".": {
+        "file": "./dist/index.js",
+        "count": 35,
+        "names": [
+          "CHART_CSS_VARS",
+          "SNAPLOT_THEME_CSS_VARS",
+          "applyThemeToElement",
+          "column",
+          "createChart",
+          "createChartGroup",
+          "createLegendPlugin",
+          "createLegendTablePlugin",
+          "createTheme",
+          "darkTheme",
+          "fogTheme",
+          "forestTheme",
+          "histogram",
+          "ivoryTheme",
+          "lightTheme",
+          "lowerBound",
+          "lttb",
+          "m4",
+          "marsTheme",
+          "metricColumn",
+          "midnightTheme",
+          "mintTheme",
+          "nameColumn",
+          "nearestIndex",
+          "oceanTheme",
+          "refinedDarkTheme",
+          "resolveTheme",
+          "studioTheme",
+          "sunsetTheme",
+          "swatchColumn",
+          "tokyoTheme",
+          "upperBound",
+          "valueColumn",
+          "viewportIndices",
+          "violetTheme"
+        ]
+      },
+      "./core": {
+        "file": "./dist/core.js",
+        "count": 35,
+        "names": [
+          "CHART_CSS_VARS",
+          "SNAPLOT_THEME_CSS_VARS",
+          "applyThemeToElement",
+          "column",
+          "createChart",
+          "createChartGroup",
+          "createLegendPlugin",
+          "createLegendTablePlugin",
+          "createTheme",
+          "darkTheme",
+          "fogTheme",
+          "forestTheme",
+          "histogram",
+          "ivoryTheme",
+          "lightTheme",
+          "lowerBound",
+          "lttb",
+          "m4",
+          "marsTheme",
+          "metricColumn",
+          "midnightTheme",
+          "mintTheme",
+          "nameColumn",
+          "nearestIndex",
+          "oceanTheme",
+          "refinedDarkTheme",
+          "resolveTheme",
+          "studioTheme",
+          "sunsetTheme",
+          "swatchColumn",
+          "tokyoTheme",
+          "upperBound",
+          "valueColumn",
+          "viewportIndices",
+          "violetTheme"
+        ]
+      },
+      "./solid": {
+        "file": "./dist/solid.js",
+        "count": 13,
+        "names": [
+          "Chart",
+          "LegendTable",
+          "SeriesLegend",
+          "column",
+          "createChart",
+          "createChartGroup",
+          "createChartState",
+          "createCursorSnapshot",
+          "createHighlight",
+          "metricColumn",
+          "nameColumn",
+          "swatchColumn",
+          "valueColumn"
+        ]
+      },
+      "./react": {
+        "file": "./dist/react.js",
+        "count": 12,
+        "names": [
+          "Chart",
+          "LegendTable",
+          "SeriesLegend",
+          "column",
+          "metricColumn",
+          "nameColumn",
+          "swatchColumn",
+          "useChartGroup",
+          "useChartState",
+          "useCursorSnapshot",
+          "useHighlight",
+          "valueColumn"
+        ]
+      }
+    }
+  },
+  "optionLeaves": {
+    "total": 169,
+    "surfaces": {
+      "ChartOptions": {
+        "count": 87,
+        "leaves": [
+          "ariaLabel",
+          "autoResize",
+          "axes",
+          "cursor.color",
+          "cursor.dash",
+          "cursor.indicators",
+          "cursor.show",
+          "cursor.snap",
+          "cursor.syncTooltip",
+          "cursor.xLine",
+          "cursor.yLine",
+          "data",
+          "debug.stats",
+          "group",
+          "height",
+          "highlight.dimOpacity",
+          "highlight.enabled",
+          "highlight.proximity",
+          "interaction",
+          "onPointClick",
+          "onSelect",
+          "padding.bottom",
+          "padding.left",
+          "padding.right",
+          "padding.top",
+          "pan.axis",
+          "pan.enabled",
+          "pan.x",
+          "pan.y",
+          "performance.interactionSampling",
+          "plugins",
+          "referenceLines",
+          "referenceRegions",
+          "rowId",
+          "selection.dataChange",
+          "selection.mode",
+          "series",
+          "streaming.followWindow",
+          "streaming.maxPoints",
+          "theme.axisLabelColor",
+          "theme.axisLineColor",
+          "theme.backgroundColor",
+          "theme.borderColor",
+          "theme.borderOpacity",
+          "theme.categoricalPalette",
+          "theme.crosshairColor",
+          "theme.divergingPalette",
+          "theme.fontFamily",
+          "theme.fontSize",
+          "theme.gridColor",
+          "theme.gridOpacity",
+          "theme.heatmapGradient",
+          "theme.palette",
+          "theme.sequentialPalette",
+          "theme.textColor",
+          "theme.tickColor",
+          "theme.tooltipBackground",
+          "theme.tooltipBorderColor",
+          "theme.tooltipTextColor",
+          "tooltip.mode",
+          "tooltip.offset",
+          "tooltip.rangeFormat",
+          "tooltip.render",
+          "tooltip.show",
+          "tooltip.xFormat",
+          "tooltip.yFormat",
+          "touch.drag",
+          "touch.hitRadius",
+          "touch.longPressMs",
+          "touch.selectionGesture",
+          "width",
+          "x",
+          "zoom.axis",
+          "zoom.bounds.max",
+          "zoom.bounds.min",
+          "zoom.bounds.x.max",
+          "zoom.bounds.x.min",
+          "zoom.bounds.y.max",
+          "zoom.bounds.y.min",
+          "zoom.enabled",
+          "zoom.maxRange",
+          "zoom.minRange",
+          "zoom.onZoom",
+          "zoom.pinchMode",
+          "zoom.wheelStep",
+          "zoom.x",
+          "zoom.y"
+        ]
+      },
+      "SeriesOptions": {
+        "count": 42,
+        "leaves": [
+          "barWidthRatio",
+          "colorBy.domain",
+          "colorBy.field",
+          "colorBy.format",
+          "colorBy.label",
+          "colorBy.nullColor",
+          "colorBy.palette",
+          "colorBy.type",
+          "data",
+          "fill",
+          "fillGradient.bottom",
+          "fillGradient.top",
+          "format",
+          "heatmapBinSize",
+          "heatmapGradient",
+          "id",
+          "interpolation",
+          "label",
+          "lineDash",
+          "lineWidth",
+          "lower",
+          "meta",
+          "opacity",
+          "pointRadius",
+          "pointShape",
+          "renderMode",
+          "rowId",
+          "sizeBy.domain",
+          "sizeBy.field",
+          "sizeBy.format",
+          "sizeBy.label",
+          "sizeBy.range",
+          "sizeBy.scale",
+          "spanGaps",
+          "stroke",
+          "tooltipFields",
+          "type",
+          "upper",
+          "x",
+          "xAxis",
+          "y",
+          "yAxis"
+        ]
+      },
+      "AxisOptions": {
+        "count": 19,
+        "leaves": [
+          "auto",
+          "categories",
+          "format",
+          "grid.color",
+          "grid.dash",
+          "grid.opacity",
+          "grid.show",
+          "max",
+          "min",
+          "position",
+          "rangePadding",
+          "roundBounds",
+          "tickCount",
+          "tickMarks.color",
+          "tickMarks.direction",
+          "tickMarks.length",
+          "ticks",
+          "title",
+          "type"
+        ]
+      },
+      "ReferenceLine": {
+        "count": 6,
+        "leaves": [
+          "axis",
+          "color",
+          "dash",
+          "label",
+          "lineWidth",
+          "value"
+        ]
+      },
+      "ReferenceRegion": {
+        "count": 9,
+        "leaves": [
+          "axis",
+          "edgeColor",
+          "edgeDash",
+          "edges",
+          "fill",
+          "from",
+          "label",
+          "opacity",
+          "to"
+        ]
+      },
+      "ChartGroupOptions": {
+        "count": 6,
+        "leaves": [
+          "alignPlots",
+          "cursor",
+          "highlight",
+          "viewport",
+          "yAxis",
+          "yRange"
+        ]
+      }
+    },
+    "missing": []
+  },
+  "handle": {
+    "members": 24,
+    "memberNames": [
+      "appendData",
+      "container",
+      "destroy",
+      "getAxis",
+      "getCursorSnapshot",
+      "getLayout",
+      "getLegendItems",
+      "getOptions",
+      "getState",
+      "getStats",
+      "getTheme",
+      "on",
+      "redraw",
+      "refreshTheme",
+      "resetViewport",
+      "resize",
+      "resumeFollow",
+      "setCursor",
+      "setHighlight",
+      "setSelection",
+      "setSeriesVisible",
+      "setViewport",
+      "subscribe",
+      "update"
+    ],
+    "events": 13,
+    "eventNames": [
+      "cursor:change",
+      "data:update",
+      "follow:change",
+      "highlight:change",
+      "options:update",
+      "point:click",
+      "resize",
+      "select",
+      "selection:change",
+      "state:change",
+      "theme:update",
+      "viewport:change",
+      "visibility:change"
+    ]
+  },
+  "legendImplementations": {
+    "count": 4,
+    "directories": [
+      "api",
+      "plugins/builtins",
+      "react",
+      "solid"
+    ],
+    "files": [
+      "api/legend.ts",
+      "plugins/builtins/legendPlugin.ts",
+      "plugins/builtins/legendTableColumns.ts",
+      "plugins/builtins/legendTablePlugin.ts",
+      "react/legends.ts",
+      "solid/LegendTable.tsx"
+    ]
+  }
+}
+```
+
+</details>
 
 ## 5. Approved baselines
 
