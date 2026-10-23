@@ -357,14 +357,11 @@ async function captureReference(ref, port, givenTree, givenSha) {
   const render = { tree, port, shots, entry };
   const captureReport = join(entry, 'out/capture-report.json');
   const capture = await renderReference({ ...render, update: 'all', reportPath: captureReport });
+  const verifyReport = join(entry, 'out/verify-report.json');
   let verify = null;
   if (capture.code === 0 && capture.passed.length > 0) {
     console.log('visual: rendering the reference again; every shot must reproduce');
-    verify = await renderReference({
-      ...render,
-      update: 'none',
-      reportPath: join(entry, 'out/verify-report.json'),
-    });
+    verify = await renderReference({ ...render, update: 'none', reportPath: verifyReport });
   }
   const onDisk = new Set(listPngs(shots).map((f) => f.split('\\').join('/').slice(0, -4)));
   const reproduced = verify ? new Set(verify.passed) : null;
@@ -394,7 +391,8 @@ async function captureReference(ref, port, givenTree, givenSha) {
         (verify ? `, second render exit ${verify.code}` : '') +
         `; ${usable.length} of ${capture.declared.length} declared shots usable` +
         (unreproduced.length ? ` (did not reproduce: ${unreproduced.join(', ')})` : '') +
-        `. See ${captureReport}. check-visual-diffs fails on this run; re-run it.`,
+        `. See ${verify?.code ? verifyReport : captureReport}. check-visual-diffs fails on ` +
+        'this run; re-run it.',
     );
     return outcome;
   }
