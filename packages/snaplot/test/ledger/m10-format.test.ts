@@ -226,7 +226,7 @@ describe('[gap-environments-06][gap-scale-longevity-03:ticks] locale and streami
     expect(chart.getCursorSnapshot().points[0]?.formattedY).toBe('0,55');
   });
 
-  it.fails('[gap-scale-longevity-03:ticks] streaming string X keeps the tick work bounded by the window', () => {
+  it('[gap-scale-longevity-03:ticks] streaming string X keeps the tick work bounded by the window', () => {
     const chart = fakes.mount(
       {
         data: [{ k: 'k0', v: 0 }],

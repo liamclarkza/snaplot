@@ -205,9 +205,14 @@ function countDataPass(pass: readonly DataPassSeries[]): { drawn: number; inView
         }
       }
     } else if (series.stride > 1) {
-      // Mirrors renderScatterSegments: the stride restarts at every run.
+      // Mirrors renderScatterSegments: the (fractional) stride restarts at every run.
       for (const run of series.runs) {
-        for (let i = run.physicalStart; i <= run.physicalEnd; i += series.stride) {
+        const start = run.physicalStart;
+        for (
+          let k = 0, i = start;
+          i <= run.physicalEnd;
+          i = start + Math.floor(++k * series.stride)
+        ) {
           if (visible(series.xData[i], series.yData[i])) drawn++;
         }
       }
@@ -433,6 +438,11 @@ export class ChartCore implements EngineHost {
      * first paint is then the only one at mount, and it draws them.
      */
     deferFirstPaint = false,
+    /**
+     * The sources were validated by the public ingest (one X pass, plan §3.4):
+     * the stores take them without scanning X again.
+     */
+    trusted = false,
   ) {
     this.container = parent;
 
@@ -446,7 +456,7 @@ export class ChartCore implements EngineHost {
     this.applyModePresets(config);
 
     // 1c. Validate the merged config against the initial sources.
-    this.validateSources(this.config, sources.sources, sources.seriesSources);
+    this.validateSources(this.config, sources.sources, sources.seriesSources, trusted);
 
     // 2. Create canvas layers
     // Resize and DPR callbacks run outside the frame loop (a ResizeObserver
@@ -478,7 +488,7 @@ export class ChartCore implements EngineHost {
     }
 
     // 4. Create data stores
-    this.sourceStores = sources.sources.map((source) => this.createDataStore(source));
+    this.sourceStores = sources.sources.map((source) => this.createDataStore(source, trusted));
     this.seriesSources = sources.seriesSources.slice();
     this.debugCounters.ingestCount++;
 
@@ -557,6 +567,7 @@ export class ChartCore implements EngineHost {
     config: ChartSpec,
     sources: readonly ColumnarData[],
     seriesSources: readonly number[],
+    trusted = false,
   ): void {
     if (this.destroyed) return;
     // Resolve and validate the complete candidate before replacing any live store.
@@ -564,14 +575,16 @@ export class ChartCore implements EngineHost {
       DEFAULT_CONFIG as unknown as Record<string, unknown>,
       config as unknown as Record<string, unknown>,
     ) as unknown as ChartSpec;
-    this.validateSources(resolved, sources, seriesSources);
+    this.validateSources(resolved, sources, seriesSources, trusted);
     const maxLen = resolved.streaming?.maxPoints;
     if (maxLen !== undefined) validateMaxLen(maxLen);
-    const stores = sources.map((data) =>
-      maxLen === undefined
-        ? new ColumnarStore(data)
-        : new RingColumnarStore(data, maxLen, this.debugCounters),
-    );
+    const build = () =>
+      sources.map((data) =>
+        maxLen === undefined
+          ? new ColumnarStore(data)
+          : new RingColumnarStore(data, maxLen, this.debugCounters),
+      );
+    const stores = trusted ? ColumnarStore.trusted(build) : build();
     this.sourceStores = stores;
     this.seriesSources = seriesSources.slice();
     this.invalidateRangeCache();
@@ -602,11 +615,12 @@ export class ChartCore implements EngineHost {
     config: ChartSpec,
     sources: readonly ColumnarData[],
     indices: readonly number[],
+    trusted: boolean,
   ): void {
     if (sources.length === 0) throw new Error('At least one data source is required');
     if (indices.length !== config.series.length)
       throw new Error('Each series requires a data source index');
-    for (const source of sources) ColumnarStore.validate(source);
+    if (!trusted) for (const source of sources) ColumnarStore.validate(source);
     for (let si = 0; si < config.series.length; si++) {
       const sourceIndex = indices[si];
       if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sources.length) {
@@ -644,30 +658,37 @@ export class ChartCore implements EngineHost {
     return min === Infinity ? null : [min, max];
   }
 
-  appendToSource(sourceIndex: number, data: ColumnarData, opts?: AppendDataOptions): void {
+  appendToSource(
+    sourceIndex: number,
+    data: ColumnarData,
+    opts?: AppendDataOptions,
+    /** The public ingest validated the batch and its order. */
+    trusted = false,
+  ): void {
     if (this.destroyed) return;
     if (!this.sourceStores[sourceIndex]) throw new Error(`Unknown data source ${sourceIndex}`);
     this.ensureStoreMatchesStreaming();
     const store = this.sourceStores[sourceIndex];
-    ColumnarStore.validate(data);
+    if (!trusted) ColumnarStore.validate(data);
     if (data.length !== store.seriesCount + 1)
       throw new Error('Appended columns must match the source schema');
-    if (data[0].length && store.length) {
+    if (!trusted && data[0].length && store.length) {
       const previousIndex = opts?.updateLast ? store.length - 2 : store.length - 1;
       if (previousIndex >= 0 && data[0][0] < store.xAt(previousIndex))
         throw new Error('Appended X values must preserve source order');
     }
 
-    let changed: boolean;
-    if (opts?.updateLast && store.length > 0 && data.length > 0 && data[0].length > 0) {
-      store.replaceLast(Array.from(data, (col) => col[0]));
-      if (data[0].length > 1) {
-        store.append(data.map((col) => col.subarray(1)) as ColumnarData);
+    const write = () => {
+      if (opts?.updateLast && store.length > 0 && data.length > 0 && data[0].length > 0) {
+        store.replaceLast(Array.from(data, (col) => col[0]));
+        if (data[0].length > 1) {
+          store.append(data.map((col) => col.subarray(1)) as ColumnarData);
+        }
+        return true;
       }
-      changed = true;
-    } else {
-      changed = store.append(data);
-    }
+      return store.append(data);
+    };
+    const changed = trusted ? ColumnarStore.trusted(write) : write();
     if (!changed) return;
 
     this.stats.dataVersion++;
@@ -1453,25 +1474,30 @@ export class ChartCore implements EngineHost {
     return seriesIndex;
   }
 
-  private createDataStore(data: ColumnarData): DataStore {
+  private createDataStore(data: ColumnarData, trusted = false): DataStore {
     const maxLen = this.streamingMaxLen();
-    return maxLen === undefined
-      ? new ColumnarStore(data)
-      : new RingColumnarStore(data, maxLen, this.debugCounters);
+    const build = () =>
+      maxLen === undefined
+        ? new ColumnarStore(data)
+        : new RingColumnarStore(data, maxLen, this.debugCounters);
+    return trusted ? ColumnarStore.trusted(build) : build();
   }
 
   private ensureStoreMatchesStreaming(): void {
     const maxLen = this.streamingMaxLen();
-    this.sourceStores = this.sourceStores.map((store) => {
-      if (maxLen !== undefined) {
-        if (store instanceof RingColumnarStore && store.maxLen === maxLen) return store;
+    // The stores' data was validated when it was stored.
+    this.sourceStores = ColumnarStore.trusted(() =>
+      this.sourceStores.map((store) => {
+        if (maxLen !== undefined) {
+          if (store instanceof RingColumnarStore && store.maxLen === maxLen) return store;
+          this.invalidateRangeCache();
+          return new RingColumnarStore(store.getData(), maxLen, this.debugCounters);
+        }
+        if (!(store instanceof RingColumnarStore)) return store;
         this.invalidateRangeCache();
-        return new RingColumnarStore(store.getData(), maxLen, this.debugCounters);
-      }
-      if (!(store instanceof RingColumnarStore)) return store;
-      this.invalidateRangeCache();
-      return new ColumnarStore(store.getData());
-    });
+        return new ColumnarStore(store.getData());
+      }),
+    );
   }
 
   private streamingMaxLen(): number | undefined {
@@ -3059,7 +3085,7 @@ export class ChartCore implements EngineHost {
               visible += segment.endIdx - segment.startIdx + 1;
             }
             if (visible > budget) {
-              sampleStride = Math.ceil(visible / budget);
+              sampleStride = visible / budget;
               this.sampledLastDataRender = true;
             }
           }

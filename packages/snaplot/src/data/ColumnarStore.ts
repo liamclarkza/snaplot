@@ -35,8 +35,24 @@ export class ColumnarStore implements DataStore {
     this.columns = [...data];
   }
 
+  private static trustedDepth = 0;
+
+  /**
+   * Run `build` with validation skipped: for data the public ingest has already
+   * checked in its one X pass (plan §3.4), so stores do not scan X again.
+   */
+  static trusted<T>(build: () => T): T {
+    ColumnarStore.trustedDepth++;
+    try {
+      return build();
+    } finally {
+      ColumnarStore.trustedDepth--;
+    }
+  }
+
   /** Validate: equal column lengths, sorted X (monotonically non-decreasing). */
   static validate(data: ColumnarData): void {
+    if (ColumnarStore.trustedDepth > 0) return;
     if (
       !Array.isArray(data) &&
       !(data && typeof (data as unknown as { length: number }).length === 'number')
@@ -239,7 +255,7 @@ export class ColumnarStore implements DataStore {
       throw new Error(
         `append() expects ${this.columns.length} columns to match the initial ` +
           `data shape, but got ${data.length}. Pass the same number of ` +
-          `Float64Arrays you passed to setData/the constructor, one X column ` +
+          `Float64Arrays the store was created with, one X column ` +
           `plus one per Y series.`,
       );
     }
@@ -258,7 +274,7 @@ export class ColumnarStore implements DataStore {
       throw new Error(
         `append() X values must continue in non-decreasing order, but ` +
           `new x[0] = ${data[0][0]} < current last X = ${this.columns[0][curLen - 1]}. ` +
-          `Append only newer points, or call setData() with a fully sorted dataset.`,
+          `Append only newer points, or replace the data with a sorted dataset.`,
       );
     }
 

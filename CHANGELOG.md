@@ -36,6 +36,27 @@ to [Semantic Versioning](https://semver.org/).
   with other series throws. Re-reading a source of 10,000 rows or more because an accessor
   function keeps getting a new identity warns once.
 
+### Data (1.0)
+
+- Typed columns are used in place: no copy and one pass over X per source and per append. Line,
+  area, band and bar columns must be sorted by X (rows are sorted for you, stably, so equal X
+  keep their order).
+- A scatter source whose X is already sorted is stored in X order, so panning a large sorted
+  scatter culls by X and keeps its points during a gesture.
+- Rows, their original indices and row ids are retained beside the drawn data (bounded by
+  `streaming.maxPoints`): appended rows survive `update()` calls that change accessors, fields or
+  styles, and every point keeps its row and index.
+- `appendData()` checks before it changes anything: rows and `{ columns }` cannot be mixed in one
+  source; an X before the last one, or of another kind than the axis holds (a number on a
+  category axis, a Date on a numeric one), throws; row ids must stay unique, may return once their
+  row has left the window, and a `{ columns }` append to data with row ids needs `rowIds`. Row
+  batches are sorted before they are appended.
+- Inferred categories follow the data: replacing the data rebuilds them, and a label leaves once
+  its last row has streamed out of the window.
+- A field that no row has throws with the closest field name. Numbers on an inferred linear X
+  that look like epoch milliseconds warn once and suggest `axes.x.type: 'time'`, which also
+  accepts ISO-8601 strings.
+
 ### Types (1.0)
 
 - Every public type is declared and documented in `snaplot` itself; none is derived from the

@@ -236,7 +236,9 @@ function drawStampedSegments(
     ? cache.stampTableFor(resolver, alpha, shape, dpr)
     : new Map<number, OffscreenCanvas | HTMLCanvasElement>();
 
-  const stride = Math.max(1, Math.floor(sampleStride));
+  // A fractional stride spreads the budget evenly: point k of a segment is
+  // startIdx + floor(k * stride), so a gesture draws close to the full budget.
+  const stride = Math.max(1, sampleStride);
 
   // Safari performs poorly when a pan frame issues hundreds of tiny,
   // translucent canvas-to-canvas drawImage calls. For fixed-radius marks,
@@ -268,7 +270,7 @@ function drawStampedSegments(
   // drawImage with a canvas source is a fast GPU blit, no path overhead
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
-    for (let i = startIdx; i <= endIdx; i += stride) {
+    for (let k = 0, i = startIdx; i <= endIdx; i = startIdx + Math.floor(++k * stride)) {
       const yVal = yData[i];
       if (!Number.isFinite(yVal)) continue;
 
@@ -332,7 +334,7 @@ function drawBatchedInteractionPoints(
 
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
-    for (let i = startIdx; i <= endIdx; i += stride) {
+    for (let k = 0, i = startIdx; i <= endIdx; i = startIdx + Math.floor(++k * stride)) {
       const y = yData[i];
       if (!Number.isFinite(y)) continue;
       const px = ax ? xData[i] * kx + bx : scaleX.dataToPixel(xData[i]);

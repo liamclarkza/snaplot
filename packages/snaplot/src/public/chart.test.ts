@@ -118,7 +118,7 @@ describe('public chart transactions', () => {
     expect(chart.getOptions().axes).toBeUndefined();
   });
 
-  it('keeps category order across replacements and rejects unknown explicit categories', () => {
+  it('rebuilds inferred categories on replacement and rejects unknown explicit categories', () => {
     const chart = make({
       data: [
         { x: 'B', y: 2 },
@@ -136,8 +136,11 @@ describe('public chart transactions', () => {
     });
     const first = chart.getCursorSnapshot({ fallback: 'first' }).points[0];
     expect(first.x).toBe('A');
-    expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 2.5 });
-    expect(() => chart.update({ axes: { x: { categories: ['A'] } } })).toThrow(/unknown|category/i);
+    // Plan D23 (dataapi-05): replacing the data rebuilds the inferred categories, so B is gone.
+    expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 1.5 });
+    expect(() => chart.update({ axes: { x: { categories: ['A'] } } })).toThrow(
+      /"C", which is not one of axes\.x\.categories/,
+    );
   });
 
   it('uses independent sample positions without a union grid or interpolation', () => {
@@ -565,7 +568,7 @@ describe('public chart transactions', () => {
           x: new Float64Array([3]),
         },
       }),
-    ).toThrow(/same fields/);
+    ).toThrow(/same columns/);
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(20);
   });
 

@@ -23,7 +23,7 @@ function latest(chart: { getCursorSnapshot(o: { fallback: 'latest' }): any }) {
 }
 
 describe('[dataapi-03] appendData validates row ids', () => {
-  it.fails('[dataapi-03] a duplicate rowId on append throws before any mutation', () => {
+  it('[dataapi-03] a duplicate rowId on append throws before any mutation', () => {
     const chart = fakes.mount<Row>({
       data: [
         { id: 'a', x: 1, y: 1 },
@@ -39,7 +39,7 @@ describe('[dataapi-03] appendData validates row ids', () => {
     expect(() => chart.update({ axes: { y: { title: 'Load' } } })).not.toThrow();
   });
 
-  it.fails('[dataapi-03] a column batch without rowIds on a source with rowIds throws', () => {
+  it('[dataapi-03] a column batch without rowIds on a source with rowIds throws', () => {
     const chart = fakes.mount({
       data: {
         columns: { x: new Float64Array([0, 1]), y: new Float64Array([5, 6]) },
@@ -61,7 +61,7 @@ describe('[dataapi-03] appendData validates row ids', () => {
 });
 
 describe('[dataapi-05] inferred categories follow the data', () => {
-  it.fails('[dataapi-05] replacing data rebuilds the inferred categories', () => {
+  it('[dataapi-05] replacing data rebuilds the inferred categories', () => {
     const chart = fakes.mount<{ m: string; v: number }>({
       data: [
         { m: 'Jan', v: 1 },
@@ -86,7 +86,7 @@ describe('[dataapi-05] inferred categories follow the data', () => {
     expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 1.5 });
   });
 
-  it.fails('[gap-scale-longevity-03:ingest] categories stay bounded after 10 × maxPoints string-X appends', () => {
+  it('[gap-scale-longevity-03:ingest] categories stay bounded after 10 × maxPoints string-X appends', () => {
     const chart = fakes.mount<{ k: string; v: number }>({
       data: [{ k: 'item-0', v: 0 }],
       x: 'k',
@@ -111,7 +111,7 @@ describe('[dataapi-07][dxtrial-08] ISO date strings', () => {
     expect(chart.getAxis('x')?.min).toBe(Date.UTC(2026, 0, 1));
   });
 
-  it.fails("[dataapi-07] axes.x.type 'time' accepts ISO strings", () => {
+  it("[dataapi-07] axes.x.type 'time' accepts ISO strings", () => {
     expect(() =>
       fakes.mount({
         data: rows,
@@ -124,7 +124,7 @@ describe('[dataapi-07][dxtrial-08] ISO date strings', () => {
 });
 
 describe('[dataapi-12] appends keep the axis kind', () => {
-  it.fails('[dataapi-12] a number appended to a category axis throws a kind error', () => {
+  it('[dataapi-12] a number appended to a category axis throws a kind error', () => {
     const chart = fakes.mount<{ x: string | number; y: number }>({
       data: [
         { x: 'A', y: 1 },
@@ -137,7 +137,7 @@ describe('[dataapi-12] appends keep the axis kind', () => {
     expect(chart.getAxis('x')?.type).toBe('category');
   });
 
-  it.fails('[dataapi-12] a Date appended to a numeric axis throws', () => {
+  it('[dataapi-12] a Date appended to a numeric axis throws', () => {
     const chart = fakes.mount<{ x: number | Date; y: number }>({
       data: [{ x: 1, y: 1 }],
       x: 'x',
@@ -146,7 +146,7 @@ describe('[dataapi-12] appends keep the axis kind', () => {
     expect(() => chart.appendData([{ x: new Date(2024, 0, 1), y: 3 }])).toThrow();
   });
 
-  it.fails('[dataapi-12] a string appended to a time axis names the kind, not the order', () => {
+  it('[dataapi-12] a string appended to a time axis names the kind, not the order', () => {
     const chart = fakes.mount<{ x: Date | string; y: number }>({
       data: [{ x: new Date(2024, 0, 1), y: 1 }],
       x: 'x',
@@ -220,7 +220,7 @@ describe('[dataapi-02] appended rows are retained across updates', () => {
     { t: 1, v: 2 },
   ];
 
-  it.fails('[dataapi-02] a new accessor identity keeps the appended per-series rows', () => {
+  it('[dataapi-02] a new accessor identity keeps the appended per-series rows', () => {
     const chart = fakes.mount<Sample>({
       x: 't',
       series: [{ id: 'cpu', data: seed, x: 't', y: (row) => row.v }],
@@ -230,7 +230,7 @@ describe('[dataapi-02] appended rows are retained across updates', () => {
     expect(latest(chart).x).toBe(2);
   });
 
-  it.fails('[dataapi-02] switching the y field keeps the appended per-series rows', () => {
+  it('[dataapi-02] switching the y field keeps the appended per-series rows', () => {
     type Pair = { t: number; v: number; w: number };
     const rows: Pair[] = [
       { t: 0, v: 1, w: 10 },

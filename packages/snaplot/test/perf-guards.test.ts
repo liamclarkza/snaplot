@@ -71,7 +71,7 @@ describe('data and culling', () => {
     expect(vertices).toBeLessThanOrEqual(101 + 2 + 4);
   });
 
-  it.fails('[perf:columns-zero-copy][arch-05] columns ingest allocates no per-row JS arrays', () => {
+  it('[perf:columns-zero-copy][arch-05] columns ingest allocates no per-row JS arrays', () => {
     const n = 50_000;
     const from = vi.spyOn(Array, 'from');
     fakes.mount({ data: columns(n, (i) => i % 7), x: 'x', series: [{ y: 'y' }] });
@@ -81,7 +81,7 @@ describe('data and culling', () => {
     expect(large).toHaveLength(0);
   });
 
-  it.fails('[perf:x-validated-once][arch-05] X is validated once per source per update', () => {
+  it('[perf:x-validated-once][arch-05] X is validated once per source per update', () => {
     const chart = fakes.mount({ data: columns(1000, (i) => i), x: 'x', series: [{ y: 'y' }] });
     chart.update({ data: columns(1000, (i) => i * 2) });
     expect(future(chart).xValidations).toBe(2);
@@ -218,7 +218,7 @@ describe('marks', () => {
     return drawnPoints / Math.min(inViewPoints, 10_000);
   }
 
-  it.fails('[perf:scatter-fidelity][gap-perf-gate-01:storage][arch-06:ingest] a sorted 200k scatter keeps fidelity ≥ 0.8 during a gesture', () => {
+  it('[perf:scatter-fidelity][gap-perf-gate-01:storage][arch-06:ingest] a sorted 200k scatter keeps fidelity ≥ 0.8 during a gesture', () => {
     expect(fidelity(true)).toBeGreaterThanOrEqual(0.8);
   });
 

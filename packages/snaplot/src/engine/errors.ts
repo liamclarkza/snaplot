@@ -43,7 +43,10 @@ export function suggest(name: string, candidates: Iterable<string>): string | un
   let bestDistance = Number.POSITIVE_INFINITY;
   const lower = name.toLowerCase();
   for (const candidate of candidates) {
-    const distance = editDistance(lower, candidate.toLowerCase());
+    const other = candidate.toLowerCase();
+    // A short name for a long one (t for time) counts as one edit.
+    const prefix = other.length > 0 && (lower.startsWith(other) || other.startsWith(lower));
+    const distance = prefix ? Math.min(1, editDistance(lower, other)) : editDistance(lower, other);
     if (distance < bestDistance) {
       best = candidate;
       bestDistance = distance;

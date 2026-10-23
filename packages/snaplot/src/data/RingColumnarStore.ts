@@ -82,7 +82,7 @@ export class RingColumnarStore implements DataStore {
       throw new Error(
         `append() X values must continue in non-decreasing order, but ` +
           `new x[0] = ${data[0][0]} < current last X = ${this.xAt(this.len - 1)}. ` +
-          `Append only newer points, or call setData() with a fully sorted dataset.`,
+          `Append only newer points, or replace the data with a sorted dataset.`,
       );
     }
 
@@ -276,7 +276,7 @@ export class RingColumnarStore implements DataStore {
       throw new Error(
         `append() expects ${this.columns.length} columns to match the initial ` +
           `data shape, but got ${data.length}. Pass the same number of ` +
-          `Float64Arrays you passed to setData/the constructor, one X column ` +
+          `Float64Arrays the store was created with, one X column ` +
           `plus one per Y series.`,
       );
     }

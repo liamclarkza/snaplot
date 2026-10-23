@@ -63,14 +63,14 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
     expect(message).toMatch(/line.*area.*band.*bar.*histogram.*scatter|line, area/);
   });
 
-  it.fails('[dataapi-13] a y field missing from every row throws with a "did you mean" suggestion', () => {
+  it('[dataapi-13] a y field missing from every row throws with a "did you mean" suggestion', () => {
     const message = thrown(() => mount({ data: rows, x: 't', series: [{ y: 'cpuu' }] }));
     expect(message).toMatch(/^snaplot: /);
     expect(message).toMatch(/"cpuu"/);
     expect(message).toMatch(/did you mean "cpu"/i);
   });
 
-  it.fails('[dataapi-13] an x field missing from every row throws', () => {
+  it('[dataapi-13] an x field missing from every row throws', () => {
     const message = thrown(() => mount({ data: rows, x: 'time', series: [{ y: 'cpu' }] }));
     expect(message).toMatch(/^snaplot: .*"time"/);
     expect(message).toMatch(/did you mean "t"/i);
@@ -82,7 +82,7 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0]).toMatchObject({ y: 3 });
   });
 
-  it.fails('[dataapi-20] unsorted typed columns throw and point at rows', () => {
+  it('[dataapi-20] unsorted typed columns throw and point at rows', () => {
     const message = thrown(() =>
       mount({
         data: { columns: { x: Float64Array.of(0, 2, 1), y: Float64Array.of(1, 2, 3) } },
@@ -207,7 +207,7 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
     expect(chart.getAxis('x')?.type).toBe('category');
   });
 
-  it.fails("[dataapi-07] axes.x.type 'time' rejects a string that is not ISO-8601", () => {
+  it("[dataapi-07] axes.x.type 'time' rejects a string that is not ISO-8601", () => {
     const message = thrown(() =>
       mount({
         data: [{ k: 'soon', v: 1 }],

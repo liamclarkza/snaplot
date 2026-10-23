@@ -53,7 +53,7 @@ describe('[arch-05] typed columns are zero-copy', () => {
     expect(latest(chart).y).toBe(4242);
   });
 
-  it.fails('[arch-05] X is validated in one pass per source', () => {
+  it('[arch-05] X is validated in one pass per source', () => {
     const shared = mount({ data: { columns: columns(100) }, x: 'x', series: [{ y: 'y' }] });
     expect(counters(shared).xValidations).toBe(1);
     const two = mount({
@@ -66,7 +66,7 @@ describe('[arch-05] typed columns are zero-copy', () => {
     expect(counters(two).xValidations).toBe(4);
   });
 
-  it.fails('[arch-05] an append validates only the appended X values', () => {
+  it('[arch-05] an append validates only the appended X values', () => {
     const chart = mount({ data: { columns: columns(1000) }, x: 'x', series: [{ y: 'y' }] });
     const before = counters(chart).xValidations ?? Number.NaN;
     chart.appendData({ columns: { x: Float64Array.of(1000, 1001), y: Float64Array.of(1, 2) } });
@@ -114,7 +114,7 @@ describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X orde
     return drawnPoints / Math.min(inViewPoints, 10_000);
   }
 
-  it.fails('[arch-06:ingest][gap-perf-gate-01:storage] a sorted scatter source is culled by X during a gesture', () => {
+  it('[arch-06:ingest][gap-perf-gate-01:storage] a sorted scatter source is culled by X during a gesture', () => {
     expect(fidelity((i) => i)).toBe(1);
   });
 
@@ -162,7 +162,7 @@ describe('appends are validated before anything changes', () => {
     expect(latest(chart)).toMatchObject({ x: 1, rowId: 'a' });
   });
 
-  it.fails('[dataapi-03] a rowId may return once its row has left the window', () => {
+  it('[dataapi-03] a rowId may return once its row has left the window', () => {
     const chart = mount({
       data: [{ id: 'a', t: 1, v: 1 }],
       x: 't',
@@ -186,5 +186,44 @@ describe('appends are validated before anything changes', () => {
     });
     expect(() => chart.appendData([{ t: 2, v: 2 }])).toThrow(/^snaplot: .*rowId/);
     expect(latest(chart)).toMatchObject({ x: 1 });
+  });
+
+  it('rows and { columns } cannot be mixed in one source', () => {
+    const rows = mount({ data: [{ x: 1, y: 1 }], x: 'x', series: [{ y: 'y' }] });
+    expect(thrown(() => rows.appendData({ columns: columns(1, () => 2) }))).toMatch(
+      /^snaplot: .*this data is rows, so append rows/,
+    );
+    const typed = mount({ data: { columns: columns(2) }, x: 'x', series: [{ y: 'y' }] });
+    expect(thrown(() => typed.appendData([{ x: 5, y: 5 }]))).toMatch(
+      /^snaplot: .*this data is \{ columns \}, so append \{ columns \}/,
+    );
+    expect(latest(typed)).toMatchObject({ x: 1 });
+  });
+
+  it('a row batch is sorted by X before it is appended', () => {
+    const chart = mount({ data: [{ x: 1, y: 1 }], x: 'x', series: [{ y: 'y' }] });
+    chart.appendData([
+      { x: 4, y: 4 },
+      { x: 2, y: 2 },
+      { x: 3, y: 3 },
+    ]);
+    expect(latest(chart)).toMatchObject({ x: 4, y: 4, rowIndex: 1 });
+    chart.setCursor(2);
+    expect(chart.getCursorSnapshot().points[0]).toMatchObject({ x: 2, y: 2, rowIndex: 2 });
+  });
+
+  it('a sorted scatter source takes an append before its last X and keeps every point', () => {
+    const chart = mount({
+      data: [
+        { x: 1, y: 1 },
+        { x: 2, y: 2 },
+      ],
+      x: 'x',
+      series: [{ type: 'scatter', y: 'y' }],
+    });
+    chart.appendData([{ x: 0, y: 9 }]);
+    expect(latest(chart)).toMatchObject({ x: 0, y: 9, rowIndex: 2 });
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect(latest(chart)).toMatchObject({ x: 0, y: 9, rowIndex: 2 });
   });
 });

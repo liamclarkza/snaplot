@@ -144,7 +144,7 @@ describe('[arch-15] removed options name their replacement', () => {
 describe('[dataapi-13][dxtrial-08] epoch-like numbers on an inferred linear X', () => {
   const at = (t: number) => Date.UTC(2026, 0, 1) + t * 60_000;
 
-  it.fails('[dataapi-13][dxtrial-08] epoch milliseconds on an inferred X warn once', () => {
+  it('[dataapi-13][dxtrial-08] epoch milliseconds on an inferred X warn once', () => {
     const data = rows.map((row) => ({ ...row, t: at(row.t) }));
     mount({ ...base, data });
     mount({ ...base, data });
