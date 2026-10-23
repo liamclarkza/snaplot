@@ -1,78 +1,98 @@
 #!/usr/bin/env node
-// Compare a benchmark run against the tracked baseline.
+// Compares two saved bench runs against bench/gate.json.
 //
-//   node bench/compare.mjs                                # latest vs baseline
-//   node bench/compare.mjs --current bench/results/pr.json --max-ratio 1.6
+//   node bench/compare.mjs --base <a.json> --current <b.json> [--set M<N>] [--allow-new]
 //
-// Exits non-zero when any scenario's median frame time regresses beyond
-// --max-ratio, or when a scenario that was valid in the baseline is now
-// invalid or missing. Ratios are only meaningful when both runs come from
-// the same machine; CI should compare two runs from the same job, or use
-// a generous ratio to absorb runner variance.
+// Each file is a run.mjs output (`kind: 'run'`) or an ab.mjs output (`kind: 'ab'`, whose head is
+// used; pass `--side base` to read its base instead). Ratios are only meaningful between runs from
+// the same machine and session; the gate proper is the same-run A/B, `npm run bench:ab`. A
+// scenario present only in the current run fails unless gate.json lists it or `--allow-new` is
+// passed (gap-perf-gate-08). The tracked bench/baselines/ is history only and is not read.
 
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { parseArgs } from './lib/env.mjs';
+import { evaluateBudgets, evaluateProfile, loadGate } from './lib/gate.mjs';
 
-const benchDir = dirname(fileURLToPath(import.meta.url));
-const args = process.argv.slice(2);
-function argValue(name, fallback) {
-  const i = args.indexOf(name);
-  return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
+const USAGE = `usage: node bench/compare.mjs --base <a.json> --current <b.json> [--set M<N>]
+       [--allow-new] [--base-side base|head] [--current-side base|head]`;
+
+const args = parseArgs(
+  process.argv.slice(2),
+  {
+    base: { type: 'string' },
+    baseline: { type: 'string' },
+    current: { type: 'string' },
+    set: { type: 'string', default: 'default' },
+    'allow-new': { type: 'boolean', default: false },
+    'base-side': { type: 'string', default: 'head' },
+    'current-side': { type: 'string', default: 'head' },
+    'max-ratio': { type: 'string' },
+    help: { type: 'boolean', default: false },
+  },
+  USAGE,
+);
+if (args.help) {
+  console.log(USAGE);
+  process.exit(0);
+}
+const basePath = args.base ?? args.baseline;
+if (!basePath || !args.current) {
+  console.error(
+    'compare needs --base and --current result files. bench/baselines/ is history only; ' +
+      'gate a change with `npm run bench:ab -- --base <ref>` (same-run A/B).',
+  );
+  console.error(USAGE);
+  process.exit(2);
 }
 
-const baselinePath = argValue('--baseline', join(benchDir, 'baselines', 'baseline.json'));
-const currentPath = argValue('--current', join(benchDir, 'results', 'latest.json'));
-const maxRatio = Number(argValue('--max-ratio', '1.5'));
+function sideOf(path, side) {
+  const doc = JSON.parse(readFileSync(path, 'utf8'));
+  if (doc.kind === 'run') return doc.aggregates;
+  if (doc.kind === 'ab') {
+    return Object.fromEntries(
+      Object.entries(doc.evaluation.aggregates).map(([p, a]) => [p, a[side]]),
+    );
+  }
+  throw new Error(
+    `${path}: not a bench result (expected kind "run" or "ab"; old baselines are history only)`,
+  );
+}
 
-const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
-const current = JSON.parse(readFileSync(currentPath, 'utf8'));
+const gate = loadGate();
+if (args['max-ratio']) gate.sets[args.set].ratio = Number(args['max-ratio']);
+const base = sideOf(basePath, args['base-side']);
+const current = sideOf(args.current, args['current-side']);
 
 let failures = 0;
-
-for (const [profileName, baseProfile] of Object.entries(baseline.profiles)) {
-  const curProfile = current.profiles[profileName];
-  if (!curProfile) {
-    console.log(`profile ${profileName}: missing from current run, skipping`);
-    continue;
-  }
-  console.log(
-    `\n#### ${profileName} (baseline ${baseline.meta.sha} -> current ${current.meta.sha})\n`,
-  );
-  console.log('| scenario | base median | cur median | ratio | verdict |');
-  console.log('| :-- | --: | --: | --: | :-- |');
-
-  for (const base of baseProfile.results) {
-    if (!base.frame || !base.valid) continue;
-    const cur = curProfile.results.find((r) => r.name === base.name);
-    if (!cur?.frame) {
-      console.log(`| ${base.name} | ${base.frame.medianMs} | missing | | FAIL |`);
-      failures++;
-      continue;
-    }
-    if (!cur.valid) {
-      console.log(
-        `| ${base.name} | ${base.frame.medianMs} | ${cur.frame.medianMs} | | FAIL (invalid) |`,
-      );
-      failures++;
-      continue;
-    }
-    // Guard against ratio blowups on sub-millisecond medians: a 0.4ms ->
-    // 0.9ms change is noise, not a regression worth failing CI over.
-    const floor = 2;
-    const baseMs = Math.max(base.frame.medianMs, floor);
-    const curMs = Math.max(cur.frame.medianMs, floor);
-    const ratio = curMs / baseMs;
-    const verdict = ratio > maxRatio ? 'FAIL' : ratio < 1 / maxRatio ? 'improved' : 'ok';
-    if (verdict === 'FAIL') failures++;
+const heads = {};
+for (const profile of Object.keys(current)) {
+  heads[profile] = current[profile];
+  const rows = evaluateProfile({
+    gate,
+    setName: args.set,
+    base: base[profile] ?? {},
+    head: current[profile],
+    allowNew: args['allow-new'],
+  });
+  console.log(`\n#### ${profile}\n`);
+  console.log('| scenario | metric | base | current | ratio | limit | verdict | notes |');
+  console.log('| :-- | :-- | --: | --: | --: | --: | :-- | :-- |');
+  for (const row of rows) {
+    if (row.blocking) failures++;
+    const v = (x) => (x === null || x === undefined ? '–' : x);
     console.log(
-      `| ${base.name} | ${base.frame.medianMs} | ${cur.frame.medianMs} | ${ratio.toFixed(2)} | ${verdict} |`,
+      `| ${row.name} | ${row.primary} | ${v(row.base)} | ${v(row.head)} | ${v(row.ratio)} | ${v(row.limit)} | ${row.blocking ? `**${row.verdict}**` : row.verdict} | ${row.notes.join('; ')} |`,
     );
   }
 }
-
+for (const b of evaluateBudgets({ gate, setName: args.set, heads, raster: 'gpu' })) {
+  if (b.blocking) {
+    failures++;
+    console.log(`budget ${b.id} (${b.profile}): ${b.value} not ${b.limit}`);
+  }
+}
 if (failures > 0) {
-  console.error(`\n${failures} scenario(s) regressed beyond ${maxRatio}x`);
+  console.error(`\n${failures} blocking failure(s) against ${basePath}`);
   process.exit(1);
 }
-console.log('\nno regressions beyond threshold');
+console.log('\nno blocking failures');

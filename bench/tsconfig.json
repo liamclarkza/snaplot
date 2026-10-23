@@ -8,9 +8,11 @@
     "noEmit": true,
     "isolatedModules": true,
     "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "paths": {
-      "snaplot/core": ["../packages/snaplot/src/core.ts"],
-      "snaplot": ["../packages/snaplot/src/index.ts"]
+      "snaplot": ["./src/api/shims/snaplot.d.ts"],
+      "snaplot/react": ["./src/api/shims/snaplot-react.d.ts"]
     }
   },
   "include": ["src"]

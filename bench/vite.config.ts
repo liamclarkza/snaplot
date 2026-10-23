@@ -1,18 +1,6 @@
-import { resolve } from 'path';
+// `npm run dev -w bench`: the bench page for interactive DevTools profiling. run.mjs builds the
+// page with the same config.
 import { defineConfig } from 'vite';
+import { benchViteConfig } from './lib/vite-config.mjs';
 
-// The bench always resolves snaplot to source so measurements reflect the
-// working tree, not the last dist build.
-export default defineConfig({
-  resolve: {
-    alias: {
-      'snaplot/core': resolve(__dirname, '../packages/snaplot/src/core.ts'),
-      snaplot: resolve(__dirname, '../packages/snaplot/src/index.ts'),
-    },
-  },
-  build: {
-    outDir: 'dist',
-    // Keep names readable in DevTools profiles taken against the built bench.
-    minify: false,
-  },
-});
+export default defineConfig(benchViteConfig({ logLevel: 'info' }));

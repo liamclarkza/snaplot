@@ -38,13 +38,14 @@ function run(...args) {
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
-// The pre-M4 compare.mjs gates against the stale tracked baseline (backlog-23), ignores scenarios
-// that only the current run has and floors medians at 2 ms (gap-perf-gate-02, -08). These tests
-// record the intended behaviour as expected failures until the rewrite flips them.
 describe('compare.mjs', () => {
-  test('[gap-perf-gate-08] a scenario only in the current run fails unless --allow-new', {
-    todo: 'expected failure: flipped by perf(bench): measure main-thread busy time on GPU raster',
-  }, () => {
+  test('passes when every required scenario is within its ratio', () => {
+    const base = saved('ok-base.json', { 'line-pan-200k': { value: 1 } });
+    const current = saved('ok-current.json', { 'line-pan-200k': { value: 1.1 } });
+    assert.equal(run('--base', base, '--current', current).code, 0);
+  });
+
+  test('[gap-perf-gate-08] a scenario only in the current run fails unless --allow-new', () => {
     const base = saved('new-base.json', { 'line-pan-200k': { value: 1 } });
     const current = saved('new-current.json', {
       'line-pan-200k': { value: 1 },
@@ -56,9 +57,7 @@ describe('compare.mjs', () => {
     assert.equal(run('--base', base, '--current', current, '--allow-new').code, 0);
   });
 
-  test('[gap-perf-gate-02] a sub-frame busy regression (0.6 → 1.8 ms) fails', {
-    todo: 'expected failure: flipped by perf(bench): measure main-thread busy time on GPU raster',
-  }, () => {
+  test('[gap-perf-gate-02] a sub-frame busy regression (0.6 → 1.8 ms) fails', () => {
     const base = saved('sub-base.json', { 'hover-sweep-50k': { value: 0.6 } });
     const current = saved('sub-current.json', { 'hover-sweep-50k': { value: 1.8 } });
     const r = run('--base', base, '--current', current);
@@ -66,9 +65,7 @@ describe('compare.mjs', () => {
     assert.match(r.out, /slower/);
   });
 
-  test('[backlog-23] the tracked baseline is history only: compare needs an explicit base', {
-    todo: 'expected failure: flipped by perf(bench): measure main-thread busy time on GPU raster',
-  }, () => {
+  test('[backlog-23] the tracked baseline is history only: compare needs an explicit base', () => {
     const current = saved('hist-current.json', { 'line-pan-200k': { value: 1 } });
     const r = run('--current', current);
     assert.equal(r.code, 2);

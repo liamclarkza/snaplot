@@ -1,0 +1,475 @@
+{
+  "$comment": [
+    "The perf gate (plan §3.4, §11.3 G12). bench/ab.mjs and bench/compare.mjs read this file.",
+    "ratio: the busy-time median-of-medians limit head/base on a set's scenarios (each scenario's primary metric), after raising both sides to floorMs.",
+    "sets: the scenarios each milestone's merge must run (`bench:ab --set M<N>`); `default` is the §3.4 set used without --set; M14 runs everything.",
+    "overrides: per-scenario ratio limits on a metric, for one set or every set (`*`).",
+    "budgets: absolute targets on the head. kind `time` budgets are recorded as met/missed and block only in budgetsBlockIn (EXECUTION rule 3); kind `count` budgets (debug counters, fidelity, bytes) block in their sets.",
+    "noise: a row is noisy when a round ran with the 1-minute load above cores × loadPerCore, or when one side's runs disagree by more than `spread` (max/min). A blocking failure on a noisy row is re-measured up to `retries` times (plan §3.4).",
+    "A scenario that is in no set and in no budget is 'unlisted': compare fails on it unless --allow-new."
+  ],
+  "floorMs": 0.25,
+  "ratio": 1.5,
+  "heap": { "ratio": 1.5, "floorKB": 16 },
+  "selfTest": { "tolerance": 0.07 },
+  "noise": { "loadPerCore": 0.5, "spread": 1.25, "retries": 3 },
+  "runs": 3,
+  "budgetsBlockIn": ["M14"],
+  "sets": {
+    "default": {
+      "ratio": 1.5,
+      "scenarios": [
+        "line-pan-200k",
+        "scatter-pan-200k",
+        "pinch-zoom-gesture-50k",
+        "heatmap-pan-300k",
+        "hover-sweep-50k",
+        "time-pan-200k",
+        "hover-sync-line-200k",
+        "hover-sync-scatter-200k",
+        "hover-sync-unsorted-200k",
+        "hover-sync-group-20",
+        "stream20hz-50k-none",
+        "stream20hz-50k-plugin",
+        "stream20hz-50k-legendtable",
+        "stream-50hz-idle",
+        "group-append-3x20k-align",
+        "ingest-cols-1m",
+        "firstpaint-line-1m",
+        "reingest-rows-200k-title",
+        "react-rerender-200k-inline",
+        "offscreen-stream-24",
+        "theme-churn-24"
+      ]
+    },
+    "M2": {
+      "ratio": 1.2,
+      "scenarios": [
+        "independent-lines-pan-75k",
+        "scatter-render-10k",
+        "scatter-render-50k",
+        "scatter-render-200k",
+        "scatter-pan-50k",
+        "scatter-pan-200k",
+        "scatter-zoom-50k",
+        "scatter-zoom-200k",
+        "scatter-offaxis-pan-50k",
+        "scatter-encoded-pan-50k",
+        "heatmap-pan-300k",
+        "line-pan-200k",
+        "two-heatmaps-highlight-150k",
+        "append-stream-50k-window",
+        "hover-sweep-50k",
+        "touch-pan-gesture-50k",
+        "pinch-zoom-gesture-50k",
+        "wheel-zoom-gesture-50k",
+        "stream20hz-50k-none",
+        "hover-sync-line-200k",
+        "ingest-cols-1m"
+      ]
+    },
+    "M7": {
+      "ratio": 1.5,
+      "scenarios": [
+        "ingest-cols-1m",
+        "firstpaint-line-1m",
+        "reingest-rows-200k-title",
+        "reingest-rows-200k-callback",
+        "reingest-cols-200k-title",
+        "reingest-cols-200k-callback",
+        "react-rerender-200k-stable",
+        "react-rerender-200k-inline",
+        "independent-lines-pan-75k",
+        "scatter-pan-200k",
+        "scatter-offaxis-pan-50k",
+        "line-pan-200k",
+        "append-stream-50k-window",
+        "stream20hz-50k-none",
+        "hover-sync-scatter-200k",
+        "hover-sync-unsorted-200k"
+      ]
+    },
+    "M8": {
+      "ratio": 1.5,
+      "scenarios": [
+        "reingest-rows-200k-title",
+        "reingest-rows-200k-callback",
+        "reingest-cols-200k-title",
+        "reingest-cols-200k-callback",
+        "react-rerender-200k-stable",
+        "react-rerender-200k-inline",
+        "stream20hz-50k-none",
+        "stream20hz-50k-plugin",
+        "stream20hz-50k-legendtable",
+        "group-append-3x20k-align",
+        "hover-sync-group-20",
+        "append-stream-50k-window",
+        "line-pan-200k",
+        "scatter-pan-200k",
+        "hover-sweep-50k",
+        "ingest-cols-1m"
+      ]
+    },
+    "M9a": {
+      "ratio": 1.2,
+      "scenarios": [
+        "independent-lines-pan-75k",
+        "scatter-render-50k",
+        "scatter-pan-200k",
+        "scatter-zoom-200k",
+        "heatmap-pan-300k",
+        "line-pan-200k",
+        "two-heatmaps-highlight-150k",
+        "append-stream-50k-window",
+        "hover-sweep-50k",
+        "touch-pan-gesture-50k",
+        "pinch-zoom-gesture-50k",
+        "wheel-zoom-gesture-50k",
+        "time-pan-200k",
+        "hover-sync-line-200k",
+        "hover-sync-scatter-200k",
+        "stream20hz-50k-none",
+        "stream20hz-50k-plugin",
+        "ingest-cols-1m",
+        "reingest-cols-200k-title"
+      ]
+    },
+    "M9b": {
+      "ratio": 1.2,
+      "scenarios": [
+        "independent-lines-pan-75k",
+        "scatter-render-50k",
+        "scatter-pan-200k",
+        "scatter-zoom-200k",
+        "heatmap-pan-300k",
+        "line-pan-200k",
+        "two-heatmaps-highlight-150k",
+        "append-stream-50k-window",
+        "hover-sweep-50k",
+        "touch-pan-gesture-50k",
+        "pinch-zoom-gesture-50k",
+        "wheel-zoom-gesture-50k",
+        "time-pan-200k",
+        "hover-sync-line-200k",
+        "hover-sync-scatter-200k",
+        "stream20hz-50k-none",
+        "stream20hz-50k-plugin",
+        "ingest-cols-1m",
+        "reingest-cols-200k-title"
+      ]
+    },
+    "M10": {
+      "ratio": 1.5,
+      "scenarios": [
+        "line-pan-200k",
+        "time-pan-200k",
+        "scatter-pan-200k",
+        "hover-sweep-50k",
+        "hover-sync-line-200k",
+        "firstpaint-line-1m",
+        "mount-24-charts",
+        "resize-storm-24"
+      ]
+    },
+    "M11": {
+      "ratio": 1.5,
+      "scenarios": [
+        "firstpaint-line-1m",
+        "stream-50hz-idle",
+        "offscreen-stream-24",
+        "mount-24-charts",
+        "resize-storm-24",
+        "theme-churn-24",
+        "hover-sync-group-20",
+        "scatter-render-200k",
+        "scatter-pan-200k",
+        "scatter-zoom-200k",
+        "scatter-offaxis-pan-50k",
+        "scatter-encoded-pan-50k",
+        "heatmap-pan-300k",
+        "two-heatmaps-highlight-150k",
+        "pinch-zoom-gesture-50k",
+        "touch-pan-gesture-50k",
+        "line-pan-200k",
+        "append-stream-50k-window"
+      ]
+    },
+    "M12a": {
+      "ratio": 1.5,
+      "scenarios": [
+        "hover-sync-line-200k",
+        "hover-sync-scatter-200k",
+        "hover-sync-unsorted-200k",
+        "hover-sync-group-20",
+        "hover-sweep-50k",
+        "touch-pan-gesture-50k",
+        "pinch-zoom-gesture-50k",
+        "wheel-zoom-gesture-50k",
+        "time-pan-200k",
+        "scatter-pan-200k"
+      ]
+    },
+    "M12b": {
+      "ratio": 1.5,
+      "scenarios": [
+        "stream20hz-50k-none",
+        "stream20hz-50k-plugin",
+        "stream20hz-50k-legendtable",
+        "append-stream-50k-window",
+        "hover-sweep-50k",
+        "mount-24-charts",
+        "theme-churn-24"
+      ]
+    },
+    "M13": {
+      "ratio": 1.5,
+      "scenarios": ["react-rerender-200k-stable", "react-rerender-200k-inline"]
+    },
+    "M14": { "ratio": 1.5, "scenarios": "*" }
+  },
+  "overrides": [
+    { "set": "*", "scenario": "line-pan-200k", "metric": "busy.median", "max": 1.2 },
+    { "set": "M7", "scenario": "ingest-cols-1m", "metric": "sync.median", "max": 0.5 },
+    { "set": "M10", "scenario": "time-pan-200k", "metric": "busy.median", "max": 1.2 },
+    { "set": "M10", "scenario": "time-pan-200k", "metric": "busy.p95", "max": 1.5 },
+    { "set": "M10", "scenario": "line-pan-200k", "metric": "busy.p95", "max": 1.5 }
+  ],
+  "budgets": [
+    {
+      "id": "ingest-cols-1m-desktop",
+      "scenario": "ingest-cols-1m",
+      "metric": "sync.median",
+      "profile": "desktop",
+      "raster": "gpu",
+      "max": 40,
+      "kind": "time",
+      "sets": ["M7", "M14"],
+      "was": "100"
+    },
+    {
+      "id": "ingest-cols-1m-mobile",
+      "scenario": "ingest-cols-1m",
+      "metric": "sync.median",
+      "profile": "mobile",
+      "raster": "gpu",
+      "max": 135,
+      "kind": "time",
+      "sets": ["M7", "M14"],
+      "was": "346"
+    },
+    {
+      "id": "reingest-rows-200k-title-desktop",
+      "scenario": "reingest-rows-200k-title",
+      "metric": "sync.median",
+      "profile": "desktop",
+      "raster": "gpu",
+      "max": 2,
+      "kind": "time",
+      "sets": ["M8", "M14"],
+      "was": "54"
+    },
+    {
+      "id": "reingest-rows-200k-title-mobile",
+      "scenario": "reingest-rows-200k-title",
+      "metric": "sync.median",
+      "profile": "mobile",
+      "raster": "gpu",
+      "max": 8,
+      "kind": "time",
+      "sets": ["M8", "M14"],
+      "was": "220"
+    },
+    {
+      "id": "react-rerender-200k-inline",
+      "scenario": "react-rerender-200k-inline",
+      "metric": "sync.median",
+      "profile": "desktop",
+      "raster": "gpu",
+      "max": 3,
+      "kind": "time",
+      "sets": ["M8", "M13", "M14"],
+      "was": "37 (inline callback)"
+    },
+    {
+      "id": "group-append-3x20k-align-mobile",
+      "scenario": "group-append-3x20k-align",
+      "metric": "sync.median",
+      "profile": "mobile",
+      "raster": "gpu",
+      "max": 0.5,
+      "kind": "time",
+      "sets": ["M8", "M14"],
+      "was": "6.5"
+    },
+    {
+      "id": "stream20hz-50k-none-heap",
+      "scenario": "stream20hz-50k-none",
+      "metric": "heap.grossKBPerOp",
+      "profile": "*",
+      "raster": "*",
+      "max": 50,
+      "kind": "count",
+      "sets": ["M8", "M12b", "M14"]
+    },
+    {
+      "id": "stream20hz-50k-plugin-heap",
+      "scenario": "stream20hz-50k-plugin",
+      "metric": "heap.grossKBPerOp",
+      "profile": "*",
+      "raster": "*",
+      "max": 50,
+      "kind": "count",
+      "sets": ["M8", "M14"],
+      "was": "930-960"
+    },
+    {
+      "id": "stream20hz-50k-legendtable-heap",
+      "scenario": "stream20hz-50k-legendtable",
+      "metric": "heap.grossKBPerOp",
+      "profile": "*",
+      "raster": "*",
+      "max": 50,
+      "kind": "count",
+      "sets": ["M12b", "M14"],
+      "was": "504-574"
+    },
+    {
+      "id": "firstpaint-line-1m-desktop",
+      "scenario": "firstpaint-line-1m",
+      "metric": "wall.median",
+      "profile": "desktop",
+      "raster": "gpu",
+      "max": 45,
+      "kind": "time",
+      "sets": ["M11", "M14"],
+      "was": "114 (Chart.js 34)"
+    },
+    {
+      "id": "firstpaint-line-1m-mobile",
+      "scenario": "firstpaint-line-1m",
+      "metric": "wall.median",
+      "profile": "mobile",
+      "raster": "gpu",
+      "max": 150,
+      "kind": "time",
+      "sets": ["M11", "M14"],
+      "was": "414"
+    },
+    {
+      "id": "stream-50hz-idle-software",
+      "scenario": "stream-50hz-idle",
+      "metric": "frame.median",
+      "profile": "mobile",
+      "raster": "software",
+      "max": 33,
+      "kind": "time",
+      "sets": ["M11", "M14"],
+      "was": "270-300"
+    },
+    {
+      "id": "offscreen-stream-24-share",
+      "scenario": "offscreen-stream-24",
+      "metric": "meta.offscreenShare",
+      "profile": "*",
+      "raster": "gpu",
+      "max": 0.15,
+      "kind": "time",
+      "sets": ["M11", "M14"],
+      "was": "about 1.0"
+    },
+    {
+      "id": "mount-24-charts-offscreen-paints",
+      "scenario": "mount-24-charts",
+      "metric": "meta.offscreenPaints",
+      "profile": "*",
+      "raster": "*",
+      "max": 0,
+      "kind": "count",
+      "sets": ["M11", "M14"]
+    },
+    {
+      "id": "mount-24-charts-canvas-mobile",
+      "scenario": "mount-24-charts",
+      "metric": "meta.canvasMBPerChart",
+      "profile": "mobile",
+      "raster": "*",
+      "max": 5,
+      "kind": "count",
+      "sets": ["M11", "M14"],
+      "was": "7.4"
+    },
+    {
+      "id": "scatter-pan-200k-fidelity",
+      "scenario": "scatter-pan-200k",
+      "metric": "fidelity.median",
+      "profile": "*",
+      "raster": "*",
+      "min": 0.8,
+      "kind": "count",
+      "sets": ["M11", "M14"]
+    },
+    {
+      "id": "pinch-zoom-gesture-50k-fidelity",
+      "scenario": "pinch-zoom-gesture-50k",
+      "metric": "fidelity.median",
+      "profile": "*",
+      "raster": "*",
+      "min": 0.8,
+      "kind": "count",
+      "sets": ["M11", "M14"]
+    },
+    {
+      "id": "hover-sync-group-20-offscreen-overlays",
+      "scenario": "hover-sync-group-20",
+      "metric": "meta.offscreenOverlaysPerMove",
+      "profile": "*",
+      "raster": "*",
+      "max": 0,
+      "kind": "count",
+      "sets": ["M11", "M14"]
+    },
+    {
+      "id": "theme-churn-24-resolves",
+      "scenario": "theme-churn-24",
+      "metric": "meta.gridRendersPerChartPerFrame",
+      "profile": "*",
+      "raster": "*",
+      "max": 1,
+      "kind": "count",
+      "sets": ["M11", "M14"]
+    },
+    {
+      "id": "hover-sync-line-200k-mobile",
+      "scenario": "hover-sync-line-200k",
+      "metric": "sync.median",
+      "profile": "mobile",
+      "raster": "gpu",
+      "max": 0.2,
+      "kind": "time",
+      "sets": ["M12a", "M14"],
+      "was": "0.26"
+    },
+    {
+      "id": "hover-sync-scatter-200k-mobile",
+      "scenario": "hover-sync-scatter-200k",
+      "metric": "sync.median",
+      "profile": "mobile",
+      "raster": "gpu",
+      "max": 0.2,
+      "kind": "time",
+      "sets": ["M12a", "M14"],
+      "was": "1.86"
+    },
+    {
+      "id": "hover-sync-unsorted-200k-mobile",
+      "scenario": "hover-sync-unsorted-200k",
+      "metric": "sync.median",
+      "profile": "mobile",
+      "raster": "gpu",
+      "max": 0.2,
+      "kind": "time",
+      "sets": ["M12a", "M14"],
+      "was": "1.80"
+    }
+  ]
+}
