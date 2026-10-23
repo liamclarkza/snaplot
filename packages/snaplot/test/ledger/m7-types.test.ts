@@ -57,6 +57,55 @@ const snippets: Record<string, string> = {
       series: [{ y: 'cpu', type: 'area' }],
     } satisfies ChartOptions<Sample>;
     createChart(el, options);`,
+  categoryFormatRejected: `
+    createChart(el, {
+      data: [{ m: 'Jan', v: 1 }],
+      x: 'm',
+      series: [{ type: 'bar', y: 'v' }],
+      axes: {
+        x: {
+          type: 'category',
+          // @ts-expect-error format is not accepted on a category axis
+          format: (value: number) => String(value),
+        },
+      },
+    });`,
+  suffixFormat: `
+    createChart(el, { data: samples, x: 'time', series: [{ y: 'cpu' }], axes: { y: { format: { suffix: '%' } } } });`,
+  dateTicks: `
+    createChart(el, {
+      data: samples,
+      x: 'time',
+      series: [{ y: 'cpu' }],
+      axes: { x: { ticks: [new Date(2026, 0, 1), 1767312000000], min: new Date(2026, 0, 1) } },
+    });`,
+  changePayloads: `
+    createChart(el, {
+      data: samples,
+      x: 'time',
+      series: [{ y: 'cpu' }],
+      onHighlightChange: (id) => { const value: string | null = id; void value; },
+      onHiddenSeriesChange: (ids) => { const value: readonly string[] = ids; void value; },
+      onFollowingChange: (following) => { const value: boolean = following; void value; },
+      onViewportChange: (viewport) => { const x: readonly [number | Date, number | Date] | undefined = viewport.x; void x; },
+      onSelectionChange: (selection) => { void selection?.x[0]; },
+      onCursorChange: (cursor) => { void cursor.points.length; },
+    });`,
+  noOnZoom: `
+    createChart(el, {
+      data: samples,
+      x: 'time',
+      series: [{ y: 'cpu' }],
+      // @ts-expect-error zoom.onZoom is not an option (arch-12): use onViewportChange
+      zoom: { onZoom: () => {} },
+    });`,
+  genericPluginFactory: `
+    function note<Row>(at: number): ChartPlugin<Row> { return { id: 'note-' + at }; }
+    createChart(el, { data: samples, x: 'time', series: [{ y: 'cpu' }], plugins: [note(1)] });`,
+  axisTypeIsAUnion: `
+    const chart = createChart(el, { data: samples, x: 'time', series: [{ y: 'cpu' }] });
+    // @ts-expect-error 'categroy' is not an axis type
+    if (chart.getAxis('x')?.type === 'categroy') void chart;`,
   misspelledFieldIsRejected: `
     // @ts-expect-error a misspelled field must stay a type error (control)
     createChart(el, { data: samples, x: 'time', series: [{ y: 'cpuu' }] });`,
@@ -132,5 +181,33 @@ describe('typed rows compile with the public types', () => {
 
   it('options declared separately with `satisfies ChartOptions<Row>` compile (control)', () => {
     expect(diagnostics.get('separateOptions')).toEqual([]);
+  });
+
+  it.fails('[dxtrial-05] a format on a category axis is a type error', () => {
+    expect(diagnostics.get('categoryFormatRejected')).toEqual([]);
+  });
+
+  it.fails("[dxtrial-05] format: { suffix: '%' } compiles on a value axis", () => {
+    expect(diagnostics.get('suffixFormat')).toEqual([]);
+  });
+
+  it.fails('[dxtrial-05] ticks and min accept Dates', () => {
+    expect(diagnostics.get('dateTicks')).toEqual([]);
+  });
+
+  it.fails('[dataapi-08] on<Key>Change options type their payloads', () => {
+    expect(diagnostics.get('changePayloads')).toEqual([]);
+  });
+
+  it.fails('[arch-12] onZoom is not an option', () => {
+    expect(diagnostics.get('noOnZoom')).toEqual([]);
+  });
+
+  it.fails('[gap-annotations-extensibility-12] a generic plugin factory keeps the chart’s Row', () => {
+    expect(diagnostics.get('genericPluginFactory')).toEqual([]);
+  });
+
+  it.fails('[gap-annotations-extensibility-12] an axis type is a union, not a string', () => {
+    expect(diagnostics.get('axisTypeIsAUnion')).toEqual([]);
   });
 });
