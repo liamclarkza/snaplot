@@ -13,10 +13,12 @@ describe('histogram', () => {
   });
 
   it('rejects invalid explicit bin counts', () => {
-    expect(() => histogram(f([1, 2, 3]), { binCount: Infinity }))
-      .toThrow(/binCount must be a positive finite number/);
-    expect(() => histogram(f([1, 2, 3]), { binCount: 0 }))
-      .toThrow(/binCount must be a positive finite number/);
+    expect(() => histogram(f([1, 2, 3]), { binCount: Infinity })).toThrow(
+      /binCount must be a positive finite number/,
+    );
+    expect(() => histogram(f([1, 2, 3]), { binCount: 0 })).toThrow(
+      /binCount must be a positive finite number/,
+    );
     expect(() => histogram(f([]), { binCount: 0 })).toThrow(/positive finite/);
     expect(() => histogram(f([1, 1]), { binCount: Infinity })).toThrow(/positive finite/);
   });
@@ -36,7 +38,9 @@ describe('histogram', () => {
 
   it('accepts ordinary readonly numeric arrays without mutating them', () => {
     const values = Object.freeze([3, 1, 2]);
-    expect(histogram(values, { binCount: 2 }).counts.reduce((sum, value) => sum + value, 0)).toBe(3);
+    expect(histogram(values, { binCount: 2 }).counts.reduce((sum, value) => sum + value, 0)).toBe(
+      3,
+    );
     expect(values).toEqual([3, 1, 2]);
   });
 });

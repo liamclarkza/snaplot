@@ -184,7 +184,11 @@ describe('GestureManager cursor emission', () => {
     const cursor = vi.fn();
     eventBus.on('action:cursor', cursor);
 
-    const down = target.dispatch('pointerdown', { clientX: 100, clientY: 100, pointerType: 'touch' });
+    const down = target.dispatch('pointerdown', {
+      clientX: 100,
+      clientY: 100,
+      pointerType: 'touch',
+    });
     const touchStart = target.dispatchTouch('touchstart');
 
     expect(cursor).toHaveBeenCalledWith({ x: 100, y: 100, pointerType: 'touch' });
@@ -265,17 +269,49 @@ describe('GestureManager cursor emission', () => {
     vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
     const cursorGesture = createGesture('analytical');
 
-    cursorGesture.target.dispatch('pointerdown', { clientX: 100, clientY: 100, pointerType: 'touch' });
-    cursorGesture.target.dispatch('pointermove', { clientX: 140, clientY: 100, pointerType: 'touch' });
-    cursorGesture.target.dispatch('pointerup', { clientX: 140, clientY: 100, pointerType: 'touch' });
+    cursorGesture.target.dispatch('pointerdown', {
+      clientX: 100,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    cursorGesture.target.dispatch('pointermove', {
+      clientX: 140,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    cursorGesture.target.dispatch('pointerup', {
+      clientX: 140,
+      clientY: 100,
+      pointerType: 'touch',
+    });
     cursorGesture.manager.detach();
 
     const selectionGesture = createGesture('analytical');
-    selectionGesture.target.dispatch('pointerdown', { clientX: 100, clientY: 100, pointerType: 'touch' });
-    selectionGesture.target.dispatch('pointerup', { clientX: 100, clientY: 100, pointerType: 'touch' });
-    selectionGesture.target.dispatch('pointerdown', { clientX: 102, clientY: 100, pointerType: 'touch' });
-    selectionGesture.target.dispatch('pointermove', { clientX: 140, clientY: 100, pointerType: 'touch' });
-    selectionGesture.target.dispatch('pointerup', { clientX: 140, clientY: 100, pointerType: 'touch' });
+    selectionGesture.target.dispatch('pointerdown', {
+      clientX: 100,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    selectionGesture.target.dispatch('pointerup', {
+      clientX: 100,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    selectionGesture.target.dispatch('pointerdown', {
+      clientX: 102,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    selectionGesture.target.dispatch('pointermove', {
+      clientX: 140,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    selectionGesture.target.dispatch('pointerup', {
+      clientX: 140,
+      clientY: 100,
+      pointerType: 'touch',
+    });
     selectionGesture.manager.detach();
 
     expect(requestAnimationFrame).not.toHaveBeenCalled();
@@ -448,8 +484,16 @@ describe('GestureManager cursor emission', () => {
 
     target.dispatch('pointerdown', { clientX: 100, clientY: 100, pointerType: 'touch' });
     target.dispatch('pointerup', { clientX: 100, clientY: 100, pointerType: 'touch' });
-    const secondDown = target.dispatch('pointerdown', { clientX: 101, clientY: 100, pointerType: 'touch' });
-    const secondUp = target.dispatch('pointerup', { clientX: 101, clientY: 100, pointerType: 'touch' });
+    const secondDown = target.dispatch('pointerdown', {
+      clientX: 101,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    const secondUp = target.dispatch('pointerup', {
+      clientX: 101,
+      clientY: 100,
+      pointerType: 'touch',
+    });
 
     expect(reset).toHaveBeenCalledOnce();
     expect(secondDown.preventDefault).toHaveBeenCalled();
@@ -502,9 +546,24 @@ describe('GestureManager cursor emission', () => {
     const zoomMove = vi.fn();
     eventBus.on('action:zoom', zoomMove);
 
-    target.dispatch('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, pointerType: 'touch' });
-    target.dispatch('pointerdown', { pointerId: 2, clientX: 200, clientY: 100, pointerType: 'touch' });
-    target.dispatch('pointermove', { pointerId: 2, clientX: 220, clientY: 100, pointerType: 'touch' });
+    target.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    target.dispatch('pointerdown', {
+      pointerId: 2,
+      clientX: 200,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    target.dispatch('pointermove', {
+      pointerId: 2,
+      clientX: 220,
+      clientY: 100,
+      pointerType: 'touch',
+    });
 
     expect(zoomMove).toHaveBeenCalledWith(expect.objectContaining({ axis: 'xy' }));
     manager.detach();
@@ -517,9 +576,24 @@ describe('GestureManager cursor emission', () => {
     const zoomMove = vi.fn();
     eventBus.on('action:zoom', zoomMove);
 
-    target.dispatch('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, pointerType: 'touch' });
-    target.dispatch('pointerdown', { pointerId: 2, clientX: 200, clientY: 100, pointerType: 'touch' });
-    target.dispatch('pointermove', { pointerId: 2, clientX: 220, clientY: 100, pointerType: 'touch' });
+    target.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    target.dispatch('pointerdown', {
+      pointerId: 2,
+      clientX: 200,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    target.dispatch('pointermove', {
+      pointerId: 2,
+      clientX: 220,
+      clientY: 100,
+      pointerType: 'touch',
+    });
 
     expect(zoomMove).toHaveBeenCalledWith(expect.objectContaining({ axis: 'x' }));
     manager.detach();
@@ -550,7 +624,11 @@ describe('GestureManager cursor emission', () => {
     eventBus.on('action:pan', panMove);
     manager.attach();
 
-    const down = target.dispatch('pointerdown', { clientX: 100, clientY: 250, pointerType: 'touch' });
+    const down = target.dispatch('pointerdown', {
+      clientX: 100,
+      clientY: 250,
+      pointerType: 'touch',
+    });
     target.dispatch('pointermove', { clientX: 140, clientY: 250 });
 
     expect(panMove).not.toHaveBeenCalled();
@@ -585,7 +663,11 @@ describe('GestureManager cursor emission', () => {
     eventBus.on('action:cursor', cursor);
     manager.attach();
 
-    const down = target.dispatch('pointerdown', { clientX: 100, clientY: 250, pointerType: 'touch' });
+    const down = target.dispatch('pointerdown', {
+      clientX: 100,
+      clientY: 250,
+      pointerType: 'touch',
+    });
     target.dispatch('pointermove', { clientX: 140, clientY: 250, pointerType: 'touch' });
 
     expect(panMove).not.toHaveBeenCalled();
@@ -666,12 +748,32 @@ describe('GestureManager pointer cancellation', () => {
     eventBus.on('action:zoom', zoomMove);
 
     // First finger goes down, then the OS cancels the touch (no pointerup).
-    target.dispatch('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, pointerType: 'touch' });
-    target.dispatch('pointercancel', { pointerId: 1, clientX: 100, clientY: 100, pointerType: 'touch' });
+    target.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+      pointerType: 'touch',
+    });
+    target.dispatch('pointercancel', {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+      pointerType: 'touch',
+    });
 
     // A fresh single-finger touch must act as one pointer, not a second finger.
-    target.dispatch('pointerdown', { pointerId: 2, clientX: 150, clientY: 120, pointerType: 'touch' });
-    target.dispatch('pointermove', { pointerId: 2, clientX: 180, clientY: 120, pointerType: 'touch' });
+    target.dispatch('pointerdown', {
+      pointerId: 2,
+      clientX: 150,
+      clientY: 120,
+      pointerType: 'touch',
+    });
+    target.dispatch('pointermove', {
+      pointerId: 2,
+      clientX: 180,
+      clientY: 120,
+      pointerType: 'touch',
+    });
 
     expect(zoomMove).not.toHaveBeenCalled();
     manager.detach();

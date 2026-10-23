@@ -11,15 +11,16 @@ export function equivalent(a: unknown, b: unknown): boolean {
     return a.length === b.length && a.every((value, index) => equivalent(value, b[index]));
   }
   if (!plain(a) || !plain(b)) return false;
-  const keys = Object.keys(a).filter(key => a[key] !== undefined);
-  const other = Object.keys(b).filter(key => b[key] !== undefined);
-  return keys.length === other.length && keys.every(key => {
-    if (!(key in b)) return false;
-    // Data and group objects are ownership boundaries, not configuration trees.
-    return key === 'data' || key === 'group'
-      ? a[key] === b[key]
-      : equivalent(a[key], b[key]);
-  });
+  const keys = Object.keys(a).filter((key) => a[key] !== undefined);
+  const other = Object.keys(b).filter((key) => b[key] !== undefined);
+  return (
+    keys.length === other.length &&
+    keys.every((key) => {
+      if (!(key in b)) return false;
+      // Data and group objects are ownership boundaries, not configuration trees.
+      return key === 'data' || key === 'group' ? a[key] === b[key] : equivalent(a[key], b[key]);
+    })
+  );
 }
 
 /** Only options merge. Dataset records, plugin instances and arrays are atomic. */

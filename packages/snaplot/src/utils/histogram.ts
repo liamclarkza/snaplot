@@ -14,7 +14,6 @@
  * histogram series dataset; callers never need to pad counts.
  */
 
-
 export interface HistogramBins {
   /** Bin edge values (length = N+1 for N bins) */
   edges: Float64Array;
@@ -43,8 +42,13 @@ export function histogram(
   const method = options?.method ?? 'freedman-diaconis';
   const explicitBinCount = options?.binCount;
 
-  if (explicitBinCount !== undefined && (!Number.isFinite(explicitBinCount) || explicitBinCount <= 0)) {
-    throw new Error(`histogram() binCount must be a positive finite number, received ${explicitBinCount}.`);
+  if (
+    explicitBinCount !== undefined &&
+    (!Number.isFinite(explicitBinCount) || explicitBinCount <= 0)
+  ) {
+    throw new Error(
+      `histogram() binCount must be a positive finite number, received ${explicitBinCount}.`,
+    );
   }
 
   // Filter values that cannot participate in finite bin math.
@@ -74,7 +78,9 @@ export function histogram(
   let nBins: number;
   if (explicitBinCount !== undefined) {
     if (!Number.isFinite(explicitBinCount) || explicitBinCount <= 0) {
-      throw new Error(`histogram() binCount must be a positive finite number, received ${explicitBinCount}.`);
+      throw new Error(
+        `histogram() binCount must be a positive finite number, received ${explicitBinCount}.`,
+      );
     }
     nBins = Math.max(1, Math.round(explicitBinCount));
   } else {

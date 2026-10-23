@@ -3,7 +3,9 @@ import { createChart, reconcileChart, setChartControls } from '../api/createChar
 import type { ChartHandle, ChartOptions } from '../api/types';
 import { applyDefaults, chartOptions, chartControls, type ChartControls } from './shared';
 
-export interface ChartProps<Row = Record<string, unknown>> extends ChartOptions<Row>, ChartControls {
+export interface ChartProps<Row = Record<string, unknown>>
+  extends ChartOptions<Row>,
+    ChartControls {
   className?: string;
   style?: CSSProperties;
   ref?: Ref<ChartHandle<Row>>;
@@ -12,9 +14,18 @@ export interface ChartProps<Row = Record<string, unknown>> extends ChartOptions<
 function assignRef<T>(ref: Ref<T> | undefined, value: T): (() => void) | undefined {
   if (typeof ref === 'function') {
     const cleanup = ref(value);
-    return typeof cleanup === 'function' ? cleanup : () => { ref(null); };
+    return typeof cleanup === 'function'
+      ? cleanup
+      : () => {
+          ref(null);
+        };
   }
-  if (ref) { ref.current = value; return () => { ref.current = null; }; }
+  if (ref) {
+    ref.current = value;
+    return () => {
+      ref.current = null;
+    };
+  }
 }
 /** Native React 19 component. Options are direct props; the ref exposes the imperative handle. */
 export function Chart<Row = Record<string, unknown>>(props: ChartProps<Row>) {
@@ -30,7 +41,10 @@ export function Chart<Row = Record<string, unknown>>(props: ChartProps<Row>) {
     setChartControls(chart, chartControls(current));
     applyDefaults(chart, current);
     current.onReady?.(chart);
-    return () => { instance.current = null; chart.destroy(); };
+    return () => {
+      instance.current = null;
+      chart.destroy();
+    };
   }, []);
   useLayoutEffect(() => {
     if (instance.current) {
@@ -41,6 +55,13 @@ export function Chart<Row = Record<string, unknown>>(props: ChartProps<Row>) {
   useLayoutEffect(() => {
     if (instance.current) return assignRef(forwardedRef, instance.current);
   }, [forwardedRef]);
-  return createElement('div', { ref: host, className: props.className,
-    style: { width: '100%', height: '100%', ...props.style }, role: 'group', 'aria-label': props['aria-label'] ?? props.ariaLabel ?? 'Chart', 'aria-describedby': props['aria-describedby'], 'aria-labelledby': props['aria-labelledby'] });
+  return createElement('div', {
+    ref: host,
+    className: props.className,
+    style: { width: '100%', height: '100%', ...props.style },
+    role: 'group',
+    'aria-label': props['aria-label'] ?? props.ariaLabel ?? 'Chart',
+    'aria-describedby': props['aria-describedby'],
+    'aria-labelledby': props['aria-labelledby'],
+  });
 }

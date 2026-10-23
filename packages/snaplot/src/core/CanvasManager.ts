@@ -30,7 +30,7 @@ export class CanvasManager {
     parent: HTMLElement,
     private onResize?: (width: number, height: number) => void,
   ) {
-    this._dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    this._dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 
     // Container. `tabindex="0"` makes the chart keyboard-focusable,    // arrow-key pan / +/- zoom / 0-reset get wired up by GestureManager.
     // We don't set `:focus-visible` styling here; consumers can target
@@ -131,7 +131,7 @@ export class CanvasManager {
    * Called once on init + on ResizeObserver callback, never per frame.
    */
   resize(width: number, height: number): void {
-    this._dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    this._dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 
     for (const canvas of [this.gridCanvas, this.dataCanvas, this.overlayCanvas]) {
       canvas.width = width * this._dpr;

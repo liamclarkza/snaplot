@@ -227,7 +227,10 @@ export function renderAreaSegments(
   }
 
   if (hasSegment) closeAndFillSegment();
-  if (!hasAnySegment) { ctx.restore(); return; }
+  if (!hasAnySegment) {
+    ctx.restore();
+    return;
+  }
 
   // Stroke the line on top
   ctx.beginPath();
@@ -236,12 +239,22 @@ export function renderAreaSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (!Number.isFinite(yVal)) { if (!spanGaps) hasPath = false; continue; }
+      if (!Number.isFinite(yVal)) {
+        if (!spanGaps) hasPath = false;
+        continue;
+      }
       const px = projX(xData[i]);
       const py = projY(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) { if (!spanGaps) hasPath = false; continue; }
-      if (!hasPath) { ctx.moveTo(px, py); hasPath = true; }
-      else { ctx.lineTo(px, py); }
+      if (!Number.isFinite(px) || !Number.isFinite(py)) {
+        if (!spanGaps) hasPath = false;
+        continue;
+      }
+      if (!hasPath) {
+        ctx.moveTo(px, py);
+        hasPath = true;
+      } else {
+        ctx.lineTo(px, py);
+      }
     }
   }
   ctx.strokeStyle = color;
@@ -327,8 +340,12 @@ export function renderBandSegments(
       for (let i = run.startIdx; i <= run.endIdx; i++) {
         const px = scaleX.dataToPixel(run.xData[i]);
         const py = scaleY.dataToPixel(run.upperYData[i]);
-        if (!moved) { ctx.moveTo(px, py); moved = true; }
-        else { ctx.lineTo(px, py); }
+        if (!moved) {
+          ctx.moveTo(px, py);
+          moved = true;
+        } else {
+          ctx.lineTo(px, py);
+        }
       }
     }
 
@@ -350,7 +367,8 @@ export function renderBandSegments(
   for (const segment of segments) {
     const { xData, centerYData, upperYData, lowerYData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
-      const u = upperYData[i], l = lowerYData[i];
+      const u = upperYData[i],
+        l = lowerYData[i];
       const valid =
         Number.isFinite(xData[i]) &&
         Number.isFinite(u) &&
@@ -362,7 +380,14 @@ export function renderBandSegments(
         runStart = i;
       } else if (!valid) {
         if (runStart >= 0) {
-          runs.push({ xData, centerYData, upperYData, lowerYData, startIdx: runStart, endIdx: i - 1 });
+          runs.push({
+            xData,
+            centerYData,
+            upperYData,
+            lowerYData,
+            startIdx: runStart,
+            endIdx: i - 1,
+          });
           runStart = -1;
         }
         if (runs.length > 0) {
@@ -389,12 +414,22 @@ export function renderBandSegments(
       const { xData, centerYData, startIdx, endIdx } = segment;
       for (let i = startIdx; i <= endIdx; i++) {
         const yVal = centerYData[i];
-        if (!Number.isFinite(yVal)) { moved = false; continue; }
+        if (!Number.isFinite(yVal)) {
+          moved = false;
+          continue;
+        }
         const px = scaleX.dataToPixel(xData[i]);
         const py = scaleY.dataToPixel(yVal);
-        if (!Number.isFinite(px) || !Number.isFinite(py)) { moved = false; continue; }
-        if (!moved) { ctx.moveTo(px, py); moved = true; }
-        else { ctx.lineTo(px, py); }
+        if (!Number.isFinite(px) || !Number.isFinite(py)) {
+          moved = false;
+          continue;
+        }
+        if (!moved) {
+          ctx.moveTo(px, py);
+          moved = true;
+        } else {
+          ctx.lineTo(px, py);
+        }
       }
     }
     ctx.strokeStyle = color;
@@ -436,14 +471,24 @@ function drawLinearSegments(
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (!Number.isFinite(yVal)) { if (!spanGaps) moved = false; continue; }
+      if (!Number.isFinite(yVal)) {
+        if (!spanGaps) moved = false;
+        continue;
+      }
 
       const px = ax ? xData[i] * kx + bx : scaleX.dataToPixel(xData[i]);
       const py = ay ? yVal * ky + by : scaleY.dataToPixel(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) { if (!spanGaps) moved = false; continue; }
+      if (!Number.isFinite(px) || !Number.isFinite(py)) {
+        if (!spanGaps) moved = false;
+        continue;
+      }
 
-      if (!moved) { ctx.moveTo(px, py); moved = true; }
-      else { ctx.lineTo(px, py); }
+      if (!moved) {
+        ctx.moveTo(px, py);
+        moved = true;
+      } else {
+        ctx.lineTo(px, py);
+      }
     }
   }
 }
@@ -460,17 +505,24 @@ function drawSteppedSegments(
 ): void {
   ctx.beginPath();
   let moved = false;
-  let prevPx = 0, prevPy = 0;
+  let prevPx = 0,
+    prevPy = 0;
 
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
-      if (!Number.isFinite(yVal)) { if (!spanGaps) moved = false; continue; }
+      if (!Number.isFinite(yVal)) {
+        if (!spanGaps) moved = false;
+        continue;
+      }
 
       const px = scaleX.dataToPixel(xData[i]);
       const py = scaleY.dataToPixel(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) { if (!spanGaps) moved = false; continue; }
+      if (!Number.isFinite(px) || !Number.isFinite(py)) {
+        if (!spanGaps) moved = false;
+        continue;
+      }
 
       if (!moved) {
         ctx.moveTo(px, py);
@@ -547,14 +599,13 @@ function drawMonotoneCubicSegments(
   flushRun();
 }
 
-function drawMonotoneRun(
-  ctx: CanvasRenderingContext2D,
-  px: number[],
-  py: number[],
-): void {
+function drawMonotoneRun(ctx: CanvasRenderingContext2D, px: number[], py: number[]): void {
   const n = px.length;
   if (n === 0) return;
-  if (n === 1) { ctx.moveTo(px[0], py[0]); return; }
+  if (n === 1) {
+    ctx.moveTo(px[0], py[0]);
+    return;
+  }
   if (n === 2) {
     ctx.moveTo(px[0], py[0]);
     ctx.lineTo(px[1], py[1]);
@@ -613,9 +664,12 @@ function drawMonotoneRun(
   for (let i = 0; i < n - 1; i++) {
     const d = dx[i] / 3;
     ctx.bezierCurveTo(
-      px[i] + d, py[i] + tangents[i] * d,
-      px[i + 1] - d, py[i + 1] - tangents[i + 1] * d,
-      px[i + 1], py[i + 1],
+      px[i] + d,
+      py[i] + tangents[i] * d,
+      px[i + 1] - d,
+      py[i + 1] - tangents[i + 1] * d,
+      px[i + 1],
+      py[i + 1],
     );
   }
 }

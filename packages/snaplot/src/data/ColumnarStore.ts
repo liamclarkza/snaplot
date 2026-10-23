@@ -37,7 +37,10 @@ export class ColumnarStore implements DataStore {
 
   /** Validate: equal column lengths, sorted X (monotonically non-decreasing). */
   static validate(data: ColumnarData): void {
-    if (!Array.isArray(data) && !(data && typeof (data as unknown as { length: number }).length === 'number')) {
+    if (
+      !Array.isArray(data) &&
+      !(data && typeof (data as unknown as { length: number }).length === 'number')
+    ) {
       throw new Error(
         'ColumnarData must be an array of Float64Arrays, received ' +
           describeType(data) +
@@ -185,12 +188,14 @@ export class ColumnarStore implements DataStore {
     const logicalStart = Math.max(0, startIdx);
     const logicalEnd = Math.min(this.length - 1, endIdx);
     if (logicalEnd < logicalStart) return [];
-    return [{
-      logicalStart,
-      logicalEnd,
-      physicalStart: logicalStart,
-      physicalEnd: logicalEnd,
-    }];
+    return [
+      {
+        logicalStart,
+        logicalEnd,
+        physicalStart: logicalStart,
+        physicalEnd: logicalEnd,
+      },
+    ];
   }
 
   /** Replace all data */

@@ -156,7 +156,8 @@ function chartEventBus(chart: ChartCore): EventBus {
 }
 
 function interactionLayer(chart: ChartCore): MockElement {
-  return (chart as unknown as { canvasManager: { interactionLayer: MockElement } }).canvasManager.interactionLayer;
+  return (chart as unknown as { canvasManager: { interactionLayer: MockElement } }).canvasManager
+    .interactionLayer;
 }
 
 function plotPoint(chart: ChartCore, xFraction = 0.5): { x: number; y: number } {
@@ -172,7 +173,10 @@ describe('ChartCore appendData', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -272,7 +276,15 @@ describe('ChartCore runtime options', () => {
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear' } },
         series: [
-          { label: 'Forecast', type: 'band', dataIndex: 1, upperDataIndex: 2, lowerDataIndex: 3, stroke: '#f90', lineDash: [4, 2] },
+          {
+            label: 'Forecast',
+            type: 'band',
+            dataIndex: 1,
+            upperDataIndex: 2,
+            lowerDataIndex: 3,
+            stroke: '#f90',
+            lineDash: [4, 2],
+          },
           { label: 'Observed', type: 'line', dataIndex: 1, visible: false },
         ],
       },
@@ -280,7 +292,14 @@ describe('ChartCore runtime options', () => {
     );
 
     expect(chart.getLegendItems()).toMatchObject([
-      { label: 'Forecast', type: 'band', color: '#f90', fill: '#f90', lineDash: [4, 2], visible: true },
+      {
+        label: 'Forecast',
+        type: 'band',
+        color: '#f90',
+        fill: '#f90',
+        lineDash: [4, 2],
+        visible: true,
+      },
       { label: 'Observed', type: 'line', fill: null, visible: false },
     ]);
     chart.destroy();
@@ -290,7 +309,10 @@ describe('ChartCore runtime options', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -344,7 +366,12 @@ describe('ChartCore runtime options', () => {
     const seen: number[] = [];
     chart.on('options:update', (config) => seen.push(config.series.length));
 
-    chart.setOptions({ series: [{ label: 'a', dataIndex: 1 }, { label: 'b', dataIndex: 1 }] });
+    chart.setOptions({
+      series: [
+        { label: 'a', dataIndex: 1 },
+        { label: 'b', dataIndex: 1 },
+      ],
+    });
     chart.replaceOptions({ series: [{ label: 'a', dataIndex: 1 }] });
 
     expect(seen).toEqual([2, 1]);
@@ -449,17 +476,26 @@ describe('ChartCore runtime options', () => {
     );
 
     chartA.setOptions({ cursor: { syncKey: 'group-a' } });
-    chartEventBus(chartA).emit('action:cursor', { ...plotPoint(chartA, 0.5), pointerType: 'mouse' });
+    chartEventBus(chartA).emit('action:cursor', {
+      ...plotPoint(chartA, 0.5),
+      pointerType: 'mouse',
+    });
     expect(chartB.getCursorSnapshot({ fallback: 'hide' }).source).toBe('cursor');
     expect(chartC.getCursorSnapshot({ fallback: 'hide' }).source).toBe('none');
 
     chartA.setOptions({ cursor: { syncKey: 'group-b' } });
-    chartEventBus(chartA).emit('action:cursor', { ...plotPoint(chartA, 0.8), pointerType: 'mouse' });
+    chartEventBus(chartA).emit('action:cursor', {
+      ...plotPoint(chartA, 0.8),
+      pointerType: 'mouse',
+    });
     expect(chartB.getCursorSnapshot({ fallback: 'hide' }).dataX).toBe(50);
     expect(chartC.getCursorSnapshot({ fallback: 'hide' }).dataX).toBe(100);
 
     chartA.setOptions({ cursor: { syncKey: null } });
-    chartEventBus(chartA).emit('action:cursor', { ...plotPoint(chartA, 0.2), pointerType: 'mouse' });
+    chartEventBus(chartA).emit('action:cursor', {
+      ...plotPoint(chartA, 0.2),
+      pointerType: 'mouse',
+    });
     expect(chartC.getCursorSnapshot({ fallback: 'hide' }).dataX).toBe(100);
 
     chartA.destroy();
@@ -473,7 +509,10 @@ describe('ChartCore cursor sync', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -584,7 +623,10 @@ describe('ChartCore histogram cursor', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -662,7 +704,7 @@ describe('ChartCore histogram cursor', () => {
       document.createElement('div'),
       {
         axes: {
-          x: { type: 'linear', nice: false, tickFormat: value => labels[value] ?? '' },
+          x: { type: 'linear', nice: false, tickFormat: (value) => labels[value] ?? '' },
           y: { type: 'linear' },
         },
         series: [{ label: 'score', dataIndex: 1, type: 'bar' }],
@@ -707,7 +749,10 @@ describe('ChartCore bar X-axis planning', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -716,9 +761,11 @@ describe('ChartCore bar X-axis planning', () => {
   });
 
   const customTicks = (chart: ChartCore) =>
-    (chart as unknown as {
-      computeCustomXTicks: () => { values: number[]; gridValues?: number[] } | undefined;
-    }).computeCustomXTicks();
+    (
+      chart as unknown as {
+        computeCustomXTicks: () => { values: number[]; gridValues?: number[] } | undefined;
+      }
+    ).computeCustomXTicks();
 
   it('uses regular center ticks and half-interval grid cells for airport-style bars', () => {
     const chart = new ChartCore(
@@ -727,7 +774,10 @@ describe('ChartCore bar X-axis planning', () => {
         axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
         series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
       },
-      [f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]), f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])],
+      [
+        f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),
+        f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+      ],
     );
 
     const xScale = chart.getAxis('x')!;
@@ -804,7 +854,10 @@ describe('ChartCore bar X-axis planning', () => {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
         series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
       },
-      [f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]), f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])],
+      [
+        f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),
+        f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+      ],
     );
     expect(optOut.getAxis('x')?.min).toBe(6.5);
     expect(optOut.getAxis('x')?.max).toBe(18.5);
@@ -817,7 +870,10 @@ describe('ChartCore bar X-axis planning', () => {
         axes: { x: { type: 'linear', ticks: [7, 12, 18] }, y: { type: 'linear', nice: false } },
         series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
       },
-      [f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]), f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])],
+      [
+        f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),
+        f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+      ],
     );
     expect(explicitTicks.getAxis('x')?.min).toBe(6.5);
     expect(explicitTicks.getAxis('x')?.max).toBe(18.5);
@@ -829,7 +885,10 @@ describe('ChartCore bar X-axis planning', () => {
         axes: { x: { type: 'linear' }, y: { type: 'linear', nice: false } },
         series: [{ label: 'departures', type: 'bar', dataIndex: 1 }],
       },
-      [f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]), f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])],
+      [
+        f([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),
+        f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+      ],
     );
     zoomed.setAxis('x', { min: 8, max: 12 });
     expect(zoomed.getAxis('x')?.min).toBe(8);
@@ -843,7 +902,10 @@ describe('ChartCore scatter selection', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -859,20 +921,17 @@ describe('ChartCore scatter selection', () => {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
         zoom: { enabled: false, x: true, y: true },
         selection: { onSelect: (selection) => selections.push(selection) },
-        series: [{
-          label: 'runs',
-          type: 'scatter',
-          xDataIndex: 1,
-          yDataIndex: 2,
-          colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
-        }],
+        series: [
+          {
+            label: 'runs',
+            type: 'scatter',
+            xDataIndex: 1,
+            yDataIndex: 2,
+            colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
+          },
+        ],
       },
-      [
-        f([0, 1, 2, 3]),
-        f([0.1, 0.4, 0.7, 0.9]),
-        f([0.2, 0.5, 0.8, 0.3]),
-        f([0, 1, 1, 0]),
-      ],
+      [f([0, 1, 2, 3]), f([0.1, 0.4, 0.7, 0.9]), f([0.2, 0.5, 0.8, 0.3]), f([0, 1, 1, 0])],
     );
     const xScale = chart.getAxis('x')!;
     const yScale = chart.getAxis('y')!;
@@ -901,20 +960,17 @@ describe('ChartCore scatter selection', () => {
         axes: { x: { type: 'linear', padding: 0 }, y: { type: 'linear', padding: 0 } },
         cursor: { show: true, snap: true },
         tooltip: { show: true, mode: 'nearest' },
-        series: [{
-          label: 'cohorts',
-          type: 'scatter',
-          xDataIndex: 1,
-          yDataIndex: 2,
-          colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
-        }],
+        series: [
+          {
+            label: 'cohorts',
+            type: 'scatter',
+            xDataIndex: 1,
+            yDataIndex: 2,
+            colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'] },
+          },
+        ],
       },
-      [
-        f([0, 1, 2, 3]),
-        f([-20, 2, 25, -15]),
-        f([10, 17, -5, 12]),
-        f([0, 1, 0, 0]),
-      ],
+      [f([0, 1, 2, 3]), f([-20, 2, 25, -15]), f([10, 17, -5, 12]), f([0, 1, 0, 0])],
     );
     chart.on('cursor:move', (dataX, dataIdx) => {
       moves.push([dataX, dataIdx]);
@@ -935,10 +991,13 @@ describe('ChartCore scatter selection', () => {
 
   it('coalesces touch cursor updates onto the next animation frame', () => {
     let raf: FrameRequestCallback | undefined;
-    vi.stubGlobal('requestAnimationFrame', vi.fn((cb: FrameRequestCallback) => {
-      raf = cb;
-      return 7;
-    }));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((cb: FrameRequestCallback) => {
+        raf = cb;
+        return 7;
+      }),
+    );
     const moves: Array<[number | null, number | null]> = [];
     const chart = new ChartCore(
       document.createElement('div'),
@@ -947,11 +1006,7 @@ describe('ChartCore scatter selection', () => {
         tooltip: { show: true, mode: 'nearest' },
         series: [{ label: 'points', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
       },
-      [
-        f([0, 1, 2]),
-        f([0, 10, 20]),
-        f([0, 10, 20]),
-      ],
+      [f([0, 1, 2]), f([0, 10, 20]), f([0, 10, 20])],
     );
     chart.on('cursor:move', (dataX, dataIdx) => {
       moves.push([dataX, dataIdx]);
@@ -984,7 +1039,10 @@ describe('ChartCore log interactions', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -999,10 +1057,7 @@ describe('ChartCore log interactions', () => {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
         series: [{ label: 'value', type: 'line', dataIndex: 1 }],
       },
-      [
-        f([3, 50, 97]),
-        f([0.2, 0.3, 0.4]),
-      ],
+      [f([3, 50, 97]), f([0.2, 0.3, 0.4])],
     );
 
     expect(exactChart.getAxis('x')?.min).toBe(3);
@@ -1015,10 +1070,7 @@ describe('ChartCore log interactions', () => {
         axes: { x: { type: 'linear' }, y: { type: 'linear' } },
         series: [{ label: 'value', type: 'line', dataIndex: 1 }],
       },
-      [
-        f([3, 50, 97]),
-        f([0.2, 0.3, 0.4]),
-      ],
+      [f([3, 50, 97]), f([0.2, 0.3, 0.4])],
     );
 
     expect(defaultChart.getAxis('x')?.min).toBe(0);
@@ -1031,10 +1083,7 @@ describe('ChartCore log interactions', () => {
         axes: { x: { type: 'linear', nice: true }, y: { type: 'linear' } },
         series: [{ label: 'value', type: 'line', dataIndex: 1 }],
       },
-      [
-        f([3, 50, 97]),
-        f([0.2, 0.3, 0.4]),
-      ],
+      [f([3, 50, 97]), f([0.2, 0.3, 0.4])],
     );
 
     expect(niceChart.getAxis('x')?.min).toBe(0);
@@ -1076,7 +1125,10 @@ describe('ChartCore log interactions', () => {
     const chart = new ChartCore(
       document.createElement('div'),
       {
-        axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false, padding: 0 } },
+        axes: {
+          x: { type: 'linear', nice: false },
+          y: { type: 'linear', nice: false, padding: 0 },
+        },
         series: [{ label: 'value', type: 'line', dataIndex: 1 }],
       },
       [f([0, 1, 2]), f([10, 10, 10])],
@@ -1131,10 +1183,7 @@ describe('ChartCore log interactions', () => {
         axes: { x: { type: 'log', padding: 0.1 }, y: { type: 'linear' } },
         series: [{ label: 'loss', type: 'line', dataIndex: 1 }],
       },
-      [
-        f([1e-4, 1e-3, 1e-2]),
-        f([0.2, 0.3, 0.4]),
-      ],
+      [f([1e-4, 1e-3, 1e-2]), f([0.2, 0.3, 0.4])],
     );
     const xScale = chart.getAxis('x')!;
     const leftPad = Math.log10(1e-4) - Math.log10(xScale.min);
@@ -1153,10 +1202,7 @@ describe('ChartCore log interactions', () => {
         axes: { x: { type: 'linear' }, y: { type: 'log', padding: 0.1 } },
         series: [{ label: 'loss', type: 'line', dataIndex: 1 }],
       },
-      [
-        f([0, 1, 2, 3]),
-        f([0, 1e-2, 1, 1e2]),
-      ],
+      [f([0, 1, 2, 3]), f([0, 1e-2, 1, 1e2])],
     );
     const yScale = chart.getAxis('y')!;
     const bottomPad = Math.log10(1e-2) - Math.log10(yScale.min);
@@ -1176,11 +1222,7 @@ describe('ChartCore log interactions', () => {
         zoom: { enabled: true, x: true, bounds: 'unbounded' },
         series: [{ label: 'points', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
       },
-      [
-        f([0, 1, 2]),
-        f([1e-5, 1e-3, 1e-1]),
-        f([0.2, 0.3, 0.4]),
-      ],
+      [f([0, 1, 2]), f([1e-5, 1e-3, 1e-1]), f([0.2, 0.3, 0.4])],
     );
     const xScale = chart.getAxis('x')!;
 
@@ -1214,11 +1256,7 @@ describe('ChartCore log interactions', () => {
         pan: { enabled: true, x: true, y: true },
         series: [{ label: 'points', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
       },
-      [
-        f([0, 1, 2]),
-        f([1e-5, 1e-3, 1e-1]),
-        f([0.2, 0.3, 0.4]),
-      ],
+      [f([0, 1, 2]), f([1e-5, 1e-3, 1e-1]), f([0.2, 0.3, 0.4])],
     );
     const xScale = chart.getAxis('x')!;
     const initial = { min: xScale.min, max: xScale.max };
@@ -1311,7 +1349,10 @@ describe('ChartCore highlight sync', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -1384,9 +1425,7 @@ describe('ChartCore highlight sync', () => {
       document.createElement('div'),
       {
         highlight: { syncKey, getKey: getRunId },
-        series: [
-          { label: 'run-a-only', dataIndex: 1, meta: { runId: 'a' } },
-        ],
+        series: [{ label: 'run-a-only', dataIndex: 1, meta: { runId: 'a' } }],
       },
       [f([1, 2]), f([10, 20])],
     );
@@ -1453,7 +1492,10 @@ describe('ChartCore lifecycle + config integrity', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -1463,11 +1505,7 @@ describe('ChartCore lifecycle + config integrity', () => {
 
   it('does not mutate the caller config object when constructing a chart', () => {
     const config = { series: [{ label: 'value', dataIndex: 1 }] };
-    const chart = new ChartCore(
-      document.createElement('div'),
-      config,
-      [f([1, 2]), f([10, 20])],
-    );
+    const chart = new ChartCore(document.createElement('div'), config, [f([1, 2]), f([10, 20])]);
 
     // initAxes writes x/y into config.axes; that must land on the chart's own
     // copy, not the object the caller passed in.
@@ -1503,7 +1541,12 @@ describe('ChartCore lifecycle + config integrity', () => {
 
     // Zoom chart A in around the middle. Publishes to B via SyncGroup.
     const anchor = plotPoint(chartA, 0.5);
-    chartEventBus(chartA).emit('action:zoom', { factor: 0.5, anchorX: anchor.x, anchorY: anchor.y, axis: 'x' });
+    chartEventBus(chartA).emit('action:zoom', {
+      factor: 0.5,
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+      axis: 'x',
+    });
 
     const zoomedMax = chartA.getAxis('x')!.max;
     const zoomedMin = chartA.getAxis('x')!.min;
@@ -1528,16 +1571,14 @@ describe('ChartCore lifecycle + config integrity', () => {
       axes: { x: { type: 'linear' as const }, y: { type: 'linear' as const } },
       series: [{ label: 'v', dataIndex: 1 }],
     };
-    const chartA = new ChartCore(
-      document.createElement('div'),
-      config,
-      [f([0, 50, 100]), f([10, 20, 15])],
-    );
-    const chartB = new ChartCore(
-      document.createElement('div'),
-      config,
-      [f([0, 50, 100]), f([1_000, 2_000, 1_500])],
-    );
+    const chartA = new ChartCore(document.createElement('div'), config, [
+      f([0, 50, 100]),
+      f([10, 20, 15]),
+    ]);
+    const chartB = new ChartCore(document.createElement('div'), config, [
+      f([0, 50, 100]),
+      f([1_000, 2_000, 1_500]),
+    ]);
     const originalY = { min: chartB.getAxis('y')!.min, max: chartB.getAxis('y')!.max };
 
     chartA.resetZoom();
@@ -1660,7 +1701,10 @@ describe('ChartCore live theme refresh', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
   afterEach(() => vi.unstubAllGlobals());
@@ -1712,7 +1756,10 @@ describe('ChartCore live-follow viewport', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
   afterEach(() => vi.unstubAllGlobals());
@@ -1724,11 +1771,10 @@ describe('ChartCore live-follow viewport', () => {
   };
 
   it('starts following and pins the X window to the trailing follow width', () => {
-    const chart = new ChartCore(
-      document.createElement('div'),
-      streamConfig,
-      [f([0, 1, 2]), f([5, 6, 7])],
-    );
+    const chart = new ChartCore(document.createElement('div'), streamConfig, [
+      f([0, 1, 2]),
+      f([5, 6, 7]),
+    ]);
     expect(chart.isFollowing()).toBe(true);
     // window 10, lastX 2, dataMin 0 -> [0, 2] (clamped to data start)
     expect(chart.getAxis('x')?.min).toBe(0);
@@ -1753,11 +1799,10 @@ describe('ChartCore live-follow viewport', () => {
 
   it('pauses following on a horizontal zoom and stops scrolling with data', () => {
     const changes: boolean[] = [];
-    const chart = new ChartCore(
-      document.createElement('div'),
-      streamConfig,
-      [f([0, 5, 10]), f([1, 2, 3])],
-    );
+    const chart = new ChartCore(document.createElement('div'), streamConfig, [
+      f([0, 5, 10]),
+      f([1, 2, 3]),
+    ]);
     chart.on('follow:change', (f2) => changes.push(f2));
 
     zoomIn(chart);
@@ -1774,11 +1819,7 @@ describe('ChartCore live-follow viewport', () => {
   });
 
   it('does not collapse to a zero-span X range with a single point', () => {
-    const chart = new ChartCore(
-      document.createElement('div'),
-      streamConfig,
-      [f([42]), f([7])],
-    );
+    const chart = new ChartCore(document.createElement('div'), streamConfig, [f([42]), f([7])]);
     const x = chart.getAxis('x')!;
     // window 10, lastX 42, dataMin 42: rawMin === lastX, so expand to a unit
     // window rather than [42, 42].
@@ -1790,11 +1831,10 @@ describe('ChartCore live-follow viewport', () => {
 
   it('setAxis (sync-peer entry) pauses following on a horizontal viewport', () => {
     const changes: boolean[] = [];
-    const chart = new ChartCore(
-      document.createElement('div'),
-      streamConfig,
-      [f([0, 5, 10]), f([1, 2, 3])],
-    );
+    const chart = new ChartCore(document.createElement('div'), streamConfig, [
+      f([0, 5, 10]),
+      f([1, 2, 3]),
+    ]);
     chart.on('follow:change', (f2) => changes.push(f2));
     expect(chart.isFollowing()).toBe(true);
     // A peer broadcasts a viewport through setAxis; the receiver must stop
@@ -1807,11 +1847,10 @@ describe('ChartCore live-follow viewport', () => {
 
   it('scrollToLatest resumes following and snaps to the newest window', () => {
     const changes: boolean[] = [];
-    const chart = new ChartCore(
-      document.createElement('div'),
-      streamConfig,
-      [f([0, 5, 10]), f([1, 2, 3])],
-    );
+    const chart = new ChartCore(document.createElement('div'), streamConfig, [
+      f([0, 5, 10]),
+      f([1, 2, 3]),
+    ]);
     chart.on('follow:change', (f2) => changes.push(f2));
 
     zoomIn(chart);
@@ -1848,7 +1887,7 @@ describe('ChartCore live-follow viewport', () => {
     const xScale = chart.getAxis('x')!;
     const internal = chart as unknown as {
       viewportActiveUntil: number;
-      decimateLineSegments: (s: typeof seg[], scale: typeof xScale) => typeof seg[];
+      decimateLineSegments: (s: (typeof seg)[], scale: typeof xScale) => (typeof seg)[];
       layout: { plot: { width: number } };
     };
 
@@ -1892,10 +1931,13 @@ describe('ChartCore live-follow viewport', () => {
   });
 
   it('brush mode creates a persistent data-anchored selection without zooming', () => {
-    const changes: (unknown)[] = [];
+    const changes: unknown[] = [];
     const xs = new Float64Array(101);
     const ys = new Float64Array(101);
-    for (let i = 0; i <= 100; i++) { xs[i] = i; ys[i] = i; }
+    for (let i = 0; i <= 100; i++) {
+      xs[i] = i;
+      ys[i] = i;
+    }
     const chart = new ChartCore(
       document.createElement('div'),
       {
@@ -1933,7 +1975,10 @@ describe('ChartCore live-follow viewport', () => {
   it('brush move shifts an existing selection by the drag delta', () => {
     const xs = new Float64Array(101);
     const ys = new Float64Array(101);
-    for (let i = 0; i <= 100; i++) { xs[i] = i; ys[i] = i; }
+    for (let i = 0; i <= 100; i++) {
+      xs[i] = i;
+      ys[i] = i;
+    }
     const chart = new ChartCore(
       document.createElement('div'),
       {
@@ -1968,7 +2013,7 @@ describe('ChartCore live-follow viewport', () => {
       },
       [f([0, 50, 100]), f([1, 2, 3])],
     );
-    const changes: (unknown)[] = [];
+    const changes: unknown[] = [];
     chart.on('selection:change', (s) => changes.push(s));
 
     chart.setSelection({ x: { min: 30, max: 10 } }); // unordered -> normalized
@@ -2043,7 +2088,10 @@ describe('ChartCore independent data sources', () => {
     vi.stubGlobal('document', new MockDocument());
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
   afterEach(() => vi.unstubAllGlobals());
@@ -2055,12 +2103,18 @@ describe('ChartCore independent data sources', () => {
   const config = () => ({
     autoResize: false,
     axes: { x: { nice: false }, y: { nice: false, padding: 0 } },
-    series: [{ label: 'a', dataIndex: 1 }, { label: 'b', dataIndex: 1 }],
+    series: [
+      { label: 'a', dataIndex: 1 },
+      { label: 'b', dataIndex: 1 },
+    ],
   });
 
   it('ranges across independent sources without padding or joining their rows', () => {
     const input = sources();
-    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: input, seriesSources: [0, 1] });
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, {
+      sources: input,
+      seriesSources: [0, 1],
+    });
     expect(chart.getAxis('x')?.min).toBe(0);
     expect(chart.getAxis('x')?.max).toBe(9);
     expect(chart.getAxis('y')?.max).toBe(90);
@@ -2072,31 +2126,49 @@ describe('ChartCore independent data sources', () => {
   });
 
   it('samples every source at its own nearest X and latest index', () => {
-    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, {
+      sources: sources(),
+      seriesSources: [0, 1],
+    });
     chart.setCursorDataX(3.2);
     const snapshot = chart.getCursorSnapshot();
     expect(snapshot.source).toBe('cursor');
     expect(snapshot.dataX).toBe(3.2);
-    expect(snapshot.points.map(p => [p.dataIndex, p.dataX, p.value])).toEqual([[2, 4, 3], [1, 3, 30]]);
+    expect(snapshot.points.map((p) => [p.dataIndex, p.dataX, p.value])).toEqual([
+      [2, 4, 3],
+      [1, 3, 30],
+    ]);
     chart.setCursorDataX(null);
-    expect(chart.getCursorSnapshot({ fallback: 'latest' }).points.map(p => [p.dataX, p.value])).toEqual([[4, 3], [9, 90]]);
+    expect(
+      chart.getCursorSnapshot({ fallback: 'latest' }).points.map((p) => [p.dataX, p.value]),
+    ).toEqual([
+      [4, 3],
+      [9, 90],
+    ]);
     chart.destroy();
   });
 
   it('supports an empty first source while other series draw and provide snapshots', () => {
     const chart = new ChartCore(document.createElement('div'), config(), undefined, {
-      sources: [[f([]), f([])], sources()[1]], seriesSources: [0, 1],
+      sources: [[f([]), f([])], sources()[1]],
+      seriesSources: [0, 1],
     });
     expect(chart.getAxis('x')?.max).toBe(9);
     chart.setCursorDataX(7);
-    expect(chart.getCursorSnapshot().points.map(p => p.value)).toEqual([70]);
+    expect(chart.getCursorSnapshot().points.map((p) => p.value)).toEqual([70]);
     chart.destroy();
   });
 
   it('appends to only the chosen bounded source and follows the newest source', () => {
-    const chart = new ChartCore(document.createElement('div'), { ...config(), streaming: { maxLen: 3, follow: 4 } }, undefined, {
-      sources: sources(), seriesSources: [0, 1],
-    });
+    const chart = new ChartCore(
+      document.createElement('div'),
+      { ...config(), streaming: { maxLen: 3, follow: 4 } },
+      undefined,
+      {
+        sources: sources(),
+        seriesSources: [0, 1],
+      },
+    );
     chart.appendToSource(1, [f([10, 12]), f([100, 120])]);
     expect(Array.from(chart.getSourceData(0)[0])).toEqual([0, 2, 4]);
     expect(Array.from(chart.getSourceData(1)[0])).toEqual([9, 10, 12]);
@@ -2107,7 +2179,10 @@ describe('ChartCore independent data sources', () => {
   });
 
   it('atomically rejects bad replacements and preserves a manual viewport across valid replacements', () => {
-    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, {
+      sources: sources(),
+      seriesSources: [0, 1],
+    });
     chart.setAxis('x', { min: 1, max: 3 });
     chart.setSelection({ x: { min: 1, max: 2 } });
     expect(() => chart.replaceSources(config(), [[f([0]), f([])]], [0, 0])).toThrow();
@@ -2123,49 +2198,97 @@ describe('ChartCore independent data sources', () => {
 
   it('uses each scatter source for selection and encoded coordinates', () => {
     const onSelect = vi.fn();
-    const chart = new ChartCore(document.createElement('div'), {
-      ...config(), zoom: { enabled: false, x: true, y: true }, selection: { onSelect },
-      series: [{ label: 'a', type: 'scatter', xDataIndex: 1, yDataIndex: 2 },
-        { label: 'b', type: 'scatter', xDataIndex: 1, yDataIndex: 2 }],
-    }, undefined, { sources: [[f([0, 1]), f([4, 1]), f([10, 20])],
-      [f([0, 1, 2]), f([6, 2, 8]), f([30, 40, 50])]], seriesSources: [0, 1] });
+    const chart = new ChartCore(
+      document.createElement('div'),
+      {
+        ...config(),
+        zoom: { enabled: false, x: true, y: true },
+        selection: { onSelect },
+        series: [
+          { label: 'a', type: 'scatter', xDataIndex: 1, yDataIndex: 2 },
+          { label: 'b', type: 'scatter', xDataIndex: 1, yDataIndex: 2 },
+        ],
+      },
+      undefined,
+      {
+        sources: [
+          [f([0, 1]), f([4, 1]), f([10, 20])],
+          [f([0, 1, 2]), f([6, 2, 8]), f([30, 40, 50])],
+        ],
+        seriesSources: [0, 1],
+      },
+    );
     const x = chart.getAxis('x')!;
     const y = chart.getAxis('y')!;
     chartEventBus(chart).emit('action:box-end', {
-      x1: x.dataToPixel(1.5), x2: x.dataToPixel(7), y1: y.dataToPixel(45), y2: y.dataToPixel(5),
+      x1: x.dataToPixel(1.5),
+      x2: x.dataToPixel(7),
+      y1: y.dataToPixel(45),
+      y2: y.dataToPixel(5),
     });
-    expect(onSelect.mock.calls[0][0].points.map((p: { seriesIndex: number; dataIndex: number; x: number }) =>
-      [p.seriesIndex, p.dataIndex, p.x])).toEqual([[0, 0, 4], [1, 0, 6], [1, 1, 2]]);
+    expect(
+      onSelect.mock.calls[0][0].points.map(
+        (p: { seriesIndex: number; dataIndex: number; x: number }) => [
+          p.seriesIndex,
+          p.dataIndex,
+          p.x,
+        ],
+      ),
+    ).toEqual([
+      [0, 0, 4],
+      [1, 0, 6],
+      [1, 1, 2],
+    ]);
     chart.setCursorDataX(2.1);
-    expect(chart.getCursorSnapshot().points.map(p => [p.dataX, p.value])).toEqual([[1, 20], [2, 40]]);
+    expect(chart.getCursorSnapshot().points.map((p) => [p.dataX, p.value])).toEqual([
+      [1, 20],
+      [2, 40],
+    ]);
     chart.destroy();
   });
 
   it('rejects a malformed updateLast tail before changing the source', () => {
-    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
-    expect(() => chart.appendToSource(1, [f([9, 8]), f([900, 800])], { updateLast: true })).toThrow();
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, {
+      sources: sources(),
+      seriesSources: [0, 1],
+    });
+    expect(() =>
+      chart.appendToSource(1, [f([9, 8]), f([900, 800])], { updateLast: true }),
+    ).toThrow();
     expect(chart.getSourceValue(1, 1, 3)).toBe(90);
     expect(chart.getSourceLength(1)).toBe(4);
     chart.destroy();
   });
 
   it('emits a point-click payload with the independent series and source-local row', () => {
-    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, {
+      sources: sources(),
+      seriesSources: [0, 1],
+    });
     const onClick = vi.fn();
     chart.on('point:click', onClick);
     chartEventBus(chart).emit('action:tap', {
-      x: chart.getAxis('x')!.dataToPixel(7), y: chart.getAxis('y')!.dataToPixel(70), pointerType: 'mouse',
+      x: chart.getAxis('x')!.dataToPixel(7),
+      y: chart.getAxis('y')!.dataToPixel(70),
+      pointerType: 'mouse',
     });
-    expect(onClick).toHaveBeenCalledWith(expect.objectContaining({ seriesIndex: 1, dataIndex: 2, x: 7, y: 70 }));
+    expect(onClick).toHaveBeenCalledWith(
+      expect.objectContaining({ seriesIndex: 1, dataIndex: 2, x: 7, y: 70 }),
+    );
     chartEventBus(chart).emit('action:tap', {
-      x: chart.getAxis('x')!.dataToPixel(9), y: chart.getAxis('y')!.dataToPixel(30), pointerType: 'mouse',
+      x: chart.getAxis('x')!.dataToPixel(9),
+      y: chart.getAxis('y')!.dataToPixel(30),
+      pointerType: 'mouse',
     });
     expect(onClick).toHaveBeenCalledTimes(1);
     chart.destroy();
   });
 
   it('guards controlled viewport, selection and reset before committing state or events', () => {
-    const chart = new ChartCore(document.createElement('div'), config(), undefined, { sources: sources(), seriesSources: [0, 1] });
+    const chart = new ChartCore(document.createElement('div'), config(), undefined, {
+      sources: sources(),
+      seriesSources: [0, 1],
+    });
     chart.setAxis('x', { min: 1, max: 3 });
     const viewport = vi.fn(() => false);
     const selection = vi.fn(() => false);

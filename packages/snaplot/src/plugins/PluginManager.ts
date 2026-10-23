@@ -11,13 +11,13 @@ export class PluginManager {
 
   register(plugin: Plugin): boolean {
     // Prevent duplicate registration
-    if (this.plugins.some(p => p.id === plugin.id)) return false;
+    if (this.plugins.some((p) => p.id === plugin.id)) return false;
     this.plugins.push(plugin);
     return true;
   }
 
   unregister(id: string): void {
-    this.plugins = this.plugins.filter(p => p.id !== id);
+    this.plugins = this.plugins.filter((p) => p.id !== id);
   }
 
   hasHook(hook: keyof Plugin): boolean {
@@ -34,10 +34,7 @@ export class PluginManager {
    * Dispatch a lifecycle hook to all plugins.
    * Returns false if any before* hook returns false (cancellation).
    */
-  dispatch(
-    hook: keyof Plugin,
-    ...args: unknown[]
-  ): boolean {
+  dispatch(hook: keyof Plugin, ...args: unknown[]): boolean {
     for (const plugin of this.plugins) {
       const fn = plugin[hook];
       if (typeof fn === 'function') {

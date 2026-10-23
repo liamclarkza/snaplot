@@ -5,11 +5,17 @@ import type { CursorSnapshotOptions } from '../types';
 const emptySubscribe = () => () => {};
 const emptySnapshot = () => undefined;
 export function useChartState<Row>(chart: ChartHandle<Row> | null | undefined) {
-  const subscribe = useCallback((listener: () => void) => chart ? chart.subscribe(listener) : emptySubscribe(), [chart]);
+  const subscribe = useCallback(
+    (listener: () => void) => (chart ? chart.subscribe(listener) : emptySubscribe()),
+    [chart],
+  );
   const snapshot = useCallback(() => chart?.getState(), [chart]);
   return useSyncExternalStore(subscribe, snapshot, emptySnapshot);
 }
-export function useCursorSnapshot<Row>(chart: ChartHandle<Row> | null | undefined, options?: CursorSnapshotOptions) {
+export function useCursorSnapshot<Row>(
+  chart: ChartHandle<Row> | null | undefined,
+  options?: CursorSnapshotOptions,
+) {
   const state = useChartState(chart);
   const fallback = options?.fallback;
   return useMemo(() => state && chart?.getCursorSnapshot({ fallback }), [chart, state, fallback]);
@@ -26,7 +32,11 @@ export function useChartGroup(options?: ChartGroupOptions) {
   const generation = useRef(0);
   useEffect(() => {
     const current = ++generation.current;
-    return () => { queueMicrotask(() => { if (generation.current === current) group.destroy(); }); };
+    return () => {
+      queueMicrotask(() => {
+        if (generation.current === current) group.destroy();
+      });
+    };
   }, [group]);
   return group;
 }

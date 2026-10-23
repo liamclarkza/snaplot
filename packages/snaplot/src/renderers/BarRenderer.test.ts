@@ -67,7 +67,20 @@ describe('renderBars baseline', () => {
       dataToPixel: (value: number) => (value > 0 ? 100 - value : Number.NaN),
     };
 
-    renderBars(ctx, f([1, 2, 3]), f([10, 20, 30]), 0, 2, scaleX, scaleY, layout(), series, '#4e79a7', 0, 1);
+    renderBars(
+      ctx,
+      f([1, 2, 3]),
+      f([10, 20, 30]),
+      0,
+      2,
+      scaleX,
+      scaleY,
+      layout(),
+      series,
+      '#4e79a7',
+      0,
+      1,
+    );
 
     expect(fill).toHaveBeenCalledTimes(3);
   });

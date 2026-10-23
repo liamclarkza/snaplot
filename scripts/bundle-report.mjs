@@ -98,9 +98,7 @@ for (const entry of ENTRIES) {
 
 const pad = (s, n) => String(s).padEnd(n);
 console.log('');
-console.log(
-  `${pad('entry', 18)}${pad('raw', 12)}${pad('gzip', 12)}${pad('budget', 12)}status`,
-);
+console.log(`${pad('entry', 18)}${pad('raw', 12)}${pad('gzip', 12)}${pad('budget', 12)}status`);
 console.log('-'.repeat(66));
 for (const r of rows) {
   console.log(

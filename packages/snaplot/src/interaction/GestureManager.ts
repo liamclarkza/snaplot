@@ -217,7 +217,9 @@ export class GestureManager {
 
   private inPlotArea(x: number, y: number): boolean {
     const { plot } = this.getLayout();
-    return x > plot.left && x < plot.left + plot.width && y > plot.top && y < plot.top + plot.height;
+    return (
+      x > plot.left && x < plot.left + plot.width && y > plot.top && y < plot.top + plot.height
+    );
   }
 
   /**
@@ -234,7 +236,12 @@ export class GestureManager {
     // Check each configured axis region
     for (const [key, entry] of Object.entries(layout.axes)) {
       const { area } = entry;
-      if (x >= area.left && x <= area.left + area.width && y >= area.top && y <= area.top + area.height) {
+      if (
+        x >= area.left &&
+        x <= area.left + area.width &&
+        y >= area.top &&
+        y <= area.top + area.height
+      ) {
         return { type: 'axis', axisKey: key };
       }
     }
@@ -269,8 +276,10 @@ export class GestureManager {
 
   private isDoubleTapCandidate(x: number, y: number, now: number): boolean {
     if (this.lastTapTime === 0) return false;
-    return now - this.lastTapTime < DOUBLE_TAP_TIMEOUT
-      && this.distance(x, y, this.lastTapX, this.lastTapY) < 30;
+    return (
+      now - this.lastTapTime < DOUBLE_TAP_TIMEOUT &&
+      this.distance(x, y, this.lastTapX, this.lastTapY) < 30
+    );
   }
 
   private pinchDistance(): number {
@@ -327,7 +336,8 @@ export class GestureManager {
     this.longPressTimer = setTimeout(() => {
       this.longPressTimer = null;
       const state = this.state;
-      if (state.kind !== 'press' || state.pointerId !== pointerId || state.pointerType !== 'touch') return;
+      if (state.kind !== 'press' || state.pointerId !== pointerId || state.pointerType !== 'touch')
+        return;
       this.state = { ...state, kind: 'long-press-ready' };
     }, longPressMs);
   }
@@ -367,12 +377,16 @@ export class GestureManager {
 
     // Capture is helpful for uninterrupted drags, but browsers can reject it
     // during fast synthetic or multi-touch transitions.
-    try { this.target.setPointerCapture(e.pointerId); } catch {}
+    try {
+      this.target.setPointerCapture(e.pointerId);
+    } catch {}
 
     const pointer: PointerState = {
       id: e.pointerId,
-      x, y,
-      startX: x, startY: y,
+      x,
+      y,
+      startX: x,
+      startY: y,
       startTime: Date.now(),
       pointerType: e.pointerType,
     };
@@ -619,7 +633,9 @@ export class GestureManager {
   private onPointerUp(e: PointerEvent): void {
     const ptr = this.pointers.get(e.pointerId);
     this.pointers.delete(e.pointerId);
-    try { this.target.releasePointerCapture(e.pointerId); } catch {}
+    try {
+      this.target.releasePointerCapture(e.pointerId);
+    } catch {}
     if (ptr && (ptr.pointerType === 'touch' || ptr.pointerType === 'pen')) {
       e.preventDefault();
     }
@@ -649,8 +665,10 @@ export class GestureManager {
     if (state.kind === 'box' && state.pointerId === e.pointerId) {
       if (dist >= MIN_DRAG_DISTANCE) {
         this.eventBus.emit('action:box-end', {
-          x1: state.startX, y1: state.startY,
-          x2: x, y2: y,
+          x1: state.startX,
+          y1: state.startY,
+          x2: x,
+          y2: y,
         });
       } else {
         this.eventBus.emit('action:box-end', { x1: 0, y1: 0, x2: 0, y2: 0 });
@@ -689,7 +707,11 @@ export class GestureManager {
           survivor.startX = survivor.x;
           survivor.startY = survivor.y;
           survivor.startTime = Date.now();
-          this.state = this.makePressState('press', survivor, this.getAxisArea(survivor.x, survivor.y));
+          this.state = this.makePressState(
+            'press',
+            survivor,
+            this.getAxisArea(survivor.x, survivor.y),
+          );
         }
       } else {
         this.resetState();
@@ -733,7 +755,9 @@ export class GestureManager {
   private onPointerCancel(e: PointerEvent): void {
     if (!this.pointers.has(e.pointerId)) return;
     this.pointers.delete(e.pointerId);
-    try { this.target.releasePointerCapture(e.pointerId); } catch {}
+    try {
+      this.target.releasePointerCapture(e.pointerId);
+    } catch {}
     this.clearLongPress();
     this.cancelMomentum();
 
@@ -964,7 +988,12 @@ export class GestureManager {
       case '=':
         if (zoom.enabled) {
           const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
-          this.eventBus.emit('action:zoom', { factor: 1 / ZOOM_FACTOR, anchorX: centreX, anchorY: centreY, axis });
+          this.eventBus.emit('action:zoom', {
+            factor: 1 / ZOOM_FACTOR,
+            anchorX: centreX,
+            anchorY: centreY,
+            axis,
+          });
           handled = true;
         }
         break;
@@ -972,7 +1001,12 @@ export class GestureManager {
       case '_':
         if (zoom.enabled) {
           const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
-          this.eventBus.emit('action:zoom', { factor: ZOOM_FACTOR, anchorX: centreX, anchorY: centreY, axis });
+          this.eventBus.emit('action:zoom', {
+            factor: ZOOM_FACTOR,
+            anchorX: centreX,
+            anchorY: centreY,
+            axis,
+          });
           handled = true;
         }
         break;

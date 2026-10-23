@@ -57,7 +57,18 @@ describe('renderHistogram baseline', () => {
     const series: SeriesConfig = { label: 'hist', dataIndex: 1, type: 'histogram' };
 
     // 3 edges → 2 bins (last count is padding).
-    renderHistogram(ctx, f([0, 1, 2]), f([10, 20, 0]), 0, 2, scaleX, scaleY, layout(), series, '#4e79a7');
+    renderHistogram(
+      ctx,
+      f([0, 1, 2]),
+      f([10, 20, 0]),
+      0,
+      2,
+      scaleX,
+      scaleY,
+      layout(),
+      series,
+      '#4e79a7',
+    );
 
     expect(fillRect).toHaveBeenCalledTimes(2);
   });

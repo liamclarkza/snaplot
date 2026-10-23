@@ -13,7 +13,7 @@ export interface EventMap {
   'pointer:leave': undefined;
   'viewport:change': { scaleKey: string; min: number; max: number };
   'data:update': undefined;
-  'resize': { width: number; height: number };
+  resize: { width: number; height: number };
   'cursor:sync': { dataX: number | null };
 
   // Semantic action events (from GestureManager)
@@ -118,8 +118,9 @@ export class SyncGroup {
     if (!group) return;
     for (const peer of group) {
       if (peer !== source) {
-        (peer as unknown as { receiveHighlightSync(payload: HighlightSyncPayload): void })
-          .receiveHighlightSync(payload);
+        (
+          peer as unknown as { receiveHighlightSync(payload: HighlightSyncPayload): void }
+        ).receiveHighlightSync(payload);
       }
     }
   }

@@ -103,9 +103,51 @@ describe('renderScatter cache keys', () => {
     const cache = new ScatterSeriesCache();
     const palettes = { categorical: [] };
 
-    renderScatter(ctx, xData, yDataA, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cache);
-    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cache);
-    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cache);
+    renderScatter(
+      ctx,
+      xData,
+      yDataA,
+      0,
+      3,
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+      1,
+      palettes,
+      cache,
+    );
+    renderScatter(
+      ctx,
+      xData,
+      yDataB,
+      0,
+      3,
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+      1,
+      palettes,
+      cache,
+    );
+    renderScatter(
+      ctx,
+      xData,
+      yDataB,
+      0,
+      3,
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+      1,
+      palettes,
+      cache,
+    );
 
     // First render bins yDataA, second bins yDataB, third reuses yDataB cache.
     expect(createImageDataCalls).toBe(2);
@@ -133,10 +175,66 @@ describe('renderScatter cache keys', () => {
     const cacheB = new ScatterSeriesCache();
     const palettes = { categorical: [] };
 
-    renderScatter(ctx, xData, yDataA, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cacheA);
-    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cacheB);
-    renderScatter(ctx, xData, yDataA, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cacheA);
-    renderScatter(ctx, xData, yDataB, 0, 3, xScale, yScale, layout, series, '#4e79a7', 1, palettes, cacheB);
+    renderScatter(
+      ctx,
+      xData,
+      yDataA,
+      0,
+      3,
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+      1,
+      palettes,
+      cacheA,
+    );
+    renderScatter(
+      ctx,
+      xData,
+      yDataB,
+      0,
+      3,
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+      1,
+      palettes,
+      cacheB,
+    );
+    renderScatter(
+      ctx,
+      xData,
+      yDataA,
+      0,
+      3,
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+      1,
+      palettes,
+      cacheA,
+    );
+    renderScatter(
+      ctx,
+      xData,
+      yDataB,
+      0,
+      3,
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+      1,
+      palettes,
+      cacheB,
+    );
 
     // One bin pass per series; the interleaved repaints hit their caches.
     expect(createImageDataCalls).toBe(2);
@@ -157,16 +255,38 @@ describe('renderScatter cache keys', () => {
       pointRadius: 3,
     };
 
-    renderScatter(ctx, xData, yData, 0, 0, xScale, yScale, layout, {
-      ...baseSeries,
-      opacity: 0.2,
-    }, '#4e79a7');
+    renderScatter(
+      ctx,
+      xData,
+      yData,
+      0,
+      0,
+      xScale,
+      yScale,
+      layout,
+      {
+        ...baseSeries,
+        opacity: 0.2,
+      },
+      '#4e79a7',
+    );
     const firstStamp = vi.mocked(ctx.drawImage).mock.calls[0][0];
 
-    renderScatter(ctx, xData, yData, 0, 0, xScale, yScale, layout, {
-      ...baseSeries,
-      opacity: 0.8,
-    }, '#4e79a7');
+    renderScatter(
+      ctx,
+      xData,
+      yData,
+      0,
+      0,
+      xScale,
+      yScale,
+      layout,
+      {
+        ...baseSeries,
+        opacity: 0.8,
+      },
+      '#4e79a7',
+    );
     const secondStamp = vi.mocked(ctx.drawImage).mock.calls[1][0];
 
     expect(secondStamp).not.toBe(firstStamp);
@@ -181,9 +301,9 @@ describe('renderScatter cache keys', () => {
       variableColor: true,
       variableRadius: false,
       maxRadius: 3,
-      colorBinAt: index => index % 2,
-      colorForBin: bin => bin === 0 ? '#f00' : '#00f',
-      colorAt: index => index % 2 === 0 ? '#f00' : '#00f',
+      colorBinAt: (index) => index % 2,
+      colorForBin: (bin) => (bin === 0 ? '#f00' : '#00f'),
+      colorAt: (index) => (index % 2 === 0 ? '#f00' : '#00f'),
       radiusAt: () => 3,
     };
 

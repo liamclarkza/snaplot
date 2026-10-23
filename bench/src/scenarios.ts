@@ -262,7 +262,12 @@ async function runGesture(
   name: string,
   config: ChartOptions,
   data: ColumnData,
-  makeStep: (chart: ChartHandle, el: Element, cx: number, cy: number) => {
+  makeStep: (
+    chart: ChartHandle,
+    el: Element,
+    cx: number,
+    cy: number,
+  ) => {
     step: (i: number) => void;
     end: () => void;
   },
@@ -322,13 +327,21 @@ async function runGesture(
 export const scenarios: Scenario[] = [
   {
     name: 'independent-lines-pan-75k',
-    run: (o) => runSweep(o, 'independent-lines-pan-75k', {
-      ...lineConfig,
-      series: [
-        { id: 'primary', label: 'Primary', y: 'value' },
-        { id: 'secondary', label: 'Secondary', data: genTimeSeries(25_000, 2), y: 'value' },
-      ],
-    }, genTimeSeries(50_000), panStep, { points: 75_000, sources: 2 }),
+    run: (o) =>
+      runSweep(
+        o,
+        'independent-lines-pan-75k',
+        {
+          ...lineConfig,
+          series: [
+            { id: 'primary', label: 'Primary', y: 'value' },
+            { id: 'secondary', label: 'Secondary', data: genTimeSeries(25_000, 2), y: 'value' },
+          ],
+        },
+        genTimeSeries(50_000),
+        panStep,
+        { points: 75_000, sources: 2 },
+      ),
   },
 
   {
@@ -601,7 +614,7 @@ export const scenarios: Scenario[] = [
             // Zoom in for the first half of the sweep, back out for the rest.
             // ctrlKey marks the event as a trackpad pinch; plain wheel
             // deliberately passes through to page scroll.
-            const dir = (i % SWEEP_STEPS) < SWEEP_STEPS / 2 ? -1 : 1;
+            const dir = i % SWEEP_STEPS < SWEEP_STEPS / 2 ? -1 : 1;
             el.dispatchEvent(
               new WheelEvent('wheel', {
                 deltaY: dir * 60,

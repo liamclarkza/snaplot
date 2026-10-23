@@ -154,7 +154,10 @@ export class HitTester {
         let closest = Infinity;
         for (let i = 0; i < store.length; i++) {
           const distance = Math.abs(store.valueAt(xColumn, i) - targetX);
-          if (distance < closest) { closest = distance; idx = i; }
+          if (distance < closest) {
+            closest = distance;
+            idx = i;
+          }
         }
       }
       const yVal = store.yAt(colIdx - 1, idx);
@@ -371,11 +374,8 @@ export class HitTester {
         radius: style.radiusAt(bestIdx),
         formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
         formattedY: formatters?.y ? formatters.y(yVal, seriesIndex) : yScale.tickFormat(yVal),
-        fields: scatterTooltipFields(
-          sc,
-          bestIdx,
-          store.seriesCount + 1,
-          (columnIdx, index) => store.valueAt(columnIdx, index),
+        fields: scatterTooltipFields(sc, bestIdx, store.seriesCount + 1, (columnIdx, index) =>
+          store.valueAt(columnIdx, index),
         ),
       },
     };

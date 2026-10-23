@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  barRectForCategory,
-  categoryWidthFromCenters,
-  categoryWidthFromData,
-} from './barGeometry';
+import { barRectForCategory, categoryWidthFromCenters, categoryWidthFromData } from './barGeometry';
 
 describe('bar geometry helpers', () => {
   it('uses local neighbor spacing for irregular categories', () => {

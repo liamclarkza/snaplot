@@ -6,9 +6,24 @@ const mock = vi.hoisted(() => ({ instances: [] as any[], reconciles: vi.fn() }))
 vi.mock('../api/createChart', () => ({
   createChart: (container: HTMLElement, options: ChartOptions) => {
     const listeners = new Set<() => void>();
-    const chart = { container, options, destroy: vi.fn(), state: { highlightedSeries: null },
-      getState() { return this.state; }, subscribe(fn: () => void) { listeners.add(fn); return () => listeners.delete(fn); },
-      listeners, publish(state: any) { this.state = state; for (const fn of listeners) fn(); }, setHighlight: vi.fn(),
+    const chart = {
+      container,
+      options,
+      destroy: vi.fn(),
+      state: { highlightedSeries: null },
+      getState() {
+        return this.state;
+      },
+      subscribe(fn: () => void) {
+        listeners.add(fn);
+        return () => listeners.delete(fn);
+      },
+      listeners,
+      publish(state: any) {
+        this.state = state;
+        for (const fn of listeners) fn();
+      },
+      setHighlight: vi.fn(),
     };
     mock.instances.push(chart);
     return chart;
@@ -18,15 +33,25 @@ vi.mock('../api/createChart', () => ({
 import { createChart } from './createChart';
 import { createChartState } from './createChartState';
 import { createHighlight } from './createHighlight';
-const options: ChartOptions<{ x: number; y: number }> = { data: [{ x: 1, y: 2 }], x: 'x', series: [{ y: 'y' }] };
-afterEach(() => { mock.instances.length = 0; vi.clearAllMocks(); });
+const options: ChartOptions<{ x: number; y: number }> = {
+  data: [{ x: 1, y: 2 }],
+  x: 'x',
+  series: [{ y: 'y' }],
+};
+afterEach(() => {
+  mock.instances.length = 0;
+  vi.clearAllMocks();
+});
 describe('Solid chart ownership', () => {
   it('reconciles complete options without remounting and destroys on host replacement', async () => {
     let dispose!: () => void;
     const [host, setHost] = createSignal<HTMLElement>();
     const [value, setValue] = createSignal(options);
     let chart!: () => ChartHandle<{ x: number; y: number }> | undefined;
-    createRoot(stop => { dispose = stop; chart = createChart(host, value); });
+    createRoot((stop) => {
+      dispose = stop;
+      chart = createChart(host, value);
+    });
     expect(chart()).toBeUndefined();
     const first = {} as HTMLElement;
     setHost(first);
@@ -46,7 +71,12 @@ describe('Solid chart ownership', () => {
     let state!: () => ChartState<{ x: number; y: number }> | undefined;
     let highlight!: readonly [() => string | null, (id: string | null) => void];
     const [host, setHost] = createSignal<HTMLElement>({} as HTMLElement);
-    createRoot(stop => { dispose = stop; const chart = createChart(host, () => options); state = createChartState(chart); highlight = createHighlight(chart); });
+    createRoot((stop) => {
+      dispose = stop;
+      const chart = createChart(host, () => options);
+      state = createChartState(chart);
+      highlight = createHighlight(chart);
+    });
     const first = mock.instances[0];
     first.publish({ highlightedSeries: 'y' });
     expect(state()?.highlightedSeries).toBe('y');

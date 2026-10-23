@@ -60,7 +60,7 @@ export class LogScale implements Scale {
       }
     }
 
-    return ticks.filter(t => t >= this.min && t <= this.max).sort((a, b) => a - b);
+    return ticks.filter((t) => t >= this.min && t <= this.max).sort((a, b) => a - b);
   }
 
   tickFormat(value: number): string {

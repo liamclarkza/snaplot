@@ -46,9 +46,16 @@ describe('computeLayout edge margin', () => {
   });
 
   it('reserves a full title strip when a vertical axis has a label', () => {
-    const base = layoutFor({ series: [], axes: { x: {}, y: {} }, padding: { left: 8 } } as ChartConfig, scales);
+    const base = layoutFor(
+      { series: [], axes: { x: {}, y: {} }, padding: { left: 8 } } as ChartConfig,
+      scales,
+    );
     const titled = layoutFor(
-      { series: [], axes: { x: {}, y: { label: 'Validation loss' } }, padding: { left: 8 } } as ChartConfig,
+      {
+        series: [],
+        axes: { x: {}, y: { label: 'Validation loss' } },
+        padding: { left: 8 },
+      } as ChartConfig,
       scales,
     );
     expect(titled.plot.left).toBeGreaterThan(base.plot.left);
@@ -66,13 +73,11 @@ describe('computeLayout edge margin', () => {
   });
 
   it('reserves the outer half of horizontal edge labels', () => {
-    const edgeScales = new Map<string, Scale>([
-      ['x', scale('x', [10, 1000])],
-    ]);
+    const edgeScales = new Map<string, Scale>([['x', scale('x', [10, 1000])]]);
     const layout = layoutFor(
       {
         series: [],
-        axes: { x: { tickFormat: value => `${value} ms` } },
+        axes: { x: { tickFormat: (value) => `${value} ms` } },
         padding: { left: 4, right: 4 },
       } as ChartConfig,
       edgeScales,
@@ -97,8 +102,8 @@ describe('computeLayout edge margin', () => {
       {
         series: [],
         axes: {
-          x: { ticks: [0, 1, 2, 3], tickFormat: value => ['JHB', 'FRA', 'IAD', 'SIN'][value] },
-          y: { tickFormat: value => `${value.toFixed(1)}%` },
+          x: { ticks: [0, 1, 2, 3], tickFormat: (value) => ['JHB', 'FRA', 'IAD', 'SIN'][value] },
+          y: { tickFormat: (value) => `${value.toFixed(1)}%` },
         },
         padding: { left: 12, right: 12 },
       } as ChartConfig,

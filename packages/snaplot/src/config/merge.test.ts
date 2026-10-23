@@ -20,10 +20,7 @@ describe('deepMerge', () => {
   });
 
   it('recursively merges nested plain objects', () => {
-    const result = deepMerge(
-      obj({ a: { b: 1, c: 2 }, d: 3 }),
-      obj({ a: { c: 20, e: 30 } }),
-    );
+    const result = deepMerge(obj({ a: { b: 1, c: 2 }, d: 3 }), obj({ a: { c: 20, e: 30 } }));
     expect(result).toEqual({ a: { b: 1, c: 20, e: 30 }, d: 3 });
   });
 
@@ -39,7 +36,12 @@ describe('deepMerge', () => {
 
   it('replaces series arrays instead of retaining stale entries', () => {
     const result = deepMerge(
-      obj({ series: [{ label: 'a', visible: true }, { label: 'b', visible: true }] }),
+      obj({
+        series: [
+          { label: 'a', visible: true },
+          { label: 'b', visible: true },
+        ],
+      }),
       obj({ series: [{ visible: false }] }),
     );
     expect(result.series).toEqual([{ visible: false }]);
@@ -50,10 +52,7 @@ describe('deepMerge', () => {
       obj({ series: [{ label: 'a' }] }),
       obj({ series: [{ label: 'a', stroke: '#fff' }, { label: 'b' }] }),
     );
-    expect(result.series).toEqual([
-      { label: 'a', stroke: '#fff' },
-      { label: 'b' },
-    ]);
+    expect(result.series).toEqual([{ label: 'a', stroke: '#fff' }, { label: 'b' }]);
   });
 
   it('does not descend into Float64Array (treats it as opaque)', () => {

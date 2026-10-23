@@ -75,9 +75,7 @@ export function normalizeScatterColorBy(
   return colorBy ?? null;
 }
 
-export function normalizeScatterSizeBy(
-  sizeBy: SeriesConfig['sizeBy'],
-): ScatterSizeEncoding | null {
+export function normalizeScatterSizeBy(sizeBy: SeriesConfig['sizeBy']): ScatterSizeEncoding | null {
   if (typeof sizeBy === 'number') return { dataIndex: sizeBy };
   return sizeBy ?? null;
 }
@@ -282,17 +280,20 @@ function buildColorState(
 ): ColorState {
   const stats = scanColumn(colorBy.dataIndex, ranges, valueAt, colorBy.type === 'category');
   const requestedType = colorBy.type ?? 'auto';
-  const type = requestedType === 'auto'
-    ? (stats.categoryValues.length > 0 && stats.categoryValues.length <= 12 && stats.allIntegers
+  const type =
+    requestedType === 'auto'
+      ? stats.categoryValues.length > 0 && stats.categoryValues.length <= 12 && stats.allIntegers
         ? 'category'
-        : 'continuous')
-    : requestedType;
+        : 'continuous'
+      : requestedType;
 
   if (type === 'category') {
     const rawPalette = colorBy.palette ?? palettes.categorical;
     const palette = rawPalette.length > 0 ? rawPalette : [fallbackColor];
     const categoryIndex = new Map<number, number>();
-    const values = colorBy.categoryValues ?? (stats.categoryValues.length > 0 ? stats.categoryValues.sort((a, b) => a - b) : [0]);
+    const values =
+      colorBy.categoryValues ??
+      (stats.categoryValues.length > 0 ? stats.categoryValues.sort((a, b) => a - b) : [0]);
     values.forEach((value, idx) => {
       categoryIndex.set(value, idx);
     });
@@ -304,11 +305,12 @@ function buildColorState(
     };
   }
 
-  const rawPalette = colorBy.palette ??
+  const rawPalette =
+    colorBy.palette ??
     (type === 'diverging' ? palettes.diverging : palettes.sequential) ??
     palettes.categorical;
   const palette = rawPalette.length > 0 ? rawPalette : [fallbackColor];
-  let domain = colorBy.domain ?? [stats.min, stats.max] as [number, number];
+  let domain = colorBy.domain ?? ([stats.min, stats.max] as [number, number]);
   if (type === 'diverging' && !colorBy.domain) {
     const maxAbs = Math.max(Math.abs(stats.min), Math.abs(stats.max), 1);
     domain = [-maxAbs, maxAbs];
@@ -328,7 +330,7 @@ function buildSizeState(
   valueAt: (columnIdx: number, index: number) => number,
 ): SizeState {
   const stats = scanColumn(sizeBy.dataIndex, ranges, valueAt);
-  let domain = sizeBy.domain ?? [stats.min, stats.max] as [number, number];
+  let domain = sizeBy.domain ?? ([stats.min, stats.max] as [number, number]);
   if (!Number.isFinite(domain[0]) || !Number.isFinite(domain[1])) domain = [0, 1];
   return {
     domain,
@@ -379,7 +381,13 @@ function scanColumn(
 /** Parse a #rrggbb or #rgb hex string into [r, g, b] 0-255. */
 export function parseHex(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const full =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h;
   return [
     parseInt(full.slice(0, 2), 16) || 0,
     parseInt(full.slice(2, 4), 16) || 0,

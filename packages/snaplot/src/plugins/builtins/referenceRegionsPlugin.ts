@@ -45,8 +45,12 @@ export function createReferenceRegionsPlugin(options: {
 
   return {
     id: 'builtin:reference-regions',
-    install(chart) { charts.add(chart); },
-    destroy(chart) { charts.delete(chart); },
+    install(chart) {
+      charts.add(chart);
+    },
+    destroy(chart) {
+      charts.delete(chart);
+    },
     setRegions(next) {
       regions = next;
       for (const chart of charts) chart.redraw();

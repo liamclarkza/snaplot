@@ -38,7 +38,10 @@ function lttbFiniteRun(
   const len = end - start + 1;
 
   if (targetCount >= len || targetCount < 3) {
-    return [Float64Array.from(x.subarray(start, end + 1)), Float64Array.from(y.subarray(start, end + 1))];
+    return [
+      Float64Array.from(x.subarray(start, end + 1)),
+      Float64Array.from(y.subarray(start, end + 1)),
+    ];
   }
 
   const outX = new Float64Array(targetCount);
@@ -60,10 +63,7 @@ function lttbFiniteRun(
 
     // Next bucket range (for computing the average point)
     const nextBucketStart = start + Math.floor((bucket + 1) * bucketSize) + 1;
-    const nextBucketEnd = Math.min(
-      start + Math.floor((bucket + 2) * bucketSize) + 1,
-      end + 1,
-    );
+    const nextBucketEnd = Math.min(start + Math.floor((bucket + 2) * bucketSize) + 1, end + 1);
 
     // Average of next bucket
     let avgX = 0;
@@ -86,9 +86,7 @@ function lttbFiniteRun(
 
     for (let j = bucketStart; j < bucketEnd; j++) {
       // Triangle area (doubled, no need for the 0.5 factor, we only compare)
-      const area = Math.abs(
-        (pX - avgX) * (y[j] - pY) - (pX - x[j]) * (avgY - pY),
-      );
+      const area = Math.abs((pX - avgX) * (y[j] - pY) - (pX - x[j]) * (avgY - pY));
       if (area > maxArea) {
         maxArea = area;
         maxIdx = j;

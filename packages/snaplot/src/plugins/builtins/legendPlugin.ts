@@ -26,9 +26,7 @@ interface LegendState {
   offTheme: () => void;
 }
 
-export function createLegendPlugin(options?: {
-  position?: 'top' | 'bottom';
-}): Plugin {
+export function createLegendPlugin(options?: { position?: 'top' | 'bottom' }): Plugin {
   // State is keyed per chart so a single plugin object spread across several
   // charts doesn't overwrite the first chart's DOM refs on the second install.
   const states = new Map<ChartInstance, LegendState>();
@@ -109,7 +107,13 @@ export function createLegendPlugin(options?: {
 }
 
 const FALLBACK_PALETTE = [
-  '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7',
+  '#E69F00',
+  '#56B4E9',
+  '#009E73',
+  '#F0E442',
+  '#0072B2',
+  '#D55E00',
+  '#CC79A7',
 ];
 
 function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
@@ -137,10 +141,7 @@ function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
     item.type = 'button';
     item.className = 'snaplot-legend-item';
     if (hidden) item.dataset.hidden = 'true';
-    item.setAttribute(
-      'aria-label',
-      `Toggle ${series.label} ${hidden ? 'on' : 'off'}`,
-    );
+    item.setAttribute('aria-label', `Toggle ${series.label} ${hidden ? 'on' : 'off'}`);
 
     const dot = document.createElement('span');
     dot.className = 'snaplot-legend-dot';
@@ -166,9 +167,7 @@ function renderItems(chart: ChartInstance, container: HTMLDivElement): void {
       const cfg = chart.getOptions();
       const currentlyVisible = cfg.series[idx]?.visible !== false;
       chart.setOptions({
-        series: cfg.series.map((s, i) =>
-          i === idx ? { ...s, visible: !currentlyVisible } : s,
-        ),
+        series: cfg.series.map((s, i) => (i === idx ? { ...s, visible: !currentlyVisible } : s)),
       });
     });
 

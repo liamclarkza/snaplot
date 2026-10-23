@@ -26,11 +26,7 @@ function scale(key: string, min: number, max: number, pxMin = 0, pxMax = 100): S
 
 describe('HitTester', () => {
   it('uses each series xAxisKey when resolving index-mode points', () => {
-    const store = new ColumnarStore([
-      f([0, 50, 100]),
-      f([10, 20, 30]),
-      f([100, 200, 300]),
-    ]);
+    const store = new ColumnarStore([f([0, 50, 100]), f([10, 20, 30]), f([100, 200, 300])]);
     const scales = new Map<string, Scale>([
       ['x', scale('x', 0, 100)],
       ['x2', scale('x2', 0, 200)],
@@ -59,11 +55,7 @@ describe('HitTester', () => {
   });
 
   it('uses each series xAxisKey when searching nearest points', () => {
-    const store = new ColumnarStore([
-      f([0, 50, 100]),
-      f([300, 200, 100]),
-      f([300, 300, 200]),
-    ]);
+    const store = new ColumnarStore([f([0, 50, 100]), f([300, 200, 100]), f([300, 300, 200])]);
     const scales = new Map<string, Scale>([
       ['x', scale('x', 0, 100)],
       ['x2', scale('x2', 0, 200)],
@@ -102,15 +94,22 @@ describe('HitTester', () => {
       ['x', scale('x', 0, 10)],
       ['y', scale('y', 0, 40)],
     ]);
-    const series: SeriesConfig[] = [{
-      label: 'runs',
-      type: 'scatter',
-      xDataIndex: 1,
-      yDataIndex: 2,
-      colorBy: { dataIndex: 3, type: 'category', palette: ['#111111', '#eeeeee'], label: 'family' },
-      sizeBy: { dataIndex: 4, domain: [4, 16], range: [2, 8], label: 'runtime' },
-      tooltipFields: [{ dataIndex: 1, label: 'lr' }],
-    }];
+    const series: SeriesConfig[] = [
+      {
+        label: 'runs',
+        type: 'scatter',
+        xDataIndex: 1,
+        yDataIndex: 2,
+        colorBy: {
+          dataIndex: 3,
+          type: 'category',
+          palette: ['#111111', '#eeeeee'],
+          label: 'family',
+        },
+        sizeBy: { dataIndex: 4, domain: [4, 16], range: [2, 8], label: 'runtime' },
+        tooltipFields: [{ dataIndex: 1, label: 'lr' }],
+      },
+    ];
 
     const points = new HitTester(12).findPoints(
       store,
@@ -198,19 +197,53 @@ describe('HitTester independent sources', () => {
     new ColumnarStore([f([0, 4]), f([10, 20])]),
     new ColumnarStore([f([1, 2, 7]), f([30, 40, 50])]),
   ];
-  const scales = new Map<string, Scale>([['x', scale('x', 0, 10)], ['y', scale('y', 0, 100)]]);
-  const series: SeriesConfig[] = [{ label: 'one', dataIndex: 1 }, { label: 'two', dataIndex: 1 }];
+  const scales = new Map<string, Scale>([
+    ['x', scale('x', 0, 10)],
+    ['y', scale('y', 0, 100)],
+  ]);
+  const series: SeriesConfig[] = [
+    { label: 'one', dataIndex: 1 },
+    { label: 'two', dataIndex: 1 },
+  ];
 
   it('resolves grouped points independently while retaining global series indices', () => {
-    const points = new HitTester(1000).findPoints(stores[0], scales, series, 30, 40, 'index', ['red', 'blue'],
-      'mouse', undefined, 0, undefined, undefined, si => stores[si]);
-    expect(points.map(p => [p.seriesIndex, p.dataIndex, p.x, p.y])).toEqual([[0, 1, 4, 20], [1, 1, 2, 40]]);
+    const points = new HitTester(1000).findPoints(
+      stores[0],
+      scales,
+      series,
+      30,
+      40,
+      'index',
+      ['red', 'blue'],
+      'mouse',
+      undefined,
+      0,
+      undefined,
+      undefined,
+      (si) => stores[si],
+    );
+    expect(points.map((p) => [p.seriesIndex, p.dataIndex, p.x, p.y])).toEqual([
+      [0, 1, 4, 20],
+      [1, 1, 2, 40],
+    ]);
   });
 
   it('finds the nearest scatter point in a different source with its local row index', () => {
-    const points = new HitTester(10).findPoints(stores[0], scales,
-      series.map(s => ({ ...s, type: 'scatter' })), 70, 50, 'nearest', ['red', 'blue'],
-      'mouse', undefined, 0, undefined, undefined, si => stores[si]);
-    expect(points.map(p => [p.seriesIndex, p.dataIndex, p.x, p.y])).toEqual([[1, 2, 7, 50]]);
+    const points = new HitTester(10).findPoints(
+      stores[0],
+      scales,
+      series.map((s) => ({ ...s, type: 'scatter' })),
+      70,
+      50,
+      'nearest',
+      ['red', 'blue'],
+      'mouse',
+      undefined,
+      0,
+      undefined,
+      undefined,
+      (si) => stores[si],
+    );
+    expect(points.map((p) => [p.seriesIndex, p.dataIndex, p.x, p.y])).toEqual([[1, 2, 7, 50]]);
   });
 });

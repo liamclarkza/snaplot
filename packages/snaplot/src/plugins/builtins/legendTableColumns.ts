@@ -21,10 +21,7 @@ export interface LegendTableColumn<TMeta = unknown> {
   /** Header text. Pass empty string for unlabeled columns (e.g. swatch). */
   header: string;
   /** Cell renderer. Receives the snapshot row + the series config. */
-  cell: (
-    point: CursorSeriesPoint<TMeta>,
-    series: SeriesConfig<TMeta>,
-  ) => LegendCellContent;
+  cell: (point: CursorSeriesPoint<TMeta>, series: SeriesConfig<TMeta>) => LegendCellContent;
   /** Optional text alignment. Defaults to `'left'`. */
   align?: 'left' | 'right' | 'center';
   /** Optional fixed/min width (CSS string). */
@@ -156,8 +153,6 @@ export function metricColumn<TMeta = unknown>(
  * Generic escape hatch for one-off columns. Mostly here to give the
  * `import { column } from 'snaplot'` ergonomic an obvious entry point.
  */
-export function column<TMeta = unknown>(
-  spec: LegendTableColumn<TMeta>,
-): LegendTableColumn<TMeta> {
+export function column<TMeta = unknown>(spec: LegendTableColumn<TMeta>): LegendTableColumn<TMeta> {
   return spec;
 }

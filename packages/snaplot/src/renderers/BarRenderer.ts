@@ -102,9 +102,8 @@ export function renderBarsSegments(
   // Baseline Y (where value = 0). A log Y scale has no pixel for 0
   // (dataToPixel(0) is NaN), which would skip every bar; anchor those to the
   // scale minimum (the plot bottom) instead.
-  const baselinePixel = scaleY.type === 'log'
-    ? scaleY.dataToPixel(scaleY.min)
-    : scaleY.dataToPixel(0);
+  const baselinePixel =
+    scaleY.type === 'log' ? scaleY.dataToPixel(scaleY.min) : scaleY.dataToPixel(0);
 
   // Fallback category width for a lone/edge bar (viewport culling leaves one
   // visible, or both pixel neighbors are non-finite): derive it from the
@@ -136,10 +135,8 @@ export function renderBarsSegments(
       if (!Number.isFinite(yVal)) continue;
 
       if (!Number.isFinite(centerX)) continue;
-      const categoryWidth = categoryWidthFromCenters(
-        centers,
-        ordinal - 1,
-        () => dataCategoryWidthPx(i, xData, centerX),
+      const categoryWidth = categoryWidthFromCenters(centers, ordinal - 1, () =>
+        dataCategoryWidthPx(i, xData, centerX),
       );
       const rect = barRectForCategory({
         centerX,

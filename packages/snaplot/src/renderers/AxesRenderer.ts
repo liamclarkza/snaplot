@@ -135,7 +135,10 @@ export function renderAxes(
     const useCustomTicks = isHorizontal && customXTicks && !hasExplicitTicks;
     let ticks = useCustomTicks ? customXTicks!.values : axisTickValues(scale, ac);
     const edgeTolerance = Math.abs(scale.max - scale.min) * 1e-9;
-    const preserveEnds = !useCustomTicks && scale.type === 'linear' && ticks.length > 1 &&
+    const preserveEnds =
+      !useCustomTicks &&
+      scale.type === 'linear' &&
+      ticks.length > 1 &&
       Math.abs(ticks[0] - scale.min) <= edgeTolerance &&
       Math.abs(ticks[ticks.length - 1] - scale.max) <= edgeTolerance;
     // Bar labels name slot centers; their grid spans the slot boundaries.
@@ -143,9 +146,10 @@ export function renderAxes(
     const customGridValues = useCustomTicks ? customXTicks?.gridValues : undefined;
     // Formatter precedence: custom-tick formatter (bar/histogram path) ->
     // user's axes.x.tickFormat -> the scale's built-in tickFormat.
-    const formatTick = useCustomTicks && customXTicks!.format
-      ? customXTicks!.format
-      : ac.tickFormat ?? ((v: number) => scale.tickFormat(v));
+    const formatTick =
+      useCustomTicks && customXTicks!.format
+        ? customXTicks!.format
+        : (ac.tickFormat ?? ((v: number) => scale.tickFormat(v)));
 
     // Width fit pass: generated tick counts are density targets that know
     // nothing about the rendered strings, so measure the actual labels and
@@ -174,7 +178,11 @@ export function renderAxes(
       const minSpacing = theme.fontSize * 1.4;
       const spacing = plot.height / (ticks.length - 1);
       if (spacing < minSpacing) {
-        ticks = thinTicks(ticks, Math.max(2, Math.floor(plot.height / minSpacing) + 1), preserveEnds);
+        ticks = thinTicks(
+          ticks,
+          Math.max(2, Math.floor(plot.height / minSpacing) + 1),
+          preserveEnds,
+        );
       }
     }
 
@@ -233,7 +241,12 @@ export function renderAxes(
         for (const t of ticks) {
           const py = scale.dataToPixel(t);
           if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
-            labels.push({ text: formatTick(t), x: plot.left - AXIS_TICK_LENGTH - AXIS_LABEL_GAP, y: py, anchor: 'end' });
+            labels.push({
+              text: formatTick(t),
+              x: plot.left - AXIS_TICK_LENGTH - AXIS_LABEL_GAP,
+              y: py,
+              anchor: 'end',
+            });
           }
         }
         break;
@@ -241,7 +254,12 @@ export function renderAxes(
         for (const t of ticks) {
           const py = scale.dataToPixel(t);
           if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
-            labels.push({ text: formatTick(t), x: plot.left + plot.width + AXIS_TICK_LENGTH + AXIS_LABEL_GAP, y: py, anchor: 'start' });
+            labels.push({
+              text: formatTick(t),
+              x: plot.left + plot.width + AXIS_TICK_LENGTH + AXIS_LABEL_GAP,
+              y: py,
+              anchor: 'start',
+            });
           }
         }
         break;
@@ -252,9 +270,10 @@ export function renderAxes(
         // into the left gutter. Clamp the label center so the text box stays
         // inside the container; only the edge labels ever shift, and by at
         // most half their own width.
-        const labelY = pos === 'bottom'
-          ? plot.top + plot.height + AXIS_TICK_LENGTH + AXIS_LABEL_GAP
-          : plot.top - AXIS_TICK_LENGTH - AXIS_LABEL_GAP;
+        const labelY =
+          pos === 'bottom'
+            ? plot.top + plot.height + AXIS_TICK_LENGTH + AXIS_LABEL_GAP
+            : plot.top - AXIS_TICK_LENGTH - AXIS_LABEL_GAP;
         for (const t of ticks) {
           const px = scale.dataToPixel(t);
           if (px >= plot.left - 10 && px <= plot.left + plot.width + 10) {
@@ -277,16 +296,40 @@ export function renderAxes(
         const inset = EDGE_MARGIN + theme.fontSize / 2;
         switch (pos) {
           case 'left':
-            labels.push({ text: ac.label, x: area.left + inset, y: plot.top + plot.height / 2, anchor: 'middle', kind: 'title' });
+            labels.push({
+              text: ac.label,
+              x: area.left + inset,
+              y: plot.top + plot.height / 2,
+              anchor: 'middle',
+              kind: 'title',
+            });
             break;
           case 'right':
-            labels.push({ text: ac.label, x: area.left + area.width - inset, y: plot.top + plot.height / 2, anchor: 'middle', kind: 'title' });
+            labels.push({
+              text: ac.label,
+              x: area.left + area.width - inset,
+              y: plot.top + plot.height / 2,
+              anchor: 'middle',
+              kind: 'title',
+            });
             break;
           case 'bottom':
-            labels.push({ text: ac.label, x: plot.left + plot.width / 2, y: area.top + area.height - inset, anchor: 'middle', kind: 'title' });
+            labels.push({
+              text: ac.label,
+              x: plot.left + plot.width / 2,
+              y: area.top + area.height - inset,
+              anchor: 'middle',
+              kind: 'title',
+            });
             break;
           case 'top':
-            labels.push({ text: ac.label, x: plot.left + plot.width / 2, y: area.top + inset, anchor: 'middle', kind: 'title' });
+            labels.push({
+              text: ac.label,
+              x: plot.left + plot.width / 2,
+              y: area.top + inset,
+              anchor: 'middle',
+              kind: 'title',
+            });
             break;
         }
       }

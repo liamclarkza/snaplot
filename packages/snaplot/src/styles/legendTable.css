@@ -81,7 +81,7 @@
   display: inline-block;
 }
 
-.snaplot-legend-row[data-dimmed='true'] {
+.snaplot-legend-row[data-dimmed="true"] {
   opacity: var(--snaplot-legend-row-dim-opacity);
   transition: opacity var(--snaplot-legend-dur) var(--snaplot-legend-ease);
 }
@@ -93,19 +93,19 @@
   background-color: var(--snaplot-legend-row-hover);
 }
 
-.snaplot-legend-row[data-highlighted='true'] > .snaplot-legend-cell {
+.snaplot-legend-row[data-highlighted="true"] > .snaplot-legend-cell {
   background-color: var(--snaplot-legend-row-highlight);
 }
 
 /* Round the outer cell corners → the highlight reads as a pill inside
    the row, not a band. */
 .snaplot-legend-row:hover > .snaplot-legend-cell:first-child,
-.snaplot-legend-row[data-highlighted='true'] > .snaplot-legend-cell:first-child {
+.snaplot-legend-row[data-highlighted="true"] > .snaplot-legend-cell:first-child {
   border-top-left-radius: var(--snaplot-legend-row-radius);
   border-bottom-left-radius: var(--snaplot-legend-row-radius);
 }
 .snaplot-legend-row:hover > .snaplot-legend-cell:last-child,
-.snaplot-legend-row[data-highlighted='true'] > .snaplot-legend-cell:last-child {
+.snaplot-legend-row[data-highlighted="true"] > .snaplot-legend-cell:last-child {
   border-top-right-radius: var(--snaplot-legend-row-radius);
   border-bottom-right-radius: var(--snaplot-legend-row-radius);
 }
@@ -165,7 +165,7 @@
   background-color: var(--snaplot-legend-row-hover);
 }
 
-.snaplot-legend-item[data-hidden='true'] {
+.snaplot-legend-item[data-hidden="true"] {
   opacity: 0.4;
 }
 
@@ -182,9 +182,9 @@
   flex-shrink: 0;
 }
 
-.snaplot-legend-dot[data-mark='line']::after,
-.snaplot-legend-dot[data-mark='area']::after {
-  content: '';
+.snaplot-legend-dot[data-mark="line"]::after,
+.snaplot-legend-dot[data-mark="area"]::after {
+  content: "";
   position: absolute;
   left: 0;
   right: 0;
@@ -192,32 +192,32 @@
   border-top: 2px solid currentColor;
 }
 
-.snaplot-legend-dot[data-dashed='true']::after {
+.snaplot-legend-dot[data-dashed="true"]::after {
   border-top-style: dashed;
 }
 
-.snaplot-legend-dot[data-mark='area'] {
+.snaplot-legend-dot[data-mark="area"] {
   height: 8px;
   margin-top: 2px;
   background: color-mix(in srgb, currentColor 28%, transparent);
 }
 
-.snaplot-legend-dot[data-mark='band'] {
+.snaplot-legend-dot[data-mark="band"] {
   height: 8px;
   margin-top: 1px;
   border: 1px solid currentColor;
   background: color-mix(in srgb, currentColor 18%, transparent);
 }
 
-.snaplot-legend-dot[data-mark='bar'],
-.snaplot-legend-dot[data-mark='histogram'] {
+.snaplot-legend-dot[data-mark="bar"],
+.snaplot-legend-dot[data-mark="histogram"] {
   width: 11px;
   height: 10px;
   border-radius: 2px 2px 0 0;
   background: currentColor;
 }
 
-.snaplot-legend-dot[data-mark='scatter'] {
+.snaplot-legend-dot[data-mark="scatter"] {
   width: 9px;
   height: 9px;
   margin-inline: 2px 3px;

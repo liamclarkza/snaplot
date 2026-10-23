@@ -36,7 +36,9 @@ for (const [profileName, baseProfile] of Object.entries(baseline.profiles)) {
     console.log(`profile ${profileName}: missing from current run, skipping`);
     continue;
   }
-  console.log(`\n#### ${profileName} (baseline ${baseline.meta.sha} -> current ${current.meta.sha})\n`);
+  console.log(
+    `\n#### ${profileName} (baseline ${baseline.meta.sha} -> current ${current.meta.sha})\n`,
+  );
   console.log('| scenario | base median | cur median | ratio | verdict |');
   console.log('| :-- | --: | --: | --: | :-- |');
 
@@ -49,7 +51,9 @@ for (const [profileName, baseProfile] of Object.entries(baseline.profiles)) {
       continue;
     }
     if (!cur.valid) {
-      console.log(`| ${base.name} | ${base.frame.medianMs} | ${cur.frame.medianMs} | | FAIL (invalid) |`);
+      console.log(
+        `| ${base.name} | ${base.frame.medianMs} | ${cur.frame.medianMs} | | FAIL (invalid) |`,
+      );
       failures++;
       continue;
     }

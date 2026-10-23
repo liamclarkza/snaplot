@@ -9,7 +9,12 @@ export default defineConfig({
     solid({ solid: { hydratable: true } }),
     dts({
       include: ['src/**/*'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/*.spec.ts', 'src/**/*.typecheck.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.test.tsx',
+        'src/**/*.spec.ts',
+        'src/**/*.typecheck.ts',
+      ],
       outDir: 'dist',
     }),
     {
@@ -36,7 +41,14 @@ export default defineConfig({
       fileName: (_format, entryName) => `${entryName}.js`,
     },
     rollupOptions: {
-      external: ['solid-js', 'solid-js/web', 'solid-js/store', 'react', 'react/jsx-runtime', 'react-dom'],
+      external: [
+        'solid-js',
+        'solid-js/web',
+        'solid-js/store',
+        'react',
+        'react/jsx-runtime',
+        'react-dom',
+      ],
     },
     target: 'esnext',
     sourcemap: true,

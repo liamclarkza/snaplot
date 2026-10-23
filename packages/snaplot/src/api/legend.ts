@@ -20,10 +20,7 @@ export interface LegendTableColumn<Row = Record<string, unknown>> {
   /** Header text. Pass empty string for unlabeled columns (e.g. swatch). */
   header: string;
   /** Cell renderer. Receives the snapshot row + the series config. */
-  cell: (
-    point: ChartPoint<Row>,
-    series: SeriesOptions<Row>,
-  ) => LegendCellContent;
+  cell: (point: ChartPoint<Row>, series: SeriesOptions<Row>) => LegendCellContent;
   /** Optional text alignment. Defaults to `'left'`. */
   align?: 'left' | 'right' | 'center';
   /** Optional fixed/min width (CSS string). */
@@ -188,18 +185,31 @@ interface MountStyle {
 }
 const mounts = new WeakMap<HTMLElement, MountStyle>();
 
-function mount<Row>(chart: ChartHandle<Row>, root: HTMLElement, options: LegendOptions): () => void {
+function mount<Row>(
+  chart: ChartHandle<Row>,
+  root: HTMLElement,
+  options: LegendOptions,
+): () => void {
   const parent = options.container ?? chart.container;
   if (!options.container) {
     let state = mounts.get(parent);
     if (!state) {
       const canvas = parent.firstElementChild as HTMLElement | null;
-      state = { users: 0, display: parent.style.display, direction: parent.style.flexDirection,
-        canvas, flex: canvas?.style.flex ?? '', minHeight: canvas?.style.minHeight ?? '' };
+      state = {
+        users: 0,
+        display: parent.style.display,
+        direction: parent.style.flexDirection,
+        canvas,
+        flex: canvas?.style.flex ?? '',
+        minHeight: canvas?.style.minHeight ?? '',
+      };
       mounts.set(parent, state);
       parent.style.display = 'flex';
       parent.style.flexDirection = 'column';
-      if (canvas) { canvas.style.flex = '1'; canvas.style.minHeight = '0'; }
+      if (canvas) {
+        canvas.style.flex = '1';
+        canvas.style.minHeight = '0';
+      }
     }
     state.users++;
   }
@@ -212,7 +222,10 @@ function mount<Row>(chart: ChartHandle<Row>, root: HTMLElement, options: LegendO
     if (!state || --state.users > 0) return;
     parent.style.display = state.display;
     parent.style.flexDirection = state.direction;
-    if (state.canvas) { state.canvas.style.flex = state.flex; state.canvas.style.minHeight = state.minHeight; }
+    if (state.canvas) {
+      state.canvas.style.flex = state.flex;
+      state.canvas.style.minHeight = state.minHeight;
+    }
     mounts.delete(parent);
   };
 }
@@ -223,7 +236,9 @@ function setFlag(element: HTMLElement, flag: string, enabled: boolean): void {
 }
 
 /** Accessible, ID-based toggles using the same legend classes as the framework companions. */
-export function createLegendPlugin<Row = Record<string, unknown>>(options: LegendOptions = {}): ChartPlugin<Row> {
+export function createLegendPlugin<Row = Record<string, unknown>>(
+  options: LegendOptions = {},
+): ChartPlugin<Row> {
   const states = new Map<ChartHandle<Row>, () => void>();
   return {
     id: 'builtin:legend',
@@ -232,11 +247,18 @@ export function createLegendPlugin<Row = Record<string, unknown>>(options: Legen
       const root = document.createElement('div');
       root.className = 'snaplot-legend-root';
       const unmount = mount(chart, root, options);
-      const buttons = new Map<string, { button: HTMLButtonElement; dot: HTMLElement; label: HTMLElement }>();
+      const buttons = new Map<
+        string,
+        { button: HTMLButtonElement; dot: HTMLElement; label: HTMLElement }
+      >();
       const refresh = () => {
         const items = chart.getLegendItems();
         const ids = new Set(items.map((item) => item.id));
-        for (const [id, entry] of buttons) if (!ids.has(id)) { entry.button.remove(); buttons.delete(id); }
+        for (const [id, entry] of buttons)
+          if (!ids.has(id)) {
+            entry.button.remove();
+            buttons.delete(id);
+          }
         items.forEach((item, index) => {
           let entry = buttons.get(item.id);
           if (!entry) {
@@ -244,23 +266,29 @@ export function createLegendPlugin<Row = Record<string, unknown>>(options: Legen
             button.type = 'button';
             button.className = 'snaplot-legend-item';
             button.dataset.seriesId = item.id;
-            const dot = document.createElement('span'); dot.className = 'snaplot-legend-dot';
-            const label = document.createElement('span'); label.className = 'snaplot-legend-label';
+            const dot = document.createElement('span');
+            dot.className = 'snaplot-legend-dot';
+            const label = document.createElement('span');
+            label.className = 'snaplot-legend-label';
             button.append(dot, label);
             button.addEventListener('click', () => {
               const current = chart.getLegendItems().find((candidate) => candidate.id === item.id);
               if (current) chart.setSeriesVisible(item.id, !current.visible);
             });
-            entry = { button, dot, label }; buttons.set(item.id, entry);
+            entry = { button, dot, label };
+            buttons.set(item.id, entry);
           }
           const { button, dot, label } = entry;
-          if (root.children[index] !== button) root.insertBefore(button, root.children[index] ?? null);
+          if (root.children[index] !== button)
+            root.insertBefore(button, root.children[index] ?? null);
           setFlag(button, 'hidden', !item.visible);
           button.setAttribute('aria-label', `Toggle ${item.label} ${item.visible ? 'off' : 'on'}`);
           button.setAttribute('aria-pressed', String(item.visible));
           dot.dataset.mark = item.type ?? 'line';
-          dot.style.color = item.color; dot.style.borderColor = item.color;
-          dot.style.backgroundColor = item.fill ?? ''; dot.style.opacity = String(item.opacity);
+          dot.style.color = item.color;
+          dot.style.borderColor = item.color;
+          dot.style.backgroundColor = item.fill ?? '';
+          dot.style.opacity = String(item.opacity);
           setFlag(dot, 'dashed', item.lineDash.length > 0);
           if (label.textContent !== item.label) label.textContent = item.label;
         });
@@ -268,9 +296,17 @@ export function createLegendPlugin<Row = Record<string, unknown>>(options: Legen
       refresh();
       const unsubscribe = chart.subscribe(refresh);
       const offTheme = chart.on('theme:update', refresh);
-      states.set(chart, () => { unsubscribe(); offTheme(); unmount(); buttons.clear(); });
+      states.set(chart, () => {
+        unsubscribe();
+        offTheme();
+        unmount();
+        buttons.clear();
+      });
     },
-    destroy(chart) { states.get(chart)?.(); states.delete(chart); },
+    destroy(chart) {
+      states.get(chart)?.();
+      states.delete(chart);
+    },
   };
 }
 
@@ -282,10 +318,22 @@ function placeContent(cell: HTMLElement, content: LegendCellContent): void {
   if (cell.firstChild === content && cell.childNodes.length === 1) return;
   const existing = cell.firstElementChild;
   // Built-in static name and swatch nodes need no replacement on cursor moves.
-  if (content instanceof Element && existing && cell.childNodes.length === 1 && existing.isEqualNode(content)) return;
-  if (content instanceof HTMLElement && existing instanceof HTMLElement && cell.childNodes.length === 1 &&
-    content.childElementCount === 0 && existing.childElementCount === 0 && content.tagName === existing.tagName &&
-    content.getAttribute('style') === existing.getAttribute('style')) {
+  if (
+    content instanceof Element &&
+    existing &&
+    cell.childNodes.length === 1 &&
+    existing.isEqualNode(content)
+  )
+    return;
+  if (
+    content instanceof HTMLElement &&
+    existing instanceof HTMLElement &&
+    cell.childNodes.length === 1 &&
+    content.childElementCount === 0 &&
+    existing.childElementCount === 0 &&
+    content.tagName === existing.tagName &&
+    content.getAttribute('style') === existing.getAttribute('style')
+  ) {
     existing.textContent = content.textContent;
     return;
   }
@@ -293,15 +341,27 @@ function placeContent(cell: HTMLElement, content: LegendCellContent): void {
 }
 
 function emptyPoint<Row>(item: LegendItem): ChartPoint<Row> {
-  return { seriesId: item.id, label: item.label, rowIndex: -1, x: 0, y: Number.NaN,
-    formattedX: '', formattedY: '', color: item.color, meta: item.meta };
+  return {
+    seriesId: item.id,
+    label: item.label,
+    rowIndex: -1,
+    x: 0,
+    y: Number.NaN,
+    formattedX: '',
+    formattedY: '',
+    color: item.color,
+    meta: item.meta,
+  };
 }
 
 /** Cursor-synchronised table with stable ID-keyed DOM rows and text-safe custom cells. */
-export function createLegendTablePlugin<Row = Record<string, unknown>>(options: LegendTableOptions<Row> = {}): ChartPlugin<Row> {
+export function createLegendTablePlugin<Row = Record<string, unknown>>(
+  options: LegendTableOptions<Row> = {},
+): ChartPlugin<Row> {
   const states = new Map<ChartHandle<Row>, () => void>();
   const columns = options.columns ?? [nameColumn<Row>(), valueColumn<Row>()];
-  if (new Set(columns.map((item) => item.key)).size !== columns.length) throw new Error('Snaplot: legend table column keys must be unique.');
+  if (new Set(columns.map((item) => item.key)).size !== columns.length)
+    throw new Error('Snaplot: legend table column keys must be unique.');
   const fallback = options.fallback ?? 'series-only';
   return {
     id: 'builtin:legend-table',
@@ -310,46 +370,71 @@ export function createLegendTablePlugin<Row = Record<string, unknown>>(options: 
       const root = document.createElement('div');
       root.className = `snaplot-legend-table-root${options.className ? ` ${options.className}` : ''}`;
       root.style.cssText = 'flex-shrink:0;padding:8px 12px;font-size:12px;line-height:1.4;';
-      if (options.maxHeight) { root.style.maxHeight = options.maxHeight; root.style.overflow = 'auto'; }
-      const stepLabel = document.createElement('div'); stepLabel.className = 'snaplot-legend-step';
+      if (options.maxHeight) {
+        root.style.maxHeight = options.maxHeight;
+        root.style.overflow = 'auto';
+      }
+      const stepLabel = document.createElement('div');
+      stepLabel.className = 'snaplot-legend-step';
       stepLabel.style.cssText = 'margin-bottom:6px;font-size:11px;opacity:0.75;min-height:16px;';
-      const step = document.createElement('span'); step.style.cssText = 'font-weight:600;font-variant-numeric:tabular-nums;';
-      stepLabel.append('Step: ', step); root.append(stepLabel);
-      const table = document.createElement('table'); table.className = 'snaplot-legend-table';
+      const step = document.createElement('span');
+      step.style.cssText = 'font-weight:600;font-variant-numeric:tabular-nums;';
+      stepLabel.append('Step: ', step);
+      root.append(stepLabel);
+      const table = document.createElement('table');
+      table.className = 'snaplot-legend-table';
       table.style.cssText = 'width:100%;border-collapse:collapse;';
-      const head = document.createElement('thead'); const header = document.createElement('tr');
+      const head = document.createElement('thead');
+      const header = document.createElement('tr');
       columns.forEach((col) => {
-        const th = document.createElement('th'); th.textContent = col.header;
+        const th = document.createElement('th');
+        th.textContent = col.header;
         th.className = `snaplot-legend-header snaplot-legend-header--${col.key}`;
         th.style.cssText = `font-weight:400;font-size:11px;opacity:0.6;text-align:${col.align ?? 'left'};padding:0 8px 4px 0;`;
         if (col.width) th.style.width = col.width;
         if (col.title) th.title = col.title;
         header.append(th);
       });
-      head.append(header); const body = document.createElement('tbody'); table.append(head, body); root.append(table);
+      head.append(header);
+      const body = document.createElement('tbody');
+      table.append(head, body);
+      root.append(table);
       const unmount = mount(chart, root, options);
       const rows = new Map<string, { row: HTMLTableRowElement; cells: HTMLTableCellElement[] }>();
       const refresh = () => {
-        const snapshot = chart.getCursorSnapshot({ fallback: fallback === 'series-only' ? 'latest' : fallback });
+        const snapshot = chart.getCursorSnapshot({
+          fallback: fallback === 'series-only' ? 'latest' : fallback,
+        });
         root.style.display = fallback === 'hide' && snapshot.source === 'none' ? 'none' : '';
         stepLabel.style.display = options.showStepHeader === false ? 'none' : '';
         const hasStep = snapshot.source === 'cursor' && snapshot.x !== null;
         step.style.visibility = hasStep ? 'visible' : 'hidden';
-        step.textContent = hasStep ? options.formatStep?.(snapshot.x!) ?? snapshot.formattedX : '\u00a0';
-        const items = chart.getLegendItems(); const ids = new Set(items.map((item) => item.id));
+        step.textContent = hasStep
+          ? (options.formatStep?.(snapshot.x!) ?? snapshot.formattedX)
+          : '\u00a0';
+        const items = chart.getLegendItems();
+        const ids = new Set(items.map((item) => item.id));
         const points = new Map(snapshot.points.map((point) => [point.seriesId, point]));
         const highlighted = chart.getState().highlightedSeries;
         const specs = chart.getOptions().series;
-        for (const [id, entry] of rows) if (!ids.has(id)) { entry.row.remove(); rows.delete(id); }
+        for (const [id, entry] of rows)
+          if (!ids.has(id)) {
+            entry.row.remove();
+            rows.delete(id);
+          }
         items.forEach((item, index) => {
           let entry = rows.get(item.id);
           if (!entry) {
-            const row = document.createElement('tr'); row.className = 'snaplot-legend-row'; row.dataset.seriesId = item.id;
+            const row = document.createElement('tr');
+            row.className = 'snaplot-legend-row';
+            row.dataset.seriesId = item.id;
             const cells = columns.map((col) => {
-              const td = document.createElement('td'); td.className = `snaplot-legend-cell snaplot-legend-cell--${col.key}`;
+              const td = document.createElement('td');
+              td.className = `snaplot-legend-cell snaplot-legend-cell--${col.key}`;
               if (col.align) td.style.textAlign = col.align;
               if (col.width) td.style.width = col.width;
-              row.append(td); return td;
+              row.append(td);
+              return td;
             });
             if (options.highlightOnHover !== false) {
               row.addEventListener('mouseenter', () => chart.setHighlight(item.id));
@@ -358,29 +443,57 @@ export function createLegendTablePlugin<Row = Record<string, unknown>>(options: 
               row.addEventListener('blur', () => chart.setHighlight(null));
             }
             if (options.toggleVisibilityOnClick) {
-              row.tabIndex = 0; row.setAttribute('role', 'button'); row.style.cursor = 'pointer';
-              const toggle = () => { const current = chart.getLegendItems().find((candidate) => candidate.id === item.id); if (current) chart.setSeriesVisible(item.id, !current.visible); };
+              row.tabIndex = 0;
+              row.setAttribute('role', 'button');
+              row.style.cursor = 'pointer';
+              const toggle = () => {
+                const current = chart
+                  .getLegendItems()
+                  .find((candidate) => candidate.id === item.id);
+                if (current) chart.setSeriesVisible(item.id, !current.visible);
+              };
               row.addEventListener('click', toggle);
-              row.addEventListener('keydown', (event) => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); toggle(); } });
+              row.addEventListener('keydown', (event) => {
+                if (event.key === ' ' || event.key === 'Enter') {
+                  event.preventDefault();
+                  toggle();
+                }
+              });
             }
-            entry = { row, cells }; rows.set(item.id, entry);
+            entry = { row, cells };
+            rows.set(item.id, entry);
           }
-          if (body.children[index] !== entry.row) body.insertBefore(entry.row, body.children[index] ?? null);
+          if (body.children[index] !== entry.row)
+            body.insertBefore(entry.row, body.children[index] ?? null);
           entry.row.style.display = item.visible ? '' : 'none';
-          if (options.toggleVisibilityOnClick) entry.row.setAttribute('aria-label', `Toggle ${item.label} ${item.visible ? 'off' : 'on'}`);
+          if (options.toggleVisibilityOnClick)
+            entry.row.setAttribute(
+              'aria-label',
+              `Toggle ${item.label} ${item.visible ? 'off' : 'on'}`,
+            );
           setFlag(entry.row, 'highlighted', highlighted === item.id);
           setFlag(entry.row, 'dimmed', highlighted !== null && highlighted !== item.id);
           const point = points.get(item.id) ?? emptyPoint<Row>(item);
           columns.forEach((col, ci) => {
-            const blank = col.key === 'value' && fallback === 'series-only' && snapshot.source !== 'cursor';
+            const blank =
+              col.key === 'value' && fallback === 'series-only' && snapshot.source !== 'cursor';
             placeContent(entry!.cells[ci], blank ? '' : col.cell(point, specs[index]));
           });
         });
       };
       refresh();
-      const unsubscribe = chart.subscribe(refresh); const offTheme = chart.on('theme:update', refresh);
-      states.set(chart, () => { unsubscribe(); offTheme(); unmount(); rows.clear(); });
+      const unsubscribe = chart.subscribe(refresh);
+      const offTheme = chart.on('theme:update', refresh);
+      states.set(chart, () => {
+        unsubscribe();
+        offTheme();
+        unmount();
+        rows.clear();
+      });
     },
-    destroy(chart) { states.get(chart)?.(); states.delete(chart); },
+    destroy(chart) {
+      states.get(chart)?.();
+      states.delete(chart);
+    },
   };
 }

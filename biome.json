@@ -6,16 +6,10 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": [
-      "**",
-      "!**/dist/**",
-      "!**/node_modules/**",
-      "!**/package-lock.json",
-      "!**/*.d.ts"
-    ]
+    "includes": ["**", "!**/dist/**", "!**/node_modules/**", "!**/package-lock.json", "!**/*.d.ts"]
   },
   "formatter": {
-    "enabled": false,
+    "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 100,

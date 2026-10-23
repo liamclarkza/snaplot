@@ -18,15 +18,13 @@ afterEach(() => {
 
 describe('column index bounds', () => {
   it('accepts indices within the column count', () => {
-    expect(() =>
-      validateChartConfig(config([{ label: 'A', dataIndex: 2 }]), data),
-    ).not.toThrow();
+    expect(() => validateChartConfig(config([{ label: 'A', dataIndex: 2 }]), data)).not.toThrow();
   });
 
   it('throws naming the series and the valid range for an out-of-range index', () => {
-    expect(() =>
-      validateChartConfig(config([{ label: 'Temp', dataIndex: 5 }]), data),
-    ).toThrow(/series "Temp".*dataIndex 5.*0 to 2/s);
+    expect(() => validateChartConfig(config([{ label: 'Temp', dataIndex: 5 }]), data)).toThrow(
+      /series "Temp".*dataIndex 5.*0 to 2/s,
+    );
   });
 
   it('validates scatter encoding indices (colorBy/sizeBy/tooltipFields)', () => {
@@ -51,9 +49,7 @@ describe('column index bounds', () => {
   });
 
   it('skips bounds checks when no data is present', () => {
-    expect(() =>
-      validateChartConfig(config([{ label: 'A', dataIndex: 99 }])),
-    ).not.toThrow();
+    expect(() => validateChartConfig(config([{ label: 'A', dataIndex: 99 }]))).not.toThrow();
   });
 });
 
@@ -119,7 +115,10 @@ describe('axis key references', () => {
 describe('tooltip mode', () => {
   it('accepts a valid tooltip mode', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    validateChartConfig(config([{ label: 'A', dataIndex: 1 }], { tooltip: { mode: 'index' } }), data);
+    validateChartConfig(
+      config([{ label: 'A', dataIndex: 1 }], { tooltip: { mode: 'index' } }),
+      data,
+    );
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -138,13 +137,19 @@ describe('tooltip mode', () => {
 describe('highlight proximity', () => {
   it('accepts a positive proximity', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    validateChartConfig(config([{ label: 'A', dataIndex: 1 }], { highlight: { proximity: 20 } }), data);
+    validateChartConfig(
+      config([{ label: 'A', dataIndex: 1 }], { highlight: { proximity: 20 } }),
+      data,
+    );
     expect(warn).not.toHaveBeenCalled();
   });
 
   it('warns on a non-positive proximity', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    validateChartConfig(config([{ label: 'A', dataIndex: 1 }], { highlight: { proximity: -7 } }), data);
+    validateChartConfig(
+      config([{ label: 'A', dataIndex: 1 }], { highlight: { proximity: -7 } }),
+      data,
+    );
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/highlight\.proximity.*-7/));
   });
 });

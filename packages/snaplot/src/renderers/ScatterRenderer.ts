@@ -40,7 +40,9 @@ export const SCATTER_DENSITY_THRESHOLD = 200_000;
 
 export function isDensityScatterSeries(series: SeriesConfig, pointCount: number): boolean {
   const renderMode = series.renderMode ?? (series.heatmap ? 'density' : 'auto');
-  return renderMode === 'density' || (renderMode === 'auto' && pointCount > SCATTER_DENSITY_THRESHOLD);
+  return (
+    renderMode === 'density' || (renderMode === 'auto' && pointCount > SCATTER_DENSITY_THRESHOLD)
+  );
 }
 
 function isOffscreenCanvas(canvas: OffscreenCanvas | HTMLCanvasElement): canvas is OffscreenCanvas {
@@ -65,9 +67,10 @@ function getStamp(
   }
 
   const size = Math.ceil((roundedRadius * 2 + 2) * dpr);
-  const canvas = typeof OffscreenCanvas !== 'undefined'
-    ? new OffscreenCanvas(size, size)
-    : document.createElement('canvas');
+  const canvas =
+    typeof OffscreenCanvas !== 'undefined'
+      ? new OffscreenCanvas(size, size)
+      : document.createElement('canvas');
 
   if (!isOffscreenCanvas(canvas)) {
     canvas.width = size;
@@ -234,9 +237,10 @@ function drawStampedSegments(
   const resolver = chartResolver ?? buildSegmentResolver(segments, series, color, radius, palettes);
 
   const constantRadius = quantizeRadius(radius);
-  const constantStamp = !resolver.variableColor && !resolver.variableRadius
-    ? getStamp(constantRadius, color, alpha, shape, dpr)
-    : null;
+  const constantStamp =
+    !resolver.variableColor && !resolver.variableRadius
+      ? getStamp(constantRadius, color, alpha, shape, dpr)
+      : null;
   const constantStampSize = constantRadius * 2 + 2;
   const constantOffset = constantRadius + 1;
 
@@ -577,9 +581,7 @@ function drawHeatmapSegments(
   }
 
   // Pre-parse the gradient once per render; fall back to Viridis.
-  const parsedStops = gradient && gradient.length >= 2
-    ? gradient.map(parseHex)
-    : null;
+  const parsedStops = gradient && gradient.length >= 2 ? gradient.map(parseHex) : null;
 
   // Bin all points. Affine scales fold the whole data-to-bin transform
   // into one multiply-add per axis.
@@ -619,9 +621,10 @@ function drawHeatmapSegments(
   if (maxCount === 0) return;
 
   // Render to temp canvas at bin resolution
-  const tmpCanvas = typeof OffscreenCanvas !== 'undefined'
-    ? new OffscreenCanvas(w, h)
-    : document.createElement('canvas');
+  const tmpCanvas =
+    typeof OffscreenCanvas !== 'undefined'
+      ? new OffscreenCanvas(w, h)
+      : document.createElement('canvas');
   if (!isOffscreenCanvas(tmpCanvas)) {
     tmpCanvas.width = w;
     tmpCanvas.height = h;

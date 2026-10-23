@@ -72,9 +72,7 @@ export function renderHistogramSegments(
 
   // A log Y scale has no pixel for 0 (dataToPixel(0) is NaN), which would
   // skip every bar; anchor to the scale minimum (the plot bottom) instead.
-  const baselineY = scaleY.type === 'log'
-    ? scaleY.dataToPixel(scaleY.min)
-    : scaleY.dataToPixel(0);
+  const baselineY = scaleY.type === 'log' ? scaleY.dataToPixel(scaleY.min) : scaleY.dataToPixel(0);
 
   for (let s = 0; s < segments.length; s++) {
     const segment = segments[s];
@@ -86,13 +84,19 @@ export function renderHistogramSegments(
       const count = segment.yData[i];
       if (!Number.isFinite(count) || count <= 0) continue;
 
-      const nextX = i === segment.endIdx && nextSegment
-        ? nextSegment.xData[nextSegment.startIdx]
-        : segment.xData[i + 1];
+      const nextX =
+        i === segment.endIdx && nextSegment
+          ? nextSegment.xData[nextSegment.startIdx]
+          : segment.xData[i + 1];
       const x1 = scaleX.dataToPixel(segment.xData[i]);
       const x2 = scaleX.dataToPixel(nextX);
       const yTop = scaleY.dataToPixel(count);
-      if (!Number.isFinite(x1) || !Number.isFinite(x2) || !Number.isFinite(yTop) || !Number.isFinite(baselineY)) {
+      if (
+        !Number.isFinite(x1) ||
+        !Number.isFinite(x2) ||
+        !Number.isFinite(yTop) ||
+        !Number.isFinite(baselineY)
+      ) {
         continue;
       }
 

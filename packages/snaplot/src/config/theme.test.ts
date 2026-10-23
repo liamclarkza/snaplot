@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  PALETTE_SEQUENTIAL_DARK,
-  PALETTE_SEQUENTIAL_LIGHT,
-} from '../constants';
+import { PALETTE_SEQUENTIAL_DARK, PALETTE_SEQUENTIAL_LIGHT } from '../constants';
 import type { ThemeConfig } from '../types';
 import {
   resolveTheme,
@@ -100,7 +97,12 @@ describe('createTheme semantic tokens', () => {
 
   it('preserves explicit opacity tokens and leaves an unmodified base alone', () => {
     expect(createTheme({ base: darkTheme })).toEqual(darkTheme);
-    const theme = createTheme({ base: darkTheme, muted: '#84969e', gridOpacity: 0.4, borderOpacity: 0.7 });
+    const theme = createTheme({
+      base: darkTheme,
+      muted: '#84969e',
+      gridOpacity: 0.4,
+      borderOpacity: 0.7,
+    });
     expect(theme.gridOpacity).toBe(0.4);
     expect(theme.borderOpacity).toBe(0.7);
   });
@@ -131,17 +133,9 @@ const NAMED_THEMES: Record<string, ThemeConfig> = {
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.trim().replace('#', '');
   if (h.length === 3) {
-    return [
-      parseInt(h[0] + h[0], 16),
-      parseInt(h[1] + h[1], 16),
-      parseInt(h[2] + h[2], 16),
-    ];
+    return [parseInt(h[0] + h[0], 16), parseInt(h[1] + h[1], 16), parseInt(h[2] + h[2], 16)];
   }
-  return [
-    parseInt(h.slice(0, 2), 16),
-    parseInt(h.slice(2, 4), 16),
-    parseInt(h.slice(4, 6), 16),
-  ];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
 /** Relative luminance per the WCAG 2.x sRGB definition. */
@@ -174,7 +168,9 @@ describe('named theme guard', () => {
       expect(contrastRatio(theme.tickColor, theme.backgroundColor)).toBeGreaterThanOrEqual(
         AA_SMALL_TEXT,
       );
-      expect(contrastRatio(theme.axisLabelColor ?? theme.textColor, theme.backgroundColor)).toBeGreaterThanOrEqual(AA_SMALL_TEXT);
+      expect(
+        contrastRatio(theme.axisLabelColor ?? theme.textColor, theme.backgroundColor),
+      ).toBeGreaterThanOrEqual(AA_SMALL_TEXT);
     });
 
     it(`${name} defines the categorical, sequential, and heatmap role palettes`, () => {

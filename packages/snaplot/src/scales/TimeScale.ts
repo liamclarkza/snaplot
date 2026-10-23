@@ -23,32 +23,32 @@ const YEAR_MS = 31_536_000_000;
 
 // [milliseconds, label]
 const TIME_INTERVALS: [number, string][] = [
-  [10,               '10ms'],
-  [50,               '50ms'],
-  [100,              '100ms'],
-  [250,              '250ms'],
-  [500,              '500ms'],
-  [1000,             '1s'],
-  [5000,             '5s'],
-  [15000,            '15s'],
-  [30000,            '30s'],
-  [60000,            '1m'],
-  [300000,           '5m'],
-  [900000,           '15m'],
-  [1800000,          '30m'],
-  [3600000,          '1h'],
-  [10800000,         '3h'],
-  [21600000,         '6h'],
-  [43200000,         '12h'],
-  [86400000,         '1d'],
-  [172800000,        '2d'],
-  [604800000,        '1w'],
-  [1209600000,       '2w'],
-  [2592000000,       '1M'],
-  [5184000000,       '2M'],
-  [7776000000,       '3M'],
-  [15552000000,      '6M'],
-  [31536000000,      '1y'],
+  [10, '10ms'],
+  [50, '50ms'],
+  [100, '100ms'],
+  [250, '250ms'],
+  [500, '500ms'],
+  [1000, '1s'],
+  [5000, '5s'],
+  [15000, '15s'],
+  [30000, '30s'],
+  [60000, '1m'],
+  [300000, '5m'],
+  [900000, '15m'],
+  [1800000, '30m'],
+  [3600000, '1h'],
+  [10800000, '3h'],
+  [21600000, '6h'],
+  [43200000, '12h'],
+  [86400000, '1d'],
+  [172800000, '2d'],
+  [604800000, '1w'],
+  [1209600000, '2w'],
+  [2592000000, '1M'],
+  [5184000000, '2M'],
+  [7776000000, '3M'],
+  [15552000000, '6M'],
+  [31536000000, '1y'],
 ];
 
 export class TimeScale implements Scale {
@@ -230,7 +230,9 @@ export class TimeScale implements Scale {
     if (domain < 1000) {
       // < 1 second: show HH:MM:SS.mmm so sub-second ticks are distinguishable.
       const base = date.toLocaleTimeString(undefined, {
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
       });
       // Floored-modulo: JS `%` keeps the sign of the dividend, so a pre-1970
       // epoch (negative value) would otherwise yield a negative "sub-second"
@@ -243,13 +245,16 @@ export class TimeScale implements Scale {
       // the visible window is short enough that adjacent minute-only ticks
       // would otherwise read identically.
       return date.toLocaleTimeString(undefined, {
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
       });
     }
     if (domain < 86400000) {
       // < 1 day: show HH:MM
       return date.toLocaleTimeString(undefined, {
-        hour: '2-digit', minute: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
       });
     }
     const isLocalMidnight =
@@ -263,12 +268,18 @@ export class TimeScale implements Scale {
       // boundary. Day-aligned ticks used to render a junk "02:00" suffix
       // (the local rendering of a UTC-aligned midnight).
       const datePart = date.toLocaleDateString(undefined, {
-        month: 'short', day: 'numeric',
+        month: 'short',
+        day: 'numeric',
       });
       if (isLocalMidnight) return datePart;
-      return datePart + ' ' + date.toLocaleTimeString(undefined, {
-        hour: '2-digit', minute: '2-digit',
-      });
+      return (
+        datePart +
+        ' ' +
+        date.toLocaleTimeString(undefined, {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      );
     }
     if (domain < 31536000000) {
       // < 1 year: Mon DD; a month boundary reads as the bare month name.
@@ -276,7 +287,8 @@ export class TimeScale implements Scale {
         return date.toLocaleDateString(undefined, { month: 'short' });
       }
       return date.toLocaleDateString(undefined, {
-        month: 'short', day: 'numeric',
+        month: 'short',
+        day: 'numeric',
       });
     }
     // >= 1 year: Mon YYYY; a year boundary reads as the bare year.
@@ -284,7 +296,8 @@ export class TimeScale implements Scale {
       return String(date.getFullYear());
     }
     return date.toLocaleDateString(undefined, {
-      year: 'numeric', month: 'short',
+      year: 'numeric',
+      month: 'short',
     });
   }
 

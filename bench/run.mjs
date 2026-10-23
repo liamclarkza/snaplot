@@ -50,8 +50,7 @@ const PROFILES = {
   },
 };
 
-const profileNames =
-  profileArg === 'all' ? Object.keys(PROFILES) : profileArg.split(',');
+const profileNames = profileArg === 'all' ? Object.keys(PROFILES) : profileArg.split(',');
 for (const p of profileNames) {
   if (!PROFILES[p]) {
     console.error(`unknown profile "${p}" (expected: desktop, mobile, all)`);
@@ -85,7 +84,9 @@ function startServer() {
       const filePath = join(distDir, urlPath === '/' ? 'index.html' : urlPath);
       try {
         const body = readFileSync(filePath);
-        res.writeHead(200, { 'content-type': MIME[extname(filePath)] ?? 'application/octet-stream' });
+        res.writeHead(200, {
+          'content-type': MIME[extname(filePath)] ?? 'application/octet-stream',
+        });
         res.end(body);
       } catch {
         res.writeHead(404);
@@ -155,7 +156,9 @@ async function main() {
 
   for (const profileName of profileNames) {
     const profile = PROFILES[profileName];
-    console.log(`\n=== profile: ${profileName} (throttle ${profile.cpuThrottle}x, dpr ${profile.deviceScaleFactor}) ===`);
+    console.log(
+      `\n=== profile: ${profileName} (throttle ${profile.cpuThrottle}x, dpr ${profile.deviceScaleFactor}) ===`,
+    );
     let { context, page } = await openPage(profile);
 
     const names = (await page.evaluate(() => window.__snaplotBench.list())).filter(

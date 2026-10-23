@@ -28,17 +28,22 @@ describe('computeTooltipPosition', () => {
   });
 
   it('clamps oversized edge cases to a readable viewport margin', () => {
-    expect(computeTooltipPosition({
-      ...base,
-      clientX: 4,
-      clientY: 4,
-      width: 900,
-      height: 700,
-    })).toEqual({ left: 8, top: 8 });
+    expect(
+      computeTooltipPosition({
+        ...base,
+        clientX: 4,
+        clientY: 4,
+        width: 900,
+        height: 700,
+      }),
+    ).toEqual({ left: 8, top: 8 });
   });
 
   it('keeps touch tooltips centred above the finger when space permits', () => {
-    expect(computeTooltipPosition({ ...base, pointerType: 'touch' })).toEqual({ left: 310, top: 128 });
+    expect(computeTooltipPosition({ ...base, pointerType: 'touch' })).toEqual({
+      left: 310,
+      top: 128,
+    });
   });
 });
 
@@ -74,8 +79,14 @@ describe('tooltipMeasurementKey', () => {
       innerHTML: '',
       appendChild: vi.fn(),
       remove: vi.fn(),
-      get offsetWidth() { widthReads++; return 120; },
-      get offsetHeight() { heightReads++; return 44; },
+      get offsetWidth() {
+        widthReads++;
+        return 120;
+      },
+      get offsetHeight() {
+        heightReads++;
+        return 44;
+      },
     };
     vi.stubGlobal('document', {
       createElement: () => element,

@@ -327,19 +327,19 @@ function normalizeTheme(
     clonePalette(userTheme?.categoricalPalette) ??
     (userTheme?.palette ? undefined : clonePalette(theme.categoricalPalette)) ??
     palette;
-  const sequentialPalette =
+  const sequentialPalette = clonePalette(userTheme?.sequentialPalette) ??
+    (customThemeSurface ? undefined : clonePalette(theme.sequentialPalette)) ?? [
+      ...defaultSequential,
+    ];
+  const divergingPalette = clonePalette(userTheme?.divergingPalette) ??
+    (customThemeSurface ? undefined : clonePalette(theme.divergingPalette)) ?? [
+      ...defaultDiverging,
+    ];
+  const heatmapGradient = clonePalette(userTheme?.heatmapGradient) ??
     clonePalette(userTheme?.sequentialPalette) ??
-    (customThemeSurface ? undefined : clonePalette(theme.sequentialPalette)) ??
-    [...defaultSequential];
-  const divergingPalette =
-    clonePalette(userTheme?.divergingPalette) ??
-    (customThemeSurface ? undefined : clonePalette(theme.divergingPalette)) ??
-    [...defaultDiverging];
-  const heatmapGradient =
-    clonePalette(userTheme?.heatmapGradient) ??
-    clonePalette(userTheme?.sequentialPalette) ??
-    (customThemeSurface ? undefined : clonePalette(theme.heatmapGradient)) ??
-    [...sequentialPalette];
+    (customThemeSurface ? undefined : clonePalette(theme.heatmapGradient)) ?? [
+      ...sequentialPalette,
+    ];
 
   return {
     ...theme,

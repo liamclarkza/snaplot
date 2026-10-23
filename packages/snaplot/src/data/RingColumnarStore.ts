@@ -202,12 +202,14 @@ export class RingColumnarStore implements DataStore {
     const physicalEnd = this.physicalIndex(logicalEnd);
 
     if (physicalStart <= physicalEnd) {
-      return [{
-        logicalStart,
-        logicalEnd,
-        physicalStart,
-        physicalEnd,
-      }];
+      return [
+        {
+          logicalStart,
+          logicalEnd,
+          physicalStart,
+          physicalEnd,
+        },
+      ];
     }
 
     const firstLength = this.maxLen - physicalStart;

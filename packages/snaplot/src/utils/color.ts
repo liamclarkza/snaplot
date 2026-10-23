@@ -79,7 +79,11 @@ export function withAlpha(color: string, alpha: number): string {
  * Flatten a stroke onto the opaque chart surface before painting it. Painting
  * the resulting opaque color keeps grid intersections from accumulating alpha.
  */
-export function opaqueColorOnBackground(color: string, opacity: number, background: string): string {
+export function opaqueColorOnBackground(
+  color: string,
+  opacity: number,
+  background: string,
+): string {
   const foreground = parseColor(color);
   const surface = parseColor(background);
   const alpha = Math.max(0, Math.min(1, opacity));
@@ -87,10 +91,12 @@ export function opaqueColorOnBackground(color: string, opacity: number, backgrou
     const normalized = color.trim().toLowerCase();
     let sourceAlpha = normalized === 'transparent' ? 0 : 1;
     if (/^#[\da-f]{4}$/i.test(normalized)) sourceAlpha = parseInt(normalized[4], 16) / 15;
-    else if (/^#[\da-f]{8}$/i.test(normalized)) sourceAlpha = parseInt(normalized.slice(7), 16) / 255;
+    else if (/^#[\da-f]{8}$/i.test(normalized))
+      sourceAlpha = parseInt(normalized.slice(7), 16) / 255;
     else {
       const match = normalized.match(/(?:\/|,\s*[\d.]+\s*,\s*[\d.]+\s*,)\s*([\d.]+%?)\s*\)$/);
-      if (match) sourceAlpha = match[1].endsWith('%') ? parseFloat(match[1]) / 100 : Number(match[1]);
+      if (match)
+        sourceAlpha = match[1].endsWith('%') ? parseFloat(match[1]) / 100 : Number(match[1]);
     }
     const combined = alpha * Math.max(0, Math.min(1, sourceAlpha));
     return `rgb(${foreground.map((channel, i) => Math.round(surface[i] + (channel - surface[i]) * combined)).join(',')})`;

@@ -39,7 +39,10 @@ function m4FiniteRun(
   // If data fits within pixel budget, return as-is
   const maxOut = pixelWidth * 4;
   if (len <= maxOut) {
-    return [Float64Array.from(x.subarray(start, end + 1)), Float64Array.from(y.subarray(start, end + 1))];
+    return [
+      Float64Array.from(x.subarray(start, end + 1)),
+      Float64Array.from(y.subarray(start, end + 1)),
+    ];
   }
 
   const xRange = xMax - xMin;
@@ -54,36 +57,57 @@ function m4FiniteRun(
 
   // Track state per pixel column
   let curBucket = -1;
-  let firstX = 0, firstY = 0;
-  let lastX = 0, lastY = 0;
-  let minY = Infinity, minX = 0;
-  let maxY_ = -Infinity, maxX = 0;
-  let minIdx = 0, maxIdx = 0;
+  let firstX = 0,
+    firstY = 0;
+  let lastX = 0,
+    lastY = 0;
+  let minY = Infinity,
+    minX = 0;
+  let maxY_ = -Infinity,
+    maxX = 0;
+  let minIdx = 0,
+    maxIdx = 0;
 
   function flushBucket() {
     if (curBucket < 0) return;
 
     // Emit in temporal order: first, then min/max (by index), then last
-    tmpX[out] = firstX; tmpY[out] = firstY; out++;
+    tmpX[out] = firstX;
+    tmpY[out] = firstY;
+    out++;
 
     if (minIdx <= maxIdx) {
       if (minX !== firstX || minY !== firstY) {
-        tmpX[out] = minX; tmpY[out] = minY; out++;
+        tmpX[out] = minX;
+        tmpY[out] = minY;
+        out++;
       }
       if (maxX !== firstX || maxY_ !== firstY) {
-        tmpX[out] = maxX; tmpY[out] = maxY_; out++;
+        tmpX[out] = maxX;
+        tmpY[out] = maxY_;
+        out++;
       }
     } else {
       if (maxX !== firstX || maxY_ !== firstY) {
-        tmpX[out] = maxX; tmpY[out] = maxY_; out++;
+        tmpX[out] = maxX;
+        tmpY[out] = maxY_;
+        out++;
       }
       if (minX !== firstX || minY !== firstY) {
-        tmpX[out] = minX; tmpY[out] = minY; out++;
+        tmpX[out] = minX;
+        tmpY[out] = minY;
+        out++;
       }
     }
 
-    if ((lastX !== minX || lastY !== minY) && (lastX !== maxX || lastY !== maxY_) && (lastX !== firstX || lastY !== firstY)) {
-      tmpX[out] = lastX; tmpY[out] = lastY; out++;
+    if (
+      (lastX !== minX || lastY !== minY) &&
+      (lastX !== maxX || lastY !== maxY_) &&
+      (lastX !== firstX || lastY !== firstY)
+    ) {
+      tmpX[out] = lastX;
+      tmpY[out] = lastY;
+      out++;
     }
   }
 
@@ -106,14 +130,29 @@ function m4FiniteRun(
     if (bucket !== curBucket) {
       flushBucket();
       curBucket = bucket;
-      firstX = xi; firstY = yi;
-      lastX = xi; lastY = yi;
-      minY = yi; minX = xi; minIdx = i;
-      maxY_ = yi; maxX = xi; maxIdx = i;
+      firstX = xi;
+      firstY = yi;
+      lastX = xi;
+      lastY = yi;
+      minY = yi;
+      minX = xi;
+      minIdx = i;
+      maxY_ = yi;
+      maxX = xi;
+      maxIdx = i;
     } else {
-      lastX = xi; lastY = yi;
-      if (yi < minY) { minY = yi; minX = xi; minIdx = i; }
-      if (yi > maxY_) { maxY_ = yi; maxX = xi; maxIdx = i; }
+      lastX = xi;
+      lastY = yi;
+      if (yi < minY) {
+        minY = yi;
+        minX = xi;
+        minIdx = i;
+      }
+      if (yi > maxY_) {
+        maxY_ = yi;
+        maxX = xi;
+        maxIdx = i;
+      }
     }
   }
 

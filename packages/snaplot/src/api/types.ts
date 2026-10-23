@@ -1,13 +1,27 @@
 import type {
-  ChartConfig as EngineConfig, AxisConfig as EngineAxis, SeriesConfig as EngineSeries,
-  ThemeConfig, ScaleRange, SelectionRange, ChartStats, Layout, CursorSnapshotOptions,
-  ScatterColorEncoding, ScatterSizeEncoding, ScatterTooltipField,
+  ChartConfig as EngineConfig,
+  AxisConfig as EngineAxis,
+  SeriesConfig as EngineSeries,
+  ThemeConfig,
+  ScaleRange,
+  SelectionRange,
+  ChartStats,
+  Layout,
+  CursorSnapshotOptions,
+  ScatterColorEncoding,
+  ScatterSizeEncoding,
+  ScatterTooltipField,
 } from '../types';
 import type { HistogramBins } from '../utils/histogram';
 
-export type Field<Row, Value> = string extends keyof Row ? string : Extract<{
-  [K in keyof Row]-?: NonNullable<Row[K]> extends Value ? K : never;
-}[keyof Row], string>;
+export type Field<Row, Value> = string extends keyof Row
+  ? string
+  : Extract<
+      {
+        [K in keyof Row]-?: NonNullable<Row[K]> extends Value ? K : never;
+      }[keyof Row],
+      string
+    >;
 export type Accessor<Row, Value> = Field<Row, Value> | ((row: Row, index: number) => Value);
 export type AxisValue = number | Date | string;
 export type RowId = string | number;
@@ -18,7 +32,8 @@ export interface ColumnData {
 export type DataSource<Row> = readonly Row[] | ColumnData | HistogramBins;
 export type Viewport = Record<string, ScaleRange>;
 
-export interface AxisOptions extends Omit<EngineAxis, 'type' | 'label' | 'nice' | 'padding' | 'tickFormat'> {
+export interface AxisOptions
+  extends Omit<EngineAxis, 'type' | 'label' | 'nice' | 'padding' | 'tickFormat'> {
   type?: 'linear' | 'log' | 'time' | 'category';
   title?: string;
   roundBounds?: boolean;
@@ -30,15 +45,39 @@ export interface AxisOptions extends Omit<EngineAxis, 'type' | 'label' | 'nice' 
 }
 
 type Numeric<Row> = Accessor<Row, number | null | undefined>;
-export type ColorEncoding<Row> = Accessor<Row, number | string | null | undefined> |
-  (Omit<ScatterColorEncoding, 'dataIndex' | 'categoryValues'> & { field: Accessor<Row, number | string | null | undefined> });
-export type SizeEncoding<Row> = Numeric<Row> | (Omit<ScatterSizeEncoding, 'dataIndex'> & { field: Numeric<Row> });
-export type TooltipField<Row> = Accessor<Row, number | string | null | undefined> |
-  (Omit<ScatterTooltipField, 'dataIndex'> & { field: Accessor<Row, number | string | null | undefined> });
+export type ColorEncoding<Row> =
+  | Accessor<Row, number | string | null | undefined>
+  | (Omit<ScatterColorEncoding, 'dataIndex' | 'categoryValues'> & {
+      field: Accessor<Row, number | string | null | undefined>;
+    });
+export type SizeEncoding<Row> =
+  | Numeric<Row>
+  | (Omit<ScatterSizeEncoding, 'dataIndex'> & { field: Numeric<Row> });
+export type TooltipField<Row> =
+  | Accessor<Row, number | string | null | undefined>
+  | (Omit<ScatterTooltipField, 'dataIndex'> & {
+      field: Accessor<Row, number | string | null | undefined>;
+    });
 
-export interface SeriesBase<Row> extends Omit<EngineSeries,
-  'type' | 'label' | 'dataIndex' | 'xDataIndex' | 'yDataIndex' | 'upperDataIndex' | 'lowerDataIndex' |
-  'xAxisKey' | 'yAxisKey' | 'colorBy' | 'sizeBy' | 'tooltipFields' | 'fill' | 'visible' | 'heatmap'> {
+export interface SeriesBase<Row>
+  extends Omit<
+    EngineSeries,
+    | 'type'
+    | 'label'
+    | 'dataIndex'
+    | 'xDataIndex'
+    | 'yDataIndex'
+    | 'upperDataIndex'
+    | 'lowerDataIndex'
+    | 'xAxisKey'
+    | 'yAxisKey'
+    | 'colorBy'
+    | 'sizeBy'
+    | 'tooltipFields'
+    | 'fill'
+    | 'visible'
+    | 'heatmap'
+  > {
   /** Inferred from a unique Y field; required for computed or ambiguous series. */
   id?: string;
   label?: string;
@@ -54,8 +93,11 @@ export type SeriesOptions<Row> =
   | (SeriesBase<Row> & { type?: 'line' | 'area' | 'bar'; y: Numeric<Row> })
   | (SeriesBase<Row> & { type: 'band'; y: Numeric<Row>; lower: Numeric<Row>; upper: Numeric<Row> })
   | (SeriesBase<Row> & {
-      type: 'scatter'; y: Numeric<Row>;
-      colorBy?: ColorEncoding<Row>; sizeBy?: SizeEncoding<Row>; tooltipFields?: readonly TooltipField<Row>[];
+      type: 'scatter';
+      y: Numeric<Row>;
+      colorBy?: ColorEncoding<Row>;
+      sizeBy?: SizeEncoding<Row>;
+      tooltipFields?: readonly TooltipField<Row>[];
     })
   | (SeriesBase<Row> & { type: 'histogram'; id: string; data: HistogramBins });
 
@@ -134,11 +176,11 @@ export interface ChartEvents<Row = Record<string, unknown>> {
   'highlight:change': string | null;
   'follow:change': boolean;
   'point:click': ChartPoint<Row>;
-  'select': SelectionResult<Row>;
+  select: SelectionResult<Row>;
   'data:update': undefined;
   'options:update': ChartOptions<Row>;
   'theme:update': ThemeConfig;
-  'resize': { width: number; height: number };
+  resize: { width: number; height: number };
 }
 export interface ChartPlugin<Row = Record<string, unknown>> {
   id: string;
@@ -151,8 +193,19 @@ export interface ChartPlugin<Row = Record<string, unknown>> {
   onDataUpdate?(chart: ChartHandle<Row>): void;
   onOptionsUpdate?(chart: ChartHandle<Row>): void;
 }
-export interface ChartOptions<Row = Record<string, unknown>> extends Omit<EngineConfig,
-  'series' | 'axes' | 'streaming' | 'plugins' | 'highlight' | 'selection' | 'tooltip' | 'cursor' | 'zoom'> {
+export interface ChartOptions<Row = Record<string, unknown>>
+  extends Omit<
+    EngineConfig,
+    | 'series'
+    | 'axes'
+    | 'streaming'
+    | 'plugins'
+    | 'highlight'
+    | 'selection'
+    | 'tooltip'
+    | 'cursor'
+    | 'zoom'
+  > {
   data?: DataSource<Row>;
   x?: Accessor<Row, AxisValue>;
   rowId?: Accessor<Row, RowId>;
@@ -167,7 +220,10 @@ export interface ChartOptions<Row = Record<string, unknown>> extends Omit<Engine
   zoom?: Omit<NonNullable<EngineConfig['zoom']>, 'syncKey'>;
   highlight?: Omit<NonNullable<EngineConfig['highlight']>, 'syncKey' | 'getKey'>;
   selection?: Omit<NonNullable<EngineConfig['selection']>, 'onSelect' | 'onBrush'>;
-  tooltip?: Omit<NonNullable<EngineConfig['tooltip']>, 'yFormat' | 'rangeFormat' | 'render' | 'xFormat'> & {
+  tooltip?: Omit<
+    NonNullable<EngineConfig['tooltip']>,
+    'yFormat' | 'rangeFormat' | 'render' | 'xFormat'
+  > & {
     xFormat?(value: number | string): string;
     /** Strings are rendered as HTML; use a DOM node with textContent for untrusted values. */
     render?: (points: readonly ChartPoint<Row>[]) => string | HTMLElement;
@@ -179,16 +235,22 @@ export interface ChartOptions<Row = Record<string, unknown>> extends Omit<Engine
   onPointClick?: (point: ChartPoint<Row>) => void;
   onSelect?: (selection: SelectionResult<Row>) => void;
 }
-type OptionPatch<T> = T extends (...args: never[]) => unknown ? T
-  : T extends readonly unknown[] ? T
-  : T extends object ? { [K in keyof T]?: OptionPatch<T[K]> | undefined }
-  : T;
+type OptionPatch<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends readonly unknown[]
+    ? T
+    : T extends object
+      ? { [K in keyof T]?: OptionPatch<T[K]> | undefined }
+      : T;
 export type ChartPatch<Row> = {
   [K in keyof ChartOptions<Row>]?: K extends 'data' | 'series' | 'plugins' | 'group'
     ? ChartOptions<Row>[K]
     : OptionPatch<ChartOptions<Row>[K]>;
 };
-export interface AppendOptions { seriesId?: string; updateLast?: boolean }
+export interface AppendOptions {
+  seriesId?: string;
+  updateLast?: boolean;
+}
 export interface ChartHandle<Row = Record<string, unknown>> {
   readonly container: HTMLElement;
   update(patch: ChartPatch<Row>): void;
@@ -196,7 +258,10 @@ export interface ChartHandle<Row = Record<string, unknown>> {
   getOptions(): Readonly<ChartOptions<Row>>;
   getState(): ChartState<Row>;
   subscribe(listener: () => void): () => void;
-  on<K extends keyof ChartEvents<Row>>(event: K, listener: (value: ChartEvents<Row>[K]) => void): () => void;
+  on<K extends keyof ChartEvents<Row>>(
+    event: K,
+    listener: (value: ChartEvents<Row>[K]) => void,
+  ): () => void;
   setViewport(viewport: Viewport): void;
   resetViewport(): void;
   resumeFollow(): void;

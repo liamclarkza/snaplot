@@ -25,9 +25,8 @@ interface TooltipPositionInput {
 
 /** Pure placement helper kept exported for deterministic edge-collision tests. */
 export function computeTooltipPosition(input: TooltipPositionInput): { left: number; top: number } {
-  const {
-    clientX, clientY, width, height, viewportWidth, viewportHeight, offset, pointerType,
-  } = input;
+  const { clientX, clientY, width, height, viewportWidth, viewportHeight, offset, pointerType } =
+    input;
   const margin = TOOLTIP_VIEWPORT_MARGIN;
   const maxLeft = Math.max(margin, viewportWidth - width - margin);
   const maxTop = Math.max(margin, viewportHeight - height - margin);
@@ -43,26 +42,26 @@ export function computeTooltipPosition(input: TooltipPositionInput): { left: num
   }
 
   const right = clientX + offset;
-  const left = right + width <= viewportWidth - margin
-    ? right
-    : clientX - offset - width;
+  const left = right + width <= viewportWidth - margin ? right : clientX - offset - width;
   const below = clientY + offset;
-  const top = below + height <= viewportHeight - margin
-    ? below
-    : clientY - offset - height;
+  const top = below + height <= viewportHeight - margin ? below : clientY - offset - height;
   return { left: clampLeft(left), top: clampTop(top) };
 }
 
 /** Structural width key: changing numeric values of the same width is layout-stable. */
 export function tooltipMeasurementKey(points: TooltipPoint[]): string {
   const widths = (value: string) => value.length;
-  return points.map(point => [
-    point.xRange ? 'range' : 'point',
-    widths(point.label),
-    widths(point.formattedX),
-    widths(point.formattedY),
-    ...(point.fields ?? []).flatMap(field => [widths(field.label), widths(field.formatted)]),
-  ].join(':')).join('|');
+  return points
+    .map((point) =>
+      [
+        point.xRange ? 'range' : 'point',
+        widths(point.label),
+        widths(point.formattedX),
+        widths(point.formattedY),
+        ...(point.fields ?? []).flatMap((field) => [widths(field.label), widths(field.formatted)]),
+      ].join(':'),
+    )
+    .join('|');
 }
 
 /** Escape the five characters that matter for HTML attribute + text contexts. */
@@ -197,17 +196,19 @@ export class TooltipManager {
     // Reading offset* forces layout; reuse the last measurement when the
     // content (and therefore the box size) has not changed.
     const geometryChanged = measurementKey === null || measurementKey !== this.lastMeasurementKey;
-    if (
-      this.lastWidth === 0 ||
-      this.lastHeight === 0 ||
-      (contentChanged && geometryChanged)
-    ) {
+    if (this.lastWidth === 0 || this.lastHeight === 0 || (contentChanged && geometryChanged)) {
       this.lastWidth = this.el.offsetWidth;
       this.lastHeight = this.el.offsetHeight;
       this.lastMeasurementKey = measurementKey;
     }
-    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || this.lastWidth + TOOLTIP_VIEWPORT_MARGIN * 2;
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || this.lastHeight + TOOLTIP_VIEWPORT_MARGIN * 2;
+    const viewportWidth =
+      window.innerWidth ||
+      document.documentElement.clientWidth ||
+      this.lastWidth + TOOLTIP_VIEWPORT_MARGIN * 2;
+    const viewportHeight =
+      window.innerHeight ||
+      document.documentElement.clientHeight ||
+      this.lastHeight + TOOLTIP_VIEWPORT_MARGIN * 2;
     const position = computeTooltipPosition({
       clientX,
       clientY,
@@ -256,12 +257,17 @@ export class TooltipManager {
     // Single point (nearest mode, e.g. scatter): show x, y as coordinate pair
     if (points.length === 1) {
       const p = points[0];
-      const fields = p.fields && p.fields.length > 0
-        ? `<div style="display:grid;grid-template-columns:auto auto;gap:2px 12px;margin-top:6px;font-variant-numeric:tabular-nums">${p.fields.map((field) => `
+      const fields =
+        p.fields && p.fields.length > 0
+          ? `<div style="display:grid;grid-template-columns:auto auto;gap:2px 12px;margin-top:6px;font-variant-numeric:tabular-nums">${p.fields
+              .map(
+                (field) => `
           <span style="opacity:0.7">${escapeHtml(field.label)}</span>
           <span style="font-weight:600;text-align:right">${escapeHtml(field.formatted)}</span>
-        `).join('')}</div>`
-        : '';
+        `,
+              )
+              .join('')}</div>`
+          : '';
       return `<div style="display:flex;align-items:center;gap:8px">${dot(p.color)}<span style="font-variant-numeric:tabular-nums"><b>x</b> ${escapeHtml(p.formattedX)}&nbsp;&nbsp;<b>y</b> ${escapeHtml(p.formattedY)}</span></div>${fields}`;
     }
 

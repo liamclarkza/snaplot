@@ -88,7 +88,10 @@ export interface Layout {
   /** The data-rendering region */
   plot: { top: number; left: number; width: number; height: number };
   /** Axis regions keyed by axis config key, with position and area */
-  axes: Record<string, { position: AxisPosition; area: { left: number; top: number; width: number; height: number } }>;
+  axes: Record<
+    string,
+    { position: AxisPosition; area: { left: number; top: number; width: number; height: number } }
+  >;
   /** Device pixel ratio */
   dpr: number;
 }
@@ -520,10 +523,7 @@ export interface CursorConfig {
  * extent; an explicit `{ min?, max? }` pins custom limits (use
  * `undefined` on one side for half-open bounds).
  */
-export type ZoomBoundsSpec =
-  | 'data'
-  | 'unbounded'
-  | { min?: number; max?: number };
+export type ZoomBoundsSpec = 'data' | 'unbounded' | { min?: number; max?: number };
 
 export interface ZoomConfig {
   /** Master switch for all zoom gestures. Default: `true`. */
@@ -1066,8 +1066,8 @@ export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends (infer U)[]
     ? DeepPartial<U>[]
     : T[P] extends object
-    ? DeepPartial<T[P]>
-    : T[P];
+      ? DeepPartial<T[P]>
+      : T[P];
 };
 
 // ============================================================
@@ -1385,11 +1385,7 @@ export interface ChartEventMap {
   /** A non-drag activation hit an actual data point or bar. */
   'point:click': (point: TooltipPoint) => void;
   /** Cursor moved or left (null args on leave). Fires on the cursor hot path. */
-  'cursor:move': (
-    dataX: number | null,
-    dataIdx: number | null,
-    origin: CursorEventOrigin,
-  ) => void;
+  'cursor:move': (dataX: number | null, dataIdx: number | null, origin: CursorEventOrigin) => void;
   /** Highlighted series changed, `null` when cleared. */
   'highlight:change': (seriesIndex: number | null) => void;
   /** An axis viewport changed via zoom/pan, with the axis key and new range. */
@@ -1407,17 +1403,17 @@ export interface ChartEventMap {
    */
   'follow:change': (following: boolean) => void;
   /** Chart resized, with the new CSS-pixel dimensions. */
-  'resize': (width: number, height: number) => void;
+  resize: (width: number, height: number) => void;
   /** Reserved click event. Not currently emitted by the core (see the DX audit). */
-  'click': (dataX: number, dataIdx: number) => void;
+  click: (dataX: number, dataIdx: number) => void;
   /** Box selection resolved. Mirror of `selection.onSelect`. */
-  'select': (selection: SelectionResult) => void;
+  select: (selection: SelectionResult) => void;
   /** Persistent brush selection changed (`null` when cleared). Mirror of `selection.onBrush`. */
   'selection:change': (selection: SelectionRange | null) => void;
   /** Emitted while the data layer paints, for canvas-level custom drawing without a plugin. */
-  'drawData': (ctx: CanvasRenderingContext2D, layout: Layout) => void;
+  drawData: (ctx: CanvasRenderingContext2D, layout: Layout) => void;
   /** Emitted while the overlay layer paints, above the data. */
-  'drawOverlay': (ctx: CanvasRenderingContext2D, layout: Layout) => void;
+  drawOverlay: (ctx: CanvasRenderingContext2D, layout: Layout) => void;
 }
 
 // ============================================================
@@ -1430,15 +1426,15 @@ export interface ChartEventMap {
  */
 export enum DirtyFlag {
   /** Nothing to repaint. */
-  NONE    = 0,
+  NONE = 0,
   /** Gridlines, axes, border (the opaque background layer). */
-  GRID    = 1 << 0,
+  GRID = 1 << 0,
   /** Series marks. */
-  DATA    = 1 << 1,
+  DATA = 1 << 1,
   /** Crosshair, indicators, selection box, tap ring. */
   OVERLAY = 1 << 2,
   /** GRID | DATA | OVERLAY, a full repaint. */
-  ALL     = 0b111,
+  ALL = 0b111,
 }
 
 /** The resolved state handed to renderers for one paint. Read-only per frame. */

@@ -60,18 +60,7 @@ describe('filled line renderers', () => {
     const layout = createLayout();
     const series: SeriesConfig = { label: 'area', dataIndex: 1, type: 'area' };
 
-    renderArea(
-      ctx,
-      f([0, 1, 2]),
-      f([10, NaN, 20]),
-      0,
-      2,
-      scale,
-      scale,
-      layout,
-      series,
-      '#4e79a7',
-    );
+    renderArea(ctx, f([0, 1, 2]), f([10, NaN, 20]), 0, 2, scale, scale, layout, series, '#4e79a7');
 
     expect(ctx.fill).toHaveBeenCalledTimes(2);
     expect(ctx.stroke).toHaveBeenCalledTimes(1);
@@ -81,7 +70,9 @@ describe('filled line renderers', () => {
     const ctx = createContext();
     const stops: string[] = [];
     (ctx.createLinearGradient as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      addColorStop: (_offset: number, color: string) => { stops.push(color); },
+      addColorStop: (_offset: number, color: string) => {
+        stops.push(color);
+      },
     });
     const scale = createScale();
     const layout = createLayout();
@@ -127,7 +118,12 @@ describe('line gap rendering', () => {
     const ctx = createContext();
     const scale = createScale();
     const layout = createLayout();
-    const series: SeriesConfig = { label: 'line', dataIndex: 1, type: 'line', interpolation: 'monotone' };
+    const series: SeriesConfig = {
+      label: 'line',
+      dataIndex: 1,
+      type: 'line',
+      interpolation: 'monotone',
+    };
 
     renderLine(
       ctx,
@@ -152,23 +148,12 @@ describe('line gap rendering', () => {
     const yScale = {
       ...createScale(),
       type: 'log' as const,
-      dataToPixel: (value: number) => value > 0 ? value : Number.NaN,
+      dataToPixel: (value: number) => (value > 0 ? value : Number.NaN),
     };
     const layout = createLayout();
     const series: SeriesConfig = { label: 'loss', dataIndex: 1, type: 'line' };
 
-    renderLine(
-      ctx,
-      f([0, 1, 2]),
-      f([1, 0, 2]),
-      0,
-      2,
-      xScale,
-      yScale,
-      layout,
-      series,
-      '#4e79a7',
-    );
+    renderLine(ctx, f([0, 1, 2]), f([1, 0, 2]), 0, 2, xScale, yScale, layout, series, '#4e79a7');
 
     expect(ctx.moveTo).toHaveBeenCalledTimes(2);
     expect(ctx.lineTo).not.toHaveBeenCalled();

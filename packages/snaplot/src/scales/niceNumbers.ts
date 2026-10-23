@@ -6,7 +6,7 @@
  * These are geometric means between consecutive nice numbers (1, 2, 5, 10).
  */
 
-const SQRT_2 = Math.sqrt(2);   // ~1.414
+const SQRT_2 = Math.sqrt(2); // ~1.414
 const SQRT_10 = Math.sqrt(10); // ~3.162
 const SQRT_50 = Math.sqrt(50); // ~7.071
 
@@ -48,11 +48,7 @@ export function niceStep(min: number, max: number, count: number): number {
 /**
  * Expand [min, max] to nice boundaries aligned to the nice step.
  */
-export function niceRange(
-  min: number,
-  max: number,
-  count: number,
-): [number, number] {
+export function niceRange(min: number, max: number, count: number): [number, number] {
   if (min === max) {
     if (min === 0) return [-1, 1];
     const offset = Math.abs(min) * 0.1;
@@ -73,11 +69,7 @@ export function niceRange(
  * using integer i, never as tick += niceStep. This prevents drift
  * (e.g. 0.1 + 0.1 + 0.1 ≠ 0.3).
  */
-export function niceTicks(
-  min: number,
-  max: number,
-  count: number,
-): number[] {
+export function niceTicks(min: number, max: number, count: number): number[] {
   if (count <= 0) return [];
   if (min === max) return [min];
 

@@ -539,10 +539,7 @@ export const MARS_THEME: ThemeConfig = {
   fontSize: 11,
   gridColor: '#3a1f17',
   gridOpacity: 0.55,
-  palette: [
-    '#ff8a3d', '#e2504b', '#f4c27c', '#c06548',
-    '#8e3a1e', '#e8a272', '#b04a2f', '#f2d7c0',
-  ],
+  palette: ['#ff8a3d', '#e2504b', '#f4c27c', '#c06548', '#8e3a1e', '#e8a272', '#b04a2f', '#f2d7c0'],
   // Dark-anchored rust ramp for the burnt-umber bg.
   sequentialPalette: ['#20120d', '#3f1f14', '#7a3a1e', '#c0632f', '#e89a5c', '#f7d9b0'],
   heatmapGradient: ['#20120d', '#3f1f14', '#7a3a1e', '#c0632f', '#e89a5c', '#f7d9b0'],

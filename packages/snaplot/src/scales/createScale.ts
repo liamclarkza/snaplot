@@ -6,12 +6,7 @@ import { TimeScale } from './TimeScale';
 /**
  * Factory: create a Scale instance by type.
  */
-export function createScale(
-  type: ScaleType,
-  key: string,
-  min?: number,
-  max?: number,
-): Scale {
+export function createScale(type: ScaleType, key: string, min?: number, max?: number): Scale {
   switch (type) {
     case 'linear':
       return new LinearScale(key, min, max);

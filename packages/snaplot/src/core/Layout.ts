@@ -138,9 +138,7 @@ export function computeLayout(
       // labels shift by a character during pan/zoom, so the plot rect does
       // not jitter and the layout stays reusable across gesture frames.
       const titleSpace = ac.label ? titleStrip : EDGE_MARGIN;
-      const needed = Math.ceil(
-        (maxWidth + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + titleSpace) / 8,
-      ) * 8;
+      const needed = Math.ceil((maxWidth + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + titleSpace) / 8) * 8;
       if (pos === 'left') {
         leftAxisWidth = Math.max(leftAxisWidth, needed);
       } else {
@@ -149,9 +147,10 @@ export function computeLayout(
     } else {
       const lo = Math.min(scale.min, scale.max);
       const hi = Math.max(scale.min, scale.max);
-      const ticks = ac.ticks && ac.ticks.length > 0
-        ? ac.ticks.filter(t => Number.isFinite(t) && t >= lo && t <= hi).sort((a, b) => a - b)
-        : scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT).sort((a, b) => a - b);
+      const ticks =
+        ac.ticks && ac.ticks.length > 0
+          ? ac.ticks.filter((t) => Number.isFinite(t) && t >= lo && t <= hi).sort((a, b) => a - b)
+          : scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT).sort((a, b) => a - b);
       const format = ac.tickFormat ?? ((value: number) => scale.tickFormat(value));
       if (ticks.length > 0) {
         horizontalEdges.push({
@@ -163,10 +162,10 @@ export function computeLayout(
       }
       const needed = Math.ceil(
         AXIS_TICK_LENGTH +
-        AXIS_LABEL_GAP +
-        lineHeight +
-        (ac.label ? AXIS_TITLE_GAP + lineHeight : 0) +
-        EDGE_MARGIN,
+          AXIS_LABEL_GAP +
+          lineHeight +
+          (ac.label ? AXIS_TITLE_GAP + lineHeight : 0) +
+          EDGE_MARGIN,
       );
       if (pos === 'bottom') bottomAxisHeight = Math.max(bottomAxisHeight, needed);
       else topAxisHeight = Math.max(topAxisHeight, needed);
@@ -214,16 +213,38 @@ export function computeLayout(
   for (const [key, pos] of axisPositions) {
     switch (pos) {
       case 'top':
-        axes[key] = { position: 'top', area: { left: plotLeft, top: 0, width: plotWidth, height: topAxisHeight } };
+        axes[key] = {
+          position: 'top',
+          area: { left: plotLeft, top: 0, width: plotWidth, height: topAxisHeight },
+        };
         break;
       case 'bottom':
-        axes[key] = { position: 'bottom', area: { left: plotLeft, top: plotTop + plotHeight, width: plotWidth, height: bottomAxisHeight } };
+        axes[key] = {
+          position: 'bottom',
+          area: {
+            left: plotLeft,
+            top: plotTop + plotHeight,
+            width: plotWidth,
+            height: bottomAxisHeight,
+          },
+        };
         break;
       case 'left':
-        axes[key] = { position: 'left', area: { left: 0, top: plotTop, width: leftAxisWidth, height: plotHeight } };
+        axes[key] = {
+          position: 'left',
+          area: { left: 0, top: plotTop, width: leftAxisWidth, height: plotHeight },
+        };
         break;
       case 'right':
-        axes[key] = { position: 'right', area: { left: plotLeft + plotWidth, top: plotTop, width: rightAxisWidth, height: plotHeight } };
+        axes[key] = {
+          position: 'right',
+          area: {
+            left: plotLeft + plotWidth,
+            top: plotTop,
+            width: rightAxisWidth,
+            height: plotHeight,
+          },
+        };
         break;
     }
   }

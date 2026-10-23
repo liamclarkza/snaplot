@@ -20,10 +20,10 @@ describe('scatter style resolver maxRadius', () => {
   const size = Float64Array.from([1, 5, 10, 40]);
 
   it('reports the fallback radius when there is no size encoding', () => {
-    const resolver = resolverFor(
-      { label: 's', type: 'scatter', xDataIndex: 0, yDataIndex: 1 },
-      [x, y],
-    );
+    const resolver = resolverFor({ label: 's', type: 'scatter', xDataIndex: 0, yDataIndex: 1 }, [
+      x,
+      y,
+    ]);
     expect(resolver.variableRadius).toBe(false);
     expect(resolver.maxRadius).toBe(3);
   });
@@ -77,13 +77,25 @@ describe('scatter color bins match colorAt', () => {
   });
 });
 
-
 describe('stable prepared categorical encodings', () => {
   it('keeps the palette slot when earlier categories leave retained data', () => {
-    const series: SeriesConfig = { label: 'sample', type: 'scatter', xDataIndex: 0, yDataIndex: 1,
-      colorBy: { dataIndex: 2, type: 'category', categoryValues: [0, 1, 2] } };
-    const before = resolverFor(series, [new Float64Array([0, 1, 2]), new Float64Array(3), new Float64Array([0, 1, 2])]);
-    const after = resolverFor(series, [new Float64Array([2]), new Float64Array(1), new Float64Array([2])]);
+    const series: SeriesConfig = {
+      label: 'sample',
+      type: 'scatter',
+      xDataIndex: 0,
+      yDataIndex: 1,
+      colorBy: { dataIndex: 2, type: 'category', categoryValues: [0, 1, 2] },
+    };
+    const before = resolverFor(series, [
+      new Float64Array([0, 1, 2]),
+      new Float64Array(3),
+      new Float64Array([0, 1, 2]),
+    ]);
+    const after = resolverFor(series, [
+      new Float64Array([2]),
+      new Float64Array(1),
+      new Float64Array([2]),
+    ]);
     expect(before.colorAt(2)).toBe('#333');
     expect(after.colorAt(0)).toBe(before.colorAt(2));
     expect(after.colorForBin(after.colorBinAt(0))).toBe('#333');
@@ -91,8 +103,16 @@ describe('stable prepared categorical encodings', () => {
 
   it('renders more than twelve explicitly categorical values', () => {
     const values = Float64Array.from({ length: 20 }, (_, index) => index);
-    const style = resolverFor({ label: 'sample', type: 'scatter', xDataIndex: 0, yDataIndex: 1,
-      colorBy: { dataIndex: 2, type: 'category' } }, [values, values, values]);
+    const style = resolverFor(
+      {
+        label: 'sample',
+        type: 'scatter',
+        xDataIndex: 0,
+        yDataIndex: 1,
+        colorBy: { dataIndex: 2, type: 'category' },
+      },
+      [values, values, values],
+    );
     expect(style.colorBinAt(19)).toBe(19);
     expect(style.colorAt(19)).toBe('#222');
   });

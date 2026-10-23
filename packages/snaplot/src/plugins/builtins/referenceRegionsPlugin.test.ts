@@ -14,10 +14,16 @@ function chart(redraw = vi.fn()): ChartInstance {
       axes: {},
     }),
     getAxis: () => ({
-      type: 'linear', key: 'x', min: 0, max: 10,
+      type: 'linear',
+      key: 'x',
+      min: 0,
+      max: 10,
       dataToPixel: (value: number) => 20 + value * 20,
       pixelToData: (value: number) => (value - 20) / 20,
-      ticks: () => [], tickFormat: String, nice: () => {}, setPixelRange: () => {},
+      ticks: () => [],
+      tickFormat: String,
+      nice: () => {},
+      setPixelRange: () => {},
     }),
     getTheme: () => lightTheme,
   } as unknown as ChartInstance;
@@ -25,9 +31,18 @@ function chart(redraw = vi.fn()): ChartInstance {
 
 function context(): CanvasRenderingContext2D {
   return {
-    save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(),
-    fillRect: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn(),
-    setLineDash: vi.fn(), measureText: vi.fn(() => ({ width: 40 })), fillText: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    fillRect: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    setLineDash: vi.fn(),
+    measureText: vi.fn(() => ({ width: 40 })),
+    fillText: vi.fn(),
   } as unknown as CanvasRenderingContext2D;
 }
 

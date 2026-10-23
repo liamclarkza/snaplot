@@ -1,14 +1,5 @@
-import type {
-  Plugin,
-  ChartInstance,
-  CursorSnapshot,
-  CursorSeriesPoint,
-} from '../../types';
-import {
-  type LegendTableColumn,
-  nameColumn,
-  valueColumn,
-} from './legendTableColumns';
+import type { Plugin, ChartInstance, CursorSnapshot, CursorSeriesPoint } from '../../types';
+import { type LegendTableColumn, nameColumn, valueColumn } from './legendTableColumns';
 
 export type { LegendTableColumn } from './legendTableColumns';
 
@@ -191,9 +182,7 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
             const cfg = chart.getOptions();
             const visible = cfg.series[si].visible !== false;
             chart.setOptions({
-              series: cfg.series.map((sc, i) =>
-                i === si ? { ...sc, visible: !visible } : sc,
-              ),
+              series: cfg.series.map((sc, i) => (i === si ? { ...sc, visible: !visible } : sc)),
             });
             // setOptions does not emit data:update, so refresh the table by hand.
             rebuildRows(state);
@@ -401,9 +390,7 @@ export function createLegendTablePlugin(options: LegendTableOptions = {}): Plugi
       // the row list. Rebuilding wipes <tr>s under the cursor/mouse at
       // streaming tick rates, which swallows clicks and hovers.
       state.offHandlers.push(chart.on('data:update', () => refreshCells(state)));
-      state.offHandlers.push(
-        chart.on('highlight:change', (idx) => applyHighlightAttr(state, idx)),
-      );
+      state.offHandlers.push(chart.on('highlight:change', (idx) => applyHighlightAttr(state, idx)));
     },
 
     // Series added/removed/visibility flipped, rebuild row list, then

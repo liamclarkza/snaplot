@@ -156,7 +156,13 @@ describe('per-axis grid config', () => {
     const scales = new Map<string, Scale>([['y', scale]]);
     const ctx = context();
 
-    renderAxes(ctx, layout(), scales, theme, gridConfig({ dash: [4, 4], color: '#123456', opacity: 0.4 }));
+    renderAxes(
+      ctx,
+      layout(),
+      scales,
+      theme,
+      gridConfig({ dash: [4, 4], color: '#123456', opacity: 0.4 }),
+    );
 
     expect(ctx.setLineDash).toHaveBeenCalledWith([4, 4]);
     // Dash pattern is reset after the grid stroke so the frame stays solid.
@@ -228,27 +234,26 @@ describe('axis corner collision handling', () => {
       dpr: 1,
     };
 
-    const result = renderAxes(
-      context(),
-      fullLayout,
-      scales,
-      theme,
-      {
-        series: [],
-        axes: { x: { position: 'bottom' }, y: { position: 'left' } },
-      } as ChartConfig,
-    );
+    const result = renderAxes(context(), fullLayout, scales, theme, {
+      series: [],
+      axes: { x: { position: 'bottom' }, y: { position: 'left' } },
+    } as ChartConfig);
 
     expect(result.labels.get('x')?.[0].x).toBeGreaterThan(20);
   });
 });
 
 describe('plot furniture', () => {
-  it.each([1, 2])('joins endpoint ticks to square, pixel-aligned frame corners at DPR %s', (dpr) => {
+  it.each([
+    1, 2,
+  ])('joins endpoint ticks to square, pixel-aligned frame corners at DPR %s', (dpr) => {
     const ctx = context();
     const box = { ...layout(), dpr, plot: { left: 20.2, top: 0.2, width: 99.4, height: 99.4 } };
     const scale = linearScale(0.2, 99.6, [0.2, 99.6]);
-    renderAxes(ctx, box, new Map([['y', scale]]), theme, { series: [], axes: { y: { position: 'left', grid: false } } });
+    renderAxes(ctx, box, new Map([['y', scale]]), theme, {
+      series: [],
+      axes: { y: { position: 'left', grid: false } },
+    });
     const offset = dpr === 1 ? 0.5 : 0;
     expect(ctx.rect).toHaveBeenLastCalledWith(20 + offset, offset, 100, 100);
     expect(ctx.moveTo).toHaveBeenCalledWith(20 + offset, offset);
@@ -258,13 +263,27 @@ describe('plot furniture', () => {
   it('uses theme opacity directly and gives tick marks the axis hue, preserving explicit overrides', () => {
     const ctx = context();
     const strokes: { color: string | CanvasGradient | CanvasPattern; alpha: number }[] = [];
-    ctx.stroke = vi.fn(() => { strokes.push({ color: ctx.strokeStyle, alpha: ctx.globalAlpha }); });
-    const quiet = { ...theme, gridOpacity: 0.18, borderOpacity: 0.18, gridColor: '#84969e', axisLineColor: '#84969e', borderColor: '#84969e' };
+    ctx.stroke = vi.fn(() => {
+      strokes.push({ color: ctx.strokeStyle, alpha: ctx.globalAlpha });
+    });
+    const quiet = {
+      ...theme,
+      gridOpacity: 0.18,
+      borderOpacity: 0.18,
+      gridColor: '#84969e',
+      axisLineColor: '#84969e',
+      borderColor: '#84969e',
+    };
     const scales = new Map([['y', linearScale(0, 100, [50])]]);
     renderAxes(ctx, layout(), scales, quiet, { series: [], axes: { y: {} } });
-    expect(strokes).toEqual(Array.from({ length: 3 }, () => ({ color: 'rgb(233,236,238)', alpha: 1 })));
+    expect(strokes).toEqual(
+      Array.from({ length: 3 }, () => ({ color: 'rgb(233,236,238)', alpha: 1 })),
+    );
     strokes.length = 0;
-    renderAxes(ctx, layout(), scales, quiet, { series: [], axes: { y: { grid: false, tickMarks: { color: '#ff0000' } } } });
+    renderAxes(ctx, layout(), scales, quiet, {
+      series: [],
+      axes: { y: { grid: false, tickMarks: { color: '#ff0000' } } },
+    });
     expect(strokes[0]).toEqual({ color: 'rgb(255,0,0)', alpha: 1 });
     expect(ctx.globalAlpha).toBe(1);
   });
@@ -274,10 +293,25 @@ describe('bar slot grids', () => {
   it('keeps evenly spaced slot boundaries when center labels are thinned', () => {
     const ctx = context();
     const scale = { ...linearScale(0, 6, []), key: 'x', dataToPixel: (v: number) => v * 10 };
-    const box: Layout = { width: 80, height: 140, plot: { left: 0, top: 0, width: 60, height: 100 }, axes: { x: { position: 'bottom', area: { left: 0, top: 100, width: 60, height: 40 } } }, dpr: 1 };
-    const result = renderAxes(ctx, box, new Map([['x', scale]]), theme, { series: [], axes: { x: {} } }, {
-      values: [1, 3, 5], gridValues: [0, 2, 4, 6], format: (v) => `Category ${v}`,
-    });
+    const box: Layout = {
+      width: 80,
+      height: 140,
+      plot: { left: 0, top: 0, width: 60, height: 100 },
+      axes: { x: { position: 'bottom', area: { left: 0, top: 100, width: 60, height: 40 } } },
+      dpr: 1,
+    };
+    const result = renderAxes(
+      ctx,
+      box,
+      new Map([['x', scale]]),
+      theme,
+      { series: [], axes: { x: {} } },
+      {
+        values: [1, 3, 5],
+        gridValues: [0, 2, 4, 6],
+        format: (v) => `Category ${v}`,
+      },
+    );
     expect(result.labels.get('x')?.length).toBeLessThan(3);
     // Every boundary remains, including both ends; no shortened edge cell.
     for (const x of [0.5, 20.5, 40.5, 60.5]) expect(ctx.moveTo).toHaveBeenCalledWith(x, 100.5);

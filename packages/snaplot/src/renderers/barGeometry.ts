@@ -27,7 +27,11 @@ export function categoryWidthFromCenters(
     const gap = Math.abs(center - centers[ordinal - 1]);
     if (gap > 0) width = Math.min(width, gap);
   }
-  if (ordinal < centers.length - 1 && Number.isFinite(center) && Number.isFinite(centers[ordinal + 1])) {
+  if (
+    ordinal < centers.length - 1 &&
+    Number.isFinite(center) &&
+    Number.isFinite(centers[ordinal + 1])
+  ) {
     const gap = Math.abs(centers[ordinal + 1] - center);
     if (gap > 0) width = Math.min(width, gap);
   }
