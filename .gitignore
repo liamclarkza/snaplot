@@ -16,11 +16,8 @@ Thumbs.db
 
 # Project-internal
 specification.md
+# Local notes and the overhaul audit evidence; never committed (backlog: docs/backlog.md).
 notes/
-# The dogfood findings are a project deliverable; keep other personal notes local.
-!notes/
-notes/*
-!notes/dogfood-friction-log.md
 .claude/
 .codex/
 codex-reviews/
