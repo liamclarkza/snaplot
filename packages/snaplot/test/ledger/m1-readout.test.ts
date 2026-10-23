@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ChartHandle } from '../../src/index';
-import { debug, type Fakes, hover, installFakes, tooltipText } from '../fakes';
+import {
+  clientPoint,
+  debug,
+  type Fakes,
+  hover,
+  installFakes,
+  pointerTarget,
+  tooltipText,
+} from '../fakes';
 
 // Plan P9 / §5.2: a value readout uses maximumFractionDigits =
 // clamp(stepDecimals + 2, 0, 6) with grouping; a non-zero value that would
@@ -127,5 +135,57 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
       '1,234.56',
       '4.84',
     ]);
+  });
+
+  it.fails('[visuals-01] a time Y axis reads as a time, never as an epoch number', () => {
+    // §5.2: a time axis reads at time precision. The exact string is M10's
+    // (data-spacing precision); here it must be a clock time, not a number.
+    const start = Date.UTC(2024, 0, 1);
+    const times = fakes.mount<Row>({
+      data: [0, 1, 2, 3].map((t) => ({ t, y: start + t * 3_600_000 })),
+      x: 't',
+      series: [{ y: 'y' }],
+      axes: { y: { type: 'time' } },
+    });
+    times.setCursor(1);
+    const [point] = times.getCursorSnapshot().points;
+    expect(point.formattedY).toMatch(/\d:\d\d/);
+    expect(point.formattedY).not.toMatch(/^[-\d,.\s]+$/);
+    hover(times, 1, start + 3_600_000);
+    fakes.frames.flush();
+    expect(tooltipText()).toContain(point.formattedY);
+    // No grouped epoch number such as 1,704,070,800,000.
+    expect(tooltipText()).not.toMatch(/\d{1,3}(,\d{3}){3,}/);
+
+    // A log axis still reads at value precision.
+    const log = fakes.mount<Row>({
+      data: [1, 10, 123456, 1e6].map((y, t) => ({ t, y })),
+      x: 't',
+      series: [{ y: 'y' }],
+      axes: { y: { type: 'log' } },
+    });
+    log.setCursor(2);
+    expect(log.getCursorSnapshot().points.map((p) => p.formattedY)).toEqual(['123,456']);
+  });
+
+  it.fails('[visuals-01] a clicked point reads like its tooltip', () => {
+    // Quarter ticks: a 0.25 step allows 4 readout decimals, where the default
+    // tick count (a 0.2 step) would allow 3.
+    const chart = fakes.mount<Row>({
+      data: [0, 0.123456, 1, 0.5].map((y, t) => ({ t, y })),
+      x: 't',
+      series: [{ y: 'y' }],
+      axes: { y: { ticks: [0, 0.25, 0.5, 0.75, 1] } },
+    });
+    const clicks: string[] = [];
+    chart.on('point:click', (point) => clicks.push(point.formattedY));
+    const { snapshot } = readout(chart, 1, 0.123456);
+    expect(snapshot).toBe('0.1235');
+
+    const target = pointerTarget(chart);
+    const at = { ...clientPoint(chart, 1, 0.123456), bubbles: true, pointerId: 1 };
+    target.dispatchEvent(new PointerEvent('pointerdown', { ...at, pointerType: 'mouse' }));
+    target.dispatchEvent(new PointerEvent('pointerup', { ...at, pointerType: 'mouse' }));
+    expect(clicks).toEqual([snapshot]);
   });
 });

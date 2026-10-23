@@ -191,6 +191,25 @@ describe('HitTester tooltip formatters', () => {
     // Readouts keep value precision (plan P9), never the tick format's.
     expect(points[0].formattedY).toBe('20.13');
   });
+
+  it.fails('reads a time Y axis through its tick format when no formatters are set', () => {
+    const store = new ColumnarStore([f([0, 50, 100]), f([10, 20.125, 30])]);
+    const scales = new Map<string, Scale>([
+      ['x', scale('x', 0, 100)],
+      ['y', { ...scale('y', 0, 100), type: 'time' }],
+    ]);
+    const points = new HitTester(1_000).findPoints(
+      store,
+      scales,
+      [{ label: 'v', dataIndex: 1 }],
+      50,
+      50,
+      'index',
+      ['#111'],
+      'mouse',
+    );
+    expect(points[0].formattedY).toBe('y:20.125');
+  });
 });
 
 describe('HitTester independent sources', () => {

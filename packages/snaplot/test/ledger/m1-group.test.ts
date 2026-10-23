@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ChartCore } from '../../src/core/Chart';
 import { createChartGroup } from '../../src/index';
-import { clientPoint, type Fakes, installFakes, pointerTarget } from '../fakes';
+import { clientPoint, debug, type Fakes, installFakes, pointerTarget } from '../fakes';
 
 // Plan D17: group viewport sync links horizontal axes only, and only axes the
 // peer has; it never pins a peer's Y, resets propagate, and `yRange: true` is
@@ -156,5 +157,37 @@ describe('[dataapi-01][dxtrial-01][frameworks-06][interact-01] group viewport sy
 
     expect(cpu.getAxis('y')).toEqual(union);
     expect(warm.getAxis('y')).toEqual(union);
+  });
+
+  it.fails('[dataapi-01] a viewport sync in an alignPlots group shares Y without an options pass', () => {
+    // Every wheel or drag frame syncs the viewport. Aligning the plots is an
+    // options pass per member (merge, axes, auto-range), so it runs on mount,
+    // update and resize only; a horizontal change moves no Y gutter.
+    const group = createChartGroup({ viewport: true, yRange: true, alignPlots: true });
+    const data = rows(41);
+    const charts = [0, 15, 30].map((offset) =>
+      fakes.mount({
+        data: data.map((row) => ({ ...row, cpu: row.cpu + offset })),
+        x: 't',
+        series: [{ y: 'cpu' }],
+        group,
+      }),
+    );
+    const [driver, ...peers] = charts;
+    const union = driver.getAxis('y');
+    const left = driver.getLayout().plot.left;
+    const ingests = charts.map((chart) => debug(chart).ingestCount);
+    const setOptions = vi.spyOn(ChartCore.prototype, 'setOptions');
+
+    for (let k = 0; k < 5; k++) driver.setViewport({ x: { min: 5 + k, max: 25 + k } });
+    driver.resetViewport();
+
+    expect(setOptions).not.toHaveBeenCalled();
+    expect(charts.map((chart) => debug(chart).ingestCount)).toEqual(ingests);
+    for (const peer of peers) {
+      expect(peer.getAxis('x')).toEqual(driver.getAxis('x'));
+      expect(peer.getAxis('y')).toEqual(union);
+      expect(peer.getLayout().plot.left).toBe(left);
+    }
   });
 });

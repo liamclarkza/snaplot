@@ -108,4 +108,28 @@ describe('[gap-scale-longevity-01] resize paints synchronously', () => {
     chart.resize(500, 200);
     expect(resets(chart)).toEqual(afterResize);
   });
+
+  it.fails('[gap-scale-longevity-01] a chart updated while hidden re-lays out when shown at the same size', () => {
+    const chart = mount(2);
+    fakes.resizeObserver.deliver();
+    fakes.frames.flush();
+    expect(chart.getLayout()).toMatchObject({ width: 400, height: 200 });
+
+    // display: none collapses the box; the observer reports 0 × 0 and the
+    // backing stores stay allocated at 400 × 200.
+    fakes.resizeObserver.resize(chart.container, 0, 0);
+    chart.update({ data: data.map((row) => ({ ...row, y: row.y * 2 })) });
+    fakes.frames.flush();
+
+    // Shown again at the old size: nothing to reallocate, but the layout made
+    // while hidden must not stay.
+    const before = resets(chart);
+    fakes.resizeObserver.resize(chart.container, 400, 200);
+    expect(resets(chart)).toEqual(before);
+    expect(chart.getLayout()).toMatchObject({ width: 400, height: 200 });
+    const { plot } = chart.getLayout();
+    expect(plot.left + plot.width).toBeLessThanOrEqual(400);
+    expect(plot.top + plot.height).toBeLessThanOrEqual(200);
+    expectPainted(chart);
+  });
 });
