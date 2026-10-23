@@ -50,11 +50,13 @@
     "test:watch": "vitest",
     "prepack": "node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').copyFileSync('../../' + f, f)\"",
     "postpack": "node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').rmSync(f, { force: true })\"",
-    "check:package": "publint --strict && attw --pack . --profile esm-only --exclude-entrypoints ./legend-table.css && node scripts/check-consumers.mjs"
+    "check:package": "publint --strict && attw --pack . --profile esm-only --exclude-entrypoints ./legend-table.css && node scripts/check-consumers.mjs",
+    "check:api": "node scripts/check-api.mjs",
+    "api:update": "node scripts/check-api.mjs --update"
   },
   "peerDependencies": {
-    "solid-js": "^1.9.0",
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "solid-js": "^1.9.0"
   },
   "peerDependenciesMeta": {
     "solid-js": {
