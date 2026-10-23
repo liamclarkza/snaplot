@@ -1,6 +1,6 @@
 // Copy lint for the site and the README (plan §8.3, §9): no marketing adjectives, no "live
 // window" (D30: say "follow window"), no "!" in headings, sentence-case h1 and h2, at most one em
-// dash per 400 words, and "dense data" only once ADR 0002 records that the first-paint budget was met.
+// dash per 400 words, and no "dense data" claim until ADR 0002 records that the first-paint budget was met.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -103,6 +103,17 @@ function isTitleCase(heading: string): boolean {
   return capitalised >= 2;
 }
 
+/**
+ * The D34 claim that snaplot suits dense data, in whatever words: "dense data", "dense datasets",
+ * "dense charts", "live and dense". A mechanism, such as the README's "dense scatter uses cached
+ * hit testing", says how something works, not what snaplot is for, and passes.
+ */
+function isDenseClaim(text: string): boolean {
+  return /\bdense(?:,?\s+(?:and\s+)?(?:live|streaming|large))?\s+(?:data|datasets?|charts?|plots?|series|time[\s-]series)\b|\band\s+dense\b/i.test(
+    text,
+  );
+}
+
 describe('copy lint (plan §8.3)', () => {
   it('uses none of the banned words or phrases', () => {
     const found: string[] = [];
@@ -144,13 +155,13 @@ describe('copy lint (plan §8.3)', () => {
     expect(found).toEqual([]);
   });
 
-  it('claims "dense data" only once ADR 0002 records that firstpaint-line-1m met its budget (D34)', () => {
+  it('claims dense data only once ADR 0002 records that firstpaint-line-1m met its budget (D34)', () => {
     // M14 writes the line `firstpaint-line-1m: met` (or `missed`) into ADR 0002.
     const adr = join(repo, 'docs/decisions/0002-overhaul.md');
     const met = existsSync(adr) && /^firstpaint-line-1m: met\b/m.test(readFileSync(adr, 'utf8'));
     const found = met
       ? []
-      : files.filter((file) => /\bdense data\b/i.test(prose(file.text))).map((file) => file.path);
+      : files.filter((file) => isDenseClaim(prose(file.text))).map((file) => file.path);
     expect(found).toEqual([]);
   });
 });
@@ -165,6 +176,26 @@ describe('the Title Case detector', () => {
     expect(isTitleCase('update, setOptions and appendData')).toBe(false);
     expect(
       isTitleCase(
+        'Canvas charts for live data. One options object for vanilla JS, React and Solid.',
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('the dense-claim detector (D34)', () => {
+  it('flags the claim in its usual wordings and passes a mechanism', () => {
+    expect(isDenseClaim('Canvas charts for live and dense data.')).toBe(true);
+    expect(isDenseClaim('Built for dense datasets.')).toBe(true);
+    expect(isDenseClaim('Dense charts stay responsive.')).toBe(true);
+    expect(isDenseClaim('Made for dense, live data.')).toBe(true);
+    expect(
+      isDenseClaim(
+        'Sorted series use binary-search culling; dense scatter uses cached hit testing.',
+      ),
+    ).toBe(false);
+    expect(isDenseClaim('Scatter density and colorBy.')).toBe(false);
+    expect(
+      isDenseClaim(
         'Canvas charts for live data. One options object for vanilla JS, React and Solid.',
       ),
     ).toBe(false);
