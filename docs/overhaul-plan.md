@@ -1,3 +1,8 @@
+> **M0 snapshot, not the working copy.** Overhaul milestone M0 copied this file verbatim (everything below
+> this note) from the local, gitignored `notes/overhaul-audit/plan.md`. That working copy is the one agents
+> read, and the orchestrator may amend it; this snapshot is not kept in sync. Absolute paths below are the
+> maintainer's machine. M17 decides whether this file stays, is refreshed or is removed (ADR 0002).
+
 # snaplot overhaul plan (final, executable)
 
 - **Repository:** `/Users/liam/Projects/snaplot`.

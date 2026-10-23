@@ -1,3 +1,9 @@
+> **M0 snapshot, not the working copy.** Overhaul milestone M0 copied this file verbatim (everything below
+> this note) from the local, gitignored `notes/overhaul-audit/EXECUTION.md`. That working copy is the one
+> agents read, and the orchestrator may amend it; this snapshot is not kept in sync. "`plan.md` in this
+> folder" below means `notes/overhaul-audit/plan.md`, snapshotted as [`overhaul-plan.md`](overhaul-plan.md).
+> M17 decides whether this file stays, is refreshed or is removed (ADR 0002).
+
 # Execution addendum (read with plan.md; this file wins where they conflict)
 
 The overhaul plan (`plan.md` in this folder) is executed by Claude Code workflow agents. The maintainer asked:

@@ -1,8 +1,11 @@
 # ADR 0002: The snaplot 1.0 API overhaul
 
 - **Status:** accepted; being executed. Edited only by milestones M0, M14 and M17.
-- **Plan of record:** [`docs/overhaul-plan.md`](../overhaul-plan.md) (the plan) and
-  [`docs/overhaul-execution.md`](../overhaul-execution.md) (process rules that win where they conflict).
+- **Plan:** the working copies are `notes/overhaul-audit/plan.md` and `notes/overhaul-audit/EXECUTION.md`
+  (local and gitignored; EXECUTION.md's process rules win where they conflict). The orchestrator may amend
+  them while the overhaul runs. [`docs/overhaul-plan.md`](../overhaul-plan.md) and
+  [`docs/overhaul-execution.md`](../overhaul-execution.md) are M0 snapshots of the two files and are not kept
+  in sync. M17 decides whether the snapshots stay, are refreshed or are removed.
 - **Baseline:** tag `overhaul-baseline` = `6237289` on the local branch `overhaul`. Audit file:line references
   point at it: `git show overhaul-baseline:<path>`.
 - **Evidence:** a 19-auditor review (336 findings; 192 required) in `notes/overhaul-audit/` (gitignored, local
@@ -184,7 +187,7 @@ undocumented; (iii) unintended regression. Rows V0 and V17 onward are files in
 | V13 | `thinTicks(…, preserveEnds)` picks a stride that divides the interval count and can collapse an axis to its two endpoints. | (i); side effect (iii) | **Revert planned:** replace stride thinning with re-ticking at a coarser nice step. | visuals-09, M10 |
 | V14 | A mouse click no longer draws the grey tap-feedback ring (touch and pen only). | (ii) | **Approved;** document it. | — |
 | V15 | `colorBy` category with more than 12 categories: every category gets a palette slot; stable `categoryValues` order. | (ii) | **Approved;** document it. | — |
-| V16 | Tooltip, crosshair, hover dots, highlight dimming, legend-table DOM and theme swatches unchanged apart from position. | — | **No action.** | — |
+| V16 | Tooltip, crosshair, hover dots, highlight dimming, legend-table DOM and theme swatches unchanged apart from position. | — | **Approved** (unchanged; no action). | — |
 
 ## 3. Visual ledger from V0 on
 

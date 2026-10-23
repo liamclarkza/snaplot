@@ -36,6 +36,7 @@ Sources marked *(local)* were gitignored notes; copies are in `notes/overhaul-au
 | COH-05:categorical | Scatter encoding legend for categorical `colorBy` | planned:M12b | backlog-15:categorical | `dom/legend.test.ts` › auto legend for categorical `colorBy` |
 | COH-05:ramp | Colour-ramp and size legends | wontdo | backlog-15:ramp | plan §6 and D36 (see §9) |
 | COH-06 | Controls match the render mode; no public resolved-render-mode accessor | open | — | an accessor (or documented rule) for the resolved scatter render mode |
+| COH-08 | Modality-aware interaction instructions (the "drag, shift-drag, wheel" hint is shown to every input) | planned:M15b | backlog-21 | see PUL-12 (the interaction-help recipe); the demo side is CohortLab-9 (planned:M16a, §10.1 #9) |
 | COH-09 | Point-cloud renderer for dense scatter | wontdo | backlog-28:cold-scatter | plan §6; at-rest decimation (`backlog-28:at-rest`) is planned:M11 |
 | COH-10 | Grouped or compact large numbers in ticks (`1000000`, `3000000000`) | planned:M10 | backlog-18 | `engine/format.test.ts` › grouping |
 | GRI-01 | Brush cleared on data change emits no `selection:change` (regressed) | planned:M8 | backlog-02 | `public/events.test.ts` › a selection cleared by a data change emits `selection:change(null)` |
