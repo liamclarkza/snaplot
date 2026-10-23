@@ -70,6 +70,7 @@ npm run demo-data -- find-the-clipping --offline  # re-decode from that cache (n
 ## Oracle
 
 - Reference scan in Chromium (written separately from `answer.ts`): **12 clipped runs**, the longest 4 samples (0.1 ms) at sample 1546672; **5 silences** longer than 2 s; peak |x| 1.
+- The generator also runs `answer.ts` (bundled with esbuild) on the same decode and stops unless it finds exactly these runs, silences and peak.
 - Values with every run and silence span are in `recording.json`. `answer.test.ts` requires `clippedRuns >= 3` and at least one silence for the bundled file, and checks `answer.ts` on generated signals against a brute-force count; the page re-runs the reference scan on an `OfflineAudioContext` decode (M16c).
 
 ## Design reference

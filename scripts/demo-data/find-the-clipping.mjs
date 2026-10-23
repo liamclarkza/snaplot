@@ -17,10 +17,11 @@
 // Outputs: site/public/data/find-the-clipping/{recording.mp3 | recording.wav, recording.json,
 // SOURCE.md} and the docs slice site/src/examples/data/waveform.ts.
 
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   DATA,
+  REPO,
   SLICES,
   biomeFormat,
   log,
@@ -148,7 +149,47 @@ async function decodeAndScan({ base64, sampleRate, rule }) {
     silences,
     excerptStart,
     excerpt: Array.from(chans[0].subarray(excerptStart, excerptStart + 1024)),
+    // The page's own module (answer.ts, bundled by esbuild) on the same decode, when present.
+    answer: globalThis.clipAnswer
+      ? (({ clippedRuns, silences, peak }) => ({
+          runs: clippedRuns.map((r) => [r.start, r.length]),
+          silences: silences.map((r) => [r.start, r.length]),
+          peak,
+        }))(globalThis.clipAnswer.scan(chans, audio.sampleRate))
+      : null,
   };
+}
+
+const ANSWER = join(REPO, 'site/src/demos/find-the-clipping/answer.ts');
+
+/** answer.ts as a browser script that defines `globalThis.clipAnswer`, or null without it. */
+async function answerScript() {
+  if (!existsSync(ANSWER)) return null;
+  const { buildSync } = await import('esbuild');
+  const out = buildSync({
+    entryPoints: [ANSWER],
+    bundle: true,
+    format: 'iife',
+    globalName: 'clipAnswer',
+    target: 'es2022',
+    write: false,
+  });
+  return out.outputFiles[0].text;
+}
+
+/** Throws unless answer.ts found exactly the reference scan's runs, silences and peak. */
+function crossCheck(s) {
+  if (!s.answer) return false;
+  const same =
+    JSON.stringify(s.answer.runs) === JSON.stringify(s.runs) &&
+    JSON.stringify(s.answer.silences) === JSON.stringify(s.silences) &&
+    s.answer.peak === s.peak;
+  if (!same) {
+    throw new Error(
+      `answer.ts disagrees with the reference scan: ${s.answer.runs.length}/${s.runs.length} runs, ${s.answer.silences.length}/${s.silences.length} silences`,
+    );
+  }
+  return true;
 }
 
 async function openBrowser() {
@@ -162,6 +203,8 @@ async function openBrowser() {
   const browser = await pw.chromium.launch();
   const page = await browser.newPage();
   await page.setContent('<!doctype html><title>decode</title>');
+  const script = await answerScript();
+  if (script) await page.addScriptTag({ content: script });
   return { browser, page };
 }
 
@@ -285,6 +328,7 @@ async function main() {
         });
         log(`  ${c.identifier}: ${s.runs.length} clipped runs, ${s.silences.length} silences`);
         if (ok) {
+          crossCheck(s);
           chosen = c;
           scan = s;
           audio = buf;
@@ -300,6 +344,7 @@ async function main() {
         sampleRate: synth.sampleRate,
         rule: RULE,
       });
+      crossCheck(scan);
     }
   } finally {
     await browser.close();
@@ -408,6 +453,9 @@ async function main() {
     ],
     oracle: [
       `Reference scan in Chromium (written separately from \`answer.ts\`): **${scan.runs.length} clipped runs**, the longest ${longest[1]} samples (${ms(longest[1])} ms) at sample ${longest[0]}; **${scan.silences.length} silences** longer than 2 s; peak |x| ${round(scan.peak, 4)}.`,
+      scan.answer
+        ? 'The generator also runs `answer.ts` (bundled with esbuild) on the same decode and stops unless it finds exactly these runs, silences and peak.'
+        : 'answer.ts was not present when this file was generated, so the generator could not cross-check it.',
       'Values with every run and silence span are in `recording.json`. `answer.test.ts` requires `clippedRuns >= 3` and at least one silence for the bundled file, and checks `answer.ts` on generated signals against a brute-force count; the page re-runs the reference scan on an `OfflineAudioContext` decode (M16c).',
     ],
     reference:
