@@ -66,9 +66,10 @@ what to use instead, and the chart keeps its default:
   area, band and bar columns must be sorted by X (rows are sorted for you, stably, so equal X
   keep their order).
 - A scatter source whose X is already sorted is stored in X order, so panning a large sorted
-  scatter culls by X and keeps its points during a gesture. While the view moves, a scatter draws
-  at most max(400, 1.5 × plot width) of the points in view, whatever the pointer; the frame after
-  the gesture draws every point.
+  scatter culls by X and keeps its points during a gesture. While the view moves, such a scatter
+  draws at most max(400, 1.5 × plot width) of the points in view, whatever the pointer; an unsorted
+  scatter keeps its budget (10,000 points with a mouse, the width-scaled one after a touch). The
+  frame after the gesture draws every point.
 - Rows, their original indices and row ids are retained beside the drawn data (bounded by
   `streaming.maxPoints`): appended rows survive `update()` calls that change accessors, fields or
   styles, and every point keeps its row and index.

@@ -1918,12 +1918,21 @@ export class ChartCore implements EngineHost {
     }, INTERACTION_REFINE_MS);
   }
 
-  private interactionSamplingBudget(): number | null {
+  /**
+   * The most scatter points drawn per frame during a gesture, or null when sampling is off.
+   * `culledByX`: the series' X is the store's X, so its segments hold the in-view points only.
+   */
+  private interactionSamplingBudget(culledByX = false): number | null {
     const configured = this.config.performance?.interactionSampling;
     if (configured === false) return null;
     if (typeof configured === 'number') return configured > 0 ? configured : null;
-    // Plan §3.4: the budget counts in-view points (a sorted scatter is culled to the
-    // view first) and scales with the plot width, for every pointer type.
+    // Plan §3.4's budget, max(400, 1.5 × plot width), counts in-view points. A source culled
+    // by X (a sorted scatter) is sampled over the view, so it gets that budget for every
+    // pointer. A source that is not culled is strided over its whole length, so the mouse
+    // and programmatic changes keep 10,000 until M11 counts its in-view points
+    // (gap-perf-gate-01:sampling); touch and pen already had the width-scaled budget.
+    if (!culledByX && this.lastPointerType !== 'touch' && this.lastPointerType !== 'pen')
+      return DEFAULT_INTERACTION_SAMPLING;
     return Math.min(
       DEFAULT_INTERACTION_SAMPLING,
       Math.max(
@@ -3077,7 +3086,7 @@ export class ChartCore implements EngineHost {
           // points drawn this frame; hit-testing and the settled repaint
           // stay full-fidelity.
           let sampleStride = 1;
-          const budget = this.interactionSamplingBudget();
+          const budget = this.interactionSamplingBudget(canCullByGlobalX);
           if (budget !== null && this.interactionActive()) {
             let visible = 0;
             for (const segment of renderSegments) {

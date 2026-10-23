@@ -201,7 +201,9 @@ describe('marks', () => {
 
   /**
    * Points drawn during a gesture over min(in view, budget), with the bench's budget of
-   * max(400, 1.5 × plot width) (plan §3.4; bench FidelitySampler).
+   * max(400, 1.5 × plot width) (plan §3.4; bench FidelitySampler). The gesture zooms to 1 % of
+   * X: an unsorted source is sampled over its whole length (with the 10,000-point mouse budget
+   * until M11), which leaves a twentieth of that budget in a view this narrow.
    */
   function fidelity(sorted: boolean): number {
     const n = 200_000;
@@ -215,7 +217,7 @@ describe('marks', () => {
     );
     fakes.frames.flush();
     // setViewport marks a gesture in flight, so the interaction pass samples.
-    chart.setViewport({ x: { min: 0, max: n / 10 } });
+    chart.setViewport({ x: { min: 0, max: n / 100 } });
     fakes.frames.flush();
     const { drawnPoints, inViewPoints } = debug(chart);
     const budget = Math.max(400, 1.5 * chart.getLayout().plot.width);

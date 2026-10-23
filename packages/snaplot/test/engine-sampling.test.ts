@@ -69,20 +69,27 @@ describe('engine interaction sampling', () => {
     expect(settled.inViewPoints).toBe(during.inViewPoints);
   });
 
-  it('uses a CSS-pixel-scaled interaction budget for every pointer type', () => {
+  /**
+   * A 4,800-point scatter in a 400 × 300 chart (plot width 320). With `xColumn: 0` the store's
+   * X is the scatter's X, so a gesture culls it to the view; with `xColumn: 2` column 0 is the
+   * row index and the scatter's own X is unsorted, so it is not culled.
+   */
+  function scatter(xColumn: 0 | 2) {
     const n = 4800;
-    const xs = new Float64Array(n);
+    const index = new Float64Array(n);
     const ys = new Float64Array(n);
+    const unsorted = new Float64Array(n);
     for (let i = 0; i < n; i++) {
-      xs[i] = i;
+      index[i] = i;
       ys[i] = i % 10;
+      unsorted[i] = (i * 7) % n;
     }
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear' }, y: { type: 'linear' } },
-        series: [{ label: 'points', type: 'scatter', xColumn: 0, yColumn: 1 }],
+        series: [{ label: 'points', type: 'scatter', xColumn, yColumn: 1 }],
       },
-      [xs, ys],
+      [index, ys, unsorted],
       { width: 400, height: 300 },
     );
     expect(chart.getLayout().plot.width).toBe(320);
@@ -92,20 +99,29 @@ describe('engine interaction sampling', () => {
     const nudge = () => {
       chart.setAxis('x', { min: x.min, max: x.max });
       fakes.frames.step();
-      return engineDebug(chart);
+      const { inViewPoints, drawnPoints } = engineDebug(chart);
+      return { inViewPoints, drawnPoints };
     };
+    return { chart, n, nudge };
+  }
 
-    // After a touch, the budget is 1.5 points per CSS pixel: 320 × 1.5 = 480.
+  it('budgets a source culled by X by plot width, for every pointer type', () => {
+    const { chart, n, nudge } = scatter(0);
+    // Plan §3.4: max(400, 1.5 × plot width) in-view points = 320 × 1.5 = 480.
     tapAt(chart, plotPoint(chart), 'touch');
-    const touch = nudge();
-    expect(touch.inViewPoints).toBe(n);
-    expect(touch.drawnPoints).toBe(480);
-
-    // After a mouse move the budget is the same (plan §3.4: max(400, 1.5 × plot width)
-    // in-view points, whatever the pointer).
+    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: 480 });
     hoverAt(chart, plotPoint(chart));
-    const mouse = nudge();
-    expect(mouse.inViewPoints).toBe(n);
-    expect(mouse.drawnPoints).toBe(480);
+    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: 480 });
+  });
+
+  it('keeps the 10,000-point mouse budget for a source not culled by X', () => {
+    // Its stride runs over the whole source, so the width-scaled budget would leave a
+    // fraction of it in view (gap-perf-gate-01:sampling, M11). Touch keeps 1.5 per pixel.
+    const { chart, n, nudge } = scatter(2);
+    tapAt(chart, plotPoint(chart), 'touch');
+    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: 480 });
+    // After a mouse move the budget is 10,000 points, so nothing is sampled.
+    hoverAt(chart, plotPoint(chart));
+    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: n });
   });
 });
