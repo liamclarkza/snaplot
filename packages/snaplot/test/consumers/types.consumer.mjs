@@ -28,10 +28,13 @@ export const notAny5: string = SolidChart;
 ${jsEntries.map((_, i) => `// @ts-expect-error a module namespace is not a string\nexport const entryProbe${i}: string = entry${i};`).join('\n')}
 
 const rows: Row[] = [{ time: 1, cpu: 2, label: 'a' }];
-export const options: ChartOptions<Row> = { data: rows, x: 'time', series: [{ y: 'cpu' }] };
-export const react: ReactProps<Row> = { ...options, viewport: { x: { min: 0, max: 2 } } };
+// \`satisfies\`, not a \`ChartOptions<Row>\` annotation: until M13 aligns the framework props with
+// the core state options, ChartOptions' viewport and on*Change types differ from the props'.
+const base = { data: rows, x: 'time', series: [{ y: 'cpu' }] } satisfies ChartOptions<Row>;
+export const options: ChartOptions<Row> = base;
+export const react: ReactProps<Row> = { ...base, viewport: { x: { min: 0, max: 2 } } };
 export const solid: SolidProps<Row> = {
-  ...options,
+  ...base,
   ref: (chart: ChartHandle<Row> | undefined) => {
     chart?.setHighlight('cpu');
   },
