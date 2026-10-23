@@ -153,7 +153,7 @@ describe('engine runtime options', () => {
   it('lets explicit zoom and pan fields override interaction mode presets', () => {
     const chart = fakes.engine(
       {
-        interaction: 'analytical',
+        mode: 'analytical',
         zoom: { enabled: false },
         pan: { y: false },
         series: [{ label: 'value', yColumn: 1 }],

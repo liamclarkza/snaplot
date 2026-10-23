@@ -148,7 +148,7 @@ function planRows<Row>(
           : typeof value === 'number'
             ? value
             : typeof value === 'string'
-              ? parseIso(value, n.timeZone)
+              ? parseIso(value, n.engine.timeZone)
               : Number.NaN;
       if (!Number.isFinite(ms))
         fail(

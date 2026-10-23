@@ -452,6 +452,40 @@ describe('ingest (plan §3.2, D18, D23)', () => {
     expect(result.referenceRegions[0]).toMatchObject({ axis: 'x', axisKey: 'x', from: 0, to: 1 });
   });
 
+  it('carries locale, timeZone, legend, height and interaction as final spec fields (plan §3.2)', () => {
+    const base = { data: [{ x: 1, y: 2 }], x: 'x' as const, series: [{ y: 'y' as const }] };
+    expect(
+      run({
+        ...base,
+        locale: 'de-DE',
+        timeZone: 'UTC',
+        legend: { position: 'bottom' },
+        height: '20rem',
+        interaction: { drag: 'pan' },
+      }).spec,
+    ).toMatchObject({
+      locale: 'de-DE',
+      timeZone: 'UTC',
+      legend: { position: 'bottom' },
+      height: '20rem',
+      interaction: { zoom: 'x', drag: 'pan', bounds: 'data' },
+      mode: 'timeseries',
+    });
+    const defaults = run({ ...base, series: [{ type: 'scatter', y: 'y' }] }).spec;
+    expect(defaults).toMatchObject({
+      timeZone: 'local',
+      legend: 'auto',
+      interaction: { zoom: 'xy', drag: 'zoom', bounds: 'data' },
+      mode: 'analytical',
+    });
+    expect(defaults.locale).toBeUndefined();
+    expect(defaults.height).toBeUndefined();
+    expect(run({ ...base, interaction: 'readonly' }).spec).toMatchObject({
+      interaction: 'readonly',
+      mode: 'readonly',
+    });
+  });
+
   it('leaves numeric bar axes alone', () => {
     const result = run({
       data: [

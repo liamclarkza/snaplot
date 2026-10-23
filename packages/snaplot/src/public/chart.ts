@@ -811,7 +811,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       return code;
     }
     if (this.ingested.kinds.get('x') === 'date' || this.ingested.spec.axes?.x?.type === 'time') {
-      const ms = parseIso(x, this.normalized.timeZone);
+      const ms = parseIso(x, this.normalized.engine.timeZone);
       if (Number.isFinite(ms)) return ms;
       fail(`${where}, which is not an ISO-8601 date for time axis "x".`);
     }

@@ -513,7 +513,7 @@ function ingestRows<Row>(
           : typeof value === 'number'
             ? value
             : typeof value === 'string'
-              ? parseIso(value, n.timeZone)
+              ? parseIso(value, n.engine.timeZone)
               : Number.NaN;
       if (!Number.isFinite(ms))
         fail(
@@ -830,7 +830,7 @@ function annotationValue(
       return code;
     }
     if (kind === 'date' || axes[axis]?.type === 'time') {
-      const ms = parseIso(value, n.timeZone);
+      const ms = parseIso(value, n.engine.timeZone);
       if (Number.isFinite(ms)) return ms;
       fail(`${path} is "${value}", which is not an ISO-8601 date for time axis "${axis}".`);
     }

@@ -144,10 +144,6 @@ export interface NormalizedOptions<Row> {
   ariaLabel?: string;
   state: NormalizedState;
   callbacks: Partial<Record<CallbackKey, (value: never) => void>>;
-  locale?: string;
-  timeZone: 'local' | 'UTC';
-  legend: boolean | 'auto' | { position: 'top' | 'bottom' };
-  height?: number | string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -468,7 +464,7 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
     fail(
       `height must be a positive number of pixels or a CSS length, not ${describe(raw.height)}.`,
     );
-  let legend: NormalizedOptions<Row>['legend'] = 'auto';
+  let legend: NonNullable<ChartSpec['legend']> = 'auto';
   if (raw.legend !== undefined) {
     if (typeof raw.legend === 'boolean' || raw.legend === 'auto') legend = raw.legend;
     else if (isPlain(raw.legend)) {
@@ -483,6 +479,11 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
       };
     } else fail(`legend must be true, false, 'auto' or { position }, not ${describe(raw.legend)}.`);
   }
+  // Options whose behaviour later milestones land, as final spec fields (plan §3.2).
+  engine.legend = legend;
+  engine.timeZone = timeZone;
+  if (locale !== undefined) engine.locale = locale;
+  if (raw.height !== undefined) engine.height = raw.height as number | string;
   if (raw.group !== undefined && (raw.group === null || typeof raw.group !== 'object'))
     fail('group must be a createChartGroup() result.');
 
@@ -502,10 +503,6 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
     ariaLabel: raw.ariaLabel as string | undefined,
     state,
     callbacks,
-    locale,
-    timeZone,
-    legend,
-    height: raw.height as number | string | undefined,
   };
 }
 
@@ -542,8 +539,10 @@ function normalizeInteraction(
     );
     value = undefined;
   }
-  if (value === 'readonly') engine.interaction = 'readonly';
-  else if (value === undefined || isPlain(value)) {
+  if (value === 'readonly') {
+    engine.mode = 'readonly';
+    engine.interaction = 'readonly';
+  } else if (value === undefined || isPlain(value)) {
     const options = (value ?? {}) as Record<string, unknown>;
     checkKeys(options, INTERACTION, 'interaction');
     const zoom = enumValue(
@@ -564,7 +563,8 @@ function normalizeInteraction(
       ['data', 'none'] as const,
       'data',
     )!;
-    engine.interaction = zoom === 'xy' ? 'analytical' : 'timeseries';
+    engine.interaction = { zoom, drag, bounds };
+    engine.mode = zoom === 'xy' ? 'analytical' : 'timeseries';
     if (zoom === 'none') {
       engine.zoom = { enabled: false };
       engine.pan = { enabled: false };

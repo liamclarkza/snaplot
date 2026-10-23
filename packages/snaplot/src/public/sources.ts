@@ -21,7 +21,7 @@ export const ISO =
  * an offset is an instant; one without is a wall time in `timeZone`, and a
  * date alone is that calendar day's midnight there.
  */
-export function parseIso(text: string, timeZone: 'local' | 'UTC'): number {
+export function parseIso(text: string, timeZone: 'local' | 'UTC' = 'local'): number {
   const m = ISO.exec(text);
   if (!m) return Number.NaN;
   const [, y, mo, d, h = '0', mi = '0', s = '0', frac = '', zone] = m;

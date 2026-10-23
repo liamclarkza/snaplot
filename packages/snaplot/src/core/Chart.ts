@@ -511,7 +511,7 @@ export class ChartCore implements EngineHost {
     this.gestureManager = new GestureManager(
       this.canvasManager.interactionLayer,
       this.eventBus,
-      () => this.config.interaction ?? 'timeseries',
+      () => this.config.mode ?? 'timeseries',
       () => this.layout,
       () => this.config.zoom ?? { enabled: true, x: true },
       () => this.config.pan ?? { enabled: true, x: true },
@@ -901,7 +901,7 @@ export class ChartCore implements EngineHost {
 
   private applyConfigSideEffects(partial: DeepPartial<ChartSpec>, fullReplace: boolean): void {
     let themeChanged = false;
-    if (fullReplace || partial.interaction) {
+    if (fullReplace || partial.mode) {
       this.applyModePresets(partial);
       this.gestureManager.updateTouchAction();
     }
@@ -1428,7 +1428,7 @@ export class ChartCore implements EngineHost {
    * zoom/pan fields supplied by the caller.
    */
   private applyModePresets(source?: DeepPartial<ChartSpec>): void {
-    const mode = this.config.interaction;
+    const mode = this.config.mode;
     if (!mode) return;
 
     const zoom = source?.zoom;

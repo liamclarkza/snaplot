@@ -446,6 +446,11 @@ export interface AxisSpec {
  */
 export type InteractionMode = 'timeseries' | 'analytical' | 'readonly';
 
+/** The public `interaction` option, with every field resolved. */
+export type InteractionSpec =
+  | 'readonly'
+  | { zoom: 'x' | 'xy' | 'none'; drag: 'zoom' | 'select' | 'pan'; bounds: 'data' | 'none' };
+
 export interface CursorConfig {
   /** Master switch for the crosshair + indicators. Default: `true`. */
   show?: boolean;
@@ -866,8 +871,11 @@ export interface StreamingSpec {
 export interface ChartSpec<TMeta = unknown> {
   /** Fixed CSS-pixel width. Omit and set `autoResize` to fill the container. */
   width?: number;
-  /** Fixed CSS-pixel height. Omit and set `autoResize` to fill the container. */
-  height?: number;
+  /**
+   * The public `height` (D26): CSS pixels or a CSS length. Unset fills the
+   * container. Normalised here; the engine does not apply it yet (M11).
+   */
+  height?: number | string;
   /**
    * Track the container's size with a ResizeObserver and repaint on change.
    * Default: `true`. Set `false` and provide `width`/`height` for a fixed size.
@@ -896,7 +904,22 @@ export interface ChartSpec<TMeta = unknown> {
   series: SeriesSpec<TMeta>[];
 
   /** Interaction mode preset, sets default gesture mappings. Default: `'timeseries'`. */
-  interaction?: InteractionMode;
+  mode?: InteractionMode;
+  /**
+   * The public `interaction` option, resolved: `'readonly'` or every field set.
+   * Today `mode`, `zoom`, `pan`, `selection` and `touch` carry its effect;
+   * M12a's gestures read it.
+   */
+  interaction?: InteractionSpec;
+  /** The public `legend` option (M8's automatic legend and M12b's views read it). */
+  legend?: boolean | 'auto' | { position: 'top' | 'bottom' };
+  /** BCP 47 locale for ticks and readouts; unset uses the runtime's (M10 reads it). */
+  locale?: string;
+  /**
+   * The time zone of dates: ISO-8601 parsing and `DateFormat` objects read it;
+   * M10's ticks and readouts will. Default: `'local'`.
+   */
+  timeZone?: 'local' | 'UTC';
 
   /** Crosshair + indicator config. Merged over the mode preset. */
   cursor?: CursorConfig;
