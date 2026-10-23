@@ -1,0 +1,5 @@
+# Commits that only reformat code. Use with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: enable biome formatter and reformat (overhaul M0)
+03a1b6444fa0d606b3ec5620cb9c57629f06bc1b
