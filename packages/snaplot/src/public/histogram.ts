@@ -13,8 +13,41 @@
  *   upper edge. Counts are found by searching the edges, so they always agree.
  * - Edges stay finite and strictly increasing up to ±Number.MAX_VALUE.
  */
-import { fail, suggest } from '../engine/errors';
 import type { HistogramBins } from './types';
+
+// histogram() is its own import (scripts/size-budgets.json). Importing engine/errors would pull in
+// the chart chunk's top-level constants, so the two helpers it needs live here.
+
+/** Throw `snaplot: <message>` as a SnaplotError, like engine/errors' fail(). */
+function fail(message: string): never {
+  const error = new Error(`snaplot: ${message}`);
+  error.name = 'SnaplotError';
+  throw error;
+}
+
+/** The candidate within two edits of `name`, if any. */
+function suggest(name: string, candidates: readonly string[]): string | undefined {
+  let best: string | undefined;
+  let bestDistance = 3;
+  for (const candidate of candidates) {
+    let previous = Array.from({ length: candidate.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= name.length; i++) {
+      const current = [i];
+      for (let j = 1; j <= candidate.length; j++)
+        current[j] = Math.min(
+          previous[j] + 1,
+          current[j - 1] + 1,
+          previous[j - 1] + (name[i - 1] === candidate[j - 1] ? 0 : 1),
+        );
+      previous = current;
+    }
+    if (previous[candidate.length] < bestDistance) {
+      best = candidate;
+      bestDistance = previous[candidate.length];
+    }
+  }
+  return best;
+}
 
 /** The rules that pick an automatic bin count. */
 export type HistogramRule = 'freedman-diaconis' | 'sturges' | 'scott';
@@ -39,7 +72,7 @@ const AUTOMATIC_CAP = 1000;
 const EXPLICIT_CAP = 10_000;
 const OPTION_HINTS: Record<string, string> = {
   binCount: 'Use bins.',
-  method: `Use bins: ${RULES.map((rule) => `'${rule}'`).join(' | ')}.`,
+  method: "Use bins: 'freedman-diaconis' | 'sturges' | 'scott'.",
 };
 
 /**
