@@ -108,13 +108,16 @@ Flow is "edit CHANGELOG as you go, cut a release with one script":
 2. When you're ready to ship, run from a clean `main`:
 
     ```bash
-    scripts/release.sh patch      # or: minor | major | 1.2.3
+    scripts/release.sh patch      # or: minor | major | 1.2.3 | 1.0.0-beta.0
+    scripts/release.sh --dry-run 1.0.0-beta.0   # print the plan, change nothing
     ```
 
    That bumps `packages/snaplot/package.json`, updates/stages
    `package-lock.json`, promotes the `[Unreleased]` section under a dated
    `## [X.Y.Z]` header (reseeding an empty `[Unreleased]` on top), commits
    `chore: release vX.Y.Z`, and tags `vX.Y.Z`. It stops short of pushing.
+   A `X.Y.Z-beta.N` version is a prerelease: it publishes on the npm
+   dist-tag `next`, so `npm i snaplot` keeps installing `latest`.
 3. Push:
 
     ```bash
@@ -123,17 +126,21 @@ Flow is "edit CHANGELOG as you go, cut a release with one script":
 
 ### What the tag push triggers
 
-`.github/workflows/publish.yml` runs three jobs in sequence:
+`.github/workflows/publish.yml` runs four jobs in sequence:
 
-1. **verify**, tag must match `packages/snaplot/package.json`; runs lint,
-   typecheck, tests, both builds; extracts the matching `CHANGELOG.md`
-   section for the release notes.
-2. **publish-npm**, `npm publish --provenance --access public`. Scoped to
-   the `npm` GitHub environment so npm's trusted-publisher OIDC trust
-   pins it there, and the publish shows up on the Deployments tab.
-3. **release**, creates a GitHub Release named `vX.Y.Z`, body is the
-   extracted CHANGELOG section, asset is the packed tarball.
+1. **ci**, the whole CI workflow (every blocking gate).
+2. **verify**, tag must match `packages/snaplot/package.json` and be
+   `X.Y.Z` or `X.Y.Z-beta.N`; re-runs the package, size and API gates on
+   this build; extracts the matching `CHANGELOG.md` section for the release
+   notes; packs the tarball.
+3. **publish-npm**, `npm publish <tarball> --provenance --access public
+   --tag <next|latest>`. Scoped to the `npm` GitHub environment so npm's
+   trusted-publisher OIDC trust pins it there, and the publish shows up on
+   the Deployments tab.
+4. **release**, creates a GitHub Release named `vX.Y.Z` (marked as a
+   prerelease for `-beta.N`), body is the extracted CHANGELOG section,
+   asset is the packed tarball.
 
-A failed `verify` blocks publish and release; a failed `publish-npm`
+A failed `ci` or `verify` blocks publish and release; a failed `publish-npm`
 blocks release. If either npm or GitHub is flaky mid-publish, re-run the
 failed job only, don't re-tag.

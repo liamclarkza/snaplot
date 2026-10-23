@@ -1,20 +1,22 @@
 name: Publish & Release
 
-# Single entry point driven by version tags. A `vX.Y.Z` push runs:
-#   1. verify: tag matches package.json, quality gates, extract
-#      matching CHANGELOG section, bundle artifact.
-#   2. publish-npm: npm publish with OIDC provenance, scoped to the
-#      `npm` environment so trusted-publisher config can pin it and
-#      the publish shows up as a Deployment.
-#   3. release: GitHub Release with the extracted changelog as body
-#      and the packed tarball as an asset.
+# Single entry point driven by version tags (scripts/release.sh). A `vX.Y.Z` or `vX.Y.Z-beta.N`
+# push runs:
+#   1. ci: the full CI workflow (every blocking gate).
+#   2. verify: the tag matches package.json and the version pattern; the package, size and API
+#      gates (G5-G7) again on this exact build; the matching CHANGELOG section; the packed
+#      tarball as an artifact.
+#   3. publish-npm: npm publish of that tarball with OIDC provenance, `--tag next` for a
+#      prerelease (D1) and `latest` otherwise, scoped to the `npm` environment so npm's
+#      trusted-publisher config can pin it and the publish shows up as a Deployment.
+#   4. release: a GitHub Release (marked prerelease for -beta.N) with the extracted changelog as
+#      body and the tarball as an asset.
 #
-# Nothing publishes if verify fails; no Release gets created if
-# publish fails. Jobs are chained via `needs`.
+# Nothing publishes if ci or verify fails; no Release is created if publish fails.
 
 on:
   push:
-    tags: ["v*"]
+    tags: ['v*']
 
 permissions:
   contents: read
@@ -24,22 +26,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   verify:
+    needs: ci
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.meta.outputs.version }}
+      dist-tag: ${{ steps.meta.outputs.dist-tag }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "lts/*"
+          node-version-file: .nvmrc
           cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - id: meta
-        name: Verify tag matches package.json version
+        name: Verify the tag, the version and the release channel
         run: |
           TAG="${GITHUB_REF_NAME}"
           VER="${TAG#v}"
@@ -48,22 +56,27 @@ jobs:
             echo "::error::Tag $TAG does not match packages/snaplot/package.json ($PKG)"
             exit 1
           fi
+          if ! [[ "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo "::error::$VER is not X.Y.Z or X.Y.Z-beta.N"
+            exit 1
+          fi
+          if [[ "$VER" == *-* ]]; then
+            echo "dist-tag=next" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dist-tag=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
 
       - name: Build library
         run: npm run build
 
-      - name: Copy README + LICENSE into package
-        run: cp README.md LICENSE packages/snaplot/
+      - name: Package, size and API gates (G5-G7)
+        run: |
+          npm run check:package
+          npm run check:size
+          npm run check:api
 
       - name: Extract matching CHANGELOG section
         env:
@@ -88,14 +101,20 @@ jobs:
           cat release-notes.md
           echo "::endgroup::"
 
+      # The tarball that is published: npm pack runs prepack, which copies README and LICENSE in.
+      - name: Pack
+        env:
+          VER: ${{ steps.meta.outputs.version }}
+        run: |
+          npm pack -w packages/snaplot --pack-destination .
+          mv "snaplot-${VER}.tgz" "snaplot-v${VER}.tgz"
+          tar -tzf "snaplot-v${VER}.tgz" | sort
+
       - uses: actions/upload-artifact@v7
         with:
           name: publish-bundle
           path: |
-            packages/snaplot/dist/
-            packages/snaplot/package.json
-            packages/snaplot/README.md
-            packages/snaplot/LICENSE
+            snaplot-v${{ steps.meta.outputs.version }}.tgz
             release-notes.md
           if-no-files-found: error
           retention-days: 7
@@ -113,19 +132,20 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
-
       - uses: actions/setup-node@v6
         with:
-          node-version: "lts/*"
-          registry-url: "https://registry.npmjs.org"
+          node-version: lts/*
+          registry-url: https://registry.npmjs.org
 
       - uses: actions/download-artifact@v8
         with:
           name: publish-bundle
 
       - name: Publish to npm
-        run: cd packages/snaplot && npm publish --provenance --access public
+        env:
+          VER: ${{ needs.verify.outputs.version }}
+          DIST_TAG: ${{ needs.verify.outputs.dist-tag }}
+        run: npm publish "snaplot-v${VER}.tgz" --provenance --access public --tag "$DIST_TAG"
 
   release:
     needs: [verify, publish-npm]
@@ -133,19 +153,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
-
       - uses: actions/download-artifact@v8
         with:
           name: publish-bundle
-
-      - name: Pack tarball asset
-        env:
-          VER: ${{ needs.verify.outputs.version }}
-        run: |
-          cd packages/snaplot
-          npm pack --pack-destination=../../
-          mv "../../snaplot-${VER}.tgz" "../../snaplot-v${VER}.tgz"
 
       - uses: softprops/action-gh-release@v3
         with:
@@ -154,5 +164,5 @@ jobs:
           body_path: release-notes.md
           files: snaplot-v${{ needs.verify.outputs.version }}.tgz
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.verify.outputs.prerelease == 'true' }}
           generate_release_notes: false
