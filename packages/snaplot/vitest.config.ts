@@ -13,6 +13,9 @@ export default defineConfig({
   ],
   resolve: {
     alias: [
+      // The library's tests import the package by name from source (plan §11.2: one alias,
+      // mirrored by tsconfig paths). Site, bench, conformance pages and demos use the build.
+      { find: /^snaplot$/, replacement: resolve(__dirname, 'src/index.ts') },
       {
         find: /^solid-js$/,
         replacement: resolve(__dirname, '../../node_modules/solid-js/dist/solid.js'),

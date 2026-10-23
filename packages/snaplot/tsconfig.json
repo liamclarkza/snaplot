@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
@@ -13,17 +14,16 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "declaration": true,
-    "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "types": ["vite/client"],
+    "types": [],
     "isolatedModules": true,
     "skipLibCheck": true,
     "paths": {
-      "~/*": ["./src/*"]
+      "snaplot": ["./src/index.ts"]
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "dev"]
+  "exclude": ["node_modules", "dist"]
 }
