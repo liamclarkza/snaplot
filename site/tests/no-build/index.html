@@ -1,0 +1,31 @@
+<!doctype html>
+<!--
+  The no-build path (D39): a plain HTML page, no bundler, snaplot as an ES module. Docs page 4 and
+  the README show it with the CDN import; site/tests/smoke.spec.ts serves this file with the import
+  map pointing `snaplot` at the local packages/snaplot/dist.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>snaplot without a bundler</title>
+    <script type="importmap">
+      { "imports": { "snaplot": "/dist/index.js" } }
+    </script>
+  </head>
+  <body>
+    <div id="chart" style="height: 280px"></div>
+    <script type="module">
+      import { createChart } from 'snaplot';
+
+      const highs = [66, 71, 79, 83, 87, 84, 76, 76, 64, 73, 81, 87, 78, 68, 64];
+      const rows = highs.map((high, i) => ({ day: i + 1, high }));
+      createChart(document.getElementById('chart'), {
+        data: rows,
+        x: 'day',
+        series: [{ y: 'high' }],
+        ariaLabel: 'Daily high temperature in Central Park, June 2025',
+      });
+    </script>
+  </body>
+</html>
