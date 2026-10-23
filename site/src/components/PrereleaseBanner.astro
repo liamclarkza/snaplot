@@ -1,0 +1,46 @@
+---
+/**
+ * The prerelease banner (D1, plan §9 item 2): a prerelease build says which docs these are on
+ * every page and links to the 0.12 docs. The docs show it through the Banner override, and the
+ * homepage and hub through their layout. A release renders nothing.
+ */
+import { isPrerelease, releaseLine, version } from '../lib/version';
+
+interface Props {
+  /** A class for the row inside the full-width bar, such as the custom layout's container. */
+  rowClass?: string;
+}
+
+const { rowClass } = Astro.props;
+---
+
+{
+  isPrerelease && (
+    <div class="prerelease-banner" data-prerelease={version}>
+      <p class:list={['prerelease-banner-row', rowClass]}>
+        {releaseLine} beta docs. 0.12 docs:{' '}
+        <a href="https://github.com/liamclarkza/snaplot/tree/v0.12.0#readme">README at tag v0.12.0</a>.
+      </p>
+    </div>
+  )
+}
+
+<style>
+  .prerelease-banner {
+    background-color: var(--snaplot-surface);
+    border-bottom: 1px solid var(--snaplot-rule);
+    color: var(--snaplot-ink);
+    font-size: 0.875rem;
+  }
+  .prerelease-banner-row {
+    margin-block: 0;
+    padding-block: 0.5rem;
+  }
+  /* In the docs the bar spans the page, like Starlight's header. */
+  .prerelease-banner-row:not(.container) {
+    padding-inline: var(--sl-nav-pad-x, var(--snaplot-gutter));
+  }
+  .prerelease-banner a {
+    color: var(--snaplot-accent);
+  }
+</style>

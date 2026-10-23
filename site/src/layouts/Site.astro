@@ -8,6 +8,7 @@
 import '../styles/fonts.css';
 import '../styles/tokens.css';
 import '../styles/site.css';
+import PrereleaseBanner from '../components/PrereleaseBanner.astro';
 import ThemeProvider from '../components/ThemeProvider.astro';
 import ThemeSelect from '../components/ThemeSelect.astro';
 import { version } from '../lib/version';
@@ -45,6 +46,7 @@ const GITHUB = 'https://github.com/liamclarkza/snaplot';
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
+    <PrereleaseBanner rowClass="container" />
     <header class="site-header">
       <div class="container site-header-row">
         <a class="brand" href={base} aria-current={current === 'home' ? 'page' : undefined}>snaplot</a>

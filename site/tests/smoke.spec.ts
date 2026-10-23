@@ -443,6 +443,25 @@ test.describe('layout and chrome', () => {
     await expect(page.locator('.site-version')).toHaveText(`v${version}`);
   });
 
+  test('[D1] a prerelease build shows the beta banner in both layouts, a release in neither', async ({
+    page,
+  }) => {
+    const { version } = JSON.parse(
+      readFileSync(join(site, '../packages/snaplot/package.json'), 'utf8'),
+    ) as { version: string };
+    for (const route of [BASE, `${BASE}examples/`, `${BASE}first-chart/`]) {
+      await page.goto(route);
+      const banner = page.locator('[data-prerelease]');
+      if (version.includes('-')) {
+        await expect(banner, route).toBeVisible();
+        await expect(banner, route).toHaveAttribute('data-prerelease', version);
+        await expect(banner.getByRole('link'), route).toHaveAttribute('href', /tree\/v0\.12\.0/);
+      } else {
+        await expect(banner, route).toHaveCount(0);
+      }
+    }
+  });
+
   test('[uisite-20] every page has its own title, and an unknown page is a 404', async ({
     page,
   }) => {
