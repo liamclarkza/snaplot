@@ -1,57 +1,24 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createChart } from '../src/index';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ChartHandle, ChartOptions } from '../src/index';
-
-// Read the untyped D31 debug symbol off a public handle.
-function debug(chart: ChartHandle<Row>) {
-  return (chart as unknown as Record<symbol, any>)[Symbol.for('snaplot.debug')];
-}
+import { debug, type Fakes, installFakes } from './fakes';
 
 type Row = { x: number; y: number };
-const frames: FrameRequestCallback[] = [];
-const live: ChartHandle<Row>[] = [];
 
-function flushFrames(): void {
-  while (frames.length) frames.shift()!(performance.now());
-}
-
+let fakes: Fakes;
 beforeEach(() => {
-  const context = new Proxy(
-    { measureText: (text: string) => ({ width: text.length * 7 }) },
-    { get: (target, key) => Reflect.get(target, key) ?? (() => {}) },
-  );
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    context as unknown as CanvasRenderingContext2D,
-  );
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-    frames.push(callback);
-    return frames.length;
-  });
-  vi.stubGlobal('cancelAnimationFrame', () => {});
+  fakes = installFakes();
 });
-afterEach(() => {
-  for (const chart of live.splice(0)) chart.destroy();
-  frames.length = 0;
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-  document.body.replaceChildren();
-});
+afterEach(() => fakes.uninstall());
 
 function make(options: Partial<ChartOptions<Row>> = {}): ChartHandle<Row> {
-  const element = document.createElement('div');
-  document.body.append(element);
-  const chart = createChart<Row>(element, {
-    width: 400,
-    height: 200,
+  return fakes.mount<Row>({
     autoResize: false,
     data: Array.from({ length: 10 }, (_, x) => ({ x, y: x * 2 })),
     x: 'x',
     series: [{ y: 'y' }],
     ...options,
   });
-  live.push(chart);
-  return chart;
 }
 
 describe('debug counters (plan D31)', () => {
@@ -73,7 +40,7 @@ describe('debug counters (plan D31)', () => {
     );
     expect(chart.container.contains(before.layers.data)).toBe(true);
     chart.redraw();
-    flushFrames();
+    fakes.frames.flush();
     expect(debug(chart).renderCount).toEqual({ grid: 2, data: 2, overlay: 2 });
     // A snapshot is a point-in-time read.
     expect(before.renderCount.data).toBe(1);
@@ -84,7 +51,7 @@ describe('debug counters (plan D31)', () => {
     expect(debug(chart).inViewPoints).toBe(10);
     expect(debug(chart).drawnPoints).toBe(10);
     chart.setViewport({ x: { min: 2, max: 5 } });
-    flushFrames();
+    fakes.frames.flush();
     // x = 2, 3, 4, 5 are in view; the neighbours drawn for continuity are not.
     expect(debug(chart).inViewPoints).toBe(4);
     expect(debug(chart).drawnPoints).toBe(4);
@@ -107,9 +74,7 @@ describe('debug counters (plan D31)', () => {
   it('lists the axis labels of the last grid paint', () => {
     const chart = make({ axes: { y: { title: 'Load' } } });
     const boxes = debug(chart).labelBoxes();
-    expect(
-      boxes.some((box: { axis: string; kind: string }) => box.axis === 'y' && box.kind === 'tick'),
-    ).toBe(true);
+    expect(boxes.some((box) => box.axis === 'y' && box.kind === 'tick')).toBe(true);
     expect(boxes).toContainEqual(
       expect.objectContaining({ axis: 'y', kind: 'title', text: 'Load' }),
     );
