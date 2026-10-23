@@ -5,7 +5,7 @@
 // warning with a `// expect-warning: <code>` comment), a title, and no serious axe violations.
 // Every [data-example]: a painted canvas in each of its three tabs, and Copy copies exactly the
 // file the tab shows. Then the [uisite-*] locks, search, the old hash links and the no-build page.
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
@@ -461,6 +461,61 @@ test.describe('layout and chrome', () => {
     const response = await page.goto(`${BASE}no-such-page/`);
     expect(response?.status()).toBe(404);
     await expect(page.locator('h1')).toHaveText('Page not found');
+  });
+
+  // The route tests load each page and its subresources, not the pages its links go to.
+  test('every internal link resolves to a page, a file or a heading (G11)', () => {
+    test.fail(true, '[uisite-17] the API landing page links to module pages that are not built');
+    const ids = new Map<string, Set<string>>();
+    const idsOf = (file: string) => {
+      const found =
+        ids.get(file) ??
+        new Set([...readFileSync(file, 'utf8').matchAll(/\sid="([^"]*)"/g)].map((m) => m[1] ?? ''));
+      ids.set(file, found);
+      return found;
+    };
+    const broken = new Set<string>();
+    let links = 0;
+    for (const file of walk(dist).filter((f) => f.endsWith('.html'))) {
+      const html = readFileSync(file, 'utf8');
+      for (const [, url = ''] of html.matchAll(/\s(?:href|src)="(\/snaplot\/[^"]*)"/g)) {
+        links++;
+        const [path = '', anchor] = url.replaceAll('&amp;', '&').split('#');
+        const local = join(dist, decodeURIComponent(path.split('?')[0] ?? '').slice(BASE.length));
+        const target =
+          existsSync(local) && statSync(local).isFile() ? local : join(local, 'index.html');
+        const from = relative(dist, file);
+        if (!existsSync(target)) broken.add(`${url} (from ${from})`);
+        else if (anchor && target.endsWith('.html') && !idsOf(target).has(anchor)) {
+          broken.add(`${url}: no heading #${anchor} (from ${from})`);
+        }
+      }
+    }
+    expect(links).toBeGreaterThan(1000);
+    expect([...broken]).toEqual([]);
+  });
+
+  test('[uisite-17] the API link opens a reference that links to each entry point', async ({
+    page,
+  }) => {
+    test.fail(true, '[uisite-17] the API landing page links to module pages that are not built');
+    const problems = watch(page);
+    await page.goto(BASE);
+    await page.locator('.site-nav').getByRole('link', { name: 'API', exact: true }).click();
+    await expect(page.locator('h1')).toBeVisible();
+    const modules = (
+      await page
+        .locator('main .sl-markdown-content a')
+        .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''))
+    ).filter((href) => href.startsWith(BASE));
+    // One page per public entry point: snaplot, snaplot/react and snaplot/solid.
+    expect(modules).toHaveLength(3);
+    for (const href of modules) {
+      const response = await page.goto(href);
+      expect(response?.status(), href).toBe(200);
+      await expect(page.locator('main .sl-markdown-content a').first(), href).toBeVisible();
+    }
+    expect(problems).toEqual([]);
   });
 });
 
