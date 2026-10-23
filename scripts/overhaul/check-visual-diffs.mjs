@@ -271,7 +271,15 @@ function main() {
   console.log(
     `check-visual-diffs: head ${String(meta.head?.sha).slice(0, 10)}${meta.head?.dirty ? ' + working tree' : ''} vs ${against}`,
   );
-  console.log(`  reference: ${reference.summary}`);
+  console.log(
+    `  reference: ${reference.summary}; ${meta.strict ? 'exact comparison (--strict)' : 'tolerance maxDiffPixelRatio 0.002'}`,
+  );
+  if (zero && !meta.strict) {
+    console.log(
+      '  note: the tolerance can hide a small change (a short title edit); run test:visual with ' +
+        '--strict for the zero-change rule',
+    );
+  }
   console.log(
     `  milestone ${milestone ?? '(unknown)'}, ${zero ? 'zero-change rule' : `rows of this milestone changed since ${base.slice(0, 12)}: ${rows.map((r) => basename(r)).join(', ') || 'none'}${ignoredRows.length ? ` (ignored: ${ignoredRows.join(', ')})` : ''}`}`,
   );

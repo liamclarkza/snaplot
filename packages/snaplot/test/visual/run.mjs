@@ -6,6 +6,8 @@
 //   npm run test:visual -- --against <ref>    render <ref>'s own fixture app into the reference
 //                                             cache, then compare the working tree against it
 //   npm run test:visual -- --update           rewrite the committed baselines (M3a and M14 only)
+//   npm run test:visual -- --strict           compare exactly instead of maxDiffPixelRatio 0.002
+//                                             (recommended for the zero-change milestones)
 //   npm run test:visual -- --serve            serve the fixture app for a look in a browser
 //   --against-tree <dir> [--against-sha <sha>] use an already extracted ref (scripts/visual-docker.sh)
 //
@@ -61,6 +63,7 @@ function parseArgs(argv) {
     againstSha: null,
     update: false,
     serve: false,
+    strict: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -74,6 +77,7 @@ function parseArgs(argv) {
     else if (a === '--against-sha') opts.againstSha = argv[++i];
     else if (a === '--update') opts.update = true;
     else if (a === '--serve') opts.serve = true;
+    else if (a === '--strict') opts.strict = true;
     else if (a === '--project') opts.projects.push(argv[++i]);
     else if (a === '--grep' || a === '-g') opts.passthrough.push('--grep', argv[++i]);
     else if (a === '--workers' || a === '-j') opts.passthrough.push('--workers', argv[++i]);
@@ -459,6 +463,7 @@ async function main() {
     ...opts.passthrough,
   );
   const env = { ...process.env, PORT: String(port) };
+  if (opts.strict) env.SNAPLOT_VISUAL_STRICT = '1';
   if (reference) env.SNAPLOT_VISUAL_EXPECTED_DIR = reference.dir;
   else delete env.SNAPLOT_VISUAL_EXPECTED_DIR;
   delete env.SNAPLOT_VISUAL_OUTPUT_DIR;
@@ -492,6 +497,7 @@ async function main() {
     suffix: reference ? '' : `-${process.platform}`,
     projects,
     filtered,
+    strict: env.SNAPLOT_VISUAL_STRICT === '1',
     exit: code,
     date: new Date().toISOString(),
   };
