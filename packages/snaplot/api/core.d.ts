@@ -133,7 +133,10 @@ export declare type Callback<Value> = {
 
 /** A category axis: one slot per label, in order of first appearance. */
 export declare interface CategoryAxisOptions extends AxisCommon {
-    /** The scale. Inferred for string values that are not ISO-8601 dates. */
+    /**
+     * The scale. Inferred for string values that are not ISO-8601 dates.
+     * @defaultValue inferred from the data
+     */
     type?: 'category';
     /**
      * The category order, including slots with no observation. Values outside this list throw.
@@ -381,19 +384,19 @@ export declare interface ChartOptions<Row = Record<string, any>> {
     selection?: Selection_2 | null;
     /** The ids of hidden series. An id the chart does not have throws. @defaultValue `[]` */
     hiddenSeries?: readonly string[];
-    /** Called with the point a click hits. */
+    /** Called with the point a click hits. @defaultValue none */
     onPointClick?: Callback<ChartPoint<Row>>;
-    /** Called when the selection changes, with `null` when it is cleared. */
+    /** Called when the selection changes, with `null` when it is cleared. @defaultValue none */
     onSelectionChange?: Callback<SelectionChange<Row> | null>;
-    /** Called when the pinned axes change, with `{}` on a reset. */
+    /** Called when the pinned axes change, with `{}` on a reset. @defaultValue none */
     onViewportChange?: Callback<Viewport>;
-    /** Called when series are shown or hidden. */
+    /** Called when series are shown or hidden. @defaultValue none */
     onHiddenSeriesChange?: Callback<readonly string[]>;
-    /** Called when the highlighted series changes. */
+    /** Called when the highlighted series changes. @defaultValue none */
     onHighlightChange?: Callback<string | null>;
-    /** Called when following the latest data starts or stops. */
+    /** Called when following the latest data starts or stops. @defaultValue none */
     onFollowingChange?: Callback<boolean>;
-    /** Called when the cursor moves or leaves. */
+    /** Called when the cursor moves or leaves. @defaultValue none */
     onCursorChange?: Callback<CursorSnapshot<Row>>;
 }
 
