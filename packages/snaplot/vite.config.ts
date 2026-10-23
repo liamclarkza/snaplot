@@ -16,11 +16,10 @@ const solidEntry = resolve(root, 'src/solid.ts');
  */
 export const external = ['snaplot', /^solid-js(\/|$)/, /^react(\/|$)/, /^react-dom(\/|$)/];
 
-/** Shared output settings: the D25 browser floor and maps without embedded sources. */
+/** The build target for the D25 browser floor (Chrome 111, Firefox 115, Safari 16.4). */
 export const target = 'es2022';
 
-const isSolidModule = (file: string) =>
-  file === solidEntry || file.startsWith(`${solidDir}/`) || file === solidDir;
+const isSolidModule = (file: string) => file === solidEntry || file.startsWith(`${solidDir}/`);
 
 function solidModules(dir = solidDir): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -38,29 +37,41 @@ function resolveSource(from: string, specifier: string): string {
 }
 
 /**
- * Runtime names the Solid adapter imports from modules outside src/solid (module → names).
- * Type-only imports are skipped; they are erased from the JavaScript.
+ * Runtime names the Solid adapter imports or re-exports from modules outside src/solid
+ * (module → names). Type-only imports and exports are skipped; they are erased from the output.
  */
 function solidCoreImports(): Map<string, Set<string>> {
   const imports = new Map<string, Set<string>>();
   for (const file of [solidEntry, ...solidModules()]) {
     const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest);
     for (const statement of source.statements) {
-      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
-        continue;
-      const specifier = statement.moduleSpecifier.text;
-      const clause = statement.importClause;
-      if (!specifier.startsWith('.') || !clause || clause.isTypeOnly) continue;
-      const target = resolveSource(file, specifier);
+      const isImport = ts.isImportDeclaration(statement);
+      if (!isImport && !ts.isExportDeclaration(statement)) continue;
+      const specifier = statement.moduleSpecifier;
+      if (!specifier || !ts.isStringLiteral(specifier) || !specifier.text.startsWith('.')) continue;
+      const target = resolveSource(file, specifier.text);
       if (isSolidModule(target)) continue;
+      const unsupported = () => {
+        throw new Error(`${file}: use named imports and exports of ${specifier.text}`);
+      };
       const names = imports.get(target) ?? new Set<string>();
-      if (clause.name) names.add('default');
-      const bindings = clause.namedBindings;
-      if (bindings && ts.isNamespaceImport(bindings))
-        throw new Error(`${file}: namespace imports of ${specifier} are not supported`);
-      if (bindings && ts.isNamedImports(bindings))
-        for (const element of bindings.elements)
-          if (!element.isTypeOnly) names.add((element.propertyName ?? element.name).text);
+      if (isImport) {
+        const clause = statement.importClause;
+        if (!clause || clause.isTypeOnly) continue;
+        if (clause.name) names.add('default');
+        const bindings = clause.namedBindings;
+        if (bindings && ts.isNamespaceImport(bindings)) unsupported();
+        if (bindings && ts.isNamedImports(bindings))
+          for (const element of bindings.elements)
+            if (!element.isTypeOnly) names.add((element.propertyName ?? element.name).text);
+      } else {
+        if (statement.isTypeOnly) continue;
+        const clause = statement.exportClause;
+        if (!clause || !ts.isNamedExports(clause)) unsupported();
+        else
+          for (const element of clause.elements)
+            if (!element.isTypeOnly) names.add((element.propertyName ?? element.name).text);
+      }
       if (names.size) imports.set(target, names);
     }
   }

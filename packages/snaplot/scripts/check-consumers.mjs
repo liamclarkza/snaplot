@@ -76,7 +76,8 @@ function findPackageDir(name) {
   for (let dir = packageRoot; ; dir = dirname(dir)) {
     const candidate = join(dir, 'node_modules', name);
     if (existsSync(join(candidate, 'package.json'))) return realpathSync(candidate);
-    if (dirname(dir) === dir) fail(`cannot find ${name} in any node_modules above ${packageRoot}`);
+    if (dirname(dir) === dir)
+      throw new Error(`cannot find ${name} in any node_modules above ${packageRoot}`);
   }
 }
 
@@ -95,7 +96,7 @@ try {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'inherit'],
   });
-  if (pack.status !== 0) fail('npm pack failed');
+  if (pack.status !== 0) throw new Error('npm pack failed');
   const [packed] = JSON.parse(pack.stdout.slice(pack.stdout.indexOf('[')));
   writeFileSync(join(consumer, 'pack.json'), `${JSON.stringify(packed, null, 2)}\n`);
   mkdirSync(join(modules, 'snaplot'));
@@ -110,7 +111,7 @@ try {
     ],
     { stdio: 'inherit' },
   );
-  if (untar.status !== 0) fail(`could not extract ${packed.filename}`);
+  if (untar.status !== 0) throw new Error(`could not extract ${packed.filename}`);
   for (const dep of CONSUMER_DEPS) symlinkSync(findPackageDir(dep), join(modules, dep), 'dir');
   cpSync(scenarios, consumer, { recursive: true });
 
@@ -139,6 +140,8 @@ try {
   );
   status = run.status ?? 1;
   if (status === 0) console.log(`check-consumers: passed (report: ${resolve(report)})`);
+} catch (error) {
+  console.error(`check-consumers: ${error.message}`);
 } finally {
   if (keep) console.log(`check-consumers: kept the consumer project at ${consumer}`);
   else rmSync(consumer, { recursive: true, force: true });
