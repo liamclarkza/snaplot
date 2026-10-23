@@ -48,7 +48,9 @@ export default defineConfig({
     command: `npx vite --config ${path('vite.config.ts')}`,
     cwd: packageRoot,
     url: `http://127.0.0.1:${port}/`,
-    reuseExistingServer: !process.env.CI,
+    // Never attach to a server another checkout left on the same port: it
+    // would serve the wrong tree.
+    reuseExistingServer: false,
     timeout: 60_000,
     env: { PORT: String(port) },
   },

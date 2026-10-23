@@ -65,8 +65,19 @@ describe('[dxtrial-06][demos-13] an automatic, styled legend', () => {
   });
 
   it.fails('[dxtrial-06] the legend is styled without importing any CSS file', () => {
-    mountTwo();
-    expect(styleText()).toMatch(/aria-pressed|legend/);
+    const buttons = legendButtons(mountTwo());
+    expect(buttons).toHaveLength(2);
+    // Computed styles (plan RC12): padded buttons and a 12 px swatch, from the
+    // injected styles alone. The muted text colour is checked in a real browser
+    // (test/browser/m12b-legend.spec.ts), where var() resolves.
+    for (const button of buttons) {
+      const style = getComputedStyle(button);
+      expect(parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)).toBeGreaterThan(0);
+      const swatch = [...button.querySelectorAll<HTMLElement>('*')].find(
+        (node) => getComputedStyle(node).width === '12px',
+      );
+      expect(swatch, 'a 12 px swatch').toBeDefined();
+    }
   });
 
   it.fails('[gap-environments-05:swatches] legend swatches keep their colour in forced colours', () => {
