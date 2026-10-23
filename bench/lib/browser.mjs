@@ -38,7 +38,7 @@ function memoryFlags() {
  */
 export function launchOptions(raster, { headed = false } = {}) {
   const options = baseLaunchOptions(raster, headed);
-  // Diagnostics only: extra Chromium switches, recorded in the report's browser line.
+  // Diagnostics only: extra Chromium switches (the report names them, lib/report.mjs).
   const extra = (process.env.BENCH_CHROMIUM_ARGS ?? '').split(/\s+/).filter(Boolean);
   return extra.length ? { ...options, args: [...options.args, ...extra] } : options;
 }

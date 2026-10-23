@@ -30,11 +30,17 @@ function verdictCell(row) {
   return row.noisy ? `${v} (noisy: ${row.noise})` : v;
 }
 
+function diagnosticsNote(meta) {
+  const entries = Object.entries(meta.diagnostics ?? {});
+  if (entries.length === 0) return '';
+  return ` · **diagnostic flags: ${entries.map(([k, v]) => `${k}=\`${v}\``).join(', ')}**`;
+}
+
 export function machineLines(meta) {
   return [
     `- **Date:** ${meta.date} · **duration:** ${Math.round(meta.durationMs / 1000)} s`,
     `- **Machine:** ${meta.machine.cpu}, ${meta.machine.cores} cores, ${meta.machine.memGB} GB, ${meta.machine.os} · Node ${meta.node} · Playwright ${meta.playwright}`,
-    `- **Browser:** ${meta.browser.userAgent.match(/Chrome\/[\d.]+/)?.[0] ?? meta.browser.userAgent} · raster **${meta.raster}** (WebGL: ${meta.browser.renderer}) · cross-origin isolated: ${meta.browser.crossOriginIsolated} · precise heap: ${meta.browser.preciseHeap}`,
+    `- **Browser:** ${meta.browser.userAgent.match(/Chrome\/[\d.]+/)?.[0] ?? meta.browser.userAgent} · raster **${meta.raster}** (WebGL: ${meta.browser.renderer}) · cross-origin isolated: ${meta.browser.crossOriginIsolated} · precise heap: ${meta.browser.preciseHeap}${diagnosticsNote(meta)}`,
     `- **Load (1 min):** ${meta.load.start.toFixed(2)} at start, ${meta.load.end.toFixed(2)} at end; noisy rounds ${meta.noisyRounds}/${meta.totalRounds} (load > ${meta.noiseThreshold} = cores × ${meta.loadPerCore})`,
   ];
 }

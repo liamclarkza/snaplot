@@ -26,6 +26,16 @@ export function playwrightVersion() {
   }
 }
 
+/** Diagnostic-only environment that changes how the browser runs (lib/browser.mjs); `{}` normally. */
+export function diagnosticEnv() {
+  const out = {};
+  for (const key of ['BENCH_JS_FLAGS', 'BENCH_CHROMIUM_ARGS']) {
+    const value = process.env[key]?.trim();
+    if (value) out[key] = value;
+  }
+  return out;
+}
+
 export function load1() {
   return loadavg()[0];
 }

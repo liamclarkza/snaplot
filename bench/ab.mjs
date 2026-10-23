@@ -13,7 +13,14 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { dirname, join } from 'node:path';
 import { loadPlaywright, serve } from './lib/browser.mjs';
-import { load1, machine, parseArgs, playwrightVersion, profilesFrom } from './lib/env.mjs';
+import {
+  diagnosticEnv,
+  load1,
+  machine,
+  parseArgs,
+  playwrightVersion,
+  profilesFrom,
+} from './lib/env.mjs';
 import { evaluateBudgets, evaluateProfile, loadGate, setScenarios } from './lib/gate.mjs';
 import { acquireLock, waitWhileLocked } from './lib/lock.mjs';
 import { matchesFilter, measure } from './lib/measure.mjs';
@@ -192,6 +199,7 @@ try {
     playwright: playwrightVersion(),
     browser: measured.info.head,
     raster: args.raster,
+    diagnostics: diagnosticEnv(),
     set: setName,
     setRatio: gate.sets[setName].ratio,
     floorMs: gate.floorMs,
