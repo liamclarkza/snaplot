@@ -34,25 +34,25 @@ const rows = Array.from({ length: 12 }, (_, t) => ({ t, v: 10 + (t % 4) }));
 const base = { data: rows, x: 't', series: [{ y: 'v' }] };
 
 describe('[arch-10] unknown option keys warn', () => {
-  it.fails('[arch-10] an unknown top-level key warns once, naming the key', () => {
+  it('[arch-10] an unknown top-level key warns once, naming the key', () => {
     mount({ ...base, colour: 'red' });
     expect(warnings()).toHaveLength(1);
     expect(warnings()[0]).toMatch(/^snaplot: /);
     expect(warnings()[0]).toMatch(/"colour"/);
   });
 
-  it.fails('[arch-10] 24 charts with the same unknown key print one warning per page', () => {
+  it('[arch-10] 24 charts with the same unknown key print one warning per page', () => {
     for (let i = 0; i < 24; i++) mount({ ...base, sparkle: true });
     expect(warnings().filter((m) => /sparkle/.test(m))).toHaveLength(1);
   });
 
-  it.fails('[arch-10] different unknown keys print different warnings', () => {
+  it('[arch-10] different unknown keys print different warnings', () => {
     mount({ ...base, alpha1: 1 });
     mount({ ...base, alpha2: 2 });
     expect(warnings().filter((m) => /alpha[12]/.test(m))).toHaveLength(2);
   });
 
-  it.fails('[arch-10] a nested unknown key names its path', () => {
+  it('[arch-10] a nested unknown key names its path', () => {
     mount({ ...base, axes: { y: { titel: 'Load' } } });
     mount({ data: rows, x: 't', series: [{ y: 'v', widht: 2 }] });
     mount({ ...base, streaming: { maxPointz: 10 } });
@@ -62,7 +62,7 @@ describe('[arch-10] unknown option keys warn', () => {
     expect(text).toMatch(/streaming\.maxPointz/);
   });
 
-  it.fails('[arch-10] a misspelled key suggests the option it is closest to', () => {
+  it('[arch-10] a misspelled key suggests the option it is closest to', () => {
     mount({ ...base, ariaLabl: 'CPU' });
     expect(warnings().join('\n')).toMatch(/did you mean "ariaLabel"/i);
   });
@@ -169,7 +169,7 @@ describe('[dataapi-13][dxtrial-08] epoch-like numbers on an inferred linear X', 
 describe('[dataapi-02] accessor churn on large sources (≥ 10,000 rows)', () => {
   const big = Array.from({ length: 10_000 }, (_, t) => ({ t, v: t % 17 }));
 
-  it.fails('[dataapi-02] three consecutive identity-only accessor changes warn once', () => {
+  it('[dataapi-02] three consecutive identity-only accessor changes warn once', () => {
     const chart = mount({ data: big, x: 't', series: [{ id: 'v', y: (row: Loose) => row.v }] });
     for (let i = 0; i < 4; i++)
       chart.update({ series: [{ id: 'v', y: (row: Loose) => row.v }] } as never);
@@ -222,11 +222,11 @@ describe('[dataapi-20][arch-11] messages use the public vocabulary (P16)', () =>
     '[dataapi-20][arch-11] negative maxPoints reads in public names',
     publicNames(() => mount({ ...base, streaming: { maxPoints: -1 } })),
   );
-  it.fails(
+  it(
     '[dataapi-20][arch-11] an unsorted append reads in public names',
     publicNames(() => mount(base).appendData([{ t: -5, v: 1 }])),
   );
-  it.fails(
+  it(
     '[dataapi-20][arch-11] a column append with the wrong columns reads in public names',
     publicNames(() =>
       mount({
@@ -236,19 +236,19 @@ describe('[dataapi-20][arch-11] messages use the public vocabulary (P16)', () =>
       }).appendData({ columns: { t: Float64Array.of(2) } }),
     ),
   );
-  it.fails(
+  it(
     '[dataapi-20][arch-11] a band without bounds reads in public names',
     publicNames(() => mount({ data: rows, x: 't', series: [{ type: 'band', y: 'v' }] })),
   );
-  it.fails(
+  it(
     '[dataapi-20][arch-11] a histogram given rows reads in public names',
     publicNames(() => mount({ ...base, series: [{ id: 'h', type: 'histogram' }] })),
   );
-  it.fails(
+  it(
     '[dataapi-20][arch-11] an unknown series in appendData reads in public names',
     publicNames(() => mount(base).appendData(rows, { seriesId: 'nope' })),
   );
-  it.fails(
+  it(
     '[dataapi-20][arch-11] array rows read in public names',
     publicNames(() => mount({ data: [[0, 1]], x: 't', series: [{ y: 'v' }] })),
   );

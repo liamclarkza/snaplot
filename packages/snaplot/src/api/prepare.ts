@@ -1,6 +1,7 @@
 import type { AxisSpec, ChartSpec, ColumnarData, SeriesSpec, ScaleType } from '../engine/spec';
 import type { ReferenceLine } from '../plugins/builtins/referenceLinesPlugin';
 import type { ReferenceRegion } from '../plugins/builtins/referenceRegionsPlugin';
+import type { NormalizedEncoding, NormalizedOptions } from '../public/normalize';
 import type { ChartOptions, DataSource } from '../public/types';
 
 type Accessor = string | ((row: any, index: number) => unknown);
@@ -45,7 +46,72 @@ interface SourcePlan {
 }
 
 function fail(message: string): never {
-  throw new Error(`Snaplot: ${message}`);
+  throw new Error(`snaplot: ${message}`);
+}
+
+/**
+ * The options object prepareChart reads, rebuilt from normalized options: every
+ * value validated and in engine terms, the engine options passed through.
+ */
+export function prepareInput<Row>(normalized: NormalizedOptions<Row>): ChartOptions<Row> {
+  const encoding = (value: NormalizedEncoding | undefined) =>
+    value && { field: value.field, ...value.options };
+  const axes = Object.fromEntries(
+    Object.entries(normalized.axes).map(([key, axis]) => {
+      const { padding, ...spec } = axis.spec;
+      return [
+        key,
+        {
+          ...spec,
+          ...(padding === undefined ? {} : { rangePadding: padding }),
+          ...(axis.type === undefined ? {} : { type: axis.type }),
+          ...(axis.categories === undefined ? {} : { categories: axis.categories }),
+        },
+      ];
+    }),
+  );
+  const series = normalized.series.map((s) => {
+    const { fill, ...style } = s.spec;
+    const pointColor = s.pointColor;
+    return {
+      ...style,
+      id: s.id,
+      label: s.label,
+      type: s.type,
+      xAxis: s.xAxis,
+      yAxis: s.yAxis,
+      ...(s.data === undefined ? {} : { data: s.data }),
+      ...(s.x === undefined ? {} : { x: s.x }),
+      ...(s.y === undefined ? {} : { y: s.y }),
+      ...(s.lower === undefined ? {} : { lower: s.lower }),
+      ...(s.upper === undefined ? {} : { upper: s.upper }),
+      ...(s.rowId === undefined ? {} : { rowId: s.rowId }),
+      ...(s.format === undefined ? {} : { format: s.format }),
+      ...(s.colorBy === undefined ? {} : { colorBy: encoding(s.colorBy) }),
+      ...(s.sizeBy === undefined ? {} : { sizeBy: encoding(s.sizeBy) }),
+      ...(s.tooltipFields === undefined ? {} : { tooltipFields: s.tooltipFields.map(encoding) }),
+      ...(pointColor
+        ? {
+            fill: (value: number, rowIndex: number, row?: unknown) =>
+              pointColor(value, row, rowIndex),
+          }
+        : fill === undefined
+          ? {}
+          : { fill }),
+    };
+  });
+  return {
+    ...normalized.engine,
+    ...(normalized.data === undefined ? {} : { data: normalized.data }),
+    ...(normalized.x === undefined ? {} : { x: normalized.x }),
+    ...(normalized.rowId === undefined ? {} : { rowId: normalized.rowId }),
+    series,
+    axes,
+    referenceLines: normalized.referenceLines,
+    referenceRegions: normalized.referenceRegions,
+    tooltip: { ...normalized.engine.tooltip, ...normalized.tooltip },
+    ...(normalized.engine.streaming ? { streaming: normalized.engine.streaming } : {}),
+  } as unknown as ChartOptions<Row>;
 }
 
 function fieldName(field: Accessor): string {
@@ -685,9 +751,11 @@ export function prepareChart<Row>(
       },
     };
   }
-  function annotationValue(axis: string, value: unknown): number {
+  function annotationValue(axis: string, value: unknown, openEnded = false): number {
     if (axis !== 'x' && axis !== 'y' && !axes[axis])
       fail(`annotation names unknown axis "${axis}".`);
+    if (openEnded && (value === Number.POSITIVE_INFINITY || value === Number.NEGATIVE_INFINITY))
+      return value as number;
     if (typeof value === 'string') {
       const index = categories.get(axis)?.indexOf(value) ?? -1;
       if (index < 0) fail(`annotation names unknown category "${value}" on axis "${axis}".`);
@@ -732,8 +800,8 @@ export function prepareChart<Row>(
       ...region,
       axis: orientation(region.axis),
       axisKey: region.axis,
-      from: annotationValue(region.axis, region.from),
-      to: annotationValue(region.axis, region.to),
+      from: annotationValue(region.axis, region.from, true),
+      to: annotationValue(region.axis, region.to, true),
     })),
   };
 }

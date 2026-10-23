@@ -14,6 +14,28 @@ to [Semantic Versioning](https://semver.org/).
 - Axis options use `title`, `roundBounds`, `rangePadding` and `format`; streaming uses `maxPoints` and `followWindow`. Repository examples, documentation, benchmarks and comparison adapters use the new API. No compatibility aliases are retained.
 - Existing visual defaults are preserved by the API overhaul.
 
+### Options and validation (1.0)
+
+- One validation layer, always on in every build (no `NODE_ENV` check): invalid input throws
+  `snaplot: <what is wrong>. <how to fix it>` at the call that passed it, and an unknown option
+  key warns once per page with its path (`"axes.y.titel"`) and the option it is closest to.
+- Options are copied when they are passed: mutating an array or object you passed changes nothing
+  until you pass it again.
+- New options: `interaction: 'readonly' | { zoom: 'x' | 'xy' | 'none', drag: 'zoom' | 'select' |
+  'pan', bounds: 'data' | 'none' }` (all-scatter charts zoom `'xy'` by default), `cursor: false`,
+  `tooltip: false` or `{ mode, render }`, `theme: 'light' | 'dark'` or the ten `ThemeTokens`,
+  the state options `viewport` (`{ x: [from, to] }`), `selection`, `hiddenSeries` and
+  `highlight`, and the callbacks `onViewportChange`, `onSelectionChange`, `onHiddenSeriesChange`,
+  `onHighlightChange`, `onFollowingChange` and `onCursorChange`. `update()` applies the state
+  options it names without re-reading data.
+- Axis and series `format` accept `Intl.NumberFormat` options with `prefix` and `suffix`; time
+  axes accept `Intl.DateTimeFormat` options. Axis `min`, `max` and `ticks` accept Dates. Series
+  `color` replaces `stroke`, `dash` replaces `lineDash`, and a bar `color` function receives the
+  value, the row and its index. Reference regions take `color` and accept `±Infinity` ends.
+- A `format` on a category axis throws. `appendData({ seriesId })` on a series that shares its data
+  with other series throws. Re-reading a source of 10,000 rows or more because an accessor
+  function keeps getting a new identity warns once.
+
 ### Types (1.0)
 
 - Every public type is declared and documented in `snaplot` itself; none is derived from the

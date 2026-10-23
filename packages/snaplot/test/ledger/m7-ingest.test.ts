@@ -247,7 +247,7 @@ describe('[dataapi-02] appended rows are retained across updates', () => {
 });
 
 describe('[repo-06][arch-12] one always-on validation layer', () => {
-  it.fails('[repo-06] configuration warnings are not stripped under NODE_ENV=production', () => {
+  it('[repo-06] configuration warnings are not stripped under NODE_ENV=production', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubEnv('NODE_ENV', 'production');
     try {
@@ -266,7 +266,7 @@ describe('[repo-06][arch-12] one always-on validation layer', () => {
     expect(warn.mock.calls.flat().join(' ')).toMatch(/nearest-repo06/);
   });
 
-  it.fails('[arch-12] zoom.onZoom is not an option: passing it warns as an unknown key', () => {
+  it('[arch-12] zoom.onZoom is not an option: passing it warns as an unknown key', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     fakes.mount({
       data: [

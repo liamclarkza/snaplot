@@ -54,7 +54,7 @@ function quiet() {
 }
 
 describe('§5.9 invalid input throws at the call that caused it', () => {
-  it.fails('[dataapi-20] an unknown series type throws, naming the valid types', () => {
+  it('[dataapi-20] an unknown series type throws, naming the valid types', () => {
     const message = thrown(() =>
       mount({ data: rows, x: 't', series: [{ y: 'cpu', type: 'pie' }] }),
     );
@@ -104,7 +104,7 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
     ).not.toThrow();
   });
 
-  it.fails('[dxtrial-05] a format on a category axis throws', () => {
+  it('[dxtrial-05] a format on a category axis throws', () => {
     const message = thrown(() =>
       mount({
         data: [
@@ -121,14 +121,14 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
     expect(message).toMatch(/categor/);
   });
 
-  it.fails('[dataapi-20] an unknown axis type throws', () => {
+  it('[dataapi-20] an unknown axis type throws', () => {
     const message = thrown(() =>
       mount({ data: rows, x: 't', series: [{ y: 'cpu' }], axes: { y: { type: 'logarithmic' } } }),
     );
     expect(message).toMatch(/^snaplot: .*"logarithmic"/);
   });
 
-  it.fails('[dataapi-22] appendData({ seriesId }) on a source other series share throws', () => {
+  it('[dataapi-22] appendData({ seriesId }) on a source other series share throws', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }, { y: 'mem' }] });
     const message = thrown(() =>
       chart.appendData([{ t: 30, cpu: 1, mem: 2 }], { seriesId: 'cpu' }),
@@ -138,7 +138,7 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].x).toBe(20);
   });
 
-  it.fails('[dataapi-20] a non-array series option throws', () => {
+  it('[dataapi-20] a non-array series option throws', () => {
     expect(thrown(() => mount({ data: rows, x: 't', series: { y: 'cpu' } }))).toMatch(
       /^snaplot: .*series/,
     );
@@ -233,6 +233,39 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
   });
 });
 
+describe('intake copies (D16)', () => {
+  it('pushing into the caller’s series array after creation changes nothing', () => {
+    const series: Loose[] = [{ y: 'cpu' }];
+    const chart = mount({ data: rows, x: 't', series });
+    series.push({ y: 'mem' });
+    chart.update({ axes: { y: { title: 'Load' } } });
+    expect(chart.getLegendItems().map((item) => item.id)).toEqual(['cpu']);
+  });
+
+  it('pushing into the caller’s referenceLines array after creation draws nothing new', () => {
+    const lines: Loose[] = [{ axis: 'y', value: 41, label: 'Deploy A' }];
+    const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], referenceLines: lines });
+    fakes.frames.flush();
+    lines.push({ axis: 'y', value: 43, label: 'Deploy B' });
+    chart.update({ axes: { y: { title: 'Load' } } });
+    fakes.frames.flush();
+    const drawn = fakes.canvas.all
+      .flatMap((record) => record.calls)
+      .filter((call) => call.name === 'fillText')
+      .map((call) => String(call.args[0]));
+    expect(drawn).toContain('Deploy A');
+    expect(drawn).not.toContain('Deploy B');
+  });
+
+  it('mutating the caller’s axes object after creation changes nothing', () => {
+    const axes = { y: { min: 0, max: 100 } };
+    const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], axes });
+    axes.y.max = 50;
+    chart.update({ series: [{ y: 'cpu', label: 'CPU' }] });
+    expect(chart.getAxis('y')).toMatchObject({ min: 0, max: 100 });
+  });
+});
+
 describe('§4.4 option leaves reach the engine', () => {
   it("interaction: 'readonly' keeps the viewport on a zoom key (control)", () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], interaction: 'readonly' });
@@ -241,7 +274,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(chart.getAxis('x')).toEqual(before);
   });
 
-  it.fails("[arch-15] interaction: { zoom: 'xy' } zooms both axes", () => {
+  it("[arch-15] interaction: { zoom: 'xy' } zooms both axes", () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -262,14 +295,14 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(chart.getAxis('y')).toEqual(y);
   });
 
-  it.fails("[arch-15] the default zoom is 'xy' when every series is scatter", () => {
+  it("[arch-15] the default zoom is 'xy' when every series is scatter", () => {
     const chart = mount({ data: rows, x: 't', series: [{ type: 'scatter', y: 'cpu' }] });
     const y = chart.getAxis('y')!;
     keyZoom(chart);
     expect(chart.getAxis('y')!.max - chart.getAxis('y')!.min).toBeLessThan(y.max - y.min);
   });
 
-  it.fails("[arch-15] interaction: { zoom: 'none' } keeps the viewport on a zoom key", () => {
+  it("[arch-15] interaction: { zoom: 'none' } keeps the viewport on a zoom key", () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -281,7 +314,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(chart.getAxis('x')).toEqual(before);
   });
 
-  it.fails("[arch-15] interaction: { bounds: 'none' } lets a zoom-out leave the data", () => {
+  it("[arch-15] interaction: { bounds: 'none' } lets a zoom-out leave the data", () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -292,7 +325,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(chart.getAxis('x')!.min).toBeLessThan(0);
   });
 
-  it.fails('[arch-15] cursor: false draws no crosshair', () => {
+  it('[arch-15] cursor: false draws no crosshair', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], cursor: false });
     fakes.frames.flush();
     const overlay = fakes.canvas.of(debug(chart).layers.overlay);
@@ -303,7 +336,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(strokes).toHaveLength(0);
   });
 
-  it.fails('[arch-15] tooltip: false shows no tooltip', () => {
+  it('[arch-15] tooltip: false shows no tooltip', () => {
     const shown = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
     fakes.frames.flush();
     hover(shown, 10, rows[10].cpu);
@@ -323,14 +356,14 @@ describe('§4.4 option leaves reach the engine', () => {
     ).not.toThrow();
   });
 
-  it.fails("[arch-15] theme: 'dark' resolves the dark roles on a light page", () => {
+  it("[arch-15] theme: 'dark' resolves the dark roles on a light page", () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], theme: 'dark' });
     const light = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], theme: 'light' });
     expect(chart.getTheme().backgroundColor).not.toBe(light.getTheme().backgroundColor);
     expect(chart.getTheme().textColor).not.toBe(light.getTheme().textColor);
   });
 
-  it.fails('[arch-15] theme tokens set the surface, text and categorical palette', () => {
+  it('[arch-15] theme tokens set the surface, text and categorical palette', () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -350,7 +383,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(chart.getLegendItems()[0]).toMatchObject({ color: '#cc79a7', lineDash: [4, 2] });
   });
 
-  it.fails('[arch-15] a bar color function receives the value, the row and the row index', () => {
+  it('[arch-15] a bar color function receives the value, the row and the row index', () => {
     const data = [
       { k: 2, v: 20 },
       { k: 1, v: 10 },
@@ -376,7 +409,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(y.min).toBeGreaterThan(2.9);
   });
 
-  it.fails('[arch-15] axis min and max accept Dates', () => {
+  it('[arch-15] axis min and max accept Dates', () => {
     const start = new Date(2026, 0, 2);
     const end = new Date(2026, 0, 3);
     const chart = mount({
@@ -391,7 +424,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(chart.getAxis('x')).toMatchObject({ min: start.getTime(), max: end.getTime() });
   });
 
-  it.fails('[arch-15] explicit ticks accept Dates', () => {
+  it('[arch-15] explicit ticks accept Dates', () => {
     const ticks = [new Date(2026, 0, 2), new Date(2026, 0, 3)];
     const chart = mount({
       data: [
@@ -409,7 +442,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(labels).toHaveLength(2);
   });
 
-  it.fails("[arch-15] an axis format { suffix: '%' } wraps the tick labels", () => {
+  it("[arch-15] an axis format { suffix: '%' } wraps the tick labels", () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -458,7 +491,7 @@ describe('§4.4 option leaves reach the engine', () => {
     ).not.toThrow();
   });
 
-  it.fails('[arch-15] a reference region accepts open ends', () => {
+  it('[arch-15] a reference region accepts open ends', () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -475,14 +508,14 @@ describe('§4.4 option leaves reach the engine', () => {
 });
 
 describe('state options at creation (D3)', () => {
-  it.fails('[arch-15] viewport pins only the axes it names', () => {
+  it('[arch-15] viewport pins only the axes it names', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], viewport: { x: [2, 8] } });
     const auto = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
     expect(chart.getAxis('x')).toMatchObject({ min: 2, max: 8 });
     expect(chart.getAxis('y')).toEqual(auto.getAxis('y'));
   });
 
-  it.fails('[arch-15] viewport accepts Dates on a time axis', () => {
+  it('[arch-15] viewport accepts Dates on a time axis', () => {
     const from = new Date(2026, 0, 2);
     const to = new Date(2026, 0, 3);
     const chart = mount({
@@ -497,7 +530,7 @@ describe('state options at creation (D3)', () => {
     expect(chart.getAxis('x')).toMatchObject({ min: from.getTime(), max: to.getTime() });
   });
 
-  it.fails('[arch-15] hiddenSeries hides the series it names', () => {
+  it('[arch-15] hiddenSeries hides the series it names', () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -507,7 +540,7 @@ describe('state options at creation (D3)', () => {
     expect(chart.getState().hiddenSeries).toEqual(['mem']);
   });
 
-  it.fails('[arch-15] highlight highlights the series it names', () => {
+  it('[arch-15] highlight highlights the series it names', () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -517,7 +550,7 @@ describe('state options at creation (D3)', () => {
     expect(chart.getState().highlightedSeries).toBe('mem');
   });
 
-  it.fails("[arch-15] selection sets the brush with interaction: { drag: 'select' }", () => {
+  it("[arch-15] selection sets the brush with interaction: { drag: 'select' }", () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -528,7 +561,7 @@ describe('state options at creation (D3)', () => {
     expect(chart.getState().selection).toEqual({ x: { min: 2, max: 6 } });
   });
 
-  it.fails('[arch-15] update({ viewport }) applies the viewport', () => {
+  it('[arch-15] update({ viewport }) applies the viewport', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
     chart.update({ viewport: { x: [4, 12] } } as never);
     expect(chart.getAxis('x')).toMatchObject({ min: 4, max: 12 });
@@ -536,7 +569,7 @@ describe('state options at creation (D3)', () => {
 });
 
 describe('on<Key>Change callback options (D16)', () => {
-  it.fails('[arch-12] onViewportChange reports the pinned axes as [from, to] tuples', () => {
+  it('[arch-12] onViewportChange reports the pinned axes as [from, to] tuples', () => {
     const onViewportChange = vi.fn();
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], onViewportChange });
     keyZoom(chart);
@@ -546,7 +579,7 @@ describe('on<Key>Change callback options (D16)', () => {
     expect(viewport.x).toEqual([x.min, x.max]);
   });
 
-  it.fails('[arch-15] onHiddenSeriesChange, onHighlightChange and onCursorChange are called', () => {
+  it('[arch-15] onHiddenSeriesChange, onHighlightChange and onCursorChange are called', () => {
     const onHiddenSeriesChange = vi.fn();
     const onHighlightChange = vi.fn();
     const onCursorChange = vi.fn();
@@ -567,7 +600,7 @@ describe('on<Key>Change callback options (D16)', () => {
     expect(onCursorChange).toHaveBeenCalled();
   });
 
-  it.fails('[arch-15] onFollowingChange reports a pan away from the latest data', () => {
+  it('[arch-15] onFollowingChange reports a pan away from the latest data', () => {
     const onFollowingChange = vi.fn();
     const chart = mount({
       data: rows,

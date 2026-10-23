@@ -12,7 +12,7 @@ import {
 } from './fakes/engine';
 
 // The engine's side of chart-group sync (createChartGroup in
-// src/api/createChart.ts): a group relays each member's `cursor:move` and
+// src/public/chart.ts): a group relays each member's `cursor:move` and
 // `viewport:change` events to its peers through `setCursorDataX` and
 // `setAxis`. Ported from src/core/Chart.append.test.ts (plan M2), where these
 // ran over the engine's own key-based SyncGroup, which M2 deleted; the

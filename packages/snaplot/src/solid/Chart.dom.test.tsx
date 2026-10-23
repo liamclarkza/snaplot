@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChartHandle, ChartOptions } from '../public/types';
 const mock = vi.hoisted(() => ({ instances: [] as any[], reconciles: vi.fn(), controls: vi.fn() }));
-vi.mock('../api/createChart', () => ({
+vi.mock('../public/chart', () => ({
   createChart: (container: HTMLElement) => {
     const chart = {
       container,

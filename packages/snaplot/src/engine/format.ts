@@ -99,3 +99,38 @@ export function scaleStepDecimals(
       : niceStep(scale.min, scale.max, Math.max(2, tickCount));
   return stepDecimals(step);
 }
+
+/** `Intl.NumberFormat` options plus text around the number, as an axis or series `format` gives them. */
+export interface NumberFormatSpec extends Intl.NumberFormatOptions {
+  prefix?: string;
+  suffix?: string;
+}
+
+/**
+ * A formatter for a `format` object: `prefix`, the number through one cached
+ * `Intl.NumberFormat`, then `suffix`. NaN reads as an empty string.
+ */
+export function numberFormatter(
+  spec: NumberFormatSpec,
+  locale?: string,
+): (value: number) => string {
+  const { prefix = '', suffix = '', ...options } = spec;
+  const format = new Intl.NumberFormat(locale, options);
+  return (value) => (Number.isNaN(value) ? '' : `${prefix}${format.format(value)}${suffix}`);
+}
+
+/**
+ * A formatter for a time `format` object (`Intl.DateTimeFormat` options) of
+ * epoch milliseconds, in the viewer's zone or in UTC.
+ */
+export function dateFormatter(
+  options: Intl.DateTimeFormatOptions,
+  locale?: string,
+  timeZone: 'local' | 'UTC' = 'local',
+): (value: number) => string {
+  const format = new Intl.DateTimeFormat(locale, {
+    ...options,
+    ...(timeZone === 'UTC' ? { timeZone: 'UTC' } : {}),
+  });
+  return (value) => (Number.isFinite(value) ? format.format(value) : '');
+}

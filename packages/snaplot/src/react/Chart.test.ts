@@ -10,7 +10,7 @@ const mock = vi.hoisted(() => ({
   controls: vi.fn(),
   groups: [] as any[],
 }));
-vi.mock('../api/createChart', () => ({
+vi.mock('../public/chart', () => ({
   createChart: (container: HTMLElement) => {
     const listeners = new Set<() => void>();
     const chart = {

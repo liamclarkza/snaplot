@@ -3,7 +3,7 @@ import type { ChartHandle, ChartOptions, ChartState } from '../public/types';
 vi.mock('solid-js', async () => vi.importActual('solid-js/dist/solid.js'));
 import { createRoot, createSignal } from 'solid-js';
 const mock = vi.hoisted(() => ({ instances: [] as any[], reconciles: vi.fn() }));
-vi.mock('../api/createChart', () => ({
+vi.mock('../public/chart', () => ({
   createChart: (container: HTMLElement, options: ChartOptions) => {
     const listeners = new Set<() => void>();
     const chart = {

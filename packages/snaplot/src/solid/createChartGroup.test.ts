@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('solid-js', async () => vi.importActual('solid-js/dist/solid.js'));
 const mock = vi.hoisted(() => ({ destroy: vi.fn(), create: vi.fn() }));
-vi.mock('../api/createChart', () => ({
+vi.mock('../public/chart', () => ({
   createChartGroup: (options: unknown) => {
     mock.create(options);
     return { destroy: mock.destroy };

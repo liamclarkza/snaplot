@@ -75,7 +75,7 @@ describe('[gap-annotations-extensibility-01] category regions span slot edges', 
 });
 
 describe('[gap-annotations-extensibility-04] open and log regions', () => {
-  it.fails('[gap-annotations-extensibility-04] a region accepts Infinity for an open end', () => {
+  it('[gap-annotations-extensibility-04] a region accepts Infinity for an open end', () => {
     expect(() =>
       fakes.mount({
         data: [0, 1, 2, 3].map((t) => ({ t, v: t })),

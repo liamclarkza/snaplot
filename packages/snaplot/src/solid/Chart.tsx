@@ -1,5 +1,5 @@
 import { onMount, onCleanup, createEffect, type JSX } from 'solid-js';
-import { createChart, reconcileChart, setChartControls } from '../api/createChart';
+import { createChart, reconcileChart, setChartControls } from '../public/chart';
 import type { ChartOptions, ChartHandle } from '../public/types';
 import {
   applyDefaults,

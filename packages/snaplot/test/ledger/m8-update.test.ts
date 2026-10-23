@@ -139,7 +139,7 @@ describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] a
     expect({ ingests, dataUpdates }).toEqual({ ingests: 0, dataUpdates: 0 });
   });
 
-  it.fails('[gap-annotations-extensibility-06] an in-place push then update({ referenceLines }) draws the new line', () => {
+  it('[gap-annotations-extensibility-06] an in-place push then update({ referenceLines }) draws the new line', () => {
     const lines = [{ axis: 'y', value: 45, label: 'Deploy A' }];
     const chart = fakes.mount<Row>({
       data: rows,

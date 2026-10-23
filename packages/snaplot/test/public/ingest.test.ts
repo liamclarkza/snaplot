@@ -130,7 +130,7 @@ describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X orde
 });
 
 describe('appends are validated before anything changes', () => {
-  it.fails('[dataapi-20] an append before the last retained X throws in public words and changes nothing', () => {
+  it('[dataapi-20] an append before the last retained X throws in public words and changes nothing', () => {
     const chart = mount({
       data: [
         { t: 1, v: 1 },
@@ -145,7 +145,7 @@ describe('appends are validated before anything changes', () => {
     expect(latest(chart)).toMatchObject({ x: 2, y: 2 });
   });
 
-  it.fails('[dataapi-03] duplicate rowIds inside one batch throw before any mutation', () => {
+  it('[dataapi-03] duplicate rowIds inside one batch throw before any mutation', () => {
     const chart = mount({
       data: [{ id: 'a', t: 1, v: 1 }],
       x: 't',
@@ -177,7 +177,7 @@ describe('appends are validated before anything changes', () => {
     expect(() => chart.appendData([{ id: 'c', t: 5, v: 5 }])).toThrow(/rowId/);
   });
 
-  it.fails('[dataapi-03] a row batch without rowId values on a source that has them throws', () => {
+  it('[dataapi-03] a row batch without rowId values on a source that has them throws', () => {
     const chart = mount({
       data: [{ id: 'a', t: 1, v: 1 }],
       x: 't',

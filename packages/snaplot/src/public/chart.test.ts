@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createChart, createChartGroup, reconcileChart, setChartControls } from './createChart';
-import type { ChartHandle, ChartOptions, ChartPoint } from '../public/types';
+import { createChart, createChartGroup, reconcileChart, setChartControls } from './chart';
+import type { ChartHandle, ChartOptions, ChartPoint } from './types';
 import { ChartCore } from '../core/Chart';
 
 const live: Array<{ destroy(): void }> = [];
@@ -210,7 +210,7 @@ describe('public chart transactions', () => {
 
   it('rejects unordered streaming batches before changing any source', () => {
     const chart = make({ data: [{ x: 2, y: 5 }], x: 'x', series: [{ y: 'y' }] });
-    expect(() => chart.appendData([{ x: 1, y: 6 }])).toThrow(/ordered/);
+    expect(() => chart.appendData([{ x: 1, y: 6 }])).toThrow(/before the last x/);
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(5);
   });
 
@@ -395,7 +395,7 @@ describe('public chart transactions', () => {
       y: 3,
     });
     expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 2.5 });
-    expect(() => chart.appendData([{ x: 'C', y: 9 }])).toThrow(/duplicate category/);
+    expect(() => chart.appendData([{ x: 'C', y: 9 }])).toThrow(/category it already has/);
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(3);
     chart.appendData([{ x: 'C', y: 4 }], { updateLast: true });
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0]).toMatchObject({
@@ -415,7 +415,7 @@ describe('public chart transactions', () => {
     const chart = make(options);
     expect(() =>
       reconcileChart(chart, { ...options, data: [{ x: 2, y: 3 }] }, { hiddenSeries: ['missing'] }),
-    ).toThrow(/unknown hidden/);
+    ).toThrow(/hiddenSeries names "missing"/);
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(1);
     expect(() => setChartControls(chart, { viewport: { x: { min: 1, max: 0 } } })).toThrow(
       /min < max/,
@@ -565,7 +565,7 @@ describe('public chart transactions', () => {
           x: new Float64Array([3]),
         },
       }),
-    ).toThrow(/schema/);
+    ).toThrow(/same fields/);
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(20);
   });
 

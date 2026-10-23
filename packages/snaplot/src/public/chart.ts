@@ -9,10 +9,14 @@ import type {
   SelectionRange,
   TooltipPoint,
 } from '../engine/spec';
-import { prepareChart, type PreparedChart } from './prepare';
+import { prepareChart, prepareInput, type PreparedChart } from '../api/prepare';
+import { fail, warnOnce } from '../engine/errors';
+import { formatValue } from '../engine/format';
+import { type NormalizedOptions, type NormalizedState, normalize } from './normalize';
 import { equivalent, patchOptions } from './options';
 import type {
   AppendOptions,
+  AxisState,
   ChartEvents,
   ChartGroup,
   ChartGroupOptions,
@@ -25,8 +29,9 @@ import type {
   CursorSnapshot,
   DataSource,
   SeriesOptions,
+  Viewport,
   ViewportRanges,
-} from '../public/types';
+} from './types';
 
 export interface ChartControls {
   viewport?: ViewportRanges;
@@ -114,8 +119,7 @@ function validateGroup(
   if (!group) return;
   const record = groups.get(group);
   if (record?.destroyed && source?.getOptions().group === group) return;
-  if (!record || record.destroyed)
-    throw new Error('Snaplot: group must be a live createChartGroup() result.');
+  if (!record || record.destroyed) fail('group must be a live createChartGroup() result.');
   for (const member of record.members) {
     if (member === source) continue;
     const keys = group.options.yRange ? ['x', group.options.yAxis ?? 'y'] : ['x'];
@@ -125,15 +129,15 @@ function validateGroup(
         ? 'category'
         : (candidate.config.axes?.[key]?.type ?? 'linear');
       if (axis && axis.type !== type)
-        throw new Error(
-          `Snaplot: group axis "${key}" has incompatible types (${axis.type} and ${type}).`,
+        fail(
+          `charts in one group need the same kind of axis "${key}", not ${axis.type} and ${type}.`,
         );
       if (
         type === 'category' &&
         !equivalent(member.groupCategories().get(key), candidate.categories.get(key))
       ) {
-        throw new Error(
-          `Snaplot: group axis "${key}" requires the same category order in every chart. Set axes.${key}.categories explicitly.`,
+        fail(
+          `charts in one group need the same category order on axis "${key}". Set axes.${key}.categories in each chart.`,
         );
       }
     }
@@ -181,12 +185,89 @@ function coordinate(group: ChartGroup | undefined, only?: 'shareY'): void {
   }
 }
 
+/** The state options (plan D3): applied to the chart, never re-ingested. */
+const STATE_KEYS = ['viewport', 'selection', 'hiddenSeries', 'highlight'] as const;
+type StateKey = (typeof STATE_KEYS)[number];
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype;
+}
+
+/** Options without the state options, for deciding whether a change needs a re-ingest. */
+function withoutState<Row>(options: ChartOptions<Row>): Record<string, unknown> {
+  const {
+    viewport: _viewport,
+    hiddenSeries: _hidden,
+    ...rest
+  } = options as unknown as Record<string, unknown>;
+  if (rest.highlight === null || typeof rest.highlight === 'string') delete rest.highlight;
+  if (rest.selection === null || (isPlainObject(rest.selection) && 'x' in rest.selection))
+    delete rest.selection;
+  return rest;
+}
+
+/** Like `equivalent`, but any two functions count as equal. */
+function sameIgnoringFunctions(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b) || (typeof a === 'function' && typeof b === 'function')) return true;
+  if (Array.isArray(a) && Array.isArray(b))
+    return a.length === b.length && a.every((value, i) => sameIgnoringFunctions(value, b[i]));
+  if (!isPlainObject(a) || !isPlainObject(b)) return false;
+  const keys = Object.keys(a).filter((key) => a[key] !== undefined);
+  const other = Object.keys(b).filter((key) => b[key] !== undefined);
+  return (
+    keys.length === other.length &&
+    keys.every((key) =>
+      key === 'data' || key === 'group' ? a[key] === b[key] : sameIgnoringFunctions(a[key], b[key]),
+    )
+  );
+}
+
+/** The accessor fields of a series whose function identity can churn. */
+const ACCESSOR_FIELDS = ['x', 'y', 'lower', 'upper', 'rowId'] as const;
+
+/**
+ * The first series and field whose accessor function is new while nothing else
+ * changed (plan D16), or `undefined`.
+ */
+function accessorOnlyChange<Row>(
+  previous: NormalizedOptions<Row>,
+  next: NormalizedOptions<Row>,
+): { id: string; field: string } | undefined {
+  if (!sameIgnoringFunctions(withoutState(previous.options), withoutState(next.options))) return;
+  for (const series of next.series) {
+    const old = previous.series.find((candidate) => candidate.id === series.id);
+    if (!old) continue;
+    for (const field of ACCESSOR_FIELDS) {
+      const a = old[field] ?? (field === 'x' || field === 'rowId' ? previous[field] : undefined);
+      const b = series[field] ?? (field === 'x' || field === 'rowId' ? next[field] : undefined);
+      if (typeof a === 'function' && typeof b === 'function' && a !== b)
+        return { id: series.id, field };
+    }
+  }
+  return undefined;
+}
+
+/** Sources of at least this many rows warn about accessor churn (plan D16). */
+const CHURN_ROWS = 10_000;
+
+/** Axis ranges as the `[from, to]` viewport `onViewportChange` reports. */
+function toViewport(ranges: ViewportRanges): Viewport {
+  return Object.fromEntries(
+    Object.entries(ranges).map(([key, range]) => [key, [range.min, range.max] as const]),
+  );
+}
+
 class Controller<Row> implements ChartHandle<Row>, GroupMember {
   readonly container: HTMLElement;
   private engine: ChartCore;
   private options: ChartOptions<Row>;
   private optionsSnapshot?: ChartOptions<Row>;
   private prepared: PreparedChart<Row>;
+  private normalized: NormalizedOptions<Row>;
+  /** The state options last applied from options (plan D3). */
+  private appliedState: NormalizedState = {};
+  /** Identity-only accessor changes in a row, and their times (plan D16). */
+  private churn = { streak: 0, times: [] as number[] };
   private hidden = new Set<string>();
   private state!: ChartState<Row>;
   private subscribers = new Set<() => void>();
@@ -205,12 +286,18 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
 
   constructor(element: HTMLElement, options: ChartOptions<Row>) {
     this.container = element;
-    this.options = options;
-    this.prepared = prepareChart(options);
+    const normalized = normalize(options);
+    this.normalized = normalized;
+    this.options = normalized.options;
+    this.prepared = prepareChart(prepareInput(normalized));
     this.cloneIdentities(this.prepared);
-    validateGroup(options.group, this.prepared);
+    validateGroup(normalized.group, this.prepared);
     this.resetIdentityTracking();
-    const config = this.configFor(this.prepared, options);
+    if (normalized.state.hiddenSeries) {
+      this.hidden = new Set(normalized.state.hiddenSeries);
+      this.appliedState.hiddenSeries = normalized.state.hiddenSeries;
+    }
+    const config = this.configFor(this.prepared, normalized);
     // User plugin install hooks need the completed public handle, not a half-built engine,
     // so plugins are installed below, and the engine's first paint waits for them.
     this.engine = new ChartCore(
@@ -231,23 +318,65 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.lines.setLines(this.prepared.referenceLines);
     this.regions.setRegions(this.prepared.referenceRegions);
     for (const plugin of config.plugins ?? []) this.engine.use(plugin);
+    this.applyState(normalized.state, ['viewport', 'selection', 'highlight']);
     // The mount paint: nothing repaints an unchanged box after it, so it must
     // draw the annotations and plugins (gap-annotations-extensibility-06:mount).
     this.engine.paint();
-    groups.get(options.group!)?.members.add(this);
-    coordinate(options.group);
+    groups.get(normalized.group!)?.members.add(this);
+    coordinate(normalized.group);
     this.state = this.readState();
   }
 
-  private configFor(prepared: PreparedChart<Row>, options: ChartOptions<Row>) {
+  /**
+   * Apply state options (plan D3) without emitting: `keys` are applied when
+   * present in `state`; a value equal to the one last applied is skipped unless
+   * `always` (an update() names the key, so it always applies).
+   */
+  private applyState(state: NormalizedState, keys: readonly StateKey[], always = true): void {
+    const wasMutating = this.mutating;
+    this.mutating = true;
+    try {
+      for (const key of keys) {
+        if (!Object.hasOwn(state, key)) continue;
+        if (!always && equivalent(state[key], this.appliedState[key])) continue;
+        if (key === 'viewport') {
+          for (const [axis, range] of Object.entries(state.viewport ?? {})) {
+            if (!this.engine.getAxis(axis))
+              fail(`viewport names axis "${axis}", which this chart does not have.`);
+            this.engine.setAxis(axis, range);
+          }
+        } else if (key === 'selection') {
+          this.engine.setSelection(state.selection ?? null);
+        } else if (key === 'hiddenSeries') {
+          const hidden = new Set(state.hiddenSeries ?? []);
+          if (!equivalent([...hidden], [...this.hidden])) {
+            this.hidden = hidden;
+            this.engine.setOptions({
+              series: this.engine.getOptions().series.map((series, si) => ({
+                ...series,
+                visible: !hidden.has(this.prepared.seriesIds[si]),
+              })),
+            });
+          }
+        } else {
+          const index = state.highlight ? this.prepared.seriesIds.indexOf(state.highlight) : -1;
+          this.engine.setHighlight(index < 0 ? null : index);
+        }
+        (this.appliedState as Record<string, unknown>)[key] = state[key];
+      }
+    } finally {
+      this.mutating = wasMutating;
+    }
+  }
+
+  private configFor(prepared: PreparedChart<Row>, normalized: NormalizedOptions<Row>) {
     const plugins = [
       this.regions,
       this.lines,
-      ...(options.plugins ?? []).map((plugin) => this.bridge(plugin)),
+      ...normalized.plugins.map((plugin) => this.bridge(plugin)),
     ];
-    const tooltipOptions = typeof options.tooltip === 'object' ? options.tooltip : undefined;
-    const renderTooltip = tooltipOptions?.render;
-    const formatTooltipX = tooltipOptions?.xFormat;
+    const renderTooltip = normalized.tooltip.render;
+    const formatTooltipX = normalized.tooltip.xFormat;
     return {
       ...prepared.config,
       tooltip: {
@@ -268,20 +397,20 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           : {}),
       },
       series: prepared.config.series.map((series, index) => {
-        const fill = (options.series[index] as { fill?: unknown }).fill;
+        const pointColor = normalized.series[index]?.pointColor;
         return {
           ...series,
           visible: !this.hidden.has(prepared.seriesIds[index]),
-          ...(typeof fill === 'function'
+          ...(pointColor
             ? {
                 fill: (value: number, rowIndex: number) => {
                   const currentIndex = this.prepared.seriesIds.indexOf(prepared.seriesIds[index]);
                   const identity = this.prepared.identities[currentIndex];
                   const position = rowIndex + (this.identityHeads[currentIndex] ?? 0);
-                  return (fill as (value: number, index: number, row?: Row) => string)(
+                  return pointColor(
                     value,
-                    identity.sourceIndices[position],
                     identity.rows?.[position],
+                    identity.sourceIndices[position],
                   );
                 },
               }
@@ -302,7 +431,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       try {
         return callback();
       } catch (error) {
-        console.error(`Snaplot: plugin "${plugin.id}" ${hook} hook failed.`, error);
+        console.error(`snaplot: plugin "${plugin.id}" ${hook} hook failed.`, error);
       }
     };
     bridge = {
@@ -324,22 +453,54 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   update(patch: ChartPatch<Row>): void {
-    this.reconcile(patchOptions(this.options, patch), Object.hasOwn(patch, 'data'));
+    this.reconcile(
+      patchOptions(this.options, patch),
+      Object.hasOwn(patch, 'data'),
+      undefined,
+      STATE_KEYS.filter((key) => Object.hasOwn(patch, key)),
+    );
   }
 
-  reconcile(next: ChartOptions<Row>, forceData = false, controls?: ChartControls): void {
+  /**
+   * Apply complete options. `stateKeys` are the state options an update()
+   * named, which always apply; any other state option applies when it
+   * differs from the value last applied (plan D3).
+   */
+  reconcile(
+    input: ChartOptions<Row>,
+    forceData = false,
+    controls?: ChartControls,
+    stateKeys?: readonly StateKey[],
+  ): void {
     if (this.destroyed) return;
-    if (!forceData && equivalent(this.options, next)) {
+    const normalized = normalize(input);
+    const next = normalized.options;
+    this.noteAccessorChurn(normalized);
+    const applyState = () => {
+      if (stateKeys) this.applyState(normalized.state, stateKeys);
+      this.applyState(
+        normalized.state,
+        STATE_KEYS.filter((key) => !stateKeys?.includes(key)),
+        false,
+      );
+    };
+    if (!forceData && equivalent(withoutState(this.options), withoutState(next))) {
+      this.options = next;
+      this.normalized = normalized;
+      this.optionsSnapshot = undefined;
+      applyState();
       if (controls) this.setControls(controls);
+      this.publish();
       return;
     }
-    const live = this.withLiveData(next, forceData);
+    const liveOptions = this.withLiveData(next, forceData);
+    const live = liveOptions === next ? normalized : normalize(liveOptions);
     const previousAxisTypes = new Map(
       Object.entries(this.prepared.config.axes ?? {})
         .filter(([key]) => this.options.axes?.[key]?.type === undefined)
         .map(([key, axis]) => [key, axis.type ?? 'linear'] as const),
     );
-    const prepared = prepareChart(live, this.prepared.categories, {
+    const prepared = prepareChart(prepareInput(live), this.prepared.categories, {
       previousAxisTypes,
       previousEncodingCategories: this.prepared.encodingCategories,
     });
@@ -349,6 +510,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const previous = {
       prepared: this.prepared,
       options: this.options,
+      normalized: this.normalized,
       hidden: this.hidden,
       optionsSnapshot: this.optionsSnapshot,
     };
@@ -385,6 +547,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     try {
       this.prepared = prepared;
       this.options = next;
+      this.normalized = normalized;
       this.optionsSnapshot = undefined;
       this.engine.replaceSources(
         this.configFor(prepared, live),
@@ -400,6 +563,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         this.nextIndices[source] = previousNextIndices[oldSource];
       }
       this.applyAccessibleName();
+      applyState();
       if (controls) this.setControls(controls);
       if (previous.options.group !== next.group) {
         if (previous.options.group) this.detachGroup(previous.options.group);
@@ -409,6 +573,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     } catch (error) {
       this.prepared = previous.prepared;
       this.options = previous.options;
+      this.normalized = previous.normalized;
       this.optionsSnapshot = previous.optionsSnapshot;
       this.hidden = previous.hidden;
       throw error;
@@ -420,6 +585,31 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.emit('data:update', undefined);
     if (previous.options.group !== next.group) coordinate(previous.options.group);
     coordinate(this.options.group);
+  }
+
+  /**
+   * Warn once when a source of at least 10,000 rows is re-read because an
+   * accessor function got a new identity and nothing else changed, three
+   * times in a row or more than ten times a second (plan D16).
+   */
+  private noteAccessorChurn(next: NormalizedOptions<Row>): void {
+    const change = accessorOnlyChange(this.normalized, next);
+    if (!change) {
+      this.churn.streak = 0;
+      return;
+    }
+    const si = this.prepared.seriesIds.indexOf(change.id);
+    const rows =
+      si < 0 ? 0 : (this.prepared.sources[this.prepared.seriesSources[si]]?.[0].length ?? 0);
+    if (rows < CHURN_ROWS) return;
+    const now = Date.now();
+    this.churn.streak++;
+    this.churn.times = [...this.churn.times.filter((time) => now - time < 1000), now];
+    if (this.churn.streak >= 3 || this.churn.times.length > 10)
+      warnOnce(
+        'accessor-churn',
+        `series "${change.id}" keeps getting a new ${change.field} function, and each one re-reads its ${formatValue(rows)} rows. Memoise the function, or use a field name.`,
+      );
   }
 
   private withLiveData(next: ChartOptions<Row>, forceData: boolean): ChartOptions<Row> {
@@ -500,26 +690,39 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (this.destroyed) return;
     const id = options.seriesId;
     const si = id === undefined ? -1 : this.prepared.seriesIds.indexOf(id);
-    if (id !== undefined && si < 0) throw new Error(`Snaplot: unknown series "${id}".`);
+    if (id !== undefined && si < 0)
+      fail(`appendData() names series "${id}", which this chart does not have.`);
     const sources = new Set<number>();
-    if (si >= 0) sources.add(this.prepared.seriesSources[si]);
-    else
+    if (si >= 0) {
+      const source = this.prepared.seriesSources[si];
+      const sharing = this.prepared.seriesIds.filter(
+        (_other, index) => index !== si && this.prepared.seriesSources[index] === source,
+      );
+      if (sharing.length)
+        fail(
+          `appendData({ seriesId: "${id}" }): series "${id}" shares its data with ${sharing.map((other) => `"${other}"`).join(', ')}. Append without a seriesId to extend the shared data, or give "${id}" its own data.`,
+        );
+      sources.add(source);
+    } else
       this.options.series.forEach((series, index) => {
         if (series.data === undefined) sources.add(this.prepared.seriesSources[index]);
       });
-    if (!sources.size) throw new Error('Snaplot: appending independent data requires a seriesId.');
+    if (!sources.size)
+      fail(
+        'appendData() without a seriesId extends the chart data, but every series has its own data. Pass { seriesId }.',
+      );
     const selected = this.options.series.filter((_series, index) =>
       sources.has(this.prepared.seriesSources[index]),
     );
     const appendSeries = selected.map((series) => {
       if (series.type === 'histogram')
-        throw new Error(
-          'Snaplot: update histogram bins atomically with update(); bins are not streaming observations.',
+        fail(
+          'histogram bins cannot be appended; pass new histogram() bins with update({ series }).',
         );
       return { ...series, data } as SeriesOptions<Row>;
     });
     const batch = prepareChart(
-      { ...this.options, data, series: appendSeries },
+      prepareInput(normalize({ ...this.options, data, series: appendSeries })),
       this.prepared.categories,
       { sortRows: false, previousEncodingCategories: this.prepared.encodingCategories },
     );
@@ -535,7 +738,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       const columns = batch.sources[batchSource];
       const currentLength = this.engine.getSourceLength(source);
       if (!equivalent(batch.sourceFields[batchSource], this.prepared.sourceFields[source]))
-        throw new Error('Snaplot: append fields must match the current source schema.');
+        fail('appendData() must append the same fields (or columns) as the data the chart holds.');
       const seriesIndices = batch.seriesSources.flatMap((value, index) =>
         value === batchSource ? [index] : [],
       );
@@ -557,8 +760,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         previousIndex >= 0 &&
         columns[0][0] < this.engine.getSourceValue(source, 0, previousIndex)
       ) {
-        throw new Error(
-          'Snaplot: streaming X must be ordered after the existing source; append batches are never sorted automatically.',
+        fail(
+          `appendData() rows start at x ${columns[0][0]}, before the last x the chart holds (${this.engine.getSourceValue(source, 0, previousIndex)}). Append rows in x order, or replace the data with update({ data }).`,
         );
       }
       const hasCategoryBars = seriesIndices.some(
@@ -572,8 +775,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         previousIndex >= 0 &&
         columns[0][0] === this.engine.getSourceValue(source, 0, previousIndex)
       ) {
-        throw new Error(
-          'Snaplot: bar series cannot append a duplicate category; use updateLast to correct its latest observation.',
+        fail(
+          'a bar series cannot append a category it already has; pass { updateLast: true } to correct the latest bar.',
         );
       }
     }
@@ -636,7 +839,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
             tooltipFields: incoming.tooltipFields,
           };
         });
-        this.engine.setOptions({ series: this.configFor(this.prepared, this.options).series });
+        this.engine.setOptions({ series: this.configFor(this.prepared, this.normalized).series });
       }
       if (categoriesChanged) {
         this.prepared.categories = batch.categories;
@@ -692,9 +895,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         !Number.isFinite(range.max) ||
         range.max <= range.min
       ) {
-        throw new Error(
-          `Snaplot: viewport "${key}" requires an existing axis and finite min < max.`,
-        );
+        fail(`the viewport of axis "${key}" needs an axis the chart has and finite min < max.`);
       }
     }
     if (!this.applyingControls && Object.hasOwn(this.controls, 'viewport')) {
@@ -725,7 +926,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
   setSeriesVisible(id: string, visible: boolean): void {
     const index = this.prepared.seriesIds.indexOf(id);
-    if (index < 0) throw new Error(`Snaplot: unknown series "${id}".`);
+    if (index < 0) fail(`setSeriesVisible() names series "${id}", which this chart does not have.`);
     const hidden = new Set(this.hidden);
     if (visible) hidden.delete(id);
     else hidden.add(id);
@@ -743,7 +944,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     });
     this.publish();
     this.emit('visibility:change', this.state.hiddenSeries);
-    if (!this.applyingControls) this.controls.onHiddenSeriesChange?.(this.state.hiddenSeries);
+    if (!this.applyingControls) {
+      this.controls.onHiddenSeriesChange?.(this.state.hiddenSeries);
+      this.callback('onHiddenSeriesChange', this.state.hiddenSeries);
+    }
     coordinate(this.options.group);
   }
   setHighlight(id: string | null): void {
@@ -872,11 +1076,11 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   getStats() {
     return this.engine.getStats();
   }
-  getAxis(key: string) {
+  getAxis(key: string): Readonly<AxisState> | undefined {
     const axis = this.engine.getAxis(key);
     return axis
       ? Object.freeze({
-          type: this.prepared.categories.has(key) ? 'category' : axis.type,
+          type: this.prepared.categories.has(key) ? ('category' as const) : axis.type,
           min: axis.min,
           max: axis.max,
         })
@@ -953,6 +1157,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         if (this.mutating) return;
         this.publish();
         this.emit('cursor:change', this.state.cursor);
+        this.callback('onCursorChange', this.state.cursor);
         if (this.options.group?.options.cursor)
           broadcast(this.options.group, (member) => member.setCursor(this.state.cursor.x), this);
       }),
@@ -960,7 +1165,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         if (this.mutating) return;
         this.publish();
         this.emit('viewport:change', this.state.viewport);
-        if (!this.applyingControls) this.controls.onViewportChange?.(this.state.viewport);
+        if (!this.applyingControls) {
+          this.controls.onViewportChange?.(this.state.viewport);
+          this.callback('onViewportChange', toViewport(this.state.viewport));
+        }
         const group = this.options.group;
         if (!group?.options.viewport || !this.isHorizontal(key)) return;
         // Plan D17: link horizontal axes only, and only axes a peer has, so a
@@ -975,6 +1183,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         if (this.mutating) return;
         this.publish();
         this.emit('highlight:change', this.state.highlightedSeries);
+        this.callback('onHighlightChange', this.state.highlightedSeries);
         if (this.options.group?.options.highlight)
           broadcast(
             this.options.group,
@@ -986,7 +1195,16 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         if (this.mutating) return;
         this.publish();
         this.emit('selection:change', selection);
-        if (!this.applyingControls) this.controls.onSelectionChange?.(selection);
+        if (!this.applyingControls) {
+          this.controls.onSelectionChange?.(selection);
+          this.callback(
+            'onSelectionChange',
+            selection && {
+              x: [selection.x.min, selection.x.max] as const,
+              ...(selection.y ? { y: [selection.y.min, selection.y.max] as const } : {}),
+            },
+          );
+        }
       }),
       this.engine.on('select', (selection) => {
         const result = {
@@ -995,12 +1213,13 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
             this.point(point.seriesIndex, point.dataIndex, point),
           ),
         };
-        this.options.onSelect?.(result);
+        this.callback('onSelect', result);
         this.emit('select', result);
       }),
       this.engine.on('follow:change', (following) => {
         this.publish();
         this.emit('follow:change', following);
+        this.callback('onFollowingChange', following);
       }),
       this.engine.on('theme:update', (theme) => {
         this.publish();
@@ -1015,10 +1234,15 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     // The internal engine emits a hit-tested point only after a non-drag click.
     const onPoint = (point: TooltipPoint) => {
       const result = this.point(point.seriesIndex, point.dataIndex, point);
-      this.options.onPointClick?.(result);
+      this.callback('onPointClick', result);
       this.emit('point:click', result);
     };
     this.off.push(this.engine.on('point:click', onPoint));
+  }
+
+  /** Call an on<Key>Change option with the current options' function. */
+  private callback(name: keyof NormalizedOptions<Row>['callbacks'], value: unknown): void {
+    (this.normalized.callbacks[name] as ((value: unknown) => void) | undefined)?.(value);
   }
   private installGuards(): void {
     this.engine.setInteractionGuards({
@@ -1045,17 +1269,15 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         !Number.isFinite(range.max) ||
         range.max <= range.min
       ) {
-        throw new Error(
-          `Snaplot: viewport "${key}" requires an existing axis and finite min < max.`,
-        );
+        fail(`the viewport of axis "${key}" needs an axis the chart has and finite min < max.`);
       }
     }
     const selection = controls.selection;
     if (selection && (!Number.isFinite(selection.x.min) || !Number.isFinite(selection.x.max)))
-      throw new Error('Snaplot: selection requires finite bounds.');
+      fail('a selection needs finite bounds.');
     for (const id of controls.hiddenSeries ?? []) {
       if (!prepared.seriesIds.includes(id))
-        throw new Error(`Snaplot: unknown hidden series "${id}".`);
+        fail(`hiddenSeries names "${id}", which is not a series id.`);
     }
   }
 
@@ -1119,14 +1341,12 @@ export function reconcileChart<Row>(
   options: ChartOptions<Row>,
   controls?: ChartControls,
 ): void {
-  if (!(chart instanceof Controller))
-    throw new Error('Snaplot: expected a chart created by createChart().');
+  if (!(chart instanceof Controller)) fail('expected a chart created by createChart().');
   chart.reconcile(options, false, controls);
 }
 
 /** Framework-only controlled state bridge. */
 export function setChartControls<Row>(chart: ChartHandle<Row>, controls: ChartControls): void {
-  if (!(chart instanceof Controller))
-    throw new Error('Snaplot: expected a chart created by createChart().');
+  if (!(chart instanceof Controller)) fail('expected a chart created by createChart().');
   chart.setControls(controls);
 }

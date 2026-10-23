@@ -28,7 +28,6 @@ import { CanvasManager } from './CanvasManager';
 import { RenderScheduler } from './RenderScheduler';
 import { EventBus } from './EventBus';
 import { computeLayout, inferPosition } from './Layout';
-import { shouldValidateConfig, validateChartConfig } from './validateConfig';
 
 import type { ColumnarSegment, DataStore } from '../data/DataStore';
 import { validateMaxLen } from '../data/DataStore';
@@ -608,14 +607,11 @@ export class ChartCore implements EngineHost {
     if (indices.length !== config.series.length)
       throw new Error('Each series requires a data source index');
     for (const source of sources) ColumnarStore.validate(source);
-    if (shouldValidateConfig()) validateChartConfig(config);
     for (let si = 0; si < config.series.length; si++) {
       const sourceIndex = indices[si];
       if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sources.length) {
         throw new Error(`Invalid data source for series ${si}`);
       }
-      if (shouldValidateConfig())
-        validateChartConfig({ ...config, series: [config.series[si]] }, sources[sourceIndex]);
     }
   }
 
@@ -850,13 +846,6 @@ export class ChartCore implements EngineHost {
       ) as unknown as ChartSpec;
     }
 
-    if (shouldValidateConfig()) {
-      // Structural checks only here: a config update can legitimately add a
-      // series that references a column arriving with a later replacement, so
-      // column-index bounds are validated by replaceSources and the constructor, not
-      // against whatever data happens to be loaded now.
-      validateChartConfig(this.config);
-    }
     this.applyConfigSideEffects(partial, false);
   }
 
@@ -886,13 +875,6 @@ export class ChartCore implements EngineHost {
       this.pluginManager.installAll(this);
     }
 
-    if (shouldValidateConfig()) {
-      // Structural checks only here: a config update can legitimately add a
-      // series that references a column arriving with a later replacement, so
-      // column-index bounds are validated by replaceSources and the constructor, not
-      // against whatever data happens to be loaded now.
-      validateChartConfig(this.config);
-    }
     this.applyConfigSideEffects(config, true);
   }
 

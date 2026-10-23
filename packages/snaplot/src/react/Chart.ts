@@ -6,7 +6,7 @@ import {
   useLayoutEffect,
   useRef,
 } from 'react';
-import { createChart, reconcileChart, setChartControls } from '../api/createChart';
+import { createChart, reconcileChart, setChartControls } from '../public/chart';
 import type { ChartHandle, ChartOptions } from '../public/types';
 import {
   applyDefaults,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore, useRef } from 'react';
-import { createChartGroup } from '../api/createChart';
+import { createChartGroup } from '../public/chart';
 import type { ChartHandle, ChartGroupOptions } from '../public/types';
 import type { CursorSnapshotOptions } from '../engine/spec';
 const emptySubscribe = () => () => {};

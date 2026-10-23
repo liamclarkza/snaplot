@@ -1,6 +1,6 @@
 // Framework-independent public API. The rendering engine is private; every type here is
 // declared in public/types.ts.
-export { createChart, createChartGroup } from './api/createChart';
+export { createChart, createChartGroup } from './public/chart';
 export type {
   Accessor,
   AppendOptions,
