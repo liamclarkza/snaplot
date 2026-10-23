@@ -137,7 +137,7 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
     ]);
   });
 
-  it.fails('[visuals-01] a time Y axis reads as a time, never as an epoch number', () => {
+  it('[visuals-01] a time Y axis reads as a time, never as an epoch number', () => {
     // §5.2: a time axis reads at time precision. The exact string is M10's
     // (data-spacing precision); here it must be a clock time, not a number.
     const start = Date.UTC(2024, 0, 1);

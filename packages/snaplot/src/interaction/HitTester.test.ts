@@ -192,7 +192,7 @@ describe('HitTester tooltip formatters', () => {
     expect(points[0].formattedY).toBe('20.13');
   });
 
-  it.fails('reads a time Y axis through its tick format when no formatters are set', () => {
+  it('reads a time Y axis through its tick format when no formatters are set', () => {
     const store = new ColumnarStore([f([0, 50, 100]), f([10, 20.125, 30])]);
     const scales = new Map<string, Scale>([
       ['x', scale('x', 0, 100)],

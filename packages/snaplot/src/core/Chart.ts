@@ -4417,12 +4417,14 @@ export class ChartCore implements ChartInstance {
 
   /**
    * A value readout on `axisKey` at value precision (plan P9): never the tick
-   * formatter, whose precision is the tick step's. Internal; also used by the
-   * public controller.
+   * formatter, whose precision is the tick step's. A time axis reads as a
+   * time (§5.2), through its tick format until M10's time readout. Internal;
+   * also used by the public controller.
    */
   formatReadout(axisKey: string, value: number): string {
     const scale = this.scales.get(axisKey);
     if (!scale) return formatValue(value);
+    if (scale.type === 'time') return scale.tickFormat(value);
     const axis = this.config.axes?.[axisKey];
     let step = this.readoutSteps.get(axisKey);
     if (

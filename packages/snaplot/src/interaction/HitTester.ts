@@ -39,7 +39,10 @@ export interface TooltipFormatters {
   readout?: (y: number, seriesIndex: number) => string;
 }
 
-/** formattedY: tooltip.yFormat, else a value readout, never the tick format. */
+/**
+ * formattedY: tooltip.yFormat, else a value readout, never a numeric tick
+ * format. A time axis reads as a time, through its tick format until M10.
+ */
 function formatY(
   formatters: TooltipFormatters | undefined,
   yScale: Scale | undefined,
@@ -48,6 +51,7 @@ function formatY(
 ): string {
   if (formatters?.y) return formatters.y(value, seriesIndex);
   if (formatters?.readout) return formatters.readout(value, seriesIndex);
+  if (yScale?.type === 'time') return yScale.tickFormat(value);
   return formatValue(value, yScale ? { stepDecimals: scaleStepDecimals(yScale) } : {});
 }
 
