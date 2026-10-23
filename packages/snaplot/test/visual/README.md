@@ -40,8 +40,18 @@ Every run writes `packages/snaplot/test-results/visual/`:
 The reference cache is `$SNAPLOT_SNAPSHOT_DIR/<sha>/`, default `<main checkout>/.claude/visual-cache/`.
 A ref is extracted with `git archive` and renders its own fixtures with its own config. A fixture whose
 options a milestone renamed therefore still compares like with like. Refs older than the M3a merge have
-no fixture app and are not valid references. The runner never deletes anything outside the worktree,
-and waits while `.claude/bench.lock` exists.
+no fixture app and are not valid references.
+
+Every worktree shares the cache. Two runs against the same SHA take turns through
+`<sha>/capture.lock` (a `mkdir` lock with `owner.json`): one captures, and the other waits, then
+reads the cache. A lock whose owner has exited, or that is older than 2 hours, is moved aside to
+`capture.lock.stale-<time>`, never deleted. The runner deletes nothing else outside the worktree.
+
+The runner waits while the bench lock exists. Like `bench/`, it finds the lock at
+`<main checkout>/.claude/bench.lock` through git's common directory. `SNAPLOT_BENCH_LOCK` (or
+`SNAPLOT_CLAUDE_DIR`) moves it. A plain clone finds itself as the main checkout, so the runner warns
+when that directory does not exist. In a clone, set `SNAPLOT_BENCH_LOCK` to the main checkout's
+lock.
 
 The reference is rendered twice, and the second render must match the first exactly (no tolerance,
 whatever the comparison then uses). It is cached (`capture.json`) only when every shot it declares

@@ -23,8 +23,15 @@
 // match the first exactly (SNAPLOT_VISUAL_STRICT), and the head is then compared with it exactly
 // too (record.mjs says why). It is cached (capture.json) only when every shot it declares rendered and reproduced itself.
 // meta.json records the outcome (`against.complete`, the exit codes and the shot list), and
-// check-visual-diffs fails on an incomplete reference. Nothing is ever deleted outside this
-// worktree (except a stale node_modules symlink the runner itself made in the cache).
+// check-visual-diffs fails on an incomplete reference. Two runs against the same SHA take turns
+// (<entry>/capture.lock), so they never build into the same extracted tree at once. Nothing is
+// ever deleted outside this worktree (except a stale node_modules symlink, or a released
+// capture lock, that the runner itself made in the cache).
+//
+// Environment: SNAPLOT_SNAPSHOT_DIR (the reference cache), SNAPLOT_BENCH_LOCK and
+// SNAPLOT_CLAUDE_DIR (as in bench/: the lock, default <main checkout>/.claude/bench.lock, found
+// through git's common directory; a plain clone has its own, so point SNAPLOT_BENCH_LOCK at the
+// main checkout's there).
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -33,6 +40,8 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  renameSync,
+  rmdirSync,
   statSync,
   symlinkSync,
   unlinkSync,
@@ -97,9 +106,22 @@ function parseArgs(argv) {
 
 const repoRoot = git(['rev-parse', '--show-toplevel']);
 const mainRoot = dirname(resolve(repoRoot, git(['rev-parse', '--git-common-dir'])));
+/** The shared .claude directory and bench lock: the same variables and defaults as bench/. */
+const claudeDir = resolve(process.env.SNAPLOT_CLAUDE_DIR || join(mainRoot, '.claude'));
+const benchLock = resolve(process.env.SNAPLOT_BENCH_LOCK || join(claudeDir, 'bench.lock'));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let lockWarned = false;
 
 async function waitForBenchLock() {
-  const lock = join(mainRoot, '.claude/bench.lock');
+  const lock = benchLock;
+  if (!lockWarned && !existsSync(dirname(lock))) {
+    // A plain clone finds itself as the main checkout, so it would not see the real lock.
+    console.warn(
+      `visual: ${dirname(lock)} does not exist, so this checkout shares no bench lock with the ` +
+        "others. In a plain clone, set SNAPLOT_BENCH_LOCK to the main checkout's .claude/bench.lock",
+    );
+    lockWarned = true;
+  }
   let announced = false;
   while (existsSync(lock)) {
     const age = Date.now() - statSync(lock).mtimeMs;
@@ -109,7 +131,75 @@ async function waitForBenchLock() {
     }
     if (!announced) console.log(`visual: waiting for the bench lock ${lock}`);
     announced = true;
-    await new Promise((r) => setTimeout(r, 15000));
+    await sleep(15000);
+  }
+}
+
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+}
+
+/**
+ * Takes <entry>/capture.lock (a mkdir lock with owner.json), so two runs against the same SHA do
+ * not extract and render into the same tree at once: one captures, the other waits and then uses
+ * the cache. A lock whose owner has exited, or that is older than LOCK_STALE_MS, is moved aside,
+ * never deleted. Resolves with the function that releases it.
+ */
+async function takeCaptureLock(entry) {
+  const lock = join(entry, 'capture.lock');
+  const ownerFile = join(lock, 'owner.json');
+  mkdirSync(entry, { recursive: true });
+  let announced = false;
+  for (;;) {
+    try {
+      mkdirSync(lock);
+      writeFileSync(
+        ownerFile,
+        `${JSON.stringify({ pid: process.pid, cwd: repoRoot, date: new Date().toISOString() })}\n`,
+      );
+      return () => {
+        try {
+          unlinkSync(ownerFile);
+          rmdirSync(lock);
+        } catch {
+          // Already moved aside by another run that judged it stale.
+        }
+      };
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+    }
+    let owner = null;
+    let age = 0;
+    try {
+      age = Date.now() - statSync(lock).mtimeMs;
+      owner = JSON.parse(readFileSync(ownerFile, 'utf8'));
+    } catch {
+      owner = null; // just released, or its owner is still writing owner.json
+    }
+    const gone = owner ? !pidAlive(owner.pid) : age > 30_000;
+    if (gone || age > LOCK_STALE_MS) {
+      const aside = `${lock}.stale-${Date.now()}`;
+      try {
+        renameSync(lock, aside);
+        console.warn(`visual: moved a stale reference capture lock aside to ${aside}`);
+      } catch {
+        // Released or moved meanwhile; try again.
+      }
+      continue;
+    }
+    if (!announced && owner) {
+      console.log(
+        `visual: waiting for another run (pid ${owner.pid}, ${owner.cwd}) that is capturing this ` +
+          'reference',
+      );
+      announced = true;
+    }
+    await sleep(2000);
   }
 }
 
@@ -283,13 +373,12 @@ async function renderReference({ tree, port, shots, entry, update, reportPath, e
  * reproduce the first exactly. Returns the reference outcome that meta.json records:
  * `{ ref, sha, dir, fingerprint, cached, exit, verifyExit, complete, declared, shots }`, where
  * `shots` lists the shot names that rendered and reproduced, and `complete` says whether that is
- * every shot the ref declares (only then is it cached).
+ * every shot the ref declares (only then is it cached). Holds the entry's capture lock while it
+ * extracts and renders.
  */
 async function captureReference(ref, port, givenTree, givenSha) {
   const sha = givenTree ? (givenSha ?? 'tree') : git(['rev-parse', '--verify', `${ref}^{commit}`]);
-  const cacheRoot = resolve(
-    process.env.SNAPLOT_SNAPSHOT_DIR || join(mainRoot, '.claude/visual-cache'),
-  );
+  const cacheRoot = resolve(process.env.SNAPLOT_SNAPSHOT_DIR || join(claudeDir, 'visual-cache'));
   const entry = join(cacheRoot, sha);
   const refLockPath = givenTree ? join(givenTree, 'package-lock.json') : null;
   const refLock = givenTree
@@ -307,8 +396,7 @@ async function captureReference(ref, port, givenTree, givenSha) {
   const fingerprint = referenceFingerprint(refLock);
   const shots = join(entry, `shots-${fingerprint}`);
   const marker = join(shots, 'capture.json');
-  const cached = readMarker(marker);
-  if (cached) {
+  const fromCache = (cached) => {
     console.log(
       `visual: reference ${ref} (${sha.slice(0, 10)}) from cache ${shots} (${cached.shots.length} shots)`,
     );
@@ -324,7 +412,9 @@ async function captureReference(ref, port, givenTree, givenSha) {
       declared: cached.declared,
       shots: cached.shots,
     };
-  }
+  };
+  const cached = readMarker(marker);
+  if (cached) return fromCache(cached);
   if (existsSync(marker)) {
     console.log('visual: the cached reference predates the verified shot list; capturing again');
   }
@@ -339,6 +429,39 @@ async function captureReference(ref, port, givenTree, givenSha) {
         'are not valid references (plan §11.3 G10)',
     );
   }
+  const release = await takeCaptureLock(entry);
+  try {
+    // Another run may have completed this reference while this one waited for the lock.
+    const done = readMarker(marker);
+    if (done) return fromCache(done);
+    return await renderInto({
+      ref,
+      sha,
+      entry,
+      shots,
+      marker,
+      fingerprint,
+      refLock,
+      port,
+      givenTree,
+    });
+  } finally {
+    release();
+  }
+}
+
+/** The extraction and the two renders of captureReference, under its lock. */
+async function renderInto({
+  ref,
+  sha,
+  entry,
+  shots,
+  marker,
+  fingerprint,
+  refLock,
+  port,
+  givenTree,
+}) {
   const tree = givenTree ?? join(entry, 'tree');
   if (!givenTree) {
     mkdirSync(tree, { recursive: true });
