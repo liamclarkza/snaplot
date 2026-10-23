@@ -228,6 +228,17 @@ describe('evaluateBudgets', () => {
         .filter((b) => b.id === 'scatter-pan-200k-fidelity')
         .every((b) => b.status === 'missed' && b.blocking),
     );
+    // An unsorted scatter is strided over its whole source: M7's sampling change cut it to 0.58.
+    const offaxis = heads('scatter-offaxis-pan-50k', [1, 1, 1], { fidelity: 0.58 });
+    for (const set of ['M7', 'M11']) {
+      const out = evaluateBudgets({ gate, setName: set, heads: offaxis, raster: 'gpu' });
+      const rows = out.filter((b) => b.id === 'scatter-offaxis-pan-50k-fidelity');
+      assert.ok(rows.length > 0, set);
+      assert.ok(
+        rows.every((b) => b.status === 'missed' && b.blocking),
+        set,
+      );
+    }
   });
 
   test('a budget for another raster mode is not evaluated', () => {

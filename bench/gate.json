@@ -419,6 +419,16 @@
       "sets": ["M11", "M14"]
     },
     {
+      "id": "scatter-offaxis-pan-50k-fidelity",
+      "scenario": "scatter-offaxis-pan-50k",
+      "metric": "fidelity.median",
+      "profile": "*",
+      "raster": "*",
+      "min": 0.8,
+      "kind": "count",
+      "sets": ["M7", "M11", "M14"]
+    },
+    {
       "id": "hover-sync-group-20-offscreen-overlays",
       "scenario": "hover-sync-group-20",
       "metric": "meta.offscreenOverlaysPerMove",
