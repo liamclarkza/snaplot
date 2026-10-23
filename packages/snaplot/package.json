@@ -49,6 +49,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "playwright test -c test/browser/playwright.config.ts",
+    "ledger": "node ../../scripts/ledger.mjs",
+    "trace-check": "node ../../scripts/overhaul/trace-check.mjs",
     "prepack": "node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').copyFileSync('../../' + f, f)\"",
     "postpack": "node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').rmSync(f, { force: true })\"",
     "check:package": "publint --strict && attw --pack . --profile esm-only --exclude-entrypoints ./legend-table.css && node scripts/check-consumers.mjs",
