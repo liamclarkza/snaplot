@@ -5,9 +5,9 @@ name: CI
 # workflow and `needs:` it, so nothing deploys or publishes unless every blocking job passes.
 #
 # Blocking: lint (G1), types (G2), unit (G3), ledger (G4), package (G5), size (G6), api (G7),
-# palettes (G8, advisory inside the script until M11), browser (G9), conformance (from M13).
+# palettes (G8, advisory inside the script until M11), browser (G9), docs (G11),
+# conformance (from M13).
 # Advisory: visual (G10, blocking from M14) and bench (G12).
-# The docs job (G11) arrives with the site in M6a.
 
 on:
   push:
@@ -183,6 +183,22 @@ jobs:
             packages/snaplot/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  docs:
+    name: Docs site (G11)
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build:site
+      - run: npm run check:examples
+      - run: npm run test:smoke -w site
 
   conformance:
     name: Conformance (from M13)
