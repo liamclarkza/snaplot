@@ -52,6 +52,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeContactSheet } from './contact-sheet.mjs';
 import { comparisonFor, describeComparison, headInputs, STRICT_ENV } from './record.mjs';
+import { parseArgs } from './run-args.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = resolve(HERE, '../..');
@@ -67,41 +68,6 @@ const CAPTURE_FORMAT = 3;
 
 function git(args, cwd = PKG) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
-}
-
-function parseArgs(argv) {
-  const opts = {
-    projects: [],
-    passthrough: [],
-    against: null,
-    againstTree: null,
-    againstSha: null,
-    update: false,
-    serve: false,
-    strict: false,
-  };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--') {
-      opts.passthrough.push(...argv.slice(i + 1));
-      break;
-    }
-    if (a === '--against') opts.against = argv[++i];
-    else if (a.startsWith('--against=')) opts.against = a.slice(10);
-    else if (a === '--against-tree') opts.againstTree = resolve(argv[++i]);
-    else if (a === '--against-sha') opts.againstSha = argv[++i];
-    else if (a === '--update') opts.update = true;
-    else if (a === '--serve') opts.serve = true;
-    else if (a === '--strict') opts.strict = true;
-    else if (a === '--project') opts.projects.push(argv[++i]);
-    else if (a === '--grep' || a === '-g') opts.passthrough.push('--grep', argv[++i]);
-    else if (a === '--workers' || a === '-j') opts.passthrough.push('--workers', argv[++i]);
-    else opts.passthrough.push(a);
-  }
-  if (opts.against === undefined || opts.against === '') throw new Error('--against needs a ref');
-  if (opts.againstTree && !opts.against) opts.against = opts.againstSha ?? 'tree';
-  if (opts.against && opts.update) throw new Error('--against and --update are exclusive');
-  return opts;
 }
 
 const repoRoot = git(['rev-parse', '--show-toplevel']);
@@ -582,6 +548,7 @@ function shotNames(report) {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
+  if (opts.againstTree) opts.againstTree = resolve(opts.againstTree);
   const port = await pickPort();
   if (opts.serve) {
     console.log(`visual: http://127.0.0.1:${port}/index.html`);
