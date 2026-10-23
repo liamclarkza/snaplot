@@ -2,7 +2,8 @@
 
 - **Branch:** `ovh/m6a-site-scaffold` · **Worktree:** `.claude/worktrees/m6a` · **Base:** `504d934`
   (`overhaul` at start, the M5 handoff commit; `overhaul` has not moved since)
-- **Status:** complete
+- **Status:** complete. Review round 1 (verdict "changes", one blocker) is fixed; see
+  [Review round 1](#review-round-1).
 
 ## Summary
 
@@ -11,11 +12,12 @@
   1. `first-chart` renders one example in Vanilla, React and Solid tabs, and each tab mounts a live,
      painted chart: a custom element for vanilla, a React island and a Solid island, `client:visible`.
      Checked in dev and in the build.
-  2. Pagefind finds `createChart` in the build (12 pages; the API reference page first). In
+  2. Pagefind finds `createChart` in the build (14 pages; the API reference page first). In
      `astro dev`, Starlight has no index by design, so the search dialog says to use
      the production build.
   3. starlight-typedoc builds the reference for `snaplot`, `snaplot/react` and `snaplot/solid`
-     (121 pages under `/reference/api/`). Dev and build.
+     (124 pages under `/reference/api/`: the landing page, one overview per entry point, and the
+     members). Dev and build.
   4. `base: '/snaplot/'` works: every page and asset is under `/snaplot/`, and `/first-chart/`
      without the base is a 404. Dev and build.
 
@@ -38,7 +40,8 @@
     - `Search`: an ARIA combobox and listbox over Pagefind's JS API, in Starlight's modal dialog.
       Pagefind's default UI has no combobox semantics.
     - `SiteTitle`: the version beside the name (docs-16).
-    - `Banner`: the D1 prerelease banner, shown only when the version has a `-`.
+    - `Banner`: the D1 prerelease banner, shown only when the version has a `-`. The custom layout
+      renders the same `PrereleaseBanner` (review round 1).
   - `<Example name>` (`src/components/Example.astro`):
     - Vanilla, React and Solid tabs, synced on the page and remembered. Storage is guarded, and an
       inline restore element avoids a flash of the wrong tab.
@@ -46,7 +49,8 @@
       chart mounts when the tab is visible.
     - Option-level examples are `<name>.options.ts` plus the fixed mount templates in
       `src/lib/examples.ts`. Integration examples are three hand-written files.
-  - The 21-page IA: 20 MDX outlines with their §8.1 headings, plus the generated reference. Also a
+  - The 21-page IA: 20 MDX outlines with their §8.1 headings, plus the generated reference, whose
+    landing page is `/reference/api/` (review round 1). Also a
     homepage and an examples hub, both skeletons on a custom 72rem layout (`src/layouts/Site.astro`),
     and a 404 page.
   - Old links: an 11-line inline script on the homepage maps `/snaplot/#/docs/<group>/<section>` and
@@ -71,12 +75,14 @@
       slices are excluded and keep the root's 100.
 - **Tests:**
   - `site/vitest.config.ts` covers `src/**` and `tests/**`, so the root `npm test` runs the site's unit
-    tests and lints (24 tests).
-  - `site/tests/smoke.spec.ts` (Playwright, 174 tests against `astro preview`) covers:
+    tests and lints (25 tests).
+  - `site/tests/smoke.spec.ts` (Playwright, 180 tests against `astro preview`) covers:
     - every route;
     - every example in each tab, painting and Copy;
     - the `[uisite-*]` locks;
     - search;
+    - every internal link and heading anchor in the build (G11's link check);
+    - the D1 banner;
     - old links;
     - the no-build page.
 - **`deploy.yml`:** the `v*` tag trigger is on (D32).
@@ -101,11 +107,18 @@ Commits (oldest first):
 | `e8425e0` | ci: deploy the docs on version tags |
 | `b6a6f04` | test(site): let copy tooltips leave before the axe pass |
 | `cb1cce7` | fix(site): style the search results the script creates; a smaller h1 on phones |
-| (tip) | docs(handoff): record the M6a gates |
+| `703d006` | docs(handoff): record the M6a gates |
+| `b4aaef4` | test(site): every internal link resolves, and the API link reaches each entry point |
+| `b7a5ae6` | fix(site): the API reference keeps its module pages, at /reference/api/ |
+| `54b445f` | test(site): the D34 lint catches dense claims beyond "dense data" |
+| `1adf1f1` | fix(site): the homepage and hub show the prerelease banner too |
+| (tip) | docs(handoff): review round 1 |
 
 The brief's two subjects are `2e9644b` and `91931e2`. The scaffold commit already carries the pipeline
-unit tests (`src/lib/examples.test.ts`), so the site's `vitest run` has tests from the first commit. The
-last two are fixes found by the gates, a flaky axe pass and unstyled search options.
+unit tests (`src/lib/examples.test.ts`), so the site's `vitest run` has tests from the first commit.
+`b6a6f04` and `cb1cce7` are fixes found by the gates, a flaky axe pass and unstyled search options.
+The four after `703d006` answer the review. `b4aaef4` adds the two locks as `test.fail`, and
+`b7a5ae6` flips them.
 
 Closes, with their locks (`site/tests/smoke.spec.ts` unless noted):
 
@@ -117,28 +130,81 @@ Closes, with their locks (`site/tests/smoke.spec.ts` unless noted):
 | uisite-05 | `[uisite-05] links and tabs show a hover state` (nav, footer, tab, sidebar) |
 | uisite-06 | axe (serious and critical) on every route in light, `[uisite-06] axe … in the dark theme either`; `lint-styles.test.ts › [uisite-06] the colour tokens keep their contrast` |
 | uisite-07 | `[uisite-07] tabular figures only on numbers, not on body text`; `lint-styles.test.ts › [uisite-07] …` |
-| uisite-12 | `[uisite-12] … nav, page and footer share one left edge` at 1440 and 390 px, with no horizontal overflow |
+| uisite-12 | `[uisite-12] … nav, page and footer share one left edge` at 1440 and 390 px on the custom pages, with no horizontal overflow. The docs keep Starlight's full-width header (D11); see Known gaps |
 | uisite-14 | `[uisite-14][docs-11] search › a combobox whose results nothing covers` at 1280 and 390 px (role, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `elementFromPoint`, ArrowDown, Escape clears and then closes) |
 | uisite-15 | `[uisite-15] the mobile drawer keeps focus in the header and the menu` (40 Tabs) |
 | uisite-16 | every route › Copy equals the tab's file; `[uisite-16] the tabs follow the keyboard and the choice holds across pages`; `src/lib/examples.test.ts › [uisite-16][docs-04] …` |
-| uisite-17 | the reference is generated and searchable; `scripts/typedoc-validate.mjs` reports the 430 undocumented declarations. Fully closed when M7 adds the JSDoc and sets `STRICT` |
+| uisite-17 | `[uisite-17] the API link opens a reference that links to each entry point`; `every internal link resolves to a page, a file or a heading (G11)`; the reference is searchable; `scripts/typedoc-validate.mjs` reports the 430 undocumented declarations. Fully closed when M7 adds the JSDoc and sets `STRICT` |
 | uisite-19 | `lint-styles.test.ts › [uisite-19] …` (no inline styles or `!important` in `site/src`, eyebrows, homepage gradients and shadows, radius) |
-| uisite-20 | `[uisite-20] every page has its own title, and an unknown page is a 404`; path routes; self-hosted fonts; Starlight's per-page Open Graph tags. The OG card image is open (Known gaps) |
+| uisite-20 | `[uisite-20] every page has its own title, and an unknown page is a 404`; path routes; self-hosted fonts; Starlight's per-page Open Graph tags. The OG card image is open (Known gaps, Requests 9) |
 | uisite-21 | `[uisite-21][research-09] … an on-page TOC`; no eyebrow or preface; Copy sits in the code frame |
 | docs-04 | every route › each tab paints, and Copy copies the full runnable file (imports, data, mount) |
 | docs-11 | `[uisite-14][docs-11] search › the index finds API names, options and topics` (createChart, useCursor, LegendTable, colorBy, height, dark, ssr, migrat) |
 | docs-16 | `ci: deploy the docs on version tags`; `[docs-16] the header shows the documented version`; per-page titles |
 | research-09 | `[uisite-21][research-09] path routes, the IA groups …`; the 21-page IA with framework tabs. `llms.txt` stays deferred (D36) |
 
+### Review round 1
+
+The reviewer found one blocker: the API landing page, which every "API" link points to, linked
+only to three module pages that 404. With several entry points and no `readme`, starlight-typedoc
+deletes every `<module>/README.md` (TypeDoc's default entry file) but keeps the root page that links
+to them. The route tests load each page and its subresources, not the pages its links go to, so they
+missed it. Fixed, tests first:
+
+- **Locks** (`b4aaef4` as `test.fail`, flipped in `b7a5ae6`):
+  - `every internal link resolves to a page, a file or a heading (G11)`. It walks every `href` and
+    `src` under `/snaplot/` in `dist/**/*.html` (24,571 links, 82 with a heading anchor), and checks
+    that each path is a file or has an `index.html`, and that each anchor is an `id` on its target.
+    Before the fix it reported exactly the reviewer's three links.
+  - `[uisite-17] the API link opens a reference that links to each entry point`. It follows Home ›
+    API, then each module link on the landing page, and expects three, each 200 with member links.
+    This lock caught what the link walk alone could not, described next.
+- **Fix** (`b7a5ae6`):
+  - TypeDoc's `entryFileName` is now `index`. The landing page is `/snaplot/reference/api/`, titled
+    "API reference" (TypeDoc `name`), and each entry point keeps its overview page.
+  - `entryFileName: 'index'` alone was not enough. The module TypeDoc names `index`, after
+    `src/index.ts`, wrote `index/index.md`, which Starlight also slugs as `reference/api`. The module
+    page replaced the landing page, so the page with the broken link was never built and the link
+    walk passed.
+  - A 19-line TypeDoc plugin, `site/scripts/typedoc-module-names.mjs`, now names the modules after
+    their import paths: `snaplot`, `snaplot/react` and `snaplot/solid`. The reference and the
+    sidebar now use those names instead of `index`, `react` and `solid`. Once M7's `@module`
+    comments land, the plugin does nothing.
+  - The nav and footer (`Site.astro`), `404.md` and the old `#/docs/api*` routes now point at
+    `reference/api/`. `old-routes.json` was regenerated. That URL stays the same whatever M7 names
+    the modules.
+  - The build has 147 pages. Its only `[WARN]`s are the harmless ones explained under `build:site`
+    below. Under `astro dev`, `/reference/api/` and the three overviews return 200
+    (criterion 3 still holds in dev).
+
+Non-blocking notes:
+
+| Note | Outcome |
+|---|---|
+| uisite-12: the logo jumps from x=168 (custom pages) to x=28 (docs) at 1440 px | Recorded as an accepted difference (D11), for the §9 review by a human (Known gaps, Human steps). Matching Starlight's full-width header on the custom pages would separate their nav from their page and footer. |
+| uisite-20 og:image has no owner after M6a | Requests 9: assign it to M16a explicitly. |
+| The custom layout has no D1 banner | Fixed in `1adf1f1`. Both layouts render one `PrereleaseBanner`, which sits in the shared container on the custom pages. The new `[D1] … both layouts, a release in neither` lock checks `/`, `/examples/` and `/first-chart/`. With the version set to `1.0.0-beta.0` locally, and not committed, the full smoke spec passed (180, axe included), and the banner text shared the brand's left edge at 1440 and 390 px. `packages/` was restored afterwards and `git diff` is empty. |
+| Spike criterion 2 cannot hold in `astro dev` | Unchanged: the plan asks for something Pagefind cannot do. Recorded in Known gaps. |
+| G11 not in CI | Unchanged: Requests 2. |
+| No site `typecheck` script | Not added. The site's TypeScript resolves `snaplot` to `dist/*.d.ts` and needs Astro's generated `.astro/types.d.ts`, but `verify` runs `typecheck` before `build`. On a clean checkout the site would fail. `check:examples` (G11) checks it after the build. Known gaps. |
+| lint-copy matches only "dense data" | Widened in `54b445f`. `isDenseClaim` matches "dense data", "dense datasets", "dense charts", "dense, live data" and "live and dense", with its own detector test. It still passes a mechanism, such as the README's "dense scatter uses cached hit testing". A bare `\bdense\b`, as §9 words it, would fail that README line, which M6a does not own. |
+| h1 is 2rem below 50rem, not 40 px | Kept. Recorded for the §9 review by a human (Human steps). |
+| frameworks-15 island height rule | Unchanged: Requests 5. |
+| No `[uisite-17]` test title | Now `[uisite-17] the API link opens a reference that links to each entry point`. |
+| M6b and `noDuplicateTestHooks` | Unchanged: Requests 1. |
+| npm audit | Unchanged: 7 (1 low, 6 moderate, 0 critical). |
+
 ## Gates
 
-All at `cb1cce7` in the worktree. Logs are in the session scratchpad (`m6a-final-*.log`).
+All at `1adf1f1` (the code tip) in the worktree; `overhaul` is still `504d934`. Logs are in the session
+scratchpad (`m6a-fix/*.log`). Every Playwright and `npm ci` run waited on `.claude/bench.lock`, which was
+free each time.
 
 **`npm run verify`** (exit 0):
 
 ```
 > biome ci . && npm run typecheck && npm test && npm run build
-Checked 205 files in 99ms. No fixes applied.
+Checked 207 files in 107ms. No fixes applied.
 > snaplot@0.12.0 typecheck
 > tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json
 > typecheck            (bench)
@@ -150,27 +216,27 @@ Checked 205 files in 99ms. No fixes applied.
 > test                 (site)
 > vitest run
  Test Files  4 passed (4)
-      Tests  24 passed (24)
+      Tests  25 passed (25)
 > snaplot@0.12.0 build
 > vite build && vite build --config vite.ssr.config.ts
-[vite:dts] Declaration files built in 3711ms.
-✓ built in 4.33s
-✓ built in 599ms
+[vite:dts] Declaration files built in 2376ms.
+✓ built in 2.78s
+✓ built in 397ms
 verify exit=0
 ```
 
 The library is unchanged: 521 plus the 2 expected failures `[arch-01]` and `[research-12]`. The site
-adds 24 tests:
+adds 25 tests:
 - `examples.test.ts` (6);
 - `lint-styles.test.ts` (8);
-- `lint-copy.test.ts` (6);
+- `lint-copy.test.ts` (7);
 - `data-size.test.ts` (4).
 
 **`git rebase -x 'git diff --quiet HEAD~1 -- package-lock.json || npm ci --no-audit --no-fund; npm test' overhaul`**
-(exit 0; `npm ci` ran at the lockfile commit; every commit green):
+(exit 0; `npm ci` ran at the lockfile commit; all 10 commits green; the SHAs are unchanged):
 
 ```
-added 657 packages in 9s
+added 657 packages in 6s
  Test Files  49 passed (49)
       Tests  521 passed | 2 expected fail (523)
  Test Files  1 passed (1)
@@ -179,37 +245,51 @@ added 657 packages in 9s
       Tests  521 passed | 2 expected fail (523)
  Test Files  4 passed (4)
       Tests  24 passed (24)
-… (the same two lines for each of the three later commits)
+… (the same for the next six commits, through b7a5ae6)
+Executing: git diff --quiet HEAD~1 -- package-lock.json || npm ci --no-audit --no-fund; npm test
+ Test Files  49 passed (49)
+      Tests  521 passed | 2 expected fail (523)
+ Test Files  4 passed (4)
+      Tests  25 passed (25)
+Rebasing (19/20)Rebasing (20/20)Executing: git diff --quiet HEAD~1 -- package-lock.json || npm ci --no-audit --no-fund; npm test
+ Test Files  49 passed (49)
+      Tests  521 passed | 2 expected fail (523)
+ Test Files  4 passed (4)
+      Tests  25 passed (25)
 Successfully rebased and updated refs/heads/ovh/m6a-site-scaffold.
-rebase exit=0
 ```
 
 **`npm run build:site`** (exit 0):
 
 ```
 > node scripts/typedoc-validate.mjs && astro build --force
-  index.createChart (CallSignature), defined in snaplot/src/api/createChart.ts, does not have any documentation
-  … and 425 more (run with --list)
 typedoc-validate: 430 undocumented public declarations (warning until M7), 0 other warnings, 0 errors.
+[WARN] [content] data store cleared (force)
 [WARN] [content] The collection "i18n" does not exist or is empty. …
 [WARN] [build] Could not render `/404` from route `/[...slug]` as it conflicts with higher priority route `/404`.
-[starlight:pagefind] Found 144 HTML files.
-[starlight:pagefind] Finished building search index in 0.83s.
-[build] 144 page(s) built in 6.32s
+[starlight:pagefind] Found 147 HTML files.
+[build] 147 page(s) built in 4.01s
 [build] Complete!
 build:site exit=0
 ```
 
-Both `[WARN]` lines are harmless. Starlight looks up an optional `i18n` collection. And
-`src/content/docs/404.md` is the documented way to customise Starlight's 404, which Starlight's own
-`/404` route renders; its catch-all also tries to.
+The `[WARN]` lines are harmless:
+- `--force` clears the content cache, as intended (Known gaps).
+- Starlight looks up an optional `i18n` collection.
+- `src/content/docs/404.md` is the documented way to customise Starlight's 404, which Starlight's own
+  `/404` route renders, and its catch-all also tries to.
+
+My first attempt at the fix, `entryFileName` alone and never committed, added a fourth warning:
+`Could not render /reference/api from route /[...slug] as it conflicts with higher priority route
+/[...slug]`. That is the collision described in Review round 1. If a module is ever named `index`
+again, this warning comes back.
 
 **`npm run check:examples`** (exit 0; the 5 hints are `navigator.platform` and `define:vars` names
 that astro check cannot see):
 
 ```
 > astro check && tsc -p tsconfig.json && node --experimental-strip-types scripts/check-examples.mjs
-Result (28 files):
+Result (30 files):
 - 0 errors
 - 0 warnings
 - 5 hints
@@ -219,68 +299,73 @@ check-examples: tsc -p tsconfig.examples.solid.json passed
 check:examples exit=0
 ```
 
-**The smoke spec**, `PORT=5336 npm run test:smoke -w site` (exit 0; 143 route tests, then):
+**The smoke spec**, `PORT=5336 npx playwright test` in `site/` (= `npm run test:smoke -w site`;
+exit 0; 146 route tests, then):
 
 ```
-Running 174 tests using 6 workers
-  ✓ [uisite-06] axe finds no serious violations in the dark theme either
+Running 180 tests using 6 workers
+  ✓ [D39] the no-build page runs snaplot from dist through an import map
   ✓ [uisite-01] blocked storage › /snaplot/ still renders, switches theme and runs its example
   ✓ [uisite-01] blocked storage › /snaplot/first-chart/ still renders, switches theme and runs its example
-  ✓ [uisite-02] the first paint has the right theme › /snaplot/: light system, no stored choice → light
   ✓ [uisite-02] the first paint has the right theme › /snaplot/: dark system → dark
-  ✓ [uisite-02] … /snaplot/first-chart/: light system, no stored choice → light
+  ✓ [uisite-02] the first paint has the right theme › /snaplot/: light system, no stored choice → light
   ✓ [uisite-02] … /snaplot/first-chart/: dark system → dark
+  ✓ [uisite-02] … /snaplot/first-chart/: light system, no stored choice → light
   ✓ [uisite-02] … a stored choice wins over the system; stale keys from the old site do not
-  ✓ [uisite-04] keyboard focus › /snaplot/: the first Tab focuses a visible skip link
   ✓ [uisite-04] keyboard focus › /snaplot/: focus rings stay visible under forced colours
-  ✓ [uisite-04] keyboard focus › /snaplot/first-chart/: the first Tab focuses a visible skip link
+  ✓ [uisite-04] keyboard focus › /snaplot/: the first Tab focuses a visible skip link
   ✓ [uisite-04] keyboard focus › /snaplot/first-chart/: focus rings stay visible under forced colours
+  ✓ [uisite-04] keyboard focus › /snaplot/first-chart/: the first Tab focuses a visible skip link
+  ✓ [uisite-06] axe finds no serious violations in the dark theme either
   ✓ [uisite-14][docs-11] search › a combobox whose results nothing covers (1280px)
   ✓ [uisite-14][docs-11] search › a combobox whose results nothing covers (390px)
   ✓ [uisite-14][docs-11] search › the index finds API names, options and topics
   ✓ [uisite-15] the mobile drawer keeps focus in the header and the menu
-  ✓ layout and chrome › [uisite-12] /snaplot/ at 1440px: nav, page and footer share one left edge
-  ✓ layout and chrome › [uisite-12] /snaplot/examples/ at 1440px: …
-  ✓ layout and chrome › [uisite-12] /snaplot/ at 390px: …
-  ✓ layout and chrome › [uisite-12] /snaplot/examples/ at 390px: …
+  ✓ examples › [uisite-16] the tabs follow the keyboard and the choice holds across pages
+  ✓ layout and chrome › [D1] a prerelease build shows the beta banner in both layouts, a release in neither
+  ✓ layout and chrome › [docs-16] the header shows the documented version
   ✓ layout and chrome › [uisite-05] links and tabs show a hover state
   ✓ layout and chrome › [uisite-07] tabular figures only on numbers, not on body text
-  ✓ layout and chrome › [uisite-21][research-09] path routes, the IA groups and an on-page TOC
-  ✓ layout and chrome › [docs-16] the header shows the documented version
+  ✓ layout and chrome › [uisite-12] /snaplot/ at 1440px: nav, page and footer share one left edge
+  ✓ layout and chrome › [uisite-12] /snaplot/ at 390px: …
+  ✓ layout and chrome › [uisite-12] /snaplot/examples/ at 1440px: …
+  ✓ layout and chrome › [uisite-12] /snaplot/examples/ at 390px: …
+  ✓ layout and chrome › [uisite-17] the API link opens a reference that links to each entry point
   ✓ layout and chrome › [uisite-20] every page has its own title, and an unknown page is a 404
-  ✓ examples › [uisite-16] the tabs follow the keyboard and the choice holds across pages
-  ✓ old links › /snaplot/#/docs/theming/css-vars lands on /snaplot/guides/theming/#css-variables
-  ✓ old links › /snaplot/#/docs/getting-started lands on /snaplot/first-chart/
+  ✓ layout and chrome › [uisite-21][research-09] path routes, the IA groups and an on-page TOC
+  ✓ layout and chrome › every internal link resolves to a page, a file or a heading (G11)
   ✓ old links › /snaplot/#/demos lands on /snaplot/examples/
+  ✓ old links › /snaplot/#/docs/getting-started lands on /snaplot/first-chart/
+  ✓ old links › /snaplot/#/docs/theming/css-vars lands on /snaplot/guides/theming/#css-variables
   ✓ old links › every old route has a page, and every anchor a heading
-  ✓ [D39] the no-build page runs snaplot from dist through an import map
-  174 passed (35.1s)
+  180 passed (27.8s)
 test:smoke exit=0
 ```
 
-Each of the 143 `every route › <route> loads cleanly, passes axe and runs its examples` tests checks:
+Each of the 146 `every route › <route> loads cleanly, passes axe and runs its examples` tests checks:
 - HTTP 200 and a title;
 - no console errors or warnings and no failed requests;
 - no serious or critical axe violations;
 - on the two pages with examples (`/snaplot/` and `/snaplot/first-chart/`), a painted canvas and an
   exact Copy in each of the three tabs.
 
-At `b6a6f04` the non-route tests passed 3 times each (`--repeat-each 3`: 93 passed) and the route tests
-3 runs in a row (143 each). `cb1cce7` then changed only the search styles and assertions, and the
-full suite passed again at the tip. Playwright starts and stops its own `astro preview` on port 5336. Port 5336 was free
-after every run, and no server of mine is left running.
+The route list now includes `/snaplot/reference/api/` and the three module overviews.
 
-**Pagefind finds `createChart`** (also locked by the search test above). Spike probe output from the
-built site:
+The 34 non-route tests then passed 3 times each (`--grep-invert "every route" --repeat-each 3`: 102
+passed). Playwright starts and stops its own `astro preview` on port 5336. Port 5336 was free after
+every run, and no server of mine is left running.
+
+**Pagefind finds `createChart`** (also locked by the search test above). Probe output from the built
+site:
 
 ```
-pagefind createChart {"count":12,"urls":["/snaplot/reference/api/index/functions/createchart/","/snaplot/reference/api/solid/functions/createchartgroup/","/snaplot/reference/api/index/functions/createchartgroup/","/snaplot/reference/api/solid/functions/createchartstate/","/snaplot/reference/api/solid/functions/createchart/"]}
+pagefind createChart {"count":14,"urls":["/snaplot/reference/api/snaplot/functions/createchart/","/snaplot/reference/api/snaplot/solid/functions/createchartgroup/","/snaplot/reference/api/snaplot/functions/createchartgroup/","/snaplot/reference/api/snaplot/solid/functions/createchartstate/","/snaplot/reference/api/snaplot/solid/functions/createchart/"]}
 ```
 
-**From M5: `check:package`, `check:size`, `check:api`** (each exit 0, re-run because the lockfile moved
-`solid-js`):
+**From M5: `check:package`, `check:size`, `check:api`** (each exit 0). They match M5, because no
+library file and no lockfile line changed after `2e9644b`:
 - `check:package`: publint `All good!`, attw as at M5, and `Test Files 7 passed (7)`,
-  `Tests 23 passed | 4 expected fail (27)`, the same as M5.
+  `Tests 23 passed | 4 expected fail (27)`.
 - `check:size`: identical to M5 (createChart 58.9, Chart (react) 59.5, Chart (solid) 59.7, histogram
   0.7, createLegendTable 2.4 KiB gzip; all `ok`).
 - `check:api`: `dist/ matches the golden declarations (core.d.ts, index.d.ts, react.d.ts, solid.d.ts).`
@@ -293,7 +378,7 @@ pagefind createChart {"count":12,"urls":["/snaplot/reference/api/index/functions
 - handle 24 members and 13 events;
 - 4 legend implementations.
 
-**`npm audit`:** 7 advisories, 0 critical (M5 left 6 with 2 critical):
+**`npm audit`:** 7 advisories (1 low, 6 moderate), 0 critical (M5 left 6 with 2 critical):
 - **Gone:** the two critical `seroval` advisories (`solid-js` 1.9.17).
 - **New:** 3 moderate, from the site's Expressive Code: `@expressive-code/core` → `postcss-nested` →
   `postcss-selector-parser`, quadratic parsing of untrusted selectors. They are build-time only, over
@@ -352,10 +437,15 @@ library.
    - Set `STRICT = true` in `site/scripts/typedoc-validate.mjs` with the JSDoc commit; `--list` prints
      all 430.
    - Add `@module snaplot`, `@module snaplot/react` and `@module snaplot/solid` doc comments to
-     `src/index.ts`, `src/react.ts` and `src/solid.ts`. Otherwise the reference names the modules
-     `index`, `react` and `solid`. If the module paths change, update the API link in
-     `site/src/layouts/Site.astro`, the `api` targets in `site/scripts/old-routes.mjs`
-     (then `npm run old-routes -w site`) and `404.md`. The smoke test catches broken old-route targets.
+     `src/index.ts`, `src/react.ts` and `src/solid.ts`. Until then,
+     `site/scripts/typedoc-module-names.mjs` gives the reference those names. After that it does
+     nothing, and the plugin file and its `plugin:` line in `site/astro.config.mjs` can go.
+   - Do not leave a module named `index`. Its `index/index.md` takes the landing page's slug, and the
+     landing page disappears (`Could not render /reference/api …` in the build output). The
+     `[uisite-17]` smoke test fails if that happens.
+   - The site's API links, `404.md` and the old `#/docs/api*` routes all target `/reference/api/`,
+     which does not depend on module names. Nothing else needs updating, and the link-walk smoke test
+     catches any link that breaks.
 5. **M8 and M13 (D26, frameworks-15).** `<Chart height={280}>` does not size the React or Solid host
    yet: the host is 0 px and the canvases fall back to 400 px. Until then,
    `.example[data-kind='options'] :global(.example-island)` in `Example.astro` gives the island
@@ -365,7 +455,9 @@ library.
    OS sees dark charts on a light page. The site gives charts no theme object (§9), so nothing is
    worked around here.
 7. **M14.** Write a `firstpaint-line-1m: met` (or `missed`) line into ADR 0002. `lint-copy.test.ts`
-   allows the claim "dense data" only after `met`. Also fold this spike outcome into ADR 0002 (§8.2):
+   allows a dense-data claim ("dense data", "dense datasets", "live and dense", …; see `isDenseClaim`)
+   only after `met`. If §9's literal rule, a bare "dense", is wanted, M15a must first reword the
+   README's "dense scatter uses cached hit testing". Also fold this spike outcome into ADR 0002 (§8.2):
    Starlight passed, with no fallback.
 8. **M15a and M15b.**
    - Use `<Example name>` for framework tabs. Do not use Starlight's `<Tabs syncKey>`: its restore and
@@ -385,6 +477,11 @@ library.
    - `site/src/lib/demos.ts` lists the six demos (question, task, framework, dataset, licence) for the
      homepage and the hub; add each row's thumbnail and Open and Source links.
    - Starlight emits `og:title`, `og:description` and `og:url`, but there is no `og:image` card yet.
+     The trace table lists M6a as uisite-20's only owner, so **assign the card to M16a explicitly**,
+     or it has no owner. Both layouts would need the `og:image` tag: Starlight's `head` config and
+     `Site.astro`.
+   - The D1 prerelease banner is already in both layouts (`PrereleaseBanner.astro`); a homepage
+     rewrite must keep `Site.astro` or render it.
 10. **Bench lock.** My first full smoke run (about 09:06Z) started while `.claude/bench.lock` existed:
    the command printed the lock and did not wait. The run took 44 s on 6 workers and may have added
    noise to that bench run. Every later Playwright and `npm ci` run waited on the lock with a polling
@@ -393,8 +490,22 @@ library.
 ## Known gaps
 
 - **No ledger entries.** Every M6a lock passes, so there are no `it.fails`.
-- **`og:image` card (part of uisite-20):** M16a, or a small Playwright script. Starlight's other
-  Open Graph tags are in place.
+- **`og:image` card (part of uisite-20):** has no owner yet; Requests 9 asks for M16a. Starlight's
+  other Open Graph tags are in place.
+- **uisite-12 across the two layouts.** At 1440 px the custom pages' brand and h1 sit at x=168, in the
+  72rem container. On docs pages Starlight's full-width header puts the brand at x=28, the sidebar at
+  25 and the h1 at 324. So the logo moves when you go from Home to Docs. D11 takes Starlight's layout
+  as it is, while §9 asks for one container shared by nav, pages and footer. The lock covers the
+  custom pages. Matching Starlight's header on the custom pages would split their nav from their
+  page and footer. Accepted for now; a human decides in the §9 review (Human steps).
+- **No `typecheck` script in the site workspace,** so the root `npm run typecheck` (G2) skips the
+  site. The site's TypeScript resolves `snaplot` to the built `dist/*.d.ts` and needs Astro's
+  generated `.astro/types.d.ts`. `verify` runs `typecheck` before `build`, so on a clean checkout a
+  site typecheck would fail. `check:examples` (G11) runs `astro check` and `tsc -p tsconfig.json`
+  after the build instead.
+- **The D34 lint matches claims, not the bare word.** `isDenseClaim` catches "dense data", "dense
+  datasets", "dense charts" and "live and dense". It does not catch every possible wording, and it
+  deliberately passes the README's "dense scatter uses cached hit testing" (Requests 7).
 - **`llms.txt` and `.md` per page (part of research-09):** deferred by D36.
 - **API reference content (uisite-17):** descriptions are empty until M7's JSDoc. Search currently
   ranks API pages above the guide outlines, because the outlines are short; M15 content fixes that.
@@ -411,8 +522,8 @@ library.
   default in Node 24 (`.nvmrc`); the script passes `--experimental-strip-types` for Node 22.
 - **`npm audit`:** 3 moderate, build-time, via Expressive Code. Starlight 0.42.6 pins
   `@expressive-code/core` 0.44.x. Revisit when a Starlight release that takes the fix is 14 days old.
-- **Visual review of the site** is only my own screenshots: 1280 px light and dark, 390 px, and the
-  search dialog. The homepage and hub are skeletons.
+- **Visual review of the site** is only my own screenshots: 1280 px light and dark, 390 px, the
+  search dialog, and the prerelease banner at 1440 and 390 px. The homepage and hub are skeletons.
 
 ## Data notes
 
@@ -428,7 +539,8 @@ library.
   - `site/test-results/`;
   - `site/node_modules/.astro/` (the content cache).
 - `site/src/lib/old-routes.json` is committed. Regenerate it with `npm run old-routes -w site`, which
-  needs the `overhaul-baseline` tag.
+  needs the `overhaul-baseline` tag. Since review round 1 the five `api` entries target
+  `reference/api/`.
 
 ## Human steps
 
@@ -437,4 +549,7 @@ library.
   that version (D1).
 - **Pin Actions by SHA** (M17's list), including configure-pages@v6, upload-pages-artifact@v5 and
   deploy-pages@v5 in `deploy.yml`.
-- **Review the site's look** (§9) before 1.0.
+- **Review the site's look** (§9) before 1.0, including two choices recorded in Known gaps:
+  - the brand moves from x=168 on the homepage and hub to x=28 in the docs at 1440 px (uisite-12
+    across Starlight's layout);
+  - below 50rem the h1 drops from §9's 40 px to 2rem (32 px), so long titles fit a phone.
