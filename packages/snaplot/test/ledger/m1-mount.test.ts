@@ -72,7 +72,7 @@ function options(plugin: ChartPlugin<Row>): ChartOptions<Row> {
 }
 
 describe('[gap-annotations-extensibility-06:mount] options given at creation are in the mount paint', () => {
-  it.fails('[gap-annotations-extensibility-06:mount] createChart paints reference lines, regions and plugins with no further repaint', () => {
+  it('[gap-annotations-extensibility-06:mount] createChart paints reference lines, regions and plugins with no further repaint', () => {
     const { plugin, drawn } = counter();
     const chart = fakes.mount(options(plugin));
 
@@ -83,7 +83,7 @@ describe('[gap-annotations-extensibility-06:mount] options given at creation are
     expect(drawn).toEqual({ grid: 1, data: 1, overlay: 1 });
   });
 
-  it.fails('[gap-annotations-extensibility-06:mount] the mount paint draws what a later full repaint draws', () => {
+  it('[gap-annotations-extensibility-06:mount] the mount paint draws what a later full repaint draws', () => {
     const chart = fakes.mount(options(counter().plugin));
     const mount = paintCalls(chart, { grid: 0, data: 0, overlay: 0 });
     const since = recorded(chart);

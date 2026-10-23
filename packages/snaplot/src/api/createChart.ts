@@ -199,12 +199,14 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     validateGroup(options.group, this.prepared);
     this.resetIdentityTracking();
     const config = this.configFor(this.prepared, options);
-    // User plugin install hooks need the completed public handle, not a half-built engine.
+    // User plugin install hooks need the completed public handle, not a half-built engine,
+    // so plugins are installed below, and the engine's first paint waits for them.
     this.engine = new ChartCore(
       element,
       { ...config, plugins: [] },
       this.prepared.sources[0],
       this.prepared,
+      /* deferFirstPaint */ true,
     );
     // Plan D31: untyped debug counters for tests and the bench, never part of
     // ChartHandle. Non-enumerable so nothing that walks the handle sees it.
@@ -218,6 +220,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.lines.setLines(this.prepared.referenceLines);
     this.regions.setRegions(this.prepared.referenceRegions);
     for (const plugin of config.plugins ?? []) this.engine.use(plugin);
+    // The mount paint: nothing repaints an unchanged box after it, so it must
+    // draw the annotations and plugins (gap-annotations-extensibility-06:mount).
+    this.engine.paint();
     groups.get(options.group!)?.members.add(this);
     coordinate(options.group);
     this.state = this.readState();

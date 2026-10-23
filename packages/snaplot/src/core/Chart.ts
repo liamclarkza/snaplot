@@ -442,6 +442,12 @@ export class ChartCore implements ChartInstance {
     config: ChartConfig,
     data?: ColumnarData,
     sources?: { sources: readonly ColumnarData[]; seriesSources: readonly number[] },
+    /**
+     * Leave the first paint to the owner's `paint()`, called once it has
+     * installed the plugins it adds through `use()` after construction. Its
+     * first paint is then the only one at mount, and it draws them.
+     */
+    deferFirstPaint = false,
   ) {
     this.container = parent;
 
@@ -555,6 +561,15 @@ export class ChartCore implements ChartInstance {
     this.updateLayout();
     this.updateScalePixelRanges();
     this.scheduler.markDirty(DirtyFlag.ALL);
+    if (!deferFirstPaint) this.scheduler.flush();
+  }
+
+  /**
+   * Paint the dirty layers now instead of on the next frame: the first paint
+   * of an engine constructed with `deferFirstPaint`.
+   */
+  paint(): void {
+    if (this.destroyed) return;
     this.scheduler.flush();
   }
 
