@@ -142,7 +142,7 @@ describe('[arch-15] removed options name their replacement', () => {
 
   // fill is the area and band fill. Bars, points and histogram bars take color (0.12 bars
   // took fill), so fill there warns and is ignored, and the legend shows what the marks draw.
-  it.fails('[arch-15] fill on a bar, scatter or histogram series warns and is ignored', () => {
+  it('[arch-15] fill on a bar, scatter or histogram series warns and is ignored', () => {
     const bar = mount({ data: rows, x: 't', series: [{ type: 'bar', y: 'v', fill: '#ff0001' }] });
     mount({ data: rows, x: 't', series: [{ type: 'scatter', y: 'v', fill: '#ff0002' }] });
     const bins = mount({

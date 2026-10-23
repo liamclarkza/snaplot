@@ -743,6 +743,12 @@ function normalizeSeries(
       'removed-option',
       `${path}.fill as a function was removed in 1.0 and is ignored. Use color: (value, row, index) => …`,
     );
+  } else if (value.fill !== undefined && (type === 'bar' || type === 'scatter' || histogram)) {
+    // fill is the area and band fill; these marks take color (0.12 bars took fill).
+    warnOnce(
+      'unknown-option',
+      `"${path}.fill" is not an option of ${type} series and is ignored. Use color.`,
+    );
   } else if (value.fill !== undefined) {
     if (value.fill !== null && typeof value.fill !== 'string')
       fail(`${path}.fill must be a CSS colour or null.`);

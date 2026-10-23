@@ -57,8 +57,9 @@ what to use instead, and the chart keeps its default:
 - The 20 theme roles (`backgroundColor` and the rest); use the ten `ThemeTokens`.
 - Axes: `roundBounds` (use `nice`), `rangePadding`, `auto`, `tickCount` (use `ticks`) and
   `tickMarks`.
-- Series: `stroke` (use `color`), `lineDash` (use `dash`), a bar or scatter `fill` function (use a
-  `color` function), `fillGradient`, `barWidthRatio`, `pointShape`, `heatmap` (use
+- Series: `stroke` (use `color`), `lineDash` (use `dash`), `fill` on bar, scatter and histogram
+  series (use `color`; `fill` stays the area and band fill), a `fill` function (use a `color`
+  function), `fillGradient`, `barWidthRatio`, `pointShape`, `heatmap` (use
   `renderMode: 'density'`), `heatmapBinSize`, `heatmapGradient`, `visible` (use `hiddenSeries`),
   `meta`, `colorBy.nullColor`, `sizeBy.scale` and `sizeBy.domain`. A histogram takes `color`.
 - Reference regions: `fill` (use `color`), `edges`, `edgeColor` and `edgeDash`.
