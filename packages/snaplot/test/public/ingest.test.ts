@@ -322,4 +322,60 @@ describe('appends are validated before anything changes', () => {
     chart.update({ axes: { y: { title: 'Kept' } } });
     expect(latest(chart)).toMatchObject({ x: 0, y: 9, rowIndex: 2 });
   });
+
+  // The forming-bucket pattern AppendOptions.updateLast documents, started from empty data:
+  // the first updateLast has no row to replace, so it appends, and indices stay 0, 1, 2.
+  const bucket = [
+    [{ x: 0, y: 1, id: 'b0' }],
+    [{ x: 0, y: 2, id: 'b0' }],
+    [
+      { x: 0, y: 3, id: 'b0' },
+      { x: 1, y: 1, id: 'b1' },
+    ],
+    [
+      { x: 1, y: 5, id: 'b1' },
+      { x: 2, y: 1, id: 'b2' },
+    ],
+  ];
+  const at = (chart: ChartHandle<any>, x: number) => {
+    chart.setCursor(x);
+    return chart.getCursorSnapshot().points[0];
+  };
+  const formed = [
+    { x: 0, y: 3, rowIndex: 0, rowId: 'b0' },
+    { x: 1, y: 5, rowIndex: 1, rowId: 'b1' },
+    { x: 2, y: 1, rowIndex: 2, rowId: 'b2' },
+  ];
+
+  it.fails('[dataapi-03] updateLast on empty data keeps original row indices', () => {
+    const chart = mount({ data: [], x: 'x', rowId: 'id', series: [{ y: 'y' }] });
+    for (const batch of bucket) chart.appendData(batch, { updateLast: true });
+    expect([0, 1, 2].map((x) => at(chart, x))).toMatchObject(formed);
+    expect([0, 1, 2].map((x) => at(chart, x).row)).toEqual([bucket[2][0], ...bucket[3]]);
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect([0, 1, 2].map((x) => at(chart, x))).toMatchObject(formed);
+    chart.appendData([{ x: 3, y: 1, id: 'b3' }]);
+    expect(at(chart, 3)).toMatchObject({ x: 3, rowIndex: 3, rowId: 'b3' });
+  });
+
+  it('[dataapi-03] updateLast on empty { columns, rowIds } keeps original row indices', () => {
+    const empty = { x: new Float64Array(0), y: new Float64Array(0) };
+    const chart = mount({ data: { columns: empty, rowIds: [] }, x: 'x', series: [{ y: 'y' }] });
+    for (const batch of bucket)
+      chart.appendData(
+        {
+          columns: {
+            x: Float64Array.from(batch, (row) => row.x),
+            y: Float64Array.from(batch, (row) => row.y),
+          },
+          rowIds: batch.map((row) => row.id),
+        },
+        { updateLast: true },
+      );
+    expect([0, 1, 2].map((x) => at(chart, x))).toMatchObject(formed);
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect([0, 1, 2].map((x) => at(chart, x))).toMatchObject(formed);
+    chart.appendData({ columns: { x: Float64Array.of(3), y: Float64Array.of(1) }, rowIds: ['b3'] });
+    expect(at(chart, 3)).toMatchObject({ x: 3, rowIndex: 3, rowId: 'b3' });
+  });
 });
