@@ -192,6 +192,11 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.prepared.sources[0],
       this.prepared,
     );
+    // Plan D31: untyped debug counters for tests and the bench, never part of
+    // ChartHandle. Non-enumerable so nothing that walks the handle sees it.
+    Object.defineProperty(this, Symbol.for('snaplot.debug'), {
+      get: () => this.engine.debugSnapshot(),
+    });
     this.applyAccessibleName();
     this.state = this.readState();
     this.bindEngine();

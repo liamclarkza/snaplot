@@ -54,7 +54,12 @@ import { deepMerge } from '../config/merge';
 import { DEFAULT_CONFIG } from '../config/defaults';
 import { applyThemeToElement, resolveTheme } from '../config/theme';
 
-import { renderAxes, thinTicks, updateDOMLabels } from '../renderers/AxesRenderer';
+import {
+  type AxesRenderResult,
+  renderAxes,
+  thinTicks,
+  updateDOMLabels,
+} from '../renderers/AxesRenderer';
 import {
   renderLineSegments,
   renderAreaSegments,
@@ -121,6 +126,115 @@ function tickFormatId(fn: ((value: number) => string) | undefined): number {
     tickFormatIds.set(fn, id);
   }
   return id;
+}
+
+// ─── Debug counters (plan D31) ──────────────────────────────
+// Tests and the bench read these through `chart[Symbol.for('snaplot.debug')]`
+// on the public handle; they are not part of any public type. Instrumentation
+// only: a data pass records O(series) facts, and point counts are computed
+// when a snapshot is read, never on the render path.
+
+/** One visible series in the most recent data-layer pass. */
+interface DataPassSeries {
+  type: NonNullable<SeriesConfig['type']>;
+  xData: Float64Array;
+  yData: Float64Array;
+  /** Physical index runs handed to the mark, before any sampling. */
+  runs: readonly ColumnarSegment[];
+  /** The M4-decimated runs a line or area stroked, when decimation ran. */
+  decimated?: readonly LineRenderSegment[];
+  /** Scatter interaction-sampling stride (1 draws every point). */
+  stride: number;
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
+/** An axis label as last laid out: its text and anchor point in CSS pixels. */
+export interface DebugLabelBox {
+  axis: string;
+  kind: 'tick' | 'title';
+  text: string;
+  x: number;
+  y: number;
+  anchor: 'start' | 'middle' | 'end';
+}
+
+/** A point-in-time read of the debug counters. Read it again after acting. */
+export interface DebugSnapshot {
+  /** Full data ingests: the initial data, `setData` and `replaceSources`. Appends do not count. */
+  readonly ingestCount: number;
+  /** Per-layer paint counts (a vetoed paint does not count). */
+  readonly renderCount: { grid: number; data: number; overlay: number };
+  /** The three canvas layers, for pixel hashing. */
+  readonly layers: {
+    grid: HTMLCanvasElement;
+    data: HTMLCanvasElement;
+    overlay: HTMLCanvasElement;
+  };
+  /** Points the last data pass drew inside the viewport, after M4 decimation or scatter sampling. */
+  readonly drawnPoints: number;
+  /** Points inside the viewport in the last data pass (X range; X and Y for scatter). */
+  readonly inViewPoints: number;
+  /** Times a ring store rebuilt its logical columns (`RingColumnarStore.materialize` cache misses). */
+  readonly materializeCount: number;
+  /** Axis labels from the last grid paint, in paint order. */
+  labelBoxes(): DebugLabelBox[];
+}
+
+function countDataPass(pass: readonly DataPassSeries[]): { drawn: number; inView: number } {
+  let drawn = 0;
+  let inView = 0;
+  for (const series of pass) {
+    const scatter = series.type === 'scatter';
+    const visible = (x: number, y: number) =>
+      x >= series.xMin &&
+      x <= series.xMax &&
+      Number.isFinite(y) &&
+      (!scatter || (y >= series.yMin && y <= series.yMax));
+    let seriesInView = 0;
+    for (const run of series.runs) {
+      for (let i = run.physicalStart; i <= run.physicalEnd; i++) {
+        if (visible(series.xData[i], series.yData[i])) seriesInView++;
+      }
+    }
+    inView += seriesInView;
+    if (series.decimated) {
+      for (const run of series.decimated) {
+        for (let i = run.startIdx; i <= run.endIdx; i++) {
+          if (visible(run.xData[i], run.yData[i])) drawn++;
+        }
+      }
+    } else if (series.stride > 1) {
+      // Mirrors renderScatterSegments: the stride restarts at every run.
+      for (const run of series.runs) {
+        for (let i = run.physicalStart; i <= run.physicalEnd; i += series.stride) {
+          if (visible(series.xData[i], series.yData[i])) drawn++;
+        }
+      }
+    } else {
+      drawn += seriesInView;
+    }
+  }
+  return { drawn, inView };
+}
+
+function debugLabelBoxes(labels: AxesRenderResult['labels'] | null): DebugLabelBox[] {
+  const boxes: DebugLabelBox[] = [];
+  for (const [axis, list] of labels ?? []) {
+    for (const label of list) {
+      boxes.push({
+        axis,
+        kind: label.kind ?? 'tick',
+        text: label.text,
+        x: label.x,
+        y: label.y,
+        anchor: label.anchor,
+      });
+    }
+  }
+  return boxes;
 }
 
 /**
@@ -299,6 +413,10 @@ export class ChartCore implements ChartInstance {
     renderCount: { grid: 0, data: 0, overlay: 0 },
     lastRenderMs: { grid: 0, data: 0, overlay: 0 },
   };
+  // D31 debug counters; see DebugSnapshot. Ring stores share this object.
+  private debugCounters = { ingestCount: 0, materializeCount: 0 };
+  private lastDataPass: DataPassSeries[] = [];
+  private lastAxisLabels: AxesRenderResult['labels'] | null = null;
 
   /**
    * Per-axis "reset-zoom" extent, the scale's min/max after the last
@@ -357,6 +475,7 @@ export class ChartCore implements ChartInstance {
     );
     this.seriesSources = sources?.seriesSources.slice() ?? [];
     this.store = this.sourceStores[0];
+    this.debugCounters.ingestCount++;
 
     // 5. Create EventBus
     this.eventBus = new EventBus();
@@ -438,7 +557,9 @@ export class ChartCore implements ChartInstance {
     const maxLen = resolved.streaming?.maxLen;
     if (maxLen !== undefined) validateMaxLen(maxLen);
     const stores = sources.map((data) =>
-      maxLen === undefined ? new ColumnarStore(data) : new RingColumnarStore(data, maxLen),
+      maxLen === undefined
+        ? new ColumnarStore(data)
+        : new RingColumnarStore(data, maxLen, this.debugCounters),
     );
     this.sourceStores = stores;
     this.store = stores[0];
@@ -446,6 +567,7 @@ export class ChartCore implements ChartInstance {
     this.invalidateRangeCache();
     this.stats.dataVersion++;
     this.stats.setDataCount++;
+    this.debugCounters.ingestCount++;
     this.replaceOptions(config);
     this.reconcileSelectionForDataChange();
     this.refreshCursor();
@@ -522,6 +644,7 @@ export class ChartCore implements ChartInstance {
     this.sourceStores[0] = this.store;
     this.stats.dataVersion++;
     this.stats.setDataCount++;
+    this.debugCounters.ingestCount++;
     const gridDirty = this.rangeForDataChange();
     this.reconcileSelectionForDataChange();
     this.refreshCursor();
@@ -1314,6 +1437,36 @@ export class ChartCore implements ChartInstance {
   }
 
   /**
+   * Internal: the D31 debug counters, exposed on the public handle as
+   * `chart[Symbol.for('snaplot.debug')]`. Point counts are computed lazily
+   * from the last data pass when first read.
+   */
+  debugSnapshot(): DebugSnapshot {
+    const pass = this.lastDataPass;
+    const labels = this.lastAxisLabels;
+    const canvases = this.canvasManager;
+    let counts: { drawn: number; inView: number } | undefined;
+    const count = () => (counts ??= countDataPass(pass));
+    return Object.freeze({
+      ingestCount: this.debugCounters.ingestCount,
+      renderCount: { ...this.stats.renderCount },
+      layers: {
+        grid: canvases.gridCanvas,
+        data: canvases.dataCanvas,
+        overlay: canvases.overlayCanvas,
+      },
+      get drawnPoints() {
+        return count().drawn;
+      },
+      get inViewPoints() {
+        return count().inView;
+      },
+      materializeCount: this.debugCounters.materializeCount,
+      labelBoxes: () => debugLabelBoxes(labels),
+    });
+  }
+
+  /**
    * Internal SyncGroup entry point. App code should call setHighlight(index);
    * sync payloads may carry stable identity keys that need local resolution.
    */
@@ -1475,7 +1628,9 @@ export class ChartCore implements ChartInstance {
 
   private createDataStore(data: ColumnarData): DataStore {
     const maxLen = this.streamingMaxLen();
-    return maxLen === undefined ? new ColumnarStore(data) : new RingColumnarStore(data, maxLen);
+    return maxLen === undefined
+      ? new ColumnarStore(data)
+      : new RingColumnarStore(data, maxLen, this.debugCounters);
   }
 
   private setStoreData(data: ColumnarData): void {
@@ -1484,7 +1639,7 @@ export class ChartCore implements ChartInstance {
       if (this.store instanceof RingColumnarStore && this.store.maxLen === maxLen) {
         this.store.setData(data);
       } else {
-        this.store = new RingColumnarStore(data, maxLen);
+        this.store = new RingColumnarStore(data, maxLen, this.debugCounters);
       }
       this.invalidateRangeCache();
       return;
@@ -1504,7 +1659,7 @@ export class ChartCore implements ChartInstance {
       if (maxLen !== undefined) {
         if (store instanceof RingColumnarStore && store.maxLen === maxLen) return store;
         this.invalidateRangeCache();
-        return new RingColumnarStore(store.getData(), maxLen);
+        return new RingColumnarStore(store.getData(), maxLen, this.debugCounters);
       }
       if (!(store instanceof RingColumnarStore)) return store;
       this.invalidateRangeCache();
@@ -2873,6 +3028,7 @@ export class ChartCore implements ChartInstance {
           customXTicks,
         );
         updateDOMLabels(this.canvasManager.domLayer, labels, this.theme, this.layout);
+        this.lastAxisLabels = labels.labels;
         this.pluginManager.dispatch('afterDrawGrid', this, this.canvasManager.gridCtx);
         // Count only actual paints: a beforeDraw* plugin that returns false
         // vetoes the clear/draw, so it must not bump renderCount.
@@ -2958,6 +3114,8 @@ export class ChartCore implements ChartInstance {
     const palette = this.categoricalPalette();
     // Reset per data pass; drawOne sets it when a scatter series samples.
     this.sampledLastDataRender = false;
+    const pass: DataPassSeries[] = [];
+    this.lastDataPass = pass;
 
     // Count bar-type series for grouped width calculation. This mapping is
     // position-based (which slot a bar occupies in each group), so it must
@@ -3027,12 +3185,26 @@ export class ChartCore implements ChartInstance {
           : series;
 
       const opacityMul = highlightActive && si !== highlightedSi ? dimOpacity : 1;
+      const record: DataPassSeries = {
+        type,
+        xData,
+        yData,
+        runs: segments,
+        stride: 1,
+        xMin: xScale.min,
+        xMax: xScale.max,
+        yMin: yScale.min,
+        yMax: yScale.max,
+      };
+      pass.push(record);
 
       switch (type) {
-        case 'line':
+        case 'line': {
+          const drawn = this.decimateLineSegments(renderSegments, xScale);
+          if (drawn !== renderSegments) record.decimated = drawn;
           renderLineSegments(
             ctx,
-            this.decimateLineSegments(renderSegments, xScale),
+            drawn,
             xScale,
             yScale,
             this.layout,
@@ -3041,10 +3213,13 @@ export class ChartCore implements ChartInstance {
             opacityMul,
           );
           break;
-        case 'area':
+        }
+        case 'area': {
+          const drawn = this.decimateLineSegments(renderSegments, xScale);
+          if (drawn !== renderSegments) record.decimated = drawn;
           renderAreaSegments(
             ctx,
-            this.decimateLineSegments(renderSegments, xScale),
+            drawn,
             xScale,
             yScale,
             this.layout,
@@ -3053,6 +3228,7 @@ export class ChartCore implements ChartInstance {
             opacityMul,
           );
           break;
+        }
         case 'band': {
           const upperIdx = series.upperDataIndex;
           const lowerIdx = series.lowerDataIndex;
@@ -3100,6 +3276,7 @@ export class ChartCore implements ChartInstance {
               this.sampledLastDataRender = true;
             }
           }
+          record.stride = sampleStride;
           renderScatterSegments(
             ctx,
             renderSegments,

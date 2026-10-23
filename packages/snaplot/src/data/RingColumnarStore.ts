@@ -18,7 +18,15 @@ export class RingColumnarStore implements DataStore {
 
   readonly maxLen: number;
 
-  constructor(data: ColumnarData, maxLen: number) {
+  /**
+   * `counters` is the owning chart's debug-counter sink (plan D31); every
+   * cache-missing materialize() bumps its `materializeCount`.
+   */
+  constructor(
+    data: ColumnarData,
+    maxLen: number,
+    private readonly counters?: { materializeCount: number },
+  ) {
     validateMaxLen(maxLen);
     this.maxLen = maxLen;
     this.reset(data);
@@ -292,6 +300,7 @@ export class RingColumnarStore implements DataStore {
 
   private materialize(): Float64Array[] {
     if (this.materialized) return this.materialized;
+    if (this.counters) this.counters.materializeCount++;
 
     if (this.len === 0) {
       this.materialized = this.columns.map(() => new Float64Array(0));
