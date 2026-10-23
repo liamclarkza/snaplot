@@ -106,13 +106,13 @@ export {
   swatchColumn,
   metricColumn,
   column,
-} from './api/legend';
+} from './public/legend';
 export type {
   LegendCellContent,
   LegendPluginOptions,
   LegendTableColumn,
   LegendTableOptions,
-} from './api/legend';
+} from './public/legend';
 export { histogram } from './utils/histogram';
 export type { HistogramOptions } from './utils/histogram';
 export { lttb } from './data/downsampling/lttb';

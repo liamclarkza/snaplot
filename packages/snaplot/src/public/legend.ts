@@ -1,10 +1,4 @@
-import type {
-  ChartPoint,
-  SeriesOptions,
-  ChartHandle,
-  ChartPlugin,
-  LegendItem,
-} from '../public/types';
+import type { ChartPoint, SeriesOptions, ChartHandle, ChartPlugin, LegendItem } from './types';
 
 /**
  * Cell content returned by a column. The plugin treats `string` as
