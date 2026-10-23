@@ -192,6 +192,11 @@ export function runScenario(scenario) {
       date: new Date(0).toISOString(),
     };
     writeFileSync(join(results, 'meta.json'), JSON.stringify(meta));
+    // Edits made after the run, before the check (a stale report, or a row added after the run).
+    for (const [path, text] of Object.entries(scenario.editAfterRun ?? {})) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), text);
+    }
 
     const run = spawnSync(
       process.execPath,

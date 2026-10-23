@@ -32,6 +32,10 @@ export interface Scenario {
   baseRows?: Record<string, string>;
   /** Row files written after the base commit (added or edited, uncommitted). */
   rows?: Record<string, string>;
+  /** Files written after the run and before the check, by path from the repository root. */
+  editAfterRun?: Record<string, string>;
+  /** Omit `head.inputs` from meta.json, as an older run.mjs did. */
+  legacyHead?: boolean;
   /** Extra arguments for check-visual-diffs.mjs. */
   args?: string[];
 }

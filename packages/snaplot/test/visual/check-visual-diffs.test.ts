@@ -198,6 +198,54 @@ describe('check-visual-diffs: the comparison', () => {
   });
 });
 
+// M3a review #2: a report from an earlier commit, or from before an edit, was judged as current.
+describe('check-visual-diffs: a stale report', () => {
+  it.fails('[repo-10] fails a report whose render inputs changed after the run', () => {
+    const r = runScenario({
+      head: unchanged,
+      referenceFiles: SHOTS,
+      editAfterRun: { 'packages/snaplot/src/theme.ts': 'export const gridColor = 1;\n' },
+    });
+    expect(r.output).toContain('the report is stale');
+    expect(r.status).toBe(1);
+  });
+
+  it.fails('[repo-10] refuses a meta.json that does not record the head inputs', () => {
+    const r = runScenario({ head: unchanged, referenceFiles: SHOTS, legacyHead: true });
+    expect(r.output).toContain('does not record the render inputs');
+    expect(r.status).toBe(1);
+  });
+
+  it('accepts edits outside the render inputs after the run (a row, a handoff)', () => {
+    const r = runScenario({
+      head: [
+        { name: 'marks/a', status: 'unexpected', error: ERRORS.changed },
+        ...unchanged.slice(1),
+      ],
+      referenceFiles: SHOTS,
+      milestone: 'M11',
+      editAfterRun: {
+        'docs/decisions/visual-ledger/V50.md': row('V50', 'M11', ['marks/a']),
+        'docs/handoff/m11.md': '# M11\n',
+      },
+    });
+    expect(r.output).toContain('check-visual-diffs: OK');
+    expect(r.status).toBe(0);
+  });
+
+  it.fails('[repo-10] judges a stale report with --any-head, and says so', () => {
+    const r = runScenario({
+      head: unchanged,
+      referenceFiles: SHOTS,
+      editAfterRun: { 'packages/snaplot/src/theme.ts': 'export const gridColor = 1;\n' },
+      args: ['--any-head'],
+    });
+    expect(r.output).toContain('--any-head');
+    expect(r.output).toContain('check-visual-diffs: OK');
+    expect(r.status).toBe(0);
+  });
+});
+
 describe('check-visual-diffs: visual-ledger rows', () => {
   const changedA = [
     { name: 'marks/a', status: 'unexpected' as const, error: ERRORS.changed },
