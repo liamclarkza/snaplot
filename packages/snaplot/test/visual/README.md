@@ -16,7 +16,8 @@ produce the `-linux` set.
 | Command | What it does |
 |---|---|
 | `npm run test:visual` | Both projects against the committed `__screenshots__/<area>/<name>-<platform>.png` |
-| `npm run test:visual -- --against <ref>` | Renders `<ref>`'s own fixture app into the reference cache, then compares the working tree with it |
+| `npm run test:visual -- --against <ref>` | Renders `<ref>`'s own fixture app into the reference cache (twice: it must reproduce itself), then compares the working tree with it |
+| `npm run test:visual -- --strict` | Compares exactly instead of `maxDiffPixelRatio: 0.002`; use it for the zero-change milestones (M2, M9a, M9b) |
 | `node scripts/overhaul/check-visual-diffs.mjs` | Judges the last run: zero changes for M2/M9a/M9b, else every changed fixture needs a visual-ledger row from this milestone |
 | `node scripts/overhaul/check-visual-ledger.mjs` | P13: every commit that touches screenshots or has a `visual:` paragraph adds or edits its row file |
 | `npm run test:visual -- --update` | Rewrites the committed baselines and prunes stale ones (M3a and M14 only) |
@@ -27,7 +28,9 @@ Playwright. The port is `$PORT`, else 5333 (EXECUTION.md rule 6), else a free on
 
 Every run writes `packages/snaplot/test-results/visual/`:
 - `report.json` (Playwright JSON);
-- `meta.json` (mode, head, reference, where the expected images live);
+- `meta.json` (mode, head, where the expected images live, and for `--against` the reference
+  outcome: `complete`, the capture and second-render exit codes, the declared shot count and the
+  `shots` that rendered and reproduced);
 - `contact-sheet.html` (open it from disk to review every shot, with diffs for changed ones).
 
 The reference cache is `$SNAPLOT_SNAPSHOT_DIR/<sha>/`, default `<main checkout>/.claude/visual-cache/`.
@@ -35,6 +38,17 @@ A ref is extracted with `git archive` and renders its own fixtures with its own 
 options a milestone renamed therefore still compares like with like. Refs older than the M3a merge have
 no fixture app and are not valid references. The runner never deletes anything outside the worktree,
 and waits while `.claude/bench.lock` exists.
+
+The reference is rendered twice, and the second render must match the first. It is cached
+(`capture.json`) only when every shot it declares rendered and reproduced. Otherwise the runner exits
+non-zero, and `check-visual-diffs` fails the run:
+- a head shot is `added` only when the reference is complete and lacks it, else `unverified`
+  (a failure unless `--allow-partial`);
+- a reference with no shots, or a platform with no committed baselines, fails outright: nothing was
+  compared.
+
+Row files count for a milestone only when they differ from the base and their `**Milestone:**` line
+names it. `V0.md` never covers a change, and editing it fails the check.
 
 ## Fixtures
 
@@ -67,7 +81,10 @@ Budget: ≤ 150 PNGs and ≤ 10 MB per committed set.
 Determinism:
 - IBM Plex Sans (`@fontsource`) is loaded before the chart exists, and `theme.fontFamily` is set
   explicitly.
-- The page reports ready after `document.fonts.ready`, two frames and an idle callback.
+- The page reports ready after `document.fonts.ready`, two frames and an idle callback, and only
+  once the grid and data layers have rendered and the data layer holds ink (the grid layer for a
+  fixture with `blankData`). It waits up to 5 s and never asks for a redraw; a chart that does not
+  paint fails its tests.
 - The Playwright config fixes the viewport (1280 × 800), reduced motion, `en-US` and UTC.
 - `minFontSize` fixtures run in a persistent full-Chromium profile, because the headless shell ignores
   the font preference.
@@ -83,7 +100,10 @@ Determinism:
 - no label outside the chart box.
 
 `probe.ts` collects the facts in the page. It reads the public handle and the debug symbol (D31), and
-prefers `scale(key).toPixel` once M8 adds it.
+prefers `scale(key).toPixel` once M8 adds it. It also calls `getLayout()` and `getAxis()`, and
+`app.ts` calls `getLayout()` for hover positions; M8 removes both (and `setHighlight`, used by
+`overlay/highlight-dim`). The M8 commit that removes them updates `probe.ts`, `app.ts` and the
+fixtures with the same output: `--against <merge-base>` shows no changed shot and the same geometry.
 
 A check that today's code fails is listed in `expected/m<N>.ts` for its owning milestone:
 - `fails('<owner>', '<fixture>', '<check>', '<finding id>')`: the test runs as `test.fail` with
@@ -103,5 +123,6 @@ A check that today's code fails is listed in `expected/m<N>.ts` for its owning m
 | `SNAPLOT_VISUAL_EXPECTED_DIR` | Expected screenshots, instead of the committed set |
 | `SNAPLOT_VISUAL_OUTPUT_DIR` | Artifacts and report |
 | `SNAPLOT_VISUAL_WORKERS` | The worker count |
+| `SNAPLOT_VISUAL_STRICT` | `1` compares exactly (`--strict`) |
 
 Keep these stable: `--against` drives an older ref's config through them.
