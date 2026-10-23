@@ -411,7 +411,9 @@ describe('public chart transactions', () => {
       y: 3,
     });
     expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 2.5 });
-    expect(() => chart.appendData([{ x: 'C', y: 9 }])).toThrow(/category it already has/);
+    expect(() => chart.appendData([{ x: 'C', y: 9 }])).toThrow(
+      /same category twice \("C"\): the batch starts at the latest bar/,
+    );
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(3);
     chart.appendData([{ x: 'C', y: 4 }], { updateLast: true });
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0]).toMatchObject({

@@ -181,7 +181,7 @@ describe('appends are validated before anything changes', () => {
 
   // A bar series holds one bar per category. An append that repeats a category throws at the
   // append, so a later update() never inherits a source it would reject (the dataapi-03 crash).
-  it.fails('[dataapi-03] a bar append that repeats a category throws and changes nothing', () => {
+  it('[dataapi-03] a bar append that repeats a category throws and changes nothing', () => {
     const bars = () =>
       mount({
         data: [

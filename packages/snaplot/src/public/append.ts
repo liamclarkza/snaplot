@@ -189,6 +189,28 @@ function planRows<Row>(
       checkOrder(target, sortedXValues[0], options, path, lastX, length);
     }
   }
+  // A bar series holds one bar per category, as ingest requires: the sorted batch may not
+  // repeat one, nor start at the latest bar's unless updateLast replaces that bar.
+  const bar =
+    source.xKind === 'category' && count > 0
+      ? source.series.find((index) => n.series[index].type === 'bar')
+      : undefined;
+  if (bar !== undefined) {
+    const label = (c: number) =>
+      registry!.labels.get(c) ?? [...pending].find(([, code]) => code === c)?.[0];
+    const twice = (c: number) =>
+      `${path}: bar series "${n.series[bar].id}" has the same category twice ("${label(c)}")`;
+    for (let i = 1; i < count; i++)
+      if (sortedXValues[i] === sortedXValues[i - 1])
+        fail(`${twice(sortedXValues[i])}. Aggregate the rows first, or use a scatter series.`);
+    const back = options.updateLast ? 2 : 1;
+    if (length(target) - back >= 0 && sortedXValues[0] === lastX(target, back))
+      fail(
+        options.updateLast
+          ? `${twice(sortedXValues[0])}: the batch replaces the latest bar with the category of the bar before it.`
+          : `${twice(sortedXValues[0])}: the batch starts at the latest bar. Pass { updateLast: true } to correct the latest bar.`,
+      );
+  }
   // Row ids: present when the source has them, unique in the batch and the window.
   let rowIds: RowId[] | undefined;
   if (source.rowIds) {

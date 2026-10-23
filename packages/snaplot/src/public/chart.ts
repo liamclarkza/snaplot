@@ -646,22 +646,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.appendData(data, options);
       return;
     }
-    for (const plan of plans) {
-      const source = sources[plan.source];
-      const bars = source.series.some((index) => this.normalized.series[index].type === 'bar');
-      const length = this.engine.getSourceLength(plan.source);
-      const previousIndex = length - (options.updateLast ? 2 : 1);
-      if (
-        bars &&
-        source.xKind === 'category' &&
-        plan.columns[0].length &&
-        previousIndex >= 0 &&
-        plan.columns[0][0] === this.engine.getSourceValue(plan.source, 0, previousIndex)
-      )
-        fail(
-          'a bar series cannot append a category it already has; pass { updateLast: true } to correct the latest bar.',
-        );
-    }
     const newLabels = plans.some((plan) => plan.newLabels.length);
     if (newLabels) {
       const categories = categoryLabels(this.ingested);
