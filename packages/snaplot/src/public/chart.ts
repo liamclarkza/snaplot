@@ -486,12 +486,14 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   /**
    * Swap in a new ingest as one transaction. Callers check the options, the state options and
    * the controls against `ingested` first, so nothing after replaceSources() throws; if the
-   * engine rejects the candidate, everything is restored.
+   * engine rejects the candidate, everything is restored. `quiet` re-stores the same data
+   * (appendData() storing a scatter unsorted), which publishes and emits nothing.
    */
   private commit(
     normalized: NormalizedOptions<Row>,
     ingested: Ingested<Row>,
     after?: () => void,
+    quiet = false,
   ): void {
     const previous = {
       ingested: this.ingested,
@@ -542,6 +544,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     } finally {
       this.mutating = false;
     }
+    if (quiet) return;
     this.publish();
     this.emit('options:update', this.options);
     this.emit('data:update', undefined);
@@ -628,32 +631,21 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       fail(
         'appendData() without a seriesId extends the chart data, but every series has its own data. Pass { seriesId }.',
       );
-    const plans = planAppend(
-      this.ingested,
-      this.normalized,
-      [...targets],
-      data,
-      options,
-      this.context(this.normalized, false),
-      (source, back) => {
-        const length = this.engine.getSourceLength(source);
-        return this.engine.getSourceValue(source, 0, length - back);
-      },
-      (source) => this.engine.getSourceLength(source),
-    );
-    const demoted = plans.filter((plan) => plan.demote);
-    if (demoted.length) {
-      // A scatter source whose X was sorted gets an append that is not: store it unsorted.
-      const unsorted = new Set(
-        demoted.map((plan) => sourceKey(plan.source, sources[plan.source].axis)),
-      );
-      this.commit(
+    const plan = () =>
+      planAppend(
+        this.ingested,
         this.normalized,
-        ingest(this.normalized, { ...this.context(this.normalized, false), unsorted }),
+        [...targets],
+        data,
+        options,
+        this.context(this.normalized, false),
+        (source, back) => {
+          const length = this.engine.getSourceLength(source);
+          return this.engine.getSourceValue(source, 0, length - back);
+        },
+        (source) => this.engine.getSourceLength(source),
       );
-      this.appendData(data, options);
-      return;
-    }
+    let plans = plan();
     const newLabels = plans.some((plan) => plan.newLabels.size);
     if (newLabels) {
       const categories = categoryLabels(this.ingested);
@@ -663,6 +655,21 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       }
       validateGroup(this.options.group, { categories, axes: this.ingested.spec.axes ?? {} }, this);
     }
+    // Every check has run. A scatter source whose X was sorted gets an append that is not: store
+    // it unsorted (the same data, so no event), then plan again, which passes the same checks.
+    const demoted = plans.filter((plan) => plan.demote);
+    if (demoted.length) {
+      const unsorted = new Set(
+        demoted.map((plan) => sourceKey(plan.source, sources[plan.source].axis)),
+      );
+      this.commit(
+        this.normalized,
+        ingest(this.normalized, { ...this.context(this.normalized, false), unsorted }),
+        undefined,
+        /* quiet */ true,
+      );
+      plans = plan();
+    }
     // Plans share their encoding lists, which hold only the lists this append adds labels to.
     const newEncodingLabels = plans.some((plan) => plan.encodings?.size);
     const maxPoints = this.normalized.engine.streaming?.maxPoints;
@@ -671,7 +678,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.mutating = true;
     try {
       for (const plan of plans) {
-        const source = sources[plan.source];
+        const source = this.ingested.sources[plan.source];
         const count = plan.columns[0].length;
         if (!count) continue;
         const length = this.engine.getSourceLength(plan.source);

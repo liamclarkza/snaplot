@@ -291,7 +291,7 @@ describe('appends are validated before anything changes', () => {
     expect(latest(chart)).toMatchObject({ x: 4, rowId: 'a' });
   });
 
-  it.fails('[dataapi-20] an append a group rejects changes nothing, one that would store a scatter unsorted too', () => {
+  it('[dataapi-20] an append a group rejects changes nothing, one that would store a scatter unsorted too', () => {
     const group = createChartGroup();
     const options = {
       data: [
