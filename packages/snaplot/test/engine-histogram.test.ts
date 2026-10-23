@@ -98,4 +98,23 @@ describe('engine histogram cursor', () => {
     expect(yScale.min).toBeLessThan(0);
     expect(yScale.max).toBeGreaterThan(120);
   });
+
+  // gap-overhaul-delta-06: the test above moved onto `nice: false`, so the
+  // default Y axis lost its baseline check. With nicening (the default) the
+  // padded domain is clamped back to the zero baseline instead.
+  it('[gap-overhaul-delta-06] keeps the zero baseline on the default Y axis when x zoom shows only positive histogram bins', () => {
+    const chart = fakes.engine(
+      {
+        axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
+        series: [{ label: 'count', dataIndex: 1, type: 'histogram' }],
+      },
+      [f([0, 1, 2, 3, 4]), f([0, 100, 120, 80, 0])],
+    );
+
+    chart.setAxis('x', { min: 1.2, max: 2.8 });
+
+    const yScale = chart.getAxis('y')!;
+    expect(yScale.min).toBe(0);
+    expect(yScale.max).toBeGreaterThan(120);
+  });
 });

@@ -168,11 +168,27 @@ describe('renderBars baseline', () => {
   });
 });
 
+/** Horizontal extent of every point on the paths a renderer drew. */
+function pathWidth(ctx: CanvasRenderingContext2D): number {
+  const calls = (name: 'moveTo' | 'lineTo' | 'quadraticCurveTo') =>
+    (ctx[name] as unknown as ReturnType<typeof vi.fn>).mock.calls as number[][];
+  const xs = [
+    ...calls('moveTo').map((call) => call[0]),
+    ...calls('lineTo').map((call) => call[0]),
+    ...calls('quadraticCurveTo').flatMap((call) => [call[0], call[2]]),
+  ];
+  return Math.max(...xs) - Math.min(...xs);
+}
+
 describe('renderBars width', () => {
-  it('keeps a lone visible bar at its data spacing, not a fraction of the plot', () => {
+  // gap-overhaul-delta-06: the probe measured the first moveTo-to-lineTo
+  // span, which is 0 for a positive bar on a real (inverted) Y axis and was
+  // only positive because the mock Y axis was not inverted.
+  it('[gap-overhaul-delta-06] keeps a lone visible bar at its data spacing, not a fraction of the plot', () => {
     const { ctx, fill } = context();
     const scaleX = linearScale('x');
-    const scaleY = linearScale('y');
+    // A real Y axis is inverted: larger values sit at smaller pixels.
+    const scaleY: Scale = { ...linearScale('y'), dataToPixel: (value: number) => 100 - value };
     const xData = f([0, 10, 20, 30, 40, 50, 60, 70]);
     const yData = f([1, 2, 3, 4, 5, 6, 7, 8]);
 
@@ -180,9 +196,8 @@ describe('renderBars width', () => {
     renderBars(ctx, xData, yData, 5, 5, scaleX, scaleY, layout(), series, '#4e79a7', 0, 1);
 
     expect(fill).toHaveBeenCalledTimes(1);
-    const left = (ctx.moveTo as ReturnType<typeof vi.fn>).mock.calls[0][0] as number;
-    const right = (ctx.lineTo as ReturnType<typeof vi.fn>).mock.calls[0][0] as number;
-    const width = right - left;
+    // The whole path's x extent, so the measurement holds for either path direction.
+    const width = pathWidth(ctx);
     // Data spacing is 10px; the bar sits well under the old plot*0.5 fallback.
     expect(width).toBeGreaterThan(0);
     expect(width).toBeLessThan(10);

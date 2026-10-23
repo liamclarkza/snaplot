@@ -439,6 +439,65 @@ describe('public chart transactions', () => {
     expect(Object.isFrozen(meta)).toBe(false);
   });
 
+  // gap-overhaul-delta-06: the Solid link tests this replaced asserted the
+  // grouped state itself (aligned gutters, the union Y) and its
+  // re-coordination after a member's data changed.
+  it('[gap-overhaul-delta-06] keeps plots aligned and Y shared while grouped, including after a member update', () => {
+    const group = createChartGroup({ yRange: true, alignPlots: true });
+    const axes = { y: { rangePadding: 0, roundBounds: false } };
+    const first = make({
+      data: [
+        { x: 0, y: 1 },
+        { x: 1, y: 3 },
+      ],
+      x: 'x',
+      series: [{ y: 'y' }],
+      axes,
+      group,
+    });
+    const second = make({
+      data: [
+        { x: 0, y: 100 },
+        { x: 1, y: 200 },
+      ],
+      x: 'x',
+      series: [{ y: 'y' }],
+      axes,
+      padding: { left: 100 },
+      group,
+    });
+    const aligned = () => {
+      const [a, b] = [first.getLayout().plot, second.getLayout().plot];
+      expect(a.left).toBe(b.left);
+      expect(a.width).toBe(b.width);
+    };
+
+    expect(first.getAxis('y')).toMatchObject({ min: 1, max: 200 });
+    expect(second.getAxis('y')).toMatchObject({ min: 1, max: 200 });
+    expect(first.getLayout().plot.left).toBeGreaterThanOrEqual(100);
+    aligned();
+
+    second.update({
+      data: [
+        { x: 0, y: 100 },
+        { x: 1, y: 400 },
+      ],
+    });
+    expect(first.getAxis('y')).toMatchObject({ min: 1, max: 400 });
+    expect(second.getAxis('y')).toMatchObject({ min: 1, max: 400 });
+    aligned();
+
+    first.update({
+      data: [
+        { x: 0, y: -50 },
+        { x: 1, y: 3 },
+      ],
+    });
+    expect(first.getAxis('y')).toMatchObject({ min: -50, max: 400 });
+    expect(second.getAxis('y')).toMatchObject({ min: -50, max: 400 });
+    aligned();
+  });
+
   it('restores independent chart ranges after leaving or destroying a group', () => {
     const group = createChartGroup({ yRange: true, alignPlots: true });
     const firstOptions: ChartOptions<{ x: number; y: number }> = {

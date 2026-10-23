@@ -103,7 +103,12 @@ describe('axisTickValues', () => {
 describe('thinTicks', () => {
   it('keeps regular intervals and both ends when thinning an aligned continuous axis', () => {
     expect(thinTicks([0, 10, 20, 30, 40, 50, 60], 4, true)).toEqual([0, 20, 40, 60]);
-    expect(thinTicks([0, 10, 20, 30, 40, 50], 4, true)).toEqual([0, 50]);
+  });
+  // gap-overhaul-delta-06: the previous assertion enshrined this collapse
+  // (thinTicks([0..50], 4, true) → [0, 50]) as the specification.
+  it.fails('[visuals-09] keeps ≥ 3 labels for prime interval counts', () => {
+    // Five intervals: no stride divides them, so only the two endpoints survive today.
+    expect(thinTicks([0, 10, 20, 30, 40, 50], 4, true).length).toBeGreaterThanOrEqual(3);
   });
   it('keeps short lists intact and thins long lists evenly from the first entry', () => {
     expect(thinTicks([1, 2, 3], 6)).toEqual([1, 2, 3]);
