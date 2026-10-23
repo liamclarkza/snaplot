@@ -52,7 +52,8 @@
     "postpack": "node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').rmSync(f, { force: true })\"",
     "check:package": "publint --strict && attw --pack . --profile esm-only --exclude-entrypoints ./legend-table.css && node scripts/check-consumers.mjs",
     "check:api": "node scripts/check-api.mjs",
-    "api:update": "node scripts/check-api.mjs --update"
+    "api:update": "node scripts/check-api.mjs --update",
+    "test:tz": "TZ=America/Los_Angeles vitest run time Time .tz. && TZ=Asia/Kathmandu vitest run time Time .tz. && TZ=UTC vitest run time Time .tz."
   },
   "peerDependencies": {
     "react": "^19.0.0",
