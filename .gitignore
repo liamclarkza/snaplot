@@ -27,6 +27,10 @@ bench/results/
 
 # Playwright reports and traces
 test-results/
+playwright-report/
+
+# Coverage output (vitest --coverage; v8 HTML report)
+coverage/
 
 # Raw downloads behind the demo datasets (only processed extracts are committed)
 scripts/demo-data/.cache/
