@@ -219,6 +219,18 @@ export interface SweepSpec {
   step(i: number): boolean | undefined | void;
   /** Runs in the next frame, after the operation's paint and before the next step. */
   afterFlush?(i: number): void;
+  /**
+   * Runs once when the measured window opens: after the warm-up operations and their paints,
+   * before the first measured step. Read counters (renders, ingests, ring copies) here, so that
+   * counts read in `onWindowEnd` cover exactly the `ops` measured operations.
+   */
+  onWindowStart?(): void;
+  /**
+   * Runs once when the measured window closes: in the frame after the last measured step, after
+   * its paint, before the sweep settles. Read at both boundaries, a counter's difference is one
+   * per operation whatever the library's paint latency (it cancels out).
+   */
+  onWindowEnd?(): void;
   /** Track gross and retained heap (needs precise memory info). */
   heap?: boolean;
   /** Bracket the window for the driver's CDP task time. Default true. */
@@ -292,11 +304,13 @@ export async function sweep(spec: SweepSpec): Promise<SweepOut> {
       if (i > spec.warmup) spec.afterFlush?.(i - 1);
       lastTs = ts;
       if (i >= spec.steps + spec.warmup) {
+        spec.onWindowEnd?.();
         resolve();
         return;
       }
       const measured = i >= spec.warmup;
       if (measured && Number.isNaN(asyncAtWindow)) {
+        spec.onWindowStart?.();
         asyncAtWindow = libraryBusyMs();
         if (heapOn) heapPrev = heapBytes() ?? heapPrev;
       }

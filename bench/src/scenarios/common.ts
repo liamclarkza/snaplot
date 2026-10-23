@@ -116,6 +116,29 @@ export function rendersSince(chart: BenchChart, before: Renders): Renders {
   };
 }
 
+/**
+ * Per-chart render counts over a sweep's measured window, for per-operation metrics. Spread
+ * `hooks` into the sweep: the counters are read when the window opens and when it closes, so the
+ * counts cover exactly the measured operations (not the warm-up, nor the frames the sweep settles
+ * after it), whatever the library's paint latency.
+ */
+export function windowRenders(charts: readonly BenchChart[]) {
+  let start = charts.map((c) => c.renders());
+  let closed: Renders[] | null = null;
+  return {
+    hooks: {
+      onWindowStart: () => {
+        start = charts.map((c) => c.renders());
+      },
+      onWindowEnd: () => {
+        closed = charts.map((c, k) => rendersSince(c, start[k]));
+      },
+    },
+    /** Renders per chart in the window (up to now, if it has not closed). */
+    each: (): Renders[] => closed ?? charts.map((c, k) => rendersSince(c, start[k])),
+  };
+}
+
 export function sumRenders(list: readonly Renders[]): Renders {
   return list.reduce(
     (a, r) => ({ grid: a.grid + r.grid, data: a.data + r.data, overlay: a.overlay + r.overlay }),

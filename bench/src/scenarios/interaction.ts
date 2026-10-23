@@ -22,6 +22,7 @@ import {
   timeScatter,
   triangle,
   viewportSweep,
+  windowRenders,
 } from './common';
 
 async function hoverSync(ctx: Ctx, head: Head, spec: ChartSpec): Promise<ScenarioResult> {
@@ -68,13 +69,14 @@ async function groupHover(ctx: Ctx, head: Head): Promise<ScenarioResult> {
     window.scrollTo(0, 0);
     await settle();
     const c = plotCenter(charts[0]);
-    const before = charts.map((chart) => chart.renders());
+    const counts = windowRenders(charts);
     const sw = await sweep({
       ...SWEEP,
+      ...counts.hooks,
       step: (i) => mouseMove(c.target, c.cx + (triangle(i, SWEEP.steps) * 2 - 1) * c.halfW, c.cy),
     });
     mouseLeave(c.target);
-    const each = charts.map((chart, k) => rendersSince(chart, before[k]));
+    const each = counts.each();
     const all = sumRenders(each);
     const offscreen = sumRenders(each.slice(2));
     return fromSweep(head, ctx.api, sw, {

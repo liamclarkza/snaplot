@@ -25,10 +25,10 @@ import {
   type Head,
   line,
   RENDER,
-  rendersSince,
   type Scenario,
   sumRenders,
   triangle,
+  windowRenders,
 } from './common';
 
 const N = 24;
@@ -160,13 +160,14 @@ async function offscreenStream(ctx: Ctx, head: Head): Promise<ScenarioResult> {
     await sleep(200);
     const chunks = charts.map((_, k) => appendChunks(lastX[k], steps + 5, 10));
     for (let k = 0; k < N; k++) lastX[k] = chunks[k][chunks[k].length - 1].x.at(-1) ?? lastX[k];
-    const before = charts.map((c) => c.renders());
+    const counts = windowRenders(charts);
     let last = Number.NEGATIVE_INFINITY;
     let next = 0;
     const sw = await sweep({
       steps,
       warmup: 5,
       markWindow: false,
+      ...counts.hooks,
       step: () => {
         const now = performance.now();
         if (now - last < 49) return false;
@@ -176,7 +177,7 @@ async function offscreenStream(ctx: Ctx, head: Head): Promise<ScenarioResult> {
         return true;
       },
     });
-    return { sw, data: sumRenders(charts.map((c, k) => rendersSince(c, before[k]))).data };
+    return { sw, data: sumRenders(counts.each()).data };
   };
   try {
     // Interleaved (ABAB), so drift over the run (heap growth, GC, JIT) affects both alike.
@@ -226,14 +227,15 @@ async function resizeStorm(ctx: Ctx, head: Head): Promise<ScenarioResult> {
   try {
     window.scrollTo(0, 0);
     await settle();
-    const before = charts.map((c) => c.renders());
+    const counts = windowRenders(charts);
     const sw = await sweep({
       ...RENDER,
+      ...counts.hooks,
       step: (i) => {
         wrap.style.width = `${60 + 40 * triangle(i, 40)}%`;
       },
     });
-    const each = charts.map((c, k) => rendersSince(c, before[k]));
+    const each = counts.each();
     const all = sumRenders(each);
     const offscreen = sumRenders(each.filter((_, k) => isOffscreen(charts[k].el)));
     return fromSweep(head, ctx.api, sw, {
@@ -278,9 +280,10 @@ async function themeChurn(ctx: Ctx, head: Head): Promise<ScenarioResult> {
     window.scrollTo(0, 0);
     await settle();
     await sleep(50);
-    const before = charts.map((c) => c.renders());
+    const counts = windowRenders(charts);
     const sw = await sweep({
       ...RENDER,
+      ...counts.hooks,
       step: (i) => {
         for (let k = 0; k < 99; k++) body.classList.toggle('bench-churn');
         const dark = i % 2 === 0;
@@ -288,7 +291,7 @@ async function themeChurn(ctx: Ctx, head: Head): Promise<ScenarioResult> {
         body.classList.toggle('bench-theme-light', !dark);
       },
     });
-    const all = sumRenders(charts.map((c, k) => rendersSince(c, before[k])));
+    const all = sumRenders(counts.each());
     return fromSweep(head, ctx.api, sw, {
       valid: all.data > 0 || all.grid > 0,
       renders: all,

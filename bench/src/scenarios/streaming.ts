@@ -40,11 +40,19 @@ async function stream(ctx: Ctx, head: Head, o: StreamOptions): Promise<ScenarioR
   let last = Number.NEGATIVE_INFINITY;
   let next = 0;
   const before = chart.renders();
-  const materialized0 = chart.materializations();
+  // Ring copies per append, counted over the measured appends only (not the warm-up).
+  let materialized0 = chart.materializations();
+  let materialized1 = materialized0;
   const sw = await sweep({
     steps: o.frames,
     warmup: SWEEP.warmup,
     heap: true,
+    onWindowStart: () => {
+      materialized0 = chart.materializations();
+    },
+    onWindowEnd: () => {
+      materialized1 = chart.materializations();
+    },
     step: () => {
       const now = performance.now();
       if (now - last < period - 1) return false;
@@ -54,7 +62,6 @@ async function stream(ctx: Ctx, head: Head, o: StreamOptions): Promise<ScenarioR
     },
   });
   const renders = rendersSince(chart, before);
-  const materialized1 = chart.materializations();
   chart.destroy();
   return fromSweep(head, ctx.api, sw, {
     valid: renders.data > 0,
