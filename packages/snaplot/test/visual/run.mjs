@@ -105,7 +105,9 @@ function parseArgs(argv) {
 }
 
 const repoRoot = git(['rev-parse', '--show-toplevel']);
-const mainRoot = dirname(resolve(repoRoot, git(['rev-parse', '--git-common-dir'])));
+// Absolute: a plain clone reports the common directory relative to the cwd (packages/snaplot),
+// which resolved against the repository root pointed two levels above the clone.
+const mainRoot = dirname(git(['rev-parse', '--path-format=absolute', '--git-common-dir']));
 /** The shared .claude directory and bench lock: the same variables and defaults as bench/. */
 const claudeDir = resolve(process.env.SNAPLOT_CLAUDE_DIR || join(mainRoot, '.claude'));
 const benchLock = resolve(process.env.SNAPLOT_BENCH_LOCK || join(claudeDir, 'bench.lock'));

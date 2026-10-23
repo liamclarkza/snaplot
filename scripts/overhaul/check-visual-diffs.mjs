@@ -218,7 +218,9 @@ function covers(pattern, fixture) {
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   const repoRoot = git(['rev-parse', '--show-toplevel'], process.cwd());
-  const mainRoot = dirname(resolve(repoRoot, git(['rev-parse', '--git-common-dir'], repoRoot)));
+  const mainRoot = dirname(
+    git(['rev-parse', '--path-format=absolute', '--git-common-dir'], repoRoot),
+  );
   const dir = resolve(repoRoot, opts.report ?? 'packages/snaplot/test-results/visual');
   const reportPath = join(dir, 'report.json');
   const metaPath = join(dir, 'meta.json');
