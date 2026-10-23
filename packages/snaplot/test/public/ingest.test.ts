@@ -479,7 +479,7 @@ describe('appends are validated before anything changes', () => {
 // Streaming keeps to the layered canvases (plan §3.4): an append repaints the data layer, and
 // the grid and overlay only when the axes or the series change.
 describe('[gap-scale-longevity-03:ingest] appends do no work they do not need', () => {
-  it.fails('[gap-scale-longevity-03:ingest] appends with known colorBy labels repaint the data layer only', () => {
+  it('[gap-scale-longevity-03:ingest] appends with known colorBy labels repaint the data layer only', () => {
     const kinds = ['a', 'b', 'c', 'd'];
     const n = 3_000;
     const chart = mount(

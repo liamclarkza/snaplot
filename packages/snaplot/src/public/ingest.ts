@@ -734,11 +734,13 @@ function seriesSpec<Row>(
       const field = source.fields[index];
       const label = typeof value.field === 'string' ? { label: value.field } : {};
       if (field.kind === 'encoding') {
-        const labels = encodings.get(field.key) ?? [];
+        const { key } = field;
+        const labels = encodings.get(key) ?? [];
         return {
           type: 'category' as const,
           ...label,
-          format: (code: number) => labels[code] ?? '',
+          // Read when called: an append's commit adds labels to `encodings`.
+          format: (code: number) => encodings.get(key)?.[code] ?? '',
           ...(role === 'color' ? { categoryValues: labels.map((_, i) => i) } : {}),
           ...value.options,
           column: index,
@@ -754,6 +756,26 @@ function seriesSpec<Row>(
       ) as SeriesSpec['tooltipFields'];
   }
   return spec;
+}
+
+/**
+ * List every label of each string colorBy in its series spec's categoryValues, after an append
+ * committed new labels: the engine colours a code by its place there, and a code it does not
+ * list draws in the fallback colour.
+ */
+export function refreshColorCodes<Row>(ingested: Ingested<Row>): void {
+  ingested.spec.series = ingested.spec.series.map((spec, si) => {
+    const colorBy = spec.colorBy;
+    if (typeof colorBy !== 'object' || !colorBy.categoryValues) return spec;
+    const field = ingested.sources[ingested.seriesSources[si]].fields[colorBy.column];
+    if (field?.kind !== 'encoding') return spec;
+    const count = ingested.encodings.get(field.key)?.length ?? 0;
+    if (colorBy.categoryValues.length === count) return spec;
+    return {
+      ...spec,
+      colorBy: { ...colorBy, categoryValues: Array.from({ length: count }, (_, i) => i) },
+    };
+  });
 }
 
 export function categoryAxisSpec(

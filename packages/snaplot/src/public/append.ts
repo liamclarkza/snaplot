@@ -5,7 +5,7 @@
  */
 import { fail } from '../engine/errors';
 import type { AxisSpec, ColumnarData } from '../engine/spec';
-import { categoryAxisSpec } from './ingest';
+import { categoryAxisSpec, refreshColorCodes } from './ingest';
 import type { NormalizedOptions } from './normalize';
 import {
   describe,
@@ -36,7 +36,10 @@ export interface SourceAppend<Row> {
   codes?: number[];
   /** The new category labels this plan introduces, with the codes it gave them, in code order. */
   newLabels: Map<string, number>;
-  /** The colorBy and tooltip label lists with this append's new labels, set on commit. */
+  /**
+   * The string encoding label lists (colorBy, tooltipFields) this append adds labels to, by
+   * key, with the new labels at their end; set on commit. Shared by the append's row plans.
+   */
   encodings?: Map<string, string[]>;
   /** The scatter source must be stored unsorted before this append fits. */
   demote?: true;
@@ -64,7 +67,7 @@ export function planAppend<Row>(
   length: (source: number) => number,
 ): SourceAppend<Row>[] {
   const out: SourceAppend<Row>[] = [];
-  // Label lists with this append's new labels, shared by its targets and set on commit.
+  // Copies of the label lists this append adds to, shared by its targets and set on commit.
   const encodings = new Map<string, string[]>();
   // New X categories by axis, shared too: two sources on one axis give a new label one code.
   const categories = new Map<string, PendingCategories>();
@@ -269,12 +272,10 @@ function planRows<Row>(
             : numeric(value, `${path}: ${fieldLabel(reader)} of appended row ${i}`);
       }
     } else if (field.kind === 'encoding') {
+      // The list is copied only when a label is new, so known labels change nothing.
+      const known = ingested.encodings.get(field.key) ?? [];
       let labels = encodings.get(field.key);
-      if (!labels) {
-        labels = [...(ingested.encodings.get(field.key) ?? [])];
-        encodings.set(field.key, labels);
-      }
-      const codes = new Map(labels.map((label, i) => [label, i]));
+      const codes = new Map((labels ?? known).map((label, i) => [label, i]));
       for (let i = 0; i < count; i++) {
         const value = read(field.read, rows[i], index[i], path);
         if (value == null || (typeof value === 'number' && Number.isNaN(value)))
@@ -284,6 +285,10 @@ function planRows<Row>(
         else {
           let c = codes.get(value);
           if (c === undefined) {
+            if (!labels) {
+              labels = [...known];
+              encodings.set(field.key, labels);
+            }
             c = labels.length;
             labels.push(value);
             codes.set(value, c);
@@ -302,7 +307,7 @@ function planRows<Row>(
     ...(rowIds ? { rowIds } : {}),
     ...(source.xKind === 'category' ? { codes: Array.from(sortedXValues) } : {}),
     newLabels,
-    ...(encodings.size ? { encodings } : {}),
+    encodings,
     ...(demote ? { demote } : {}),
   };
 }
@@ -442,7 +447,15 @@ export function commitAppend<Row>(
   }
   source.nextIndex += count - (replaced ? 1 : 0);
   source.streamed = true;
-  for (const [key, labels] of plan.encodings ?? []) ingested.encodings.set(key, labels);
+  // New encoding labels (the plans of one append share their lists): every series that reads
+  // the list must colour and name them.
+  let encodings = false;
+  for (const [key, labels] of plan.encodings ?? []) {
+    if (ingested.encodings.get(key) === labels) continue;
+    ingested.encodings.set(key, labels);
+    encodings = true;
+  }
+  if (encodings) refreshColorCodes(ingested);
   // Eviction from the front.
   if (evicted > 0) {
     for (let i = 0; i < evicted; i++) {

@@ -658,6 +658,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       }
       validateGroup(this.options.group, { categories, axes: this.ingested.spec.axes ?? {} }, this);
     }
+    // Plans share their encoding lists, which hold only the lists this append adds labels to.
+    const newEncodingLabels = plans.some((plan) => plan.encodings?.size);
     const maxPoints = this.normalized.engine.streaming?.maxPoints;
     const changedAxes = new Set<string>();
     this.optionsSnapshot = undefined;
@@ -685,8 +687,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         if (commitAppend(this.ingested, plan, replace > 0, evicted, evictedCodes))
           changedAxes.add(source.axis);
       }
-      if (plans.some((plan) => plan.rows) && this.ingested.encodings.size) {
-        // String encodings may have new categories: refresh their colour codes.
+      if (newEncodingLabels) {
+        // New colorBy or tooltip labels: the series specs list them now (refreshColorCodes).
+        // Known labels change no series, so the append repaints only the data layer.
         this.engine.setOptions({ series: this.configFor(this.ingested, this.normalized).series });
       }
       if (changedAxes.size) {

@@ -544,7 +544,7 @@ describe('[dataapi-20] an append plan changes nothing until it is committed (D23
 
   // The engine colours a category code by its place in categoryValues, so a label the
   // series spec does not list draws in the fallback colour until the next ingest.
-  it.fails('[dataapi-20] new colorBy labels reach the series colours and labels with the commit', () => {
+  it('[dataapi-20] new colorBy labels reach the series colours and labels with the commit', () => {
     const { ingested, plan } = setup();
     const colorBy = () =>
       ingested.spec.series[0].colorBy as {
