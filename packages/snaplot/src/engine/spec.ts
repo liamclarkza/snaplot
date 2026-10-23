@@ -253,7 +253,7 @@ export interface SeriesSpec<TMeta = unknown> {
    * ```ts
    * // data = [x, yMean, yUpper, yLower]
    * series: [
-   *   { label: 'Loss', type: 'band', dataIndex: 1,
+   *   { label: 'Loss', type: 'band', yColumn: 1,
    *     upperColumn: 2, lowerColumn: 3,
    *     color: '#4f8fea', fill: '#4f8fea', opacity: 0.15 },
    * ]
@@ -889,7 +889,7 @@ export interface ChartSpec<TMeta = unknown> {
   /**
    * Axis definitions keyed by axis key. `'x'`/`'y'` are conventional; extra
    * keys (e.g. `'y2'`) create additional axes that series bind to via
-   * `xAxisKey`/`yAxisKey`. Omitted axes default to a linear scale.
+   * `xAxis`/`yAxis`. Omitted axes default to a linear scale.
    */
   axes?: Record<string, AxisSpec>;
   /** Series to draw, in paint order (later series draw on top). Required. */
@@ -925,7 +925,7 @@ export interface ChartSpec<TMeta = unknown> {
    * theme object to pin colors regardless of the page.
    */
   theme?: Partial<ThemeConfig>;
-  /** Plugins installed at creation. Also addable later via `chart.use()`. */
+  /** Plugins installed at creation. Also addable later via `ChartCore.use()`. */
   plugins?: Plugin[];
 }
 

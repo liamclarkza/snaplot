@@ -792,7 +792,11 @@ declare interface InteractionOptions {
      * @defaultValue `'x'`, or `'xy'` when every series is scatter
      */
     zoom?: 'x' | 'xy' | 'none';
-    /** What a drag does: zoom to the dragged box, keep a selection, or pan. @defaultValue `'zoom'` */
+    /**
+     * What a drag does: `'zoom'` zooms to the dragged box, `'select'` keeps a selection, and
+     * `'pan'` makes a one-finger touch drag pan. A mouse pans with Shift+drag in every mode.
+     * @defaultValue `'zoom'`
+     */
     drag?: 'zoom' | 'select' | 'pan';
     /** Keep zoom and pan inside the data, or let them leave it. @defaultValue `'data'` */
     bounds?: 'data' | 'none';
