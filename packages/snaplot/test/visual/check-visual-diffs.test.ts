@@ -154,7 +154,7 @@ describe('check-visual-diffs: visual-ledger rows', () => {
     expect(r.status).toBe(0);
   });
 
-  it.fails('[repo-10] never accepts an edit to V0, the initial-baseline row', () => {
+  it('[repo-10] never accepts an edit to V0, the initial-baseline row', () => {
     const r = runScenario({
       head: changedA,
       referenceFiles: SHOTS,
@@ -165,7 +165,7 @@ describe('check-visual-diffs: visual-ledger rows', () => {
     expect(r.status).toBe(1);
   });
 
-  it.fails('[repo-10] ignores a row whose Milestone line names another milestone', () => {
+  it('[repo-10] ignores a row whose Milestone line names another milestone', () => {
     const r = runScenario({
       head: changedA,
       referenceFiles: SHOTS,

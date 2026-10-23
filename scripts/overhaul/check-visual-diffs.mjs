@@ -8,10 +8,12 @@
 //
 // - M2, M9a and M9b (or --zero): no fixture may change. Blocking.
 // - Every other milestone: every changed (or removed) shot must belong to a fixture named in the
-//   `**Fixtures:**` line of a visual-ledger row file that this milestone adds or edits, i.e. a
+//   `**Fixtures:**` line of a visual-ledger row file of this milestone: a
 //   docs/decisions/visual-ledger/V<n>.md that differs from <base> (committed, staged, unstaged or
-//   untracked). A fixture id names all its shots (`theme/card-dark` covers `@light`, `@dark` and
-//   `@2x`); a trailing `*` matches a prefix (`marks/grid-*`).
+//   untracked) and whose `**Milestone:**` line names the milestone (with no milestone known, only
+//   rows added since <base>). V0.md, the initial-baseline row, never covers a change, and an edit
+//   to it fails the check. A fixture id names all its shots (`theme/card-dark` covers `@light`,
+//   `@dark` and `@2x`); a trailing `*` matches a prefix (`marks/grid-*`).
 // - A shot that exists only on the head is reported as added and needs no row, but only when the
 //   reference is known to be whole: a reference rendered from a ref must have completed (run.mjs
 //   records `against.complete` and the shot list in meta.json), and committed baselines must
@@ -109,17 +111,33 @@ function listPngs(dir, base = dir) {
 
 const fixtureOf = (shot) => shot.split('@')[0];
 
+/** Row files that differ from <base>, each `added` (new since <base>) or `edited`. */
 function rowFiles(repoRoot, base) {
-  const changed = git(
-    ['diff', '--name-only', '--diff-filter=AMR', base, '--', LEDGER_DIR],
+  const files = new Map();
+  for (const line of git(
+    ['diff', '--name-status', '--diff-filter=AMR', base, '--', LEDGER_DIR],
     repoRoot,
   )
     .split('\n')
-    .filter(Boolean);
-  const untracked = git(['ls-files', '--others', '--exclude-standard', '--', LEDGER_DIR], repoRoot)
+    .filter(Boolean)) {
+    const [status, ...paths] = line.split('\t');
+    files.set(paths[paths.length - 1], status.startsWith('M') ? 'edited' : 'added');
+  }
+  for (const path of git(['ls-files', '--others', '--exclude-standard', '--', LEDGER_DIR], repoRoot)
     .split('\n')
-    .filter(Boolean);
-  return [...new Set([...changed, ...untracked])].filter((p) => /\/V\d+\.md$/.test(p)).sort();
+    .filter(Boolean)) {
+    files.set(path, 'added');
+  }
+  return [...files]
+    .filter(([path]) => /\/V\d+\.md$/.test(path))
+    .map(([path, change]) => ({ path, change }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** The milestone a row's `**Milestone:**` line names, normalised (`M10`), or null. */
+function rowMilestone(text) {
+  const m = /\*\*Milestone:\*\*\s*`?(M\d+[a-z]?)\b/i.exec(text);
+  return m ? normalize(m[1]) : null;
 }
 
 /** `**Fixtures:**` ids of a row file (backticked tokens on that line and its continuation). */
@@ -230,7 +248,17 @@ function main() {
     (t) => t.status === 'unexpected' || t.status === 'flaky',
   );
 
-  const rows = zero ? [] : rowFiles(repoRoot, base);
+  const changedRows = rowFiles(repoRoot, base);
+  const v0Edited = changedRows.some((r) => basename(r.path) === 'V0.md' && r.change === 'edited');
+  const rows = [];
+  const ignoredRows = [];
+  for (const r of zero ? [] : changedRows) {
+    const name = basename(r.path);
+    const owner = rowMilestone(readFileSync(join(repoRoot, r.path), 'utf8'));
+    if (name === 'V0.md') ignoredRows.push(`${name} (initial baselines)`);
+    else if (milestone ? owner === milestone : r.change === 'added') rows.push(r.path);
+    else ignoredRows.push(`${name} (${owner ? `Milestone ${owner}` : 'no Milestone line'})`);
+  }
   const named = rows.flatMap((p) =>
     rowFixtures(readFileSync(join(repoRoot, p), 'utf8')).map((id) => ({ id, row: basename(p) })),
   );
@@ -245,7 +273,7 @@ function main() {
   );
   console.log(`  reference: ${reference.summary}`);
   console.log(
-    `  milestone ${milestone ?? '(unknown)'}, ${zero ? 'zero-change rule' : `rows changed since ${base.slice(0, 12)}: ${rows.map((r) => basename(r)).join(', ') || 'none'}`}`,
+    `  milestone ${milestone ?? '(unknown)'}, ${zero ? 'zero-change rule' : `rows of this milestone changed since ${base.slice(0, 12)}: ${rows.map((r) => basename(r)).join(', ') || 'none'}${ignoredRows.length ? ` (ignored: ${ignoredRows.join(', ')})` : ''}`}`,
   );
   console.log(
     `  ${visual.length} shots: ${changed.length} changed, ${added.length} added, ${removed.length} removed, ${broken.length} broken, ${unverified.length} unverified` +
@@ -299,6 +327,12 @@ function main() {
       `${reference.complete ? 'the reference is missing images it lists' : `the reference capture did not complete (${reference.outcome})`}: ` +
         `${unverified.length} head shot(s) unverified. Run npm run test:visual -- --against ${meta.against?.ref ?? '<ref>'} again, ` +
         'or pass --allow-partial to judge only the shots the reference produced',
+    );
+  }
+  if (v0Edited) {
+    failures.push(
+      'V0.md, the initial-baseline row (M3a), is never edited: name changed fixtures in a new ' +
+        "row from the milestone's V-range",
     );
   }
   if (uncovered.length) {
