@@ -87,7 +87,7 @@ test.describe('colour parsing', () => {
         x: 't',
         series: [{ y: 'v' }],
         axes: { y: { min: 0, max: 10 } },
-        referenceRegions: [{ axis: 'x', from: 2, to: 8, fill: 'orange', opacity: 0.1 }],
+        referenceRegions: [{ axis: 'x', from: 2, to: 8, color: 'orange', opacity: 0.1 }],
       });
       chart.redraw();
     });
@@ -109,8 +109,8 @@ test.describe('colour parsing', () => {
         series: [{ y: 'v' }],
         axes: { y: { min: 0, max: 10 } },
         referenceRegions: [
-          { axis: 'x', from: 1, to: 3, fill: 'hsl(200 80% 50%)', opacity: 0.5 },
-          { axis: 'x', from: 6, to: 9, fill: 'var(--accent)', opacity: 0.5 },
+          { axis: 'x', from: 1, to: 3, color: 'hsl(200 80% 50%)', opacity: 0.5 },
+          { axis: 'x', from: 6, to: 9, color: 'var(--accent)', opacity: 0.5 },
         ],
       });
       chart.redraw();
@@ -157,7 +157,7 @@ test.describe('mark fills', () => {
 
   test('[render-03] a named-colour area fills translucently', async ({ harnessPage: page }) => {
     test.fail(true, '[render-03]');
-    await mountArea(page, { stroke: 'steelblue', color: 'steelblue' });
+    await mountArea(page, { color: 'steelblue' });
     const body = await pixelAt(page, 'chart-0', 5, 3);
     // Opaque steelblue is (70, 130, 180); a translucent fill is much lighter.
     expect(body[0]).toBeGreaterThan(150);
@@ -182,17 +182,15 @@ test.describe('mark fills', () => {
     expect(between[2] - between[0]).toBeGreaterThan(below[2] - below[0] + 4);
   });
 
-  test('[demos-06][backlog-12] a histogram honours its fill colour', async ({
-    harnessPage: page,
-  }) => {
-    test.fail(true, '[demos-06]');
+  test('[demos-06][backlog-12] a histogram honours its colour', async ({ harnessPage: page }) => {
+    // 1.0 (M7): a histogram takes `color`, the colour of every mark, and paints its bars with it.
     await page.evaluate(() => {
       const bins = window.harness.histogram(
         Array.from({ length: 200 }, (_, i) => (i % 10) + 0.5),
         { binCount: 10 },
       );
       window.harness.mount({
-        series: [{ type: 'histogram', id: 'h', data: bins, fill: '#ff0000' }],
+        series: [{ type: 'histogram', id: 'h', data: bins, color: '#ff0000' }],
       });
     });
     await settle(page);
@@ -207,15 +205,15 @@ test.describe('mark fills', () => {
     expect(r).toBeGreaterThan(g + 60);
   });
 
-  test('[demos-10] a bar with a fill and no stroke gets an outline in the same colour', async ({
+  test('[demos-10] a bar given one colour gets an outline in the same colour', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[demos-10]');
+    // 1.0 (M7): a bar has one `color` for its fill and outline; 0.12's separate fill is gone.
     await page.evaluate(() => {
       window.harness.mount({
         data: [{ q: 'A', v: 8 }],
         x: 'q',
-        series: [{ type: 'bar', y: 'v', fill: '#ff0000' }],
+        series: [{ type: 'bar', y: 'v', color: '#ff0000' }],
         axes: { y: { min: 0, max: 10 } },
       });
     });
@@ -375,7 +373,7 @@ test.describe('ramps and surfaces', () => {
           x: 't',
           series: [{ y: 'v' }],
           axes: { y: { min: 0, max: 10 } },
-          theme: { backgroundColor: 'transparent' },
+          theme: { surface: 'transparent' },
         },
         { parentId: 'blue' },
       );

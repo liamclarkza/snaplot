@@ -110,7 +110,6 @@ export function legendPoint<Row>(
     formattedX: '',
     formattedY: '',
     color: item.color,
-    meta: item.meta,
   };
   return fallback === 'series-only' && state?.cursor.source !== 'cursor'
     ? { ...base, y: Number.NaN, formattedY: '' }

@@ -276,7 +276,7 @@ describe('[repo-06][arch-12] one always-on validation layer', () => {
       x: 't',
       series: [{ y: 'y' }],
       zoom: { onZoom: () => {} },
-    });
+    } as never);
     expect(warn.mock.calls.flat().join(' ')).toMatch(/onZoom/);
   });
 });

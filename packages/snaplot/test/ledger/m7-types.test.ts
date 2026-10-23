@@ -195,7 +195,7 @@ describe('typed rows compile with the public types', () => {
     expect(diagnostics.get('changePayloads')).toEqual([]);
   });
 
-  it.fails('[arch-12] onZoom is not an option', () => {
+  it('[arch-12] onZoom is not an option', () => {
     expect(diagnostics.get('noOnZoom')).toEqual([]);
   });
 

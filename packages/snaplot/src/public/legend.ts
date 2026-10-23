@@ -361,7 +361,6 @@ function emptyPoint<Row>(item: LegendItem): ChartPoint<Row> {
     formattedX: '',
     formattedY: '',
     color: item.color,
-    meta: item.meta,
   };
 }
 

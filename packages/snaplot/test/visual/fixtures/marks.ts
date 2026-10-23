@@ -459,7 +459,7 @@ const edges: Fixture[] = [
   },
   {
     id: 'marks/histogram-fill',
-    title: 'A histogram with an explicit fill (demos-06: the fill is ignored)',
+    title: 'A histogram with an explicit color (demos-06)',
     width: 480,
     height: 240,
     options: (lib) => ({
@@ -468,7 +468,7 @@ const edges: Fixture[] = [
           id: 'latency',
           label: 'Latency',
           type: 'histogram',
-          fill: '#d55e00',
+          color: '#d55e00',
           data: lib.histogram(latencySamples(13, 2000)),
         },
       ],

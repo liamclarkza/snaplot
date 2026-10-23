@@ -88,12 +88,12 @@ export const fixtures: Fixture[] = [
   },
   {
     id: 'theme/transparent-background',
-    title: "theme.backgroundColor 'transparent' on a light-blue card (render-04)",
+    title: "theme.surface 'transparent' on a light-blue card (render-04)",
     width: CARD_W,
     height: CARD_H,
     schemes: true,
     card: { background: '#e8f0ff', color: '#111111' },
-    options: () => ({ ...surfaceLine(), theme: { backgroundColor: 'transparent' } }),
+    options: () => ({ ...surfaceLine(), theme: { surface: 'transparent' } }),
   },
   {
     id: 'theme/dark-css-vars',

@@ -146,7 +146,7 @@ export interface ScaleRange {
 }
 
 /** Options every axis kind shares. */
-interface AxisCommon extends LegacyAxisOptions {
+interface AxisCommon {
   /** The axis title, drawn outside the tick labels. @defaultValue no title */
   title?: string;
   /**
@@ -176,7 +176,7 @@ interface AxisCommon extends LegacyAxisOptions {
    */
   ticks?: readonly (number | Date)[];
   /** Draw gridlines for this axis. @defaultValue `true` */
-  grid?: boolean | LegacyOption;
+  grid?: boolean;
 }
 
 /** A numeric axis: linear or logarithmic. */
@@ -284,7 +284,7 @@ export type PointColor<Row> = {
 }['bivarianceHack'];
 
 /** Options every series shares. */
-interface SeriesCommon<Row> extends LegacySeriesOptions<Row> {
+interface SeriesCommon<Row> {
   /**
    * The series id: the key for `hiddenSeries`, `highlight`, legends and `appendData({ seriesId })`.
    * @defaultValue the `y` field name; required when `y` is a function
@@ -402,8 +402,6 @@ export interface ColorEncodingOptions<Row> {
   label?: string;
   /** How the field's value is written in the tooltip. @defaultValue automatic */
   format?: (value: number) => string;
-  /** @deprecated Removed in 1.0: missing values take the series colour. */
-  nullColor?: string;
 }
 
 /** A colour encoding: a field, or a field with options. */
@@ -421,10 +419,6 @@ export interface SizeEncodingOptions<Row> {
   label?: string;
   /** How the field's value is written in the tooltip. @defaultValue automatic */
   format?: (value: number) => string;
-  /** @deprecated Removed in 1.0: point area is proportional to the value. */
-  scale?: 'linear' | 'sqrt';
-  /** @deprecated Removed in 1.0: the domain is the data extent. */
-  domain?: readonly [number, number];
 }
 
 /** A size encoding: a field, or a field with options. */
@@ -483,8 +477,6 @@ export interface HistogramSeriesOptions {
   yAxis?: string;
   /** How counts are written in readouts. @defaultValue the Y axis `format` */
   format?: NumberFormat;
-  /** @deprecated Removed in 1.0: use `color`. */
-  fill?: string;
 }
 
 /** The marks whose fields are read from rows. */
@@ -541,7 +533,7 @@ export interface ReferenceLine {
 }
 
 /** A shaded span between two values of one axis. */
-export interface ReferenceRegion extends LegacyRegionOptions {
+export interface ReferenceRegion {
   /** The axis key the span is on. */
   axis: string;
   /** The start: a number, a Date, an ISO-8601 string, a category label, or `-Infinity` for an open start. */
@@ -721,8 +713,6 @@ export interface ChartPoint<Row = Record<string, any>> {
   formattedY: string;
   /** The point's colour. */
   color: string;
-  /** Application data attached to the series. */
-  meta?: unknown;
 }
 
 /** The values under the cursor, or at a fallback position. */
@@ -763,8 +753,6 @@ export interface LegendItem {
   lineDash: number[];
   /** The series opacity. */
   opacity: number;
-  /** Application data attached to the series. */
-  meta?: unknown;
 }
 
 /** The chart's state, as `getState()` reports it. */
@@ -885,7 +873,7 @@ export type Callback<Value> = {
  * });
  * ```
  */
-export interface ChartOptions<Row = Record<string, any>> extends LegacyChartOptions<Row> {
+export interface ChartOptions<Row = Record<string, any>> {
   /**
    * The data series read unless they bring their own: rows, typed columns or histogram bins.
    * @defaultValue no data
@@ -927,19 +915,19 @@ export interface ChartOptions<Row = Record<string, any>> extends LegacyChartOpti
    * Gestures, or `'readonly'` for a tooltip with no navigation.
    * @defaultValue `{ zoom: 'x', drag: 'zoom', bounds: 'data' }`
    */
-  interaction?: 'readonly' | InteractionOptions | LegacyInteraction;
+  interaction?: 'readonly' | InteractionOptions;
   /** Show the crosshair and point indicators. @defaultValue `true` */
-  cursor?: boolean | LegacyOption;
+  cursor?: boolean;
   /** The highlighted series id; the others dim. `null` highlights none. @defaultValue `null` */
-  highlight?: string | null | LegacyOption;
+  highlight?: string | null;
   /** The tooltip: `false` hides it, an object configures it. @defaultValue `true` */
-  tooltip?: boolean | (TooltipOptions<Row> & LegacyTooltipOptions);
+  tooltip?: boolean | TooltipOptions<Row>;
   /**
    * `'auto'` follows the page the chart sits on; `'light'` and `'dark'` pin the roles; tokens
    * override single roles.
    * @defaultValue `'auto'`
    */
-  theme?: 'auto' | 'light' | 'dark' | ThemeTokens | LegacyOption;
+  theme?: 'auto' | 'light' | 'dark' | ThemeTokens;
   /** The built-in legend: `'auto'` shows it for two or more series. @defaultValue `'auto'` */
   legend?: boolean | 'auto' | LegendOptions;
   /**
@@ -958,7 +946,7 @@ export interface ChartOptions<Row = Record<string, any>> extends LegacyChartOpti
    */
   viewport?: Viewport;
   /** The selection, with `interaction: { drag: 'select' }`. @defaultValue `null` */
-  selection?: Selection | null | LegacyOption;
+  selection?: Selection | null;
   /** The ids of hidden series. @defaultValue `[]` */
   hiddenSeries?: readonly string[];
   /** Called with the point a click hits. */
@@ -1189,8 +1177,6 @@ export interface ChartGroupOptions {
   alignPlots?: boolean;
   /** Share one Y range across the group. @defaultValue `false` */
   yRange?: boolean;
-  /** @deprecated Removed in 1.0: a group shares Y only through `yRange`. */
-  yAxis?: string;
 }
 
 /** Charts linked by `group` share their cursor, highlight and, optionally, X viewport. */
@@ -1203,110 +1189,4 @@ export interface ChartGroup {
   setHighlight(id: string | null): void;
   /** Unlink every member. */
   destroy(): void;
-}
-
-// ─── Removed in 1.0 (accepted until their removal lands) ─────────────
-
-/** An option object of the 0.12 surface. */
-export type LegacyOption = Readonly<Record<string, unknown>>;
-
-/** The 0.12 interaction presets. */
-export type LegacyInteraction = 'timeseries' | 'analytical';
-
-/** Tooltip fields of the 0.12 surface. */
-export interface LegacyTooltipOptions {
-  /** @deprecated Removed in 1.0: use `tooltip: false`. */
-  show?: boolean;
-  /** @deprecated Removed in 1.0: the tooltip places itself. */
-  offset?: number;
-  /** @deprecated Removed in 1.0: use `axes.x.format`. */
-  xFormat?(value: number | string): string;
-  /** @deprecated Removed in 1.0: use `axes.y.format` or `series.format`. */
-  yFormat?(value: number, seriesId: string): string;
-  /** @deprecated Removed in 1.0: use `axes.x.format`. */
-  rangeFormat?(min: number, max: number, seriesId: string): string;
-}
-
-/** Top-level options of the 0.12 surface. */
-export interface LegacyChartOptions<Row> {
-  /** @deprecated Removed in 1.0: size the container with CSS. */
-  width?: number;
-  /** @deprecated Removed in 1.0: charts always follow their container. */
-  autoResize?: boolean;
-  /** @deprecated Removed in 1.0: gutters are measured. */
-  padding?: LegacyOption;
-  /** @deprecated Removed in 1.0: use `interaction`. */
-  zoom?: LegacyOption;
-  /** @deprecated Removed in 1.0: use `interaction`. */
-  pan?: LegacyOption;
-  /** @deprecated Removed in 1.0: use `interaction`. */
-  touch?: LegacyOption;
-  /** @deprecated Removed in 1.0. */
-  performance?: LegacyOption;
-  /** @deprecated Removed in 1.0. */
-  debug?: LegacyOption;
-  /** @deprecated Removed in 1.0: use `onSelectionChange`. */
-  onSelect?: Callback<SelectionResult<Row>>;
-}
-
-/** Series fields of the 0.12 surface. */
-export interface LegacySeriesOptions<Row> {
-  /** @deprecated Removed in 1.0: use `color`. */
-  stroke?: string;
-  /** @deprecated Removed in 1.0: use `dash`. */
-  lineDash?: readonly number[];
-  /** @deprecated Removed in 1.0: a bar or scatter colour function is `color`. */
-  fill?: string | null | LegacyFill<Row>;
-  /** @deprecated Removed in 1.0. */
-  fillGradient?: {
-    /** The colour at the line. */
-    top: string;
-    /** The colour at the baseline. */
-    bottom: string;
-  };
-  /** @deprecated Removed in 1.0. */
-  barWidthRatio?: number;
-  /** @deprecated Removed in 1.0. */
-  pointShape?: 'circle' | 'square' | 'diamond';
-  /** @deprecated Removed in 1.0: use `renderMode: 'density'`. */
-  heatmap?: boolean;
-  /** @deprecated Removed in 1.0. */
-  heatmapBinSize?: number;
-  /** @deprecated Removed in 1.0: density uses the theme's `sequential` ramp. */
-  heatmapGradient?: readonly string[];
-  /** @deprecated Removed in 1.0: use `hiddenSeries`. */
-  visible?: boolean;
-  /** @deprecated Removed in 1.0. */
-  meta?: unknown;
-}
-
-/** A per-bar fill function of the 0.12 surface. */
-export type LegacyFill<Row> = {
-  bivarianceHack(value: number, rowIndex: number, row?: Row): string;
-}['bivarianceHack'];
-
-/** Axis fields of the 0.12 surface. */
-export interface LegacyAxisOptions {
-  /** @deprecated Removed in 1.0: use `nice`. */
-  roundBounds?: boolean;
-  /** @deprecated Removed in 1.0. */
-  rangePadding?: number;
-  /** @deprecated Removed in 1.0. */
-  auto?: boolean;
-  /** @deprecated Removed in 1.0: use `ticks` for explicit values. */
-  tickCount?: number;
-  /** @deprecated Removed in 1.0. */
-  tickMarks?: boolean | LegacyOption;
-}
-
-/** Region fields of the 0.12 surface. */
-export interface LegacyRegionOptions {
-  /** @deprecated Removed in 1.0: use `color`. */
-  fill?: string;
-  /** @deprecated Removed in 1.0. */
-  edges?: boolean;
-  /** @deprecated Removed in 1.0. */
-  edgeColor?: string;
-  /** @deprecated Removed in 1.0. */
-  edgeDash?: readonly number[];
 }

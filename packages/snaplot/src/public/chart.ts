@@ -329,19 +329,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       ...normalized.plugins.map((plugin) => this.bridge(plugin)),
     ];
     const renderTooltip = normalized.tooltip.render;
-    const formatTooltipX = normalized.tooltip.xFormat;
     return {
       ...ingested.spec,
       tooltip: {
         ...ingested.spec.tooltip,
-        ...(formatTooltipX
-          ? {
-              xFormat: (value: number) =>
-                formatTooltipX(
-                  this.ingested.categories.get('x')?.labels.get(Math.round(value)) ?? value,
-                ),
-            }
-          : {}),
         ...(renderTooltip
           ? {
               render: (points: TooltipPoint[]) =>
@@ -837,13 +828,12 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       formattedX: values?.formattedX ?? this.format(axis, x),
       formattedY: values?.formattedY ?? this.readout(series.yAxis ?? 'y', y),
       color: values?.color ?? this.engine.getLegendItems()[si]?.color ?? '',
-      meta: series.meta,
       ...(values?.xRange ? { xRange: { ...values.xRange } } : {}),
       ...(values?.radius !== undefined ? { radius: values.radius } : {}),
       ...(fields ? { fields } : {}),
     };
     const formatter = this.normalized.series[si]?.format;
-    if (!this.normalized.tooltip.yFormat && formatter) point.formattedY = formatter(y, point);
+    if (formatter) point.formattedY = formatter(y, point);
     return point;
   }
   /** A value readout at value precision (plan P9); the axis format still wins here. */
@@ -888,10 +878,12 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     });
   }
   getLegendItems() {
-    return this.engine.getLegendItems().map(({ seriesIndex: _index, ...item }, index) => ({
-      ...item,
-      id: this.ingested.seriesIds[index],
-    }));
+    return this.engine
+      .getLegendItems()
+      .map(({ seriesIndex: _index, meta: _meta, ...item }, index) => ({
+        ...item,
+        id: this.ingested.seriesIds[index],
+      }));
   }
   getTheme() {
     return this.engine.getTheme();
@@ -933,21 +925,14 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   detachGroup(group: ChartGroup): void {
     this.coordinatePadding(undefined, undefined);
     if (group.options.yRange) {
-      const key = group.options.yAxis ?? 'y';
-      const ownRange = this.naturalRange(key);
-      if (ownRange) this.engine.setCoordinatedAxis(key, ownRange);
+      const ownRange = this.naturalRange('y');
+      if (ownRange) this.engine.setCoordinatedAxis('y', ownRange);
     }
     this.publish();
   }
+  /** Pin the plot's side gutters for alignPlots, or (undefined) return to the defaults. */
   coordinatePadding(left: number | undefined, right: number | undefined): void {
-    const padding = this.options.padding as { left?: number; right?: number } | undefined;
-    this.engine.setOptions({
-      padding: {
-        ...padding,
-        left: left ?? padding?.left ?? 56,
-        right: right ?? padding?.right ?? 24,
-      },
-    });
+    this.engine.setOptions({ padding: { left: left ?? 56, right: right ?? 24 } });
   }
   private readState(): ChartState<Row> {
     const viewport: Record<string, ScaleRange> = {};
@@ -1039,7 +1024,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
             this.point(point.seriesIndex, point.dataIndex, point),
           ),
         };
-        this.callback('onSelect', result);
         this.emit('select', result);
       }),
       this.engine.on('follow:change', (following) => {

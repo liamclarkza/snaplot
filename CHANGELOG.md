@@ -36,6 +36,30 @@ to [Semantic Versioning](https://semver.org/).
   with other series throws. Re-reading a source of 10,000 rows or more because an accessor
   function keeps getting a new identity warns once.
 
+### Removed options (1.0)
+
+The 0.12 options below left the public types. Passing one warns once per page with its path and
+what to use instead, and the chart keeps its default:
+
+- Top level: `width`, `autoResize` and `padding` (size the container with CSS; gutters are
+  measured), `zoom`, `pan` and `touch` (use `interaction`), `performance`, `debug`, and `onSelect`
+  (use `onSelectionChange`). `interaction: 'timeseries'` is the default and `'analytical'` is
+  `interaction: { zoom: 'xy' }`.
+- The object forms of `cursor` (now `true`/`false`), `highlight` (a series id), `selection`
+  (`{ x: [from, to] }`; brush with `interaction: { drag: 'select' }`) and `axes.<key>.grid`, and
+  the tooltip's `show`, `offset`, `xFormat`, `yFormat` and `rangeFormat` (use `tooltip: false`
+  and the axis or series `format`).
+- The 20 theme roles (`backgroundColor` and the rest); use the ten `ThemeTokens`.
+- Axes: `roundBounds` (use `nice`), `rangePadding`, `auto`, `tickCount` (use `ticks`) and
+  `tickMarks`.
+- Series: `stroke` (use `color`), `lineDash` (use `dash`), a bar or scatter `fill` function (use a
+  `color` function), `fillGradient`, `barWidthRatio`, `pointShape`, `heatmap` (use
+  `renderMode: 'density'`), `heatmapBinSize`, `heatmapGradient`, `visible` (use `hiddenSeries`),
+  `meta`, `colorBy.nullColor`, `sizeBy.scale` and `sizeBy.domain`. A histogram takes `color`.
+- Reference regions: `fill` (use `color`), `edges`, `edgeColor` and `edgeDash`.
+- `createChartGroup({ yAxis })`: `yRange` shares the `y` axis.
+- `meta` on points and legend items.
+
 ### Data (1.0)
 
 - Typed columns are used in place: no copy and one pass over X per source and per append. Line,
@@ -73,8 +97,7 @@ to [Semantic Versioning](https://semver.org/).
   category axis takes none. `min`, `max` and `ticks` accept `Date`.
 - New option types for the 1.0 surface: `InteractionOptions`, `TooltipOptions`, `LegendOptions`,
   `StreamingOptions`, `ThemeTokens` (ten tokens), `Viewport` (`{ x?: [from, to] }`), `Selection`,
-  `SelectionChange` and the `on<Key>Change` callbacks. Options that 1.0 removes are still accepted
-  and marked deprecated until their removal lands.
+  `SelectionChange` and the `on<Key>Change` callbacks.
 - Renamed type exports: `ChartType` is `SeriesType`, `ScatterColorEncodingType` is
   `ColorEncodingType`, the `createTheme()` tokens are `CreateThemeTokens`, and the axis ranges that
   `getState().viewport`, `setViewport()` and `viewport:change` use are `ViewportRanges`.

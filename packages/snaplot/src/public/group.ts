@@ -4,7 +4,7 @@
  * group model; this module holds today's.
  */
 import type { ScaleRange } from '../engine/spec';
-import { fail } from '../engine/errors';
+import { fail, suggest, warnOnce } from '../engine/errors';
 import { equivalent } from './options';
 import type { ChartGroup, ChartGroupOptions, ChartHandle, ChartOptions, ChartState } from './types';
 
@@ -28,6 +28,11 @@ interface GroupRecord {
   broadcasting: boolean;
   destroyed: boolean;
 }
+const GROUP_KEYS = ['cursor', 'highlight', 'viewport', 'alignPlots', 'yRange'];
+const GROUP_HINTS: Record<string, string> = {
+  yAxis: 'Removed in 1.0: yRange shares the "y" axis.',
+};
+
 /** Live groups and their members. */
 export const groups = new WeakMap<ChartGroup, GroupRecord>();
 
@@ -44,8 +49,23 @@ export const groups = new WeakMap<ChartGroup, GroupRecord>();
  */
 export function createChartGroup(options: ChartGroupOptions = {}): ChartGroup {
   const record: GroupRecord = { members: new Set(), broadcasting: false, destroyed: false };
+  const known: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(options)) {
+    if (value === undefined) continue;
+    if (GROUP_KEYS.includes(key)) {
+      known[key] = value;
+      continue;
+    }
+    const hint =
+      GROUP_HINTS[key] ??
+      (suggest(key, GROUP_KEYS) ? `Did you mean "${suggest(key, GROUP_KEYS)}"?` : '');
+    warnOnce(
+      'unknown-option',
+      `"${key}" is not a createChartGroup() option and is ignored.${hint ? ` ${hint}` : ''}`,
+    );
+  }
   const group: ChartGroup = {
-    options: Object.freeze({ cursor: true, highlight: true, ...options }),
+    options: Object.freeze({ cursor: true, highlight: true, ...known }),
     setCursor(value) {
       broadcast(group, (member) => member.setCursor(value));
     },
@@ -98,7 +118,7 @@ export function validateGroup(
   if (!record || record.destroyed) fail('group must be a live createChartGroup() result.');
   for (const member of record.members) {
     if (member === source) continue;
-    const keys = group.options.yRange ? ['x', group.options.yAxis ?? 'y'] : ['x'];
+    const keys = group.options.yRange ? ['x', 'y'] : ['x'];
     for (const key of keys) {
       const axis = member.getAxis(key);
       const type = candidate.categories.has(key)
@@ -144,7 +164,7 @@ export function coordinate(group: ChartGroup | undefined, only?: 'shareY'): void
       for (const member of record.members) member.coordinatePadding(left, right);
     }
     if (group.options.yRange) {
-      const key = group.options.yAxis ?? 'y';
+      const key = 'y';
       const domains = [...record.members]
         .map((member) => member.naturalRange(key))
         .filter((axis) => !!axis);

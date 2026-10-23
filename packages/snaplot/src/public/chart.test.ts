@@ -48,10 +48,23 @@ afterEach(() => {
 function make<Row = Record<string, any>>(options: ChartOptions<Row>): ChartHandle<Row> {
   const element = document.createElement('div');
   document.body.append(element);
-  const chart = createChart(element, { width: 640, height: 360, autoResize: false, ...options });
+  const chart = createChart(element, { height: 360, ...options });
   live.push(chart);
   return chart;
 }
+
+/** The Y range a chart with these options shows on its own. */
+function soloY<Row>(options: ChartOptions<Row>) {
+  const chart = make(options);
+  const axis = chart.getAxis('y')!;
+  chart.destroy();
+  return { min: axis.min, max: axis.max };
+}
+/** The union of Y ranges a `yRange` group shares. */
+const union = (...ranges: { min: number; max: number }[]) => ({
+  min: Math.min(...ranges.map((range) => range.min)),
+  max: Math.max(...ranges.map((range) => range.max)),
+});
 
 describe('public chart transactions', () => {
   it('accepts ordinary rows, keeps original identity after sorting and reports actual values', () => {
@@ -427,10 +440,9 @@ describe('public chart transactions', () => {
     expect(chart.getState().viewport.x).toEqual({ min: 0, max: 5 });
   });
 
-  it('freezes cached cursor snapshots without freezing caller-owned rows or metadata', () => {
+  it('freezes cached cursor snapshots without freezing caller-owned rows', () => {
     const row = { x: 1, y: 2 };
-    const meta = { experiment: 'one' };
-    const chart = make({ data: [row], x: 'x', series: [{ y: 'y', meta }] });
+    const chart = make({ data: [row], x: 'x', series: [{ y: 'y' }] });
     chart.setCursor(1);
     const state = chart.getState();
     expect(chart.getState()).toBe(state);
@@ -439,7 +451,6 @@ describe('public chart transactions', () => {
     expect(Object.isFrozen(state.cursor.points[0])).toBe(true);
     expect(state.cursor.points[0].row).toBe(row);
     expect(Object.isFrozen(row)).toBe(false);
-    expect(Object.isFrozen(meta)).toBe(false);
   });
 
   // gap-overhaul-delta-06: the Solid link tests this replaced asserted the
@@ -447,57 +458,47 @@ describe('public chart transactions', () => {
   // re-coordination after a member's data changed.
   it('[gap-overhaul-delta-06] keeps plots aligned and Y shared while grouped, including after a member update', () => {
     const group = createChartGroup({ yRange: true, alignPlots: true });
-    const axes = { y: { rangePadding: 0, roundBounds: false } };
-    const first = make({
-      data: [
-        { x: 0, y: 1 },
-        { x: 1, y: 3 },
-      ],
+    const rows = (a: number, b: number) => [
+      { x: 0, y: a },
+      { x: 1, y: b },
+    ];
+    const firstOptions: Omit<ChartOptions<{ x: number; y: number }>, 'data'> = {
       x: 'x',
       series: [{ y: 'y' }],
-      axes,
-      group,
-    });
-    const second = make({
-      data: [
-        { x: 0, y: 100 },
-        { x: 1, y: 200 },
-      ],
-      x: 'x',
-      series: [{ y: 'y' }],
-      axes,
-      padding: { left: 100 },
-      group,
-    });
+      axes: { y: { nice: false } },
+    };
+    // A title widens the second chart's left gutter; alignPlots widens the first's to match.
+    const secondOptions: typeof firstOptions = {
+      ...firstOptions,
+      axes: { y: { nice: false, title: 'Requests per second' } },
+    };
+    const own = make({ ...firstOptions, data: rows(1, 3) }).getLayout().plot.left;
+    const first = make({ ...firstOptions, data: rows(1, 3), group });
+    const second = make({ ...secondOptions, data: rows(100, 200), group });
     const aligned = () => {
       const [a, b] = [first.getLayout().plot, second.getLayout().plot];
       expect(a.left).toBe(b.left);
       expect(a.width).toBe(b.width);
     };
+    const shared = (a: [number, number], b: [number, number]) => {
+      const range = union(
+        soloY({ ...firstOptions, data: rows(...a) }),
+        soloY({ ...secondOptions, data: rows(...b) }),
+      );
+      expect(first.getAxis('y')).toMatchObject(range);
+      expect(second.getAxis('y')).toMatchObject(range);
+    };
 
-    expect(first.getAxis('y')).toMatchObject({ min: 1, max: 200 });
-    expect(second.getAxis('y')).toMatchObject({ min: 1, max: 200 });
-    expect(first.getLayout().plot.left).toBeGreaterThanOrEqual(100);
+    shared([1, 3], [100, 200]);
+    expect(first.getLayout().plot.left).toBeGreaterThan(own);
     aligned();
 
-    second.update({
-      data: [
-        { x: 0, y: 100 },
-        { x: 1, y: 400 },
-      ],
-    });
-    expect(first.getAxis('y')).toMatchObject({ min: 1, max: 400 });
-    expect(second.getAxis('y')).toMatchObject({ min: 1, max: 400 });
+    second.update({ data: rows(100, 400) });
+    shared([1, 3], [100, 400]);
     aligned();
 
-    first.update({
-      data: [
-        { x: 0, y: -50 },
-        { x: 1, y: 3 },
-      ],
-    });
-    expect(first.getAxis('y')).toMatchObject({ min: -50, max: 400 });
-    expect(second.getAxis('y')).toMatchObject({ min: -50, max: 400 });
+    first.update({ data: rows(-50, 3) });
+    shared([-50, 3], [100, 400]);
     aligned();
   });
 
@@ -510,7 +511,7 @@ describe('public chart transactions', () => {
       ],
       x: 'x',
       series: [{ y: 'y' }],
-      axes: { y: { rangePadding: 0, roundBounds: false } },
+      axes: { y: { nice: false } },
     };
     const secondOptions = {
       ...firstOptions,
@@ -518,19 +519,21 @@ describe('public chart transactions', () => {
         { x: 0, y: 100 },
         { x: 1, y: 200 },
       ],
-      padding: { left: 100 },
+      axes: { y: { nice: false, title: 'Requests per second' } },
     };
+    const firstY = soloY(firstOptions);
+    const secondY = soloY(secondOptions);
     const first = make({ ...firstOptions, group });
     const second = make({ ...secondOptions, group });
-    expect(first.getAxis('y')).toMatchObject({ min: 1, max: 200 });
+    expect(first.getAxis('y')).toMatchObject(union(firstY, secondY));
     first.update({ group: undefined });
-    expect(first.getAxis('y')).toMatchObject({ min: 1, max: 3 });
-    expect(second.getAxis('y')).toMatchObject({ min: 100, max: 200 });
+    expect(first.getAxis('y')).toMatchObject(firstY);
+    expect(second.getAxis('y')).toMatchObject(secondY);
     expect(first.getLayout().plot.left).toBeLessThan(second.getLayout().plot.left);
     first.update({ group });
     group.destroy();
-    expect(first.getAxis('y')).toMatchObject({ min: 1, max: 3 });
-    expect(second.getAxis('y')).toMatchObject({ min: 100, max: 200 });
+    expect(first.getAxis('y')).toMatchObject(firstY);
+    expect(second.getAxis('y')).toMatchObject(secondY);
     first.update({
       data: [
         { x: 0, y: 5 },
@@ -538,7 +541,7 @@ describe('public chart transactions', () => {
       ],
     });
     expect(first.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(10);
-    expect(second.getAxis('y')).toMatchObject({ min: 100, max: 200 });
+    expect(second.getAxis('y')).toMatchObject(secondY);
   });
 
   it('matches column names independently of key order and rejects schema substitutions', () => {
@@ -621,28 +624,28 @@ describe('public chart transactions', () => {
     );
   });
 
-  it('resolves per-datum fill callbacks against retained live row identity', () => {
+  it('resolves per-datum color callbacks against retained live row identity', () => {
     const rows = [
       { x: 2, y: 20 },
       { x: 1, y: 10 },
     ];
-    const fill = vi.fn(() => '#abcdef');
+    const color = vi.fn(() => '#abcdef');
     const chart = make({
       data: rows,
       x: 'x',
-      series: [{ type: 'bar', y: 'y', fill }],
+      series: [{ type: 'bar', y: 'y', color }],
       streaming: { maxPoints: 2 },
     });
     const appended = { x: 3, y: 30 };
     chart.appendData([appended]);
     const draw = vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0];
     draw(0);
-    expect(fill).toHaveBeenCalledWith(20, 0, rows[0]);
-    expect(fill).toHaveBeenCalledWith(30, 2, appended);
-    fill.mockClear();
+    expect(color).toHaveBeenCalledWith(20, rows[0], 0);
+    expect(color).toHaveBeenCalledWith(30, appended, 2);
+    color.mockClear();
     chart.update({ axes: { y: { title: 'Updated' } } });
     vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0](16);
-    expect(fill).toHaveBeenCalledWith(30, 2, appended);
+    expect(color).toHaveBeenCalledWith(30, appended, 2);
   });
 
   it('gives newly declared series the retained shared source identities', () => {
@@ -674,18 +677,15 @@ describe('public chart transactions', () => {
   it('gives custom tooltips public identity and preserves encoded fields and intervals', () => {
     const row = { x: 'One', y: 4, label: 'Control' };
     const render = vi.fn((_points: readonly ChartPoint<typeof row>[]) => 'custom');
-    const xFormat = vi.fn((value: number | string) => `Category ${value}`);
     const chart = make({
       data: [row],
       x: 'x',
       series: [{ type: 'scatter', y: 'y', colorBy: 'label' }],
-      tooltip: { render, xFormat },
+      tooltip: { render },
     });
     const replace = vi.spyOn(ChartCore.prototype, 'replaceSources');
     chart.update({ axes: { y: { title: 'Metric' } } });
     const tooltip = replace.mock.calls[0][0].tooltip!;
-    expect(tooltip.xFormat!(0)).toBe('Category One');
-    expect(xFormat).toHaveBeenCalledWith('One');
     tooltip.render!([
       {
         seriesIndex: 0,
@@ -715,21 +715,21 @@ describe('public chart transactions', () => {
   });
 
   it('retains public beforeDraw cancellation through the plugin bridge', () => {
-    const fill = vi.fn(() => '#abcdef');
+    const color = vi.fn(() => '#abcdef');
     let cancelled = true;
     const chart = make({
       data: [{ x: 0, y: 1 }],
       x: 'x',
-      series: [{ type: 'bar', y: 'y', fill }],
+      series: [{ type: 'bar', y: 'y', color }],
       plugins: [{ id: 'cancel', beforeDraw: () => (cancelled ? false : undefined) }],
     });
-    fill.mockClear();
+    color.mockClear();
     vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0](0);
-    expect(fill).not.toHaveBeenCalled();
+    expect(color).not.toHaveBeenCalled();
     cancelled = false;
     chart.redraw();
     vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0](16);
-    expect(fill).toHaveBeenCalled();
+    expect(color).toHaveBeenCalled();
   });
 
   it('rejects invalid axis and viewport bounds without committing replacement data', () => {

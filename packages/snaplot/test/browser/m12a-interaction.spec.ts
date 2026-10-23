@@ -70,7 +70,7 @@ test.describe('hover model', () => {
 });
 
 test.describe('brush selection', () => {
-  const brush = { selection: { mode: 'brush' } };
+  const brush = { interaction: { drag: 'select' } };
 
   async function select(page: Page): Promise<void> {
     const plot = await plotRect(page);
@@ -124,9 +124,11 @@ test.describe('brush selection', () => {
 });
 
 test.describe('box zoom', () => {
-  test('[interact-13] a box zoom respects zoom.minRange', async ({ harnessPage: page }) => {
+  test('[interact-13] a box zoom respects the minimum span', async ({ harnessPage: page }) => {
     test.fail(true, '[interact-13]');
-    await mountLines(page, { zoom: { minRange: 20 } });
+    // zoom.minRange left the public options in M7; M12a restates this test against the internal
+    // minimum span (D29).
+    await mountLines(page);
     const plot = await plotRect(page);
     const y = plot.top + plot.height / 2;
     await drag(
@@ -247,7 +249,7 @@ test.describe('clicks, wheel and keys', () => {
     harnessPage: page,
   }) => {
     test.fail(true, '[interact-18]');
-    await mountLines(page, { zoom: { enabled: false }, pan: { enabled: false } });
+    await mountLines(page, { interaction: { zoom: 'none' } });
     await page.evaluate(() => {
       (window as unknown as { wheelPrevented: boolean[] }).wheelPrevented = [];
       window.addEventListener('wheel', (event) => {
@@ -308,7 +310,7 @@ test.describe('clicks, wheel and keys', () => {
     harnessPage: page,
   }) => {
     test.fail(true, '[interact-18]');
-    await mountLines(page, { zoom: { enabled: false }, pan: { enabled: false } });
+    await mountLines(page, { interaction: { zoom: 'none' } });
     const prevented = await page.evaluate(() => {
       const target = document.querySelector('#chart-0 [tabindex]') as HTMLElement | null;
       target?.focus();

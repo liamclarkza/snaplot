@@ -63,16 +63,6 @@ const TOP = keys(
   'selection',
   'hiddenSeries',
   ...CALLBACKS,
-  // Removed in 1.0, still honoured until their removal lands.
-  'width',
-  'autoResize',
-  'padding',
-  'zoom',
-  'pan',
-  'touch',
-  'performance',
-  'debug',
-  'onSelect',
 );
 const SERIES = keys(
   'id',
@@ -99,16 +89,6 @@ const SERIES = keys(
   'colorBy',
   'sizeBy',
   'tooltipFields',
-  'stroke',
-  'lineDash',
-  'fillGradient',
-  'barWidthRatio',
-  'pointShape',
-  'heatmap',
-  'heatmapBinSize',
-  'heatmapGradient',
-  'visible',
-  'meta',
 );
 const AXIS = keys(
   'type',
@@ -121,15 +101,10 @@ const AXIS = keys(
   'grid',
   'format',
   'categories',
-  'roundBounds',
-  'rangePadding',
-  'auto',
-  'tickCount',
-  'tickMarks',
 );
 const STREAMING = keys('maxPoints', 'followWindow');
 const INTERACTION = keys('zoom', 'drag', 'bounds');
-const TOOLTIP = keys('mode', 'render', 'show', 'offset', 'xFormat', 'yFormat', 'rangeFormat');
+const TOOLTIP = keys('mode', 'render');
 const THEME_TOKENS = keys(
   'mode',
   'surface',
@@ -142,81 +117,100 @@ const THEME_TOKENS = keys(
   'fontFamily',
   'fontSize',
 );
-const THEME_ROLES = keys(
-  'backgroundColor',
-  'textColor',
-  'axisLabelColor',
-  'fontFamily',
-  'fontSize',
-  'gridColor',
-  'gridOpacity',
-  'palette',
-  'categoricalPalette',
-  'sequentialPalette',
-  'divergingPalette',
-  'heatmapGradient',
-  'axisLineColor',
-  'borderColor',
-  'borderOpacity',
-  'tickColor',
-  'crosshairColor',
-  'tooltipBackground',
-  'tooltipTextColor',
-  'tooltipBorderColor',
-);
 const LEGEND = keys('position');
 const LINE = keys('axis', 'value', 'label', 'color', 'dash', 'lineWidth');
-const REGION = keys(
-  'axis',
-  'from',
-  'to',
-  'label',
-  'color',
-  'opacity',
-  'fill',
-  'edges',
-  'edgeColor',
-  'edgeDash',
-);
-const COLOR_BY = keys('field', 'type', 'palette', 'domain', 'label', 'format', 'nullColor');
-const SIZE_BY = keys('field', 'range', 'label', 'format', 'scale', 'domain');
+const REGION = keys('axis', 'from', 'to', 'label', 'color', 'opacity');
+const COLOR_BY = keys('field', 'type', 'palette', 'domain', 'label', 'format');
+const SIZE_BY = keys('field', 'range', 'label', 'format');
 const TOOLTIP_FIELD = keys('field', 'label', 'format');
 const SELECTION = keys('x', 'y');
-const LEGACY_SELECTION = keys('mode', 'dataChange');
-const LEGACY_CURSOR = keys(
-  'show',
-  'snap',
-  'xLine',
-  'yLine',
-  'indicators',
-  'color',
-  'dash',
-  'syncTooltip',
-);
-const LEGACY_HIGHLIGHT = keys('enabled', 'dimOpacity', 'proximity');
-const LEGACY_ZOOM = keys(
-  'enabled',
-  'x',
-  'y',
-  'axis',
-  'wheelStep',
-  'pinchMode',
-  'minRange',
-  'maxRange',
-  'bounds',
-);
-const LEGACY_PAN = keys('enabled', 'x', 'y', 'axis');
-const LEGACY_TOUCH = keys('hitRadius', 'drag', 'selectionGesture', 'longPressMs');
-const LEGACY_PADDING = keys('top', 'right', 'bottom', 'left');
 
-/** Hints for keys that are not options but name something that is. */
+/**
+ * Hints for keys that are not options: the 0.12 options 1.0 removed (arch-15)
+ * and names from other libraries, each with what to use instead. A key is
+ * looked up by its full path (`axes.y.roundBounds`), then by its path with the
+ * axis key or series index generalised (`axes.*.roundBounds`, `series.*.stroke`),
+ * then by its name.
+ */
 const HINTS: Record<string, string> = {
+  // Top level.
+  width: 'Removed in 1.0: size the container with CSS; the chart follows it.',
+  autoResize: 'Removed in 1.0: charts always follow their container.',
+  padding: 'Removed in 1.0: the gutters are measured from the axis labels.',
+  zoom: "Removed in 1.0: use interaction: { zoom: 'x' | 'xy' | 'none', bounds }.",
   'zoom.onZoom': 'Observe zoom with onViewportChange.',
+  pan: "Removed in 1.0: use interaction: { drag: 'pan' }; panning follows interaction.zoom.",
+  touch: "Removed in 1.0: use interaction: { drag: 'pan' | 'select' }.",
+  performance: 'Removed in 1.0: sampling during gestures is automatic.',
+  debug: 'Removed in 1.0.',
+  onSelect: 'Removed in 1.0: use onSelectionChange.',
+  // Axes.
+  'axes.*.roundBounds': 'Use nice.',
+  'axes.*.rangePadding': 'Removed in 1.0: set min and max for a fixed domain.',
+  'axes.*.auto': 'Removed in 1.0.',
+  'axes.*.tickCount': 'Removed in 1.0: use ticks for explicit values.',
+  'axes.*.tickMarks': 'Removed in 1.0.',
+  // Series.
+  'series.*.stroke': 'Use color.',
+  'series.*.lineDash': 'Use dash.',
+  'series.*.fillGradient': 'Removed in 1.0.',
+  'series.*.barWidthRatio': 'Removed in 1.0.',
+  'series.*.pointShape': 'Removed in 1.0.',
+  'series.*.heatmap': "Use renderMode: 'density'.",
+  'series.*.heatmapBinSize': 'Removed in 1.0.',
+  'series.*.heatmapGradient': "Removed in 1.0: density uses the theme's sequential ramp.",
+  'series.*.visible': 'Use hiddenSeries.',
+  'series.*.meta': 'Removed in 1.0: keep it in your own map by series id.',
+  'series.*.colorBy.nullColor': 'Removed in 1.0: missing values take the series colour.',
+  'series.*.sizeBy.scale': 'Removed in 1.0: point area is proportional to the value.',
+  'series.*.sizeBy.domain': 'Removed in 1.0: the size domain runs from zero to the largest value.',
+  // Annotations.
+  'referenceRegions.*.fill': 'Use color.',
+  'referenceRegions.*.edges': 'Removed in 1.0.',
+  'referenceRegions.*.edgeColor': 'Removed in 1.0.',
+  'referenceRegions.*.edgeDash': 'Removed in 1.0.',
+  // Tooltip.
+  'tooltip.show': 'Use tooltip: false.',
+  'tooltip.offset': 'Removed in 1.0: the tooltip places itself.',
+  'tooltip.xFormat': 'Use axes.x.format.',
+  'tooltip.yFormat': 'Use the series format or axes.y.format.',
+  'tooltip.rangeFormat': 'Use axes.x.format.',
+  // Theme roles of 0.12, by the token that replaces them.
+  'theme.backgroundColor': 'Use surface.',
+  'theme.textColor': 'Use text.',
+  'theme.axisLabelColor': 'Use muted.',
+  'theme.palette': 'Use categorical.',
+  'theme.categoricalPalette': 'Use categorical.',
+  'theme.sequentialPalette': 'Use sequential.',
+  'theme.divergingPalette': 'Use diverging.',
+  'theme.heatmapGradient': 'Use sequential.',
+  'theme.crosshairColor': 'Use accent.',
+  'theme.tooltipBackground': 'Use surface.',
+  'theme.tooltipTextColor': 'Use text.',
+  'theme.gridColor': 'Removed in 1.0: grid lines derive from text and surface.',
+  'theme.gridOpacity': 'Removed in 1.0: grid lines derive from text and surface.',
+  'theme.axisLineColor': 'Removed in 1.0: axis lines derive from text and surface.',
+  'theme.borderColor': 'Removed in 1.0: borders derive from text and surface.',
+  'theme.borderOpacity': 'Removed in 1.0: borders derive from text and surface.',
+  'theme.tickColor': 'Removed in 1.0: ticks derive from text and surface.',
+  'theme.tooltipBorderColor': 'Removed in 1.0: the tooltip border derives from text and surface.',
+  // Other libraries.
   maxLen: 'Use streaming.maxPoints.',
   follow: 'Use streaming.followWindow.',
   tickFormat: 'Use format.',
   label: 'Axes take title.',
   syncKey: 'Link charts with createChartGroup().',
+};
+
+/** The removed 0.12 values of object-or-value options, with what to use instead. */
+const REMOVED_VALUES: Record<string, string> = {
+  cursor:
+    "cursor takes true or false; its 0.12 options were removed (the Y line is automatic with interaction: { zoom: 'xy' }).",
+  highlight:
+    'highlight takes a series id or null; its 0.12 options were removed (legend hover dims the other series).',
+  selection:
+    "selection takes { x: [from, to] } or null; brush with interaction: { drag: 'select' }.",
+  grid: 'grid takes true or false; grid lines are styled by the theme.',
 };
 
 const SERIES_TYPES: readonly SeriesType[] = ['line', 'area', 'band', 'bar', 'scatter', 'histogram'];
@@ -329,9 +323,6 @@ export interface NormalizedOptions<Row> {
   engine: Omit<ChartSpec, 'series' | 'axes' | 'plugins'>;
   tooltip: {
     render?: (points: readonly ChartPoint<Row>[]) => string | Node;
-    xFormat?: (value: number | string) => string;
-    yFormat?: (value: number, seriesId: string) => string;
-    rangeFormat?: (min: number, max: number, seriesId: string) => string;
   };
   referenceLines: NormalizedLine[];
   referenceRegions: NormalizedRegion[];
@@ -339,7 +330,7 @@ export interface NormalizedOptions<Row> {
   group?: ChartGroup;
   ariaLabel?: string;
   state: NormalizedState;
-  callbacks: Partial<Record<CallbackKey | 'onSelect', (value: never) => void>>;
+  callbacks: Partial<Record<CallbackKey, (value: never) => void>>;
   locale?: string;
   timeZone: 'local' | 'UTC';
   legend: boolean | 'auto' | { position: 'top' | 'bottom' };
@@ -385,14 +376,24 @@ function checkKeys(value: Record<string, unknown>, known: Keys, path: string): v
   for (const [name, item] of Object.entries(value)) {
     if (known.has(name) || item === undefined) continue;
     const full = path ? `${path}.${name}` : name;
+    const general = full.replace(/\[\d+\]/g, '.*').replace(/^axes\.[^.]+/, 'axes.*');
     const hint =
       HINTS[full] ??
+      HINTS[general] ??
       HINTS[name] ??
       (suggest(name, known) ? `Did you mean "${suggest(name, known)}"?` : '');
     warnOnce(
       'unknown-option',
       `"${full}" is not an option and is ignored.${hint ? ` ${hint}` : ''}`,
     );
+    // A removed object can hold keys with their own hint (`zoom.onZoom`).
+    if (isPlain(item))
+      for (const child of Object.keys(item))
+        if (HINTS[`${full}.${child}`])
+          warnOnce(
+            'unknown-option',
+            `"${full}.${child}" is not an option and is ignored. ${HINTS[`${full}.${child}`]}`,
+          );
   }
 }
 
@@ -527,22 +528,18 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
   const allScatter = series.length > 0 && series.every((s) => s.type === 'scatter');
   normalizeInteraction(raw, engine, allScatter);
 
-  // Cursor and highlight: booleans and ids in 1.0; 0.12 objects are honoured until removed.
+  // Cursor and highlight: a boolean and a series id.
   if (raw.cursor !== undefined) {
     if (typeof raw.cursor === 'boolean') engine.cursor = { show: raw.cursor };
-    else if (isPlain(raw.cursor)) {
-      checkKeys(raw.cursor, LEGACY_CURSOR, 'cursor');
-      engine.cursor = known(raw.cursor, LEGACY_CURSOR) as ChartSpec['cursor'];
-    } else fail(`cursor must be true or false, not ${describe(raw.cursor)}.`);
+    else if (isPlain(raw.cursor)) removedValue('cursor');
+    else fail(`cursor must be true or false, not ${describe(raw.cursor)}.`);
   }
   const state: NormalizedState = {};
   if (raw.highlight !== undefined) {
     if (raw.highlight === null || typeof raw.highlight === 'string')
       state.highlight = raw.highlight;
-    else if (isPlain(raw.highlight)) {
-      checkKeys(raw.highlight, LEGACY_HIGHLIGHT, 'highlight');
-      engine.highlight = known(raw.highlight, LEGACY_HIGHLIGHT) as ChartSpec['highlight'];
-    } else fail(`highlight must be a series id or null, not ${describe(raw.highlight)}.`);
+    else if (isPlain(raw.highlight)) removedValue('highlight');
+    else fail(`highlight must be a series id or null, not ${describe(raw.highlight)}.`);
   }
 
   // Tooltip.
@@ -552,16 +549,11 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
     else if (isPlain(raw.tooltip)) {
       const t = raw.tooltip;
       checkKeys(t, TOOLTIP, 'tooltip');
-      const mode = enumValue('tooltip.mode', t.mode, ['index', 'nearest', 'x'] as const, undefined);
-      engine.tooltip = {
-        ...(t.show === undefined ? {} : { show: t.show !== false }),
-        ...(mode === undefined ? {} : { mode }),
-        ...(typeof t.offset === 'number' ? { offset: t.offset } : {}),
-      };
-      for (const name of ['render', 'xFormat', 'yFormat', 'rangeFormat'] as const) {
-        if (t[name] === undefined) continue;
-        if (typeof t[name] !== 'function') fail(`tooltip.${name} must be a function.`);
-        tooltip[name] = t[name] as never;
+      const mode = enumValue('tooltip.mode', t.mode, ['index', 'nearest'] as const, undefined);
+      engine.tooltip = mode === undefined ? {} : { mode };
+      if (t.render !== undefined) {
+        if (typeof t.render !== 'function') fail('tooltip.render must be a function.');
+        tooltip.render = t.render as never;
       }
     } else fail(`tooltip must be true, false or tooltip options, not ${describe(raw.tooltip)}.`);
   }
@@ -590,7 +582,7 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
   // Theme.
   if (raw.theme !== undefined) engine.theme = normalizeTheme(raw.theme);
 
-  // Selection: the 1.0 state option, or the 0.12 brush settings.
+  // Selection: a state option.
   if (raw.selection !== undefined) {
     if (raw.selection === null) state.selection = null;
     else if (isPlain(raw.selection) && ('x' in raw.selection || 'y' in raw.selection)) {
@@ -599,13 +591,8 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
         x: interval(raw.selection.x, 'selection.x'),
         ...(raw.selection.y === undefined ? {} : { y: interval(raw.selection.y, 'selection.y') }),
       };
-    } else if (isPlain(raw.selection)) {
-      checkKeys(raw.selection, LEGACY_SELECTION, 'selection');
-      engine.selection = {
-        ...engine.selection,
-        ...(known(raw.selection, LEGACY_SELECTION) as ChartSpec['selection']),
-      };
-    } else fail(`selection must be { x: [from, to] } or null, not ${describe(raw.selection)}.`);
+    } else if (isPlain(raw.selection)) removedValue('selection');
+    else fail(`selection must be { x: [from, to] } or null, not ${describe(raw.selection)}.`);
   }
 
   // The viewport and hidden series.
@@ -646,23 +633,12 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
 
   // Callbacks.
   const callbacks: NormalizedOptions<Row>['callbacks'] = {};
-  for (const name of [...CALLBACKS, 'onSelect'] as const) {
+  for (const name of CALLBACKS) {
     const fn = raw[name];
     if (fn === undefined) continue;
     if (typeof fn !== 'function') fail(`${name} must be a function, not ${describe(fn)}.`);
     callbacks[name] = fn as (value: never) => void;
   }
-
-  // The 0.12 sizing, padding and tuning options, honoured until their removal lands.
-  if (raw.padding !== undefined) {
-    if (!isPlain(raw.padding)) fail('padding must be an object.');
-    checkKeys(raw.padding, LEGACY_PADDING, 'padding');
-    engine.padding = raw.padding as ChartSpec['padding'];
-  }
-  if (raw.performance !== undefined)
-    engine.performance = raw.performance as ChartSpec['performance'];
-  if (raw.debug !== undefined) engine.debug = raw.debug as ChartSpec['debug'];
-  if (raw.autoResize !== undefined) engine.autoResize = raw.autoResize !== false;
 
   // The rest.
   if (raw.ariaLabel !== undefined && typeof raw.ariaLabel !== 'string')
@@ -715,9 +691,9 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
   };
 }
 
-/** The entries of `value` whose keys are in `accepted`. */
-function known(value: Record<string, unknown>, accepted: Keys): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(value).filter(([key]) => accepted.has(key)));
+/** Warn that an option's 0.12 object form was removed; the option keeps its default. */
+function removedValue(name: keyof typeof REMOVED_VALUES, path: string = name): void {
+  warnOnce('removed-option', `${path}: ${REMOVED_VALUES[name]} The object is ignored.`);
 }
 
 function listOf(value: unknown, path: string): unknown[] {
@@ -740,9 +716,15 @@ function normalizeInteraction(
   engine: Omit<ChartSpec, 'series' | 'axes' | 'plugins'>,
   allScatter: boolean,
 ): void {
-  const value = raw.interaction;
+  let value = raw.interaction;
+  if (value === 'timeseries' || value === 'analytical') {
+    warnOnce(
+      'removed-option',
+      `interaction '${value}' was removed in 1.0 and is ignored. Use ${value === 'analytical' ? "interaction: { zoom: 'xy' }" : 'the default (no interaction option)'}.`,
+    );
+    value = undefined;
+  }
   if (value === 'readonly') engine.interaction = 'readonly';
-  else if (value === 'timeseries' || value === 'analytical') engine.interaction = value;
   else if (value === undefined || isPlain(value)) {
     const options = (value ?? {}) as Record<string, unknown>;
     checkKeys(options, INTERACTION, 'interaction');
@@ -773,19 +755,6 @@ function normalizeInteraction(
     if (drag === 'select') engine.selection = { ...engine.selection, mode: 'brush' };
     if (drag === 'pan') engine.touch = { ...engine.touch, drag: 'pan' };
   } else fail(`interaction must be 'readonly' or { zoom, drag, bounds }, not ${describe(value)}.`);
-
-  // The 0.12 gesture objects refine the preset until their removal lands.
-  for (const [name, accepted] of [
-    ['zoom', LEGACY_ZOOM],
-    ['pan', LEGACY_PAN],
-    ['touch', LEGACY_TOUCH],
-  ] as const) {
-    const legacy = raw[name];
-    if (legacy === undefined) continue;
-    if (!isPlain(legacy)) fail(`${name} must be an object.`);
-    checkKeys(legacy, accepted, name);
-    engine[name] = { ...(engine[name] as object), ...known(legacy, accepted) } as never;
-  }
 }
 
 function normalizeTheme(value: unknown): Partial<ThemeConfig> | undefined {
@@ -798,20 +767,10 @@ function normalizeTheme(value: unknown): Partial<ThemeConfig> | undefined {
   }
   if (!isPlain(value))
     fail(`theme must be 'auto', 'light', 'dark' or theme tokens, not ${describe(value)}.`);
+  checkKeys(value, THEME_TOKENS, 'theme');
   const tokens: Record<string, unknown> = {};
-  const roles: Record<string, unknown> = {};
-  for (const [key, item] of Object.entries(value)) {
-    if (item === undefined) continue;
-    if (THEME_TOKENS.has(key)) tokens[key] = item;
-    else if (THEME_ROLES.has(key)) roles[key] = item;
-    else {
-      const hint = suggest(key, THEME_TOKENS);
-      warnOnce(
-        'unknown-option',
-        `"theme.${key}" is not an option and is ignored.${hint ? ` Did you mean "${hint}"?` : ''}`,
-      );
-    }
-  }
+  for (const [key, item] of Object.entries(value))
+    if (item !== undefined && THEME_TOKENS.has(key)) tokens[key] = item;
   const mode = enumValue('theme.mode', tokens.mode, ['light', 'dark'] as const, undefined);
   const base = mode === 'dark' ? DARK_THEME : mode === 'light' ? DEFAULT_THEME : undefined;
   for (const key of ['categorical', 'sequential', 'diverging'] as const) {
@@ -826,7 +785,7 @@ function normalizeTheme(value: unknown): Partial<ThemeConfig> | undefined {
     ...(tokens.sequential ? { sequential: [...(tokens.sequential as string[])] } : {}),
     ...(tokens.diverging ? { diverging: [...(tokens.diverging as string[])] } : {}),
   });
-  return { ...fromTokens, ...(roles as Partial<ThemeConfig>) };
+  return fromTokens;
 }
 
 function normalizeAxis(
@@ -876,15 +835,14 @@ function normalizeAxis(
       POSITIONS,
       undefined,
     ) as AxisSpec['position'];
-  const nice = value.nice ?? value.roundBounds;
-  if (nice !== undefined) spec.nice = nice !== false;
+  if (value.nice !== undefined) spec.nice = value.nice !== false;
   if (value.ticks !== undefined) {
     if (!Array.isArray(value.ticks)) fail(`${path}.ticks must be an array of numbers or Dates.`);
     spec.ticks = value.ticks.map((tick, i) => toNumber(tick, `${path}.ticks[${i}]`));
   }
   if (value.grid !== undefined) {
     if (typeof value.grid === 'boolean') spec.grid = value.grid;
-    else if (isPlain(value.grid)) spec.grid = value.grid as AxisSpec['grid'];
+    else if (isPlain(value.grid)) removedValue('grid', `${path}.grid`);
     else fail(`${path}.grid must be true or false.`);
   }
   const format = compileFormat(
@@ -895,15 +853,6 @@ function normalizeAxis(
     timeZone,
   );
   if (format) spec.format = format;
-  if (value.rangePadding !== undefined) {
-    const padding = value.rangePadding;
-    if (typeof padding !== 'number' || !Number.isFinite(padding) || padding < 0)
-      fail(`${path}.rangePadding must be a non-negative number.`);
-    spec.padding = padding;
-  }
-  if (value.auto !== undefined) spec.auto = value.auto !== false;
-  if (value.tickCount !== undefined) spec.tickCount = value.tickCount as number;
-  if (value.tickMarks !== undefined) spec.tickMarks = value.tickMarks as AxisSpec['tickMarks'];
   return {
     ...(type === undefined ? {} : { type: type as NormalizedAxis['type'] }),
     categories,
@@ -962,7 +911,7 @@ function normalizeSeries(
     fail(`series ${name} needs an id: its y is not a field name.`);
 
   const spec: Partial<SeriesSpec> = {};
-  const color = value.color ?? value.stroke;
+  const color = value.color;
   let pointColor: NormalizedSeries['pointColor'];
   if (typeof color === 'function') {
     pointColor = color as NormalizedSeries['pointColor'];
@@ -971,15 +920,16 @@ function normalizeSeries(
     spec.color = color;
   }
   if (typeof value.fill === 'function') {
-    // 0.12: fill(value, rowIndex, row) on bars.
-    const fill = value.fill as (value: number, rowIndex: number, row: unknown) => string;
-    pointColor ??= (v, row, rowIndex) => fill(v, rowIndex, row);
+    warnOnce(
+      'removed-option',
+      `${path}.fill as a function was removed in 1.0 and is ignored. Use color: (value, row, index) => …`,
+    );
   } else if (value.fill !== undefined) {
     if (value.fill !== null && typeof value.fill !== 'string')
       fail(`${path}.fill must be a CSS colour or null.`);
     spec.fill = value.fill as string | null;
   }
-  const dash = dashOption(value.dash ?? value.lineDash, `${path}.dash`);
+  const dash = dashOption(value.dash, `${path}.dash`);
   if (dash) spec.dash = dash;
   const lineWidth = finiteOption(value.lineWidth, `${path}.lineWidth`);
   if (lineWidth !== undefined) spec.lineWidth = lineWidth;
@@ -1002,19 +952,6 @@ function normalizeSeries(
       RENDER_MODES,
       'auto',
     ) as SeriesSpec['renderMode'];
-  // 0.12 style fields, honoured until their removal lands.
-  for (const legacy of [
-    'fillGradient',
-    'barWidthRatio',
-    'pointShape',
-    'heatmap',
-    'heatmapBinSize',
-    'heatmapGradient',
-    'visible',
-    'meta',
-  ] as const)
-    if (value[legacy] !== undefined) (spec as Record<string, unknown>)[legacy] = value[legacy];
-
   let format: NormalizedSeries['format'];
   if (value.format !== undefined) {
     format =
@@ -1087,7 +1024,7 @@ function normalizeRegion(value: unknown, path: string): NormalizedRegion {
   if (typeof value.axis !== 'string') fail(`${path}.axis must be an axis key such as 'x'.`);
   if (value.from === undefined || value.to === undefined) fail(`${path} needs from and to.`);
   const opacity = finiteOption(value.opacity, `${path}.opacity`, 0, 1);
-  const color = value.color ?? value.fill;
+  const color = value.color;
   return {
     axis: value.axis,
     from: value.from,
@@ -1095,8 +1032,5 @@ function normalizeRegion(value: unknown, path: string): NormalizedRegion {
     ...(value.label === undefined ? {} : { label: String(value.label) }),
     ...(typeof color === 'string' ? { fill: color } : {}),
     ...(opacity === undefined ? {} : { opacity }),
-    ...(value.edges === undefined ? {} : { edges: value.edges === true }),
-    ...(typeof value.edgeColor === 'string' ? { edgeColor: value.edgeColor } : {}),
-    ...(Array.isArray(value.edgeDash) ? { edgeDash: [...(value.edgeDash as number[])] } : {}),
   };
 }

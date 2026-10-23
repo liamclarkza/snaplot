@@ -169,7 +169,14 @@ export function contract(el: HTMLElement, samples: Sample[], losses: Loss[], acc
       { type: 'band', y: 'cpu' },
       // @ts-expect-error column indices are not public
       { y: 'cpu', dataIndex: 1 },
+      // @ts-expect-error stroke was removed in 1.0: color
+      { y: 'cpu', stroke: '#000' },
     ],
+  };
+  const removed: ChartOptions<Sample> = {
+    series: [{ y: 'cpu' }],
+    // @ts-expect-error padding was removed in 1.0: gutters are measured
+    padding: { left: 60 },
   };
   // @ts-expect-error a category axis takes no format
   const categoryFormat: AxisOptions = {
@@ -181,5 +188,6 @@ export function contract(el: HTMLElement, samples: Sample[], losses: Loss[], acc
 
   void handle;
   void invalid;
+  void removed;
   void categoryFormat;
 }

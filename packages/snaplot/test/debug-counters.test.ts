@@ -15,7 +15,6 @@ afterEach(() => fakes.uninstall());
 
 function make(options: Partial<ChartOptions<Row>> = {}): ChartHandle<Row> {
   return fakes.mount<Row>({
-    autoResize: false,
     data: Array.from({ length: 10 }, (_, x) => ({ x, y: x * 2 })),
     x: 'x',
     series: [{ y: 'y' }],

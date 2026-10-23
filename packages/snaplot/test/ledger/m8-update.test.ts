@@ -52,7 +52,7 @@ describe('[arch-03][dataapi-10] presentation changes do not ingest', () => {
     const chart = mountCpu();
     expect(
       ingestsDuring(chart, () => {
-        chart.update({ cursor: { show: false } });
+        chart.update({ cursor: false });
         chart.update({ tooltip: { mode: 'nearest' } });
         chart.update({
           series: [

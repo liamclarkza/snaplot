@@ -382,7 +382,7 @@ export function ingest<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>):
     ...n.engine,
     axes: axisSpecs,
     series: seriesSpecs,
-    tooltip: tooltipSpec(n, seriesSpecs, seriesIds),
+    tooltip: tooltipSpec(n, seriesSpecs),
   };
   return {
     spec,
@@ -1042,16 +1042,9 @@ function epochWarning(
   }
 }
 
-function tooltipSpec<Row>(
-  n: NormalizedOptions<Row>,
-  series: SeriesSpec[],
-  ids: string[],
-): ChartSpec['tooltip'] {
+function tooltipSpec<Row>(n: NormalizedOptions<Row>, series: SeriesSpec[]): ChartSpec['tooltip'] {
   const tooltip: NonNullable<ChartSpec['tooltip']> = { ...n.engine.tooltip };
-  const { yFormat, rangeFormat } = n.tooltip;
-  if (yFormat) tooltip.yFormat = (value, index) => yFormat(value, ids[index]);
-  if (rangeFormat) tooltip.rangeFormat = (min, max, index) => rangeFormat(min, max, ids[index]);
-  if (!yFormat && n.series.some((s) => s.format)) {
+  if (n.series.some((s) => s.format)) {
     tooltip.yFormat = (value, index) => {
       const s = n.series[index];
       const axisFormat = n.axes[series[index]?.yAxis ?? 'y']?.spec.format;

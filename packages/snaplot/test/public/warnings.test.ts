@@ -82,41 +82,41 @@ describe('[arch-15] removed options name their replacement', () => {
     expect(text).toMatch(hint);
   };
 
-  it.fails(
+  it(
     '[arch-15] padding warns with its replacement',
     removed('padding', { padding: { left: 60 } }, /padding/),
   );
-  it.fails('[arch-15] width warns with its replacement', removed('width', { width: 640 }, /width/));
-  it.fails(
+  it('[arch-15] width warns with its replacement', removed('width', { width: 640 }, /width/));
+  it(
     '[arch-15] autoResize warns with its replacement',
     removed('autoResize', { autoResize: false }, /autoResize/),
   );
-  it.fails(
+  it(
     '[arch-15] zoom warns with its replacement',
     removed('zoom', { zoom: { wheelStep: 0.2 } }, /interaction/),
   );
-  it.fails(
+  it(
     '[arch-15] pan warns with its replacement',
     removed('pan', { pan: { y: true } }, /interaction/),
   );
-  it.fails(
+  it(
     '[arch-15] touch warns with its replacement',
     removed('touch', { touch: { drag: 'pan' } }, /interaction/),
   );
-  it.fails(
+  it(
     '[arch-15] performance warns with its replacement',
     removed('performance', { performance: { interactionSampling: false } }, /performance/),
   );
-  it.fails(
+  it(
     '[arch-15] debug warns with its replacement',
     removed('debug', { debug: { stats: true } }, /debug/),
   );
-  it.fails(
+  it(
     '[arch-15] onSelect warns with its replacement',
     removed('onSelect', { onSelect: () => {} }, /onSelectionChange/),
   );
 
-  it.fails('[arch-15] removed axis, series and region keys name their 1.0 names', () => {
+  it('[arch-15] removed axis, series and region keys name their 1.0 names', () => {
     mount({
       data: rows,
       x: 't',
