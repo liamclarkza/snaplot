@@ -43,14 +43,20 @@ export const V0 = [
   '',
 ].join('\n');
 
-/** A row file in the format check-visual-ledger.mjs validates. */
-export function row(id, milestone, fixtures) {
+/**
+ * A row file in the format check-visual-ledger.mjs validates (plan P13), for a commit with the
+ * subject `subject`.
+ */
+export function row(id, milestone, fixtures, subject = 'fix(marks): change a default') {
   return [
     `# ${id}: a deliberate default change`,
     '',
-    '- **Commit:** `fix(marks): change a default`',
+    `- **Commit:** \`${subject}\``,
     `- **Milestone:** ${milestone}`,
     `- **Fixtures:** ${fixtures.map((f) => `\`${f}\``).join(', ')}`,
+    '- **Before → after:** line width 1.5 → 2 px',
+    '- **Finding:** `visuals-02`',
+    '- **Revert:** revert the commit with the subject above, then `npm run test:visual`',
     '',
   ].join('\n');
 }

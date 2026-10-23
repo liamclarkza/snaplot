@@ -71,8 +71,8 @@ export const ERRORS: { changed: string; missing: string; threw: string };
 /** The V0 row file as the M3a baseline commit writes it. */
 export const V0: string;
 
-/** A well-formed row file naming `fixtures`. */
-export function row(id: string, milestone: string, fixtures: string[]): string;
+/** A well-formed row file naming `fixtures`, for a commit with the subject `subject`. */
+export function row(id: string, milestone: string, fixtures: string[], subject?: string): string;
 
 /** Runs scripts/overhaul/check-visual-diffs.mjs on the synthetic run. */
 export function runScenario(scenario: Scenario): { status: number | null; output: string };
