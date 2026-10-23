@@ -207,3 +207,25 @@ describe('typed rows compile with the public types', () => {
     expect(diagnostics.get('axisTypeIsAUnion')).toEqual([]);
   });
 });
+
+describe('[dxtrial-17] the declarations document the public API only', () => {
+  const golden = ['index', 'core', 'react', 'solid'].map((name) =>
+    ts.sys.readFile(
+      decodeURIComponent(new URL(`../../api/${name}.d.ts`, import.meta.url).pathname),
+    ),
+  );
+
+  it('[dxtrial-17] no declaration or comment names an engine API', () => {
+    for (const text of golden) {
+      expect(text).toBeTypeOf('string');
+      for (const engineName of [
+        'scrollToLatest',
+        'chart.use(',
+        'tickFormat',
+        'dataIndex',
+        'maxLen',
+      ])
+        expect(text, engineName).not.toContain(engineName);
+    }
+  });
+});

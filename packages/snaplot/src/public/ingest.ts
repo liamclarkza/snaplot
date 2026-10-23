@@ -845,5 +845,18 @@ function annotationValue(
     fail(
       `${path} is ${describe(value)}; give a finite number, a Date, an ISO-8601 string or a category label.`,
     );
+  const time = kind === 'date' || axes[axis]?.type === 'time';
+  if (value instanceof Date && !time)
+    warnOnce(
+      'annotation-date',
+      `${path} is a Date, but axis "${axis}" is not a time axis, so it is read as ${ms} (epoch milliseconds). Set axes.${axis}.type: 'time'.`,
+    );
+  // A number on a category axis is a slot position; one beyond every slot draws nothing.
+  const registry = categories.get(axis);
+  if (registry && ![...registry.labels.keys()].some((code) => Math.abs(code - ms) <= 0.5))
+    warnOnce(
+      'annotation-category',
+      `${path} is ${ms}, which is beyond the ${registry.labels.size} categories of axis "${axis}"; give a category label.`,
+    );
   return ms;
 }

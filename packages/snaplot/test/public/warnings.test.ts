@@ -253,3 +253,65 @@ describe('[dataapi-20][arch-11] messages use the public vocabulary (P16)', () =>
     publicNames(() => mount({ data: [[0, 1]], x: 't', series: [{ y: 'v' }] })),
   );
 });
+
+describe('[gap-annotations-extensibility-13] annotation values and styles', () => {
+  it('[gap-annotations-extensibility-13] a string on a numeric axis names the axis kind', () => {
+    const message = (() => {
+      try {
+        mount({ ...base, referenceLines: [{ axis: 'x', value: '5' }] });
+      } catch (error) {
+        return (error as Error).message;
+      }
+      return '';
+    })();
+    expect(message).toMatch(/^snaplot: referenceLines\[0\]\.value is "5", but axis "x" is numeric/);
+    expect(message).not.toMatch(/categor/);
+  });
+
+  it('[gap-annotations-extensibility-13] a Date on a linear axis warns that it is read as epoch ms', () => {
+    mount({ ...base, referenceLines: [{ axis: 'x', value: new Date(5) }] });
+    expect(warnings().join('\n')).toMatch(
+      /referenceLines\[0\]\.value is a Date, but axis "x" is not a time axis.*axes\.x\.type: 'time'/,
+    );
+  });
+
+  it('[gap-annotations-extensibility-13] a number beyond every category warns', () => {
+    mount({
+      data: [
+        { q: 'A', v: 1 },
+        { q: 'B', v: 2 },
+        { q: 'C', v: 3 },
+      ],
+      x: 'q',
+      series: [{ type: 'bar', y: 'v' }],
+      referenceLines: [{ axis: 'x', value: 40 }],
+    });
+    expect(warnings().join('\n')).toMatch(
+      /referenceLines\[0\]\.value is 40, which is beyond the 3 categories of axis "x"; give a category label/,
+    );
+  });
+
+  it('[gap-annotations-extensibility-13] invalid style values warn and are ignored', () => {
+    mount({
+      ...base,
+      referenceLines: [{ axis: 'y', value: 11, lineWidth: Number.NaN }],
+      referenceRegions: [{ axis: 'x', from: 2, to: 4, opacity: -0.5 }],
+    });
+    const text = warnings().join('\n');
+    expect(text).toMatch(/referenceLines\[0\]\.lineWidth NaN is not valid and is ignored/);
+    expect(text).toMatch(/referenceRegions\[0\]\.opacity -0\.5 is not valid and is ignored/);
+  });
+
+  it('a category label and an in-range slot do not warn (control)', () => {
+    mount({
+      data: [
+        { q: 'A', v: 1 },
+        { q: 'B', v: 2 },
+      ],
+      x: 'q',
+      series: [{ type: 'bar', y: 'v' }],
+      referenceRegions: [{ axis: 'x', from: 'A', to: 1.5 }],
+    });
+    expect(warnings()).toEqual([]);
+  });
+});
