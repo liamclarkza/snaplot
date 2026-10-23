@@ -30,7 +30,9 @@ export function parseIso(text: string, timeZone: 'local' | 'UTC'): number {
   const hour = Number(h);
   const minute = Number(mi);
   const second = Number(s);
-  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59)
+  // The last day of the month too: 2026-02-31 is not a date, not 3 March.
+  const days = new Date(Date.UTC(Number(y), month, 0)).getUTCDate();
+  if (month < 1 || month > 12 || day < 1 || day > days || hour > 23 || minute > 59 || second > 59)
     return Number.NaN;
   const ms = frac ? Math.round(Number(`0.${frac.padEnd(3, '0').slice(0, 3)}`) * 1000) : 0;
   const wall = Date.UTC(Number(y), month - 1, day, hour, minute, second, ms);

@@ -267,6 +267,32 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
     expect(chart.getAxis('x')).toMatchObject({ type: 'time', min: new Date(2026, 2, 1).getTime() });
   });
 
+  it('[dataapi-07] an impossible calendar date throws at its row instead of rolling over', () => {
+    for (const bad of ['2026-02-31', '2026-02-29', '2026-04-31T09:00:00Z']) {
+      expect(
+        thrown(() =>
+          mount({
+            data: [
+              { day: '2026-01-31', v: 1 },
+              { day: bad, v: 2 },
+            ],
+            x: 'day',
+            series: [{ y: 'v' }],
+          }),
+        ),
+      ).toMatch(new RegExp(`^snaplot: .*x of row 1 is "${bad}", which is not an ISO-8601 date`));
+    }
+    const leap = mount({
+      data: [
+        { day: '2028-02-28', v: 1 },
+        { day: '2028-02-29', v: 2 },
+      ],
+      x: 'day',
+      series: [{ y: 'v' }],
+    });
+    expect(leap.getAxis('x')).toMatchObject({ type: 'time', max: new Date(2028, 1, 29).getTime() });
+  });
+
   it("[dataapi-07] date-only strings are UTC dates with timeZone: 'UTC'", () => {
     const chart = mount({
       data: [
