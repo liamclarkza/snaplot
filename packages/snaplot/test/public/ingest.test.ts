@@ -248,7 +248,7 @@ describe('appends are validated before anything changes', () => {
       series: [{ y: 'y' }],
     });
 
-  it.fails('[dataapi-02][dataapi-03] removing rowId from a streamed row source drops its ids', () => {
+  it('[dataapi-02][dataapi-03] removing rowId from a streamed row source drops its ids', () => {
     const chart = keyed();
     chart.appendData([{ x: 2, y: 3, id: 'c', key: 'C' }]);
     chart.update({ rowId: undefined });
@@ -259,7 +259,7 @@ describe('appends are validated before anything changes', () => {
     expect(latest(chart).rowId).toBeUndefined();
   });
 
-  it.fails('[dataapi-02][dataapi-03] changing rowId on a streamed row source reads every id again', () => {
+  it('[dataapi-02][dataapi-03] changing rowId on a streamed row source reads every id again', () => {
     const chart = keyed();
     chart.appendData([{ x: 2, y: 3, id: 'c', key: 'C' }]);
     chart.update({ rowId: 'key' });

@@ -266,11 +266,10 @@ function ingestSource<Row>(
     state.nextIndex = retained.nextIndex;
     state.streamed = true;
   }
-  // Row ids, read in storage order and checked for duplicates before anything commits.
+  // Row ids, read with the current rowId in storage order (retained rows too: rowId is an
+  // accessor, D16), and checked for duplicates before anything commits.
   const rowIdField = n.series[plan.series[0]].rowId ?? n.rowId;
-  if (retained?.rowIds) {
-    state.rowIds = [...retained.rowIds];
-  } else if (rowIdField !== undefined) {
+  if (rowIdField !== undefined) {
     const ids = new Array<RowId>(state.rows!.length);
     const idPath = `${path} rowId`;
     for (let i = 0; i < ids.length; i++) {

@@ -238,6 +238,7 @@ export interface Retained<Row> {
   rows?: Row[];
   index?: number[];
   columns?: Record<string, Float64Array>;
+  /** The ids of a `{ columns, rowIds }` source, which has no accessor to read them with. */
   rowIds?: RowId[];
   evicted: number;
   nextIndex: number;

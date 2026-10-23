@@ -267,12 +267,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
 
   /** What a streamed source retains, to ingest again instead of its declared input. */
   private retained(source: SourceState<Row>, index: number): Retained<Row> {
-    const base = {
-      evicted: source.evicted,
-      nextIndex: source.nextIndex,
-      // Ids read from a column are read from the retained column again.
-      ...(source.rowIds && !source.rowIdColumn ? { rowIds: source.rowIds.slice(source.head) } : {}),
-    };
+    const base = { evicted: source.evicted, nextIndex: source.nextIndex };
+    // A row source reads its ids with the current rowId again (it is an accessor, D16).
     if (source.kind === 'rows')
       return {
         ...base,
@@ -285,7 +281,13 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       if (field.kind === 'x') columns[source.x as string] = data[c];
       else if (field.kind === 'field') columns[field.name] = data[c];
     });
-    return { ...base, columns };
+    // { columns, rowIds } has no accessor, so its ids are kept; ids read from a column
+    // (rowId: '<column>') are read from the retained column again.
+    return {
+      ...base,
+      columns,
+      ...(source.rowIds && !source.rowIdColumn ? { rowIds: source.rowIds.slice(source.head) } : {}),
+    };
   }
 
   /**
