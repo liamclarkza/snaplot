@@ -35,7 +35,7 @@ function expectPainted(chart: ChartHandle<Row>): void {
 }
 
 describe('[gap-environments-01] print keeps the canvases', () => {
-  it.fails('[gap-environments-01] print with unchanged DPR keeps canvases', () => {
+  it('[gap-environments-01] print with unchanged DPR keeps canvases', () => {
     const chart = mount(2);
     fakes.resizeObserver.deliver();
     fakes.frames.flush();

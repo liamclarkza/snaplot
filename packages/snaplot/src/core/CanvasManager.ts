@@ -101,8 +101,14 @@ export class CanvasManager {
    * ResizeObserver never fires in that case (the contentRect is identical), so
    * the backing store would stay at the old resolution and render blurry until
    * an unrelated resize. A `(resolution: Ndppx)` media query matches only the
-   * current dpr, so its `change` event fires exactly when dpr moves off N; we
-   * then re-size and re-arm for the new dpr.
+   * current dpr, so its `change` event fires when dpr moves off N; we then
+   * re-size and re-arm for the new dpr.
+   *
+   * The query also fires without a dpr change: Blink flips it when entering
+   * and leaving print media, with no animation frame before the snapshot.
+   * Resizing then would clear every canvas into the printout
+   * (gap-environments-01), so only a real dpr change resizes; every change
+   * re-arms.
    */
   private watchDpr(): void {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -110,9 +116,11 @@ export class CanvasManager {
     const dpr = window.devicePixelRatio || 1;
     this.dprMediaQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
     this.boundDprChange = () => {
-      this.resize(this.cssWidth, this.cssHeight);
-      this.onResize?.(this.cssWidth, this.cssHeight);
-      // The query is pinned to the old dpr, re-arm against the new one.
+      if ((window.devicePixelRatio || 1) !== this._dpr) {
+        this.resize(this.cssWidth, this.cssHeight);
+        this.onResize?.(this.cssWidth, this.cssHeight);
+      }
+      // The query is pinned to the dpr it was armed with; re-arm for the current one.
       this.watchDpr();
     };
     this.dprMediaQuery.addEventListener('change', this.boundDprChange);
