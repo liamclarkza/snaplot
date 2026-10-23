@@ -84,6 +84,14 @@ export class CategoryAxis {
     return code;
   }
 
+  /** Add `label` with the code an append plan gave it (it took codes from `nextCode` on). */
+  define(label: string, code: number): void {
+    if (this.codes.has(label)) return;
+    this.codes.set(label, code);
+    this.labels.set(code, label);
+    if (code >= this.next) this.next = code + 1;
+  }
+
   count(code: number, delta: number): void {
     this.refs.set(code, (this.refs.get(code) ?? 0) + delta);
   }

@@ -34,12 +34,18 @@ export interface SourceAppend<Row> {
   rowIds?: RowId[];
   /** X category codes per appended row, when the axis is a category axis. */
   codes?: number[];
-  /** New category labels, in code order. */
-  newLabels: string[];
+  /** The new category labels this plan introduces, with the codes it gave them, in code order. */
+  newLabels: Map<string, number>;
   /** The colorBy and tooltip label lists with this append's new labels, set on commit. */
   encodings?: Map<string, string[]>;
   /** The scatter source must be stored unsorted before this append fits. */
   demote?: true;
+}
+
+/** New X category labels of one append on one axis, shared by the sources on that axis. */
+interface PendingCategories {
+  codes: Map<string, number>;
+  next: number;
 }
 
 /**
@@ -60,6 +66,8 @@ export function planAppend<Row>(
   const out: SourceAppend<Row>[] = [];
   // Label lists with this append's new labels, shared by its targets and set on commit.
   const encodings = new Map<string, string[]>();
+  // New X categories by axis, shared too: two sources on one axis give a new label one code.
+  const categories = new Map<string, PendingCategories>();
   for (const target of targets) {
     const source = ingested.sources[target];
     const path = `appendData() to series "${ingested.seriesIds[source.series[0]]}"`;
@@ -76,7 +84,18 @@ export function planAppend<Row>(
     ctx.counters.xValidations++;
     out.push(
       source.kind === 'rows'
-        ? planRows(ingested, n, target, data as Row[], options, path, lastX, length, encodings)
+        ? planRows(
+            ingested,
+            n,
+            target,
+            data as Row[],
+            options,
+            path,
+            lastX,
+            length,
+            encodings,
+            categories,
+          )
         : planColumns(ingested, target, data as ColumnData, options, path, lastX, length),
     );
   }
@@ -110,25 +129,29 @@ function planRows<Row>(
   lastX: (source: number, back: number) => number,
   length: (source: number) => number,
   encodings: Map<string, string[]>,
+  categories: Map<string, PendingCategories>,
 ): SourceAppend<Row> {
   const source = ingested.sources[target];
   const count = batch.length;
   const start = source.nextIndex - (options.updateLast && length(target) > 0 ? 1 : 0);
   const registry = ingested.categories.get(source.axis);
-  const newLabels: string[] = [];
-  const pending = new Map<string, number>();
-  let nextCode = registry?.nextCode ?? 0;
+  const newLabels = new Map<string, number>();
   // Messages are built only for a row that fails: the loops below run once per row.
   const where = (i: number) => `${path}: x of appended row ${i}`;
   const code = (label: string, row: number) => {
     const known = registry!.codes.get(label);
     if (known !== undefined) return known;
     if (registry!.explicit) registry!.unknown(where(row), label);
-    let c = pending.get(label);
+    let pending = categories.get(source.axis);
+    if (!pending) {
+      pending = { codes: new Map(), next: registry!.nextCode };
+      categories.set(source.axis, pending);
+    }
+    let c = pending.codes.get(label);
     if (c === undefined) {
-      c = nextCode++;
-      pending.set(label, c);
-      newLabels.push(label);
+      c = pending.next++;
+      pending.codes.set(label, c);
+      newLabels.set(label, c);
     }
     return c;
   };
@@ -196,6 +219,7 @@ function planRows<Row>(
       ? source.series.find((index) => n.series[index].type === 'bar')
       : undefined;
   if (bar !== undefined) {
+    const pending = categories.get(source.axis)?.codes ?? new Map<string, number>();
     const label = (c: number) =>
       registry!.labels.get(c) ?? [...pending].find(([, code]) => code === c)?.[0];
     const twice = (c: number) =>
@@ -375,7 +399,7 @@ function planColumns<Row>(
     source: target,
     columns: columns as unknown as ColumnarData,
     ...(rowIds ? { rowIds } : {}),
-    newLabels: [],
+    newLabels: new Map(),
     ...(demote ? { demote } : {}),
   };
 }
@@ -438,8 +462,8 @@ export function commitAppend<Row>(
   const registry = ingested.categories.get(source.axis);
   if (!registry || source.xKind !== 'category') return false;
   let changed = false;
-  for (const label of plan.newLabels) {
-    registry.code(label);
+  for (const [label, code] of plan.newLabels) {
+    registry.define(label, code);
     changed = true;
   }
   for (const code of plan.codes ?? []) registry.count(code, 1);

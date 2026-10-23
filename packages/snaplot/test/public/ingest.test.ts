@@ -446,7 +446,7 @@ describe('[dataapi-05] category codes stay with their labels', () => {
     return chart.getCursorSnapshot().points.map((point) => [point.seriesId, point.x, point.y]);
   };
 
-  it.fails('[dataapi-05] sources on one axis that append different new labels in one call keep them apart', () => {
+  it('[dataapi-05] sources on one axis that append different new labels in one call keep them apart', () => {
     const chart = mount({
       data: [{ a: 'P', b: 'Q', y1: 1, y2: 2 }],
       x: 'a',

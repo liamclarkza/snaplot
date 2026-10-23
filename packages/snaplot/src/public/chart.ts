@@ -646,12 +646,12 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.appendData(data, options);
       return;
     }
-    const newLabels = plans.some((plan) => plan.newLabels.length);
+    const newLabels = plans.some((plan) => plan.newLabels.size);
     if (newLabels) {
       const categories = categoryLabels(this.ingested);
       for (const plan of plans) {
         const axis = sources[plan.source].axis;
-        categories.set(axis, [...(categories.get(axis) ?? []), ...plan.newLabels]);
+        categories.set(axis, [...(categories.get(axis) ?? []), ...plan.newLabels.keys()]);
       }
       validateGroup(this.options.group, { categories, axes: this.ingested.spec.axes ?? {} }, this);
     }
