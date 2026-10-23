@@ -7,6 +7,13 @@ import { describe, expect, it } from 'vitest';
 import { row } from './diff-scenario.mjs';
 import { runLedgerScenario } from './ledger-scenario.mjs';
 
+/**
+ * Each scenario spawns the checker in a scratch git repository, and a few spawn it several
+ * times. Under heavy load (parallel worktrees, a visual run) one took over 10 s, past vitest's
+ * default 5 s (M3a review #4), so the scenario tests get an explicit generous timeout.
+ */
+const SCENARIO = { timeout: 60_000 };
+
 const SHOT = 'packages/snaplot/test/visual/__screenshots__/marks/basic-line-darwin.png';
 const SUBJECT = 'fix(marks): thicker default lines';
 const FULL_ROW = row('V50', 'M11', ['marks/*'], SUBJECT);
@@ -18,7 +25,7 @@ function without(...fields: string[]): string {
     .join('\n');
 }
 
-describe('check-visual-ledger', () => {
+describe('check-visual-ledger', SCENARIO, () => {
   it('passes a screenshot change that adds a complete row', () => {
     const r = runLedgerScenario({
       commits: [

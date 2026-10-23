@@ -6,11 +6,18 @@
 import { describe, expect, it } from 'vitest';
 import { ERRORS, row, runScenario, V0 } from './diff-scenario.mjs';
 
+/**
+ * Each scenario spawns the checker in a scratch git repository, and a few spawn it several
+ * times. Under heavy load (parallel worktrees, a visual run) one took over 10 s, past vitest's
+ * default 5 s (M3a review #4), so the scenario tests get an explicit generous timeout.
+ */
+const SCENARIO = { timeout: 60_000 };
+
 const SHOTS = ['marks/a', 'marks/b', 'marks/c'];
 const unchanged = SHOTS.map((name) => ({ name }));
 const missing = (name: string) => ({ name, status: 'unexpected' as const, error: ERRORS.missing });
 
-describe('check-visual-diffs: the reference', () => {
+describe('check-visual-diffs: the reference', SCENARIO, () => {
   it('passes a complete reference that every head shot matches', () => {
     const r = runScenario({ head: unchanged, referenceFiles: SHOTS });
     expect(r.output).toContain('check-visual-diffs: OK');
@@ -108,7 +115,7 @@ describe('check-visual-diffs: the reference', () => {
   });
 });
 
-describe('check-visual-diffs: committed baselines', () => {
+describe('check-visual-diffs: committed baselines', SCENARIO, () => {
   it('passes when every shot matches its committed baseline', () => {
     const r = runScenario({
       mode: 'baselines',
@@ -139,7 +146,7 @@ describe('check-visual-diffs: committed baselines', () => {
 
 // M3a review #2: at the tolerance, a theme-wide grid colour change gave "0 changed" and a
 // fixture's lineWidth edit passed the self-test, so the merge gate must compare exactly.
-describe('check-visual-diffs: the comparison', () => {
+describe('check-visual-diffs: the comparison', SCENARIO, () => {
   const changedA = [
     { name: 'marks/a', status: 'unexpected' as const, error: ERRORS.changed },
     ...unchanged.slice(1),
@@ -199,7 +206,7 @@ describe('check-visual-diffs: the comparison', () => {
 });
 
 // M3a review #2: a report from an earlier commit, or from before an edit, was judged as current.
-describe('check-visual-diffs: a stale report', () => {
+describe('check-visual-diffs: a stale report', SCENARIO, () => {
   it('[repo-10] fails a report whose render inputs changed after the run', () => {
     const r = runScenario({
       head: unchanged,
@@ -246,7 +253,7 @@ describe('check-visual-diffs: a stale report', () => {
   });
 });
 
-describe('check-visual-diffs: visual-ledger rows', () => {
+describe('check-visual-diffs: visual-ledger rows', SCENARIO, () => {
   const changedA = [
     { name: 'marks/a', status: 'unexpected' as const, error: ERRORS.changed },
     ...unchanged.slice(1),
@@ -295,7 +302,7 @@ describe('check-visual-diffs: visual-ledger rows', () => {
 
 // M3a review #3: `--against <ref> -u` wrote the head's screenshots into the shared reference
 // cache, and the next run against that cache reported 0 changed shots and OK.
-describe('check-visual-diffs: a reference written after capture', () => {
+describe('check-visual-diffs: a reference written after capture', SCENARIO, () => {
   it('[repo-10] fails a reference image that changed after capture, even with --allow-partial', () => {
     for (const args of [[], ['--allow-partial']]) {
       const r = runScenario({
@@ -352,7 +359,7 @@ describe('check-visual-diffs: a reference written after capture', () => {
 
 // M3a review #3: once a milestone commits its changes, `--against HEAD` compares the head with
 // itself and passes either rule, so on a milestone branch the reference must be the merge base.
-describe('check-visual-diffs: the merge base', () => {
+describe('check-visual-diffs: the merge base', SCENARIO, () => {
   const branch = { branch: 'ovh/m11-marks', branchCommit: true, milestone: 'M11' } as const;
 
   it('[repo-10] fails a run against a ref other than the merge base with overhaul', () => {
@@ -414,7 +421,7 @@ describe('check-visual-diffs: the merge base', () => {
 
 // M3a review #3: in a clone without a local `overhaul`, a committed-baseline run exited 2 with
 // git's "bad revision 'overhaul'", even under the zero-change rule, which reads no rows.
-describe('check-visual-diffs: a base that does not resolve', () => {
+describe('check-visual-diffs: a base that does not resolve', SCENARIO, () => {
   it('[repo-10] applies the zero-change rule without reading rows', () => {
     const r = runScenario({
       mode: 'baselines',
