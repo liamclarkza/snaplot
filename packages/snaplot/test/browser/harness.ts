@@ -24,7 +24,10 @@ export interface MountSpec {
 
 const charts = new Map<string, AnyChart>();
 
-function mount<Row>(options: ChartOptions<Row>, spec: MountSpec = {}): ChartHandle<Row> {
+function mount<Row = Record<string, any>>(
+  options: ChartOptions<Row>,
+  spec: MountSpec = {},
+): ChartHandle<Row> {
   const host = document.createElement('div');
   host.id = spec.id ?? `chart-${charts.size}`;
   host.style.cssText = `width:${spec.width ?? 640}px;height:${spec.height ?? 320}px;${spec.style ?? ''}`;

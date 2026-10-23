@@ -25,9 +25,8 @@ describe('golden public declarations (api/*.d.ts)', () => {
     expect(Object.keys(golden).sort()).toEqual([...new Set(typed)].sort());
   });
 
-  // SeriesConfig reaches users through `Omit<SeriesConfig, …>` (research-12, M7) and ChartInstance
-  // through the engine plugin hooks (removed by M2).
-  it.fails('[research-12] name no engine type (P4)', () => {
+  // The public types are written in public/types.ts, not derived from the engine (research-12).
+  it('[research-12] name no engine type (P4)', () => {
     const found = Object.entries(golden).flatMap(([file, text]) =>
       FORBIDDEN.filter((name) => new RegExp(`\\b${name}\\b`).test(text)).map(
         (name) => `${file}: ${name}`,

@@ -8,15 +8,22 @@ import {
   type JSX,
 } from 'solid-js';
 import { applyThemeToElement } from '../config/theme';
-import type { ChartHandle, LegendItem } from '../api/types';
+import type { ChartHandle, LegendItem } from '../public/types';
 import { createChartState } from './createChartState';
-export interface SeriesLegendProps<Row = Record<string, unknown>> {
+/** Props of {@link SeriesLegend}. */
+export interface SeriesLegendProps<Row = Record<string, any>> {
+  /** The chart, as an accessor. */
   chart: Accessor<ChartHandle<Row> | undefined | null>;
+  /** Toggle a series on click. @defaultValue `true` */
   toggle?: boolean;
+  /** Highlight a series on hover and focus. @defaultValue `true` */
   highlight?: boolean;
+  /** Extra class names. @defaultValue none */
   class?: string;
+  /** Inline styles. @defaultValue none */
   style?: string | JSX.CSSProperties;
 }
+/** A list legend for a chart: one button per series. */
 export function SeriesLegend<Row>(props: SeriesLegendProps<Row>): JSX.Element {
   let root!: HTMLDivElement;
   const state = createChartState(props.chart);

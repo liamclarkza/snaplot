@@ -4,17 +4,24 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactElement,
   type ReactNode,
 } from 'react';
-import type { ChartHandle, ChartPoint, LegendItem, CursorSnapshot } from '../api/types';
+import type { ChartHandle, ChartPoint, LegendItem, CursorSnapshot } from '../public/types';
 import { applyThemeToElement } from '../config/theme';
 import { useChartState, useCursorSnapshot } from './hooks';
 import { legendPoint, type LegendTableFallback } from './shared';
-export interface SeriesLegendProps<Row = Record<string, unknown>> {
+/** Props of {@link SeriesLegend}. */
+export interface SeriesLegendProps<Row = Record<string, any>> {
+  /** The chart, from a ref. */
   chart: ChartHandle<Row> | null | undefined;
+  /** Toggle a series on click. @defaultValue `true` */
   toggle?: boolean;
+  /** Highlight a series on hover and focus. @defaultValue `true` */
   highlight?: boolean;
+  /** Extra class names. @defaultValue none */
   className?: string;
+  /** Inline styles. @defaultValue none */
   style?: CSSProperties;
 }
 function useLegend<Row>(chart: ChartHandle<Row> | null | undefined) {
@@ -35,7 +42,8 @@ function useLegend<Row>(chart: ChartHandle<Row> | null | undefined) {
   }, [chart]);
   return { state, root, items: chart?.getLegendItems() ?? [] };
 }
-export function SeriesLegend<Row>(props: SeriesLegendProps<Row>) {
+/** A list legend for a chart: one button per series. */
+export function SeriesLegend<Row>(props: SeriesLegendProps<Row>): ReactElement {
   const { root, items } = useLegend(props.chart);
   return h(
     'div',
@@ -79,34 +87,53 @@ export function SeriesLegend<Row>(props: SeriesLegendProps<Row>) {
     ),
   );
 }
+/** One column of {@link LegendTable}. */
 export interface LegendTableColumn<Row> {
+  /** A stable key for the column. */
   key: string;
+  /** The header text. */
   header: string;
+  /** Text alignment. @defaultValue `'left'` */
   align?: 'left' | 'right' | 'center';
+  /** A CSS width. @defaultValue automatic */
   width?: string;
+  /** The header's title attribute. @defaultValue none */
   title?: string;
+  /** Renders the cell of one series. */
   cell: (
     point: ChartPoint<Row>,
     series: LegendItem,
     api: { setHighlight: (id: string | null) => void },
   ) => ReactNode;
 }
-export interface LegendTableProps<Row = Record<string, unknown>> {
+/** Props of {@link LegendTable}. */
+export interface LegendTableProps<Row = Record<string, any>> {
+  /** The chart, from a ref. */
   chart: ChartHandle<Row> | null | undefined;
+  /** What the rows show when the cursor is not over the chart. @defaultValue `'series-only'` */
   fallback?: LegendTableFallback;
+  /** The columns. @defaultValue name and value */
   columns?: readonly LegendTableColumn<Row>[];
+  /** Show the X value above the rows. @defaultValue `true` */
   showStepHeader?: boolean;
+  /** How the X value in the header is written. @defaultValue the X axis format */
   formatStep?: (value: number | string) => string;
+  /** Highlight a series while its row is hovered. @defaultValue `true` */
   highlightOnHover?: boolean;
+  /** A CSS max-height; the table scrolls beyond it. @defaultValue no limit */
   maxHeight?: string;
+  /** Extra class names. @defaultValue none */
   className?: string;
+  /** Inline styles. @defaultValue none */
   style?: CSSProperties;
+  /** Render the table yourself from the cursor snapshot. */
   children?: (
     snapshot: CursorSnapshot<Row> | undefined,
     highlight: string | null,
     setHighlight: (id: string | null) => void,
   ) => ReactNode;
 }
+/** A table of each series' value at the cursor. */
 export function LegendTable<Row>(props: LegendTableProps<Row>) {
   const { state, root, items } = useLegend(props.chart);
   const fallback = props.fallback ?? 'series-only';
@@ -292,6 +319,7 @@ export function swatchColumn<Row>(
       }),
   };
 }
+/** A column with the series swatch and name. */
 export function nameColumn<Row>(
   options: { swatch?: boolean; truncate?: number } = {},
 ): LegendTableColumn<Row> {
@@ -322,6 +350,7 @@ export function nameColumn<Row>(
       ),
   };
 }
+/** A column with the series value. */
 export function valueColumn<Row>(
   options: {
     format?: (value: number, point: ChartPoint<Row>) => string;
@@ -344,6 +373,7 @@ export function valueColumn<Row>(
           ),
   };
 }
+/** A column with a value computed from the point. */
 export function metricColumn<Row>(
   resolve: (point: ChartPoint<Row>, series: LegendItem) => string,
   options: { header?: string; truncate?: number } = {},
@@ -368,6 +398,7 @@ export function metricColumn<Row>(
       ),
   };
 }
+/** Declares a custom column. */
 export function column<Row>(spec: LegendTableColumn<Row>): LegendTableColumn<Row> {
   return spec;
 }

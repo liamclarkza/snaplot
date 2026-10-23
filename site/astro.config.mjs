@@ -106,7 +106,7 @@ export default defineConfig({
           output: 'reference/api',
           sidebar: { label: 'API reference', collapsed: true },
           // The plugin renders but never validates; scripts/typedoc-validate.mjs runs TypeDoc's
-          // notDocumented check before every build (a warning until M7, plan §8.4).
+          // notDocumented check before every build, as an error (plan §8.4).
           typeDoc: {
             excludeInternal: true,
             // With several entry points and no `readme`, the plugin deletes every
@@ -114,9 +114,9 @@ export default defineConfig({
             // to them. Named `index`, the landing page is /reference/api/ (the URL the site's API
             // links use, whatever the modules are called) and each module keeps its overview.
             entryFileName: 'index',
+            // The entry points name their modules with `@module` (snaplot, snaplot/react and
+            // snaplot/solid); a module named `index` would collide with the landing page.
             name: 'API reference',
-            // Modules named after their import paths; `index` would collide with the landing page.
-            plugin: [fileURLToPath(new URL('./scripts/typedoc-module-names.mjs', import.meta.url))],
           },
         }),
       ],

@@ -1,14 +1,31 @@
-import { createElement, useLayoutEffect, useRef, type CSSProperties, type Ref } from 'react';
+import {
+  createElement,
+  type CSSProperties,
+  type ReactElement,
+  type Ref,
+  useLayoutEffect,
+  useRef,
+} from 'react';
 import { createChart, reconcileChart, setChartControls } from '../api/createChart';
-import type { ChartHandle, ChartOptions } from '../api/types';
-import { applyDefaults, chartOptions, chartControls, type ChartControls } from './shared';
+import type { ChartHandle, ChartOptions } from '../public/types';
+import {
+  applyDefaults,
+  chartOptions,
+  chartControls,
+  type ChartControls,
+  type ControlledOptionKeys,
+} from './shared';
 
-export interface ChartProps<Row = Record<string, unknown>>
-  extends ChartOptions<Row>,
+export interface ChartProps<Row = Record<string, any>>
+  extends Omit<ChartOptions<Row>, ControlledOptionKeys>,
     ChartControls {
+  /** Class names of the host element. @defaultValue none */
   className?: string;
+  /** Inline styles of the host element. @defaultValue full width and height */
   style?: CSSProperties;
+  /** Receives the chart handle. */
   ref?: Ref<ChartHandle<Row>>;
+  /** Called once with the chart handle after mount. */
   onReady?: (chart: ChartHandle<Row>) => void;
 }
 function assignRef<T>(ref: Ref<T> | undefined, value: T): (() => void) | undefined {
@@ -28,7 +45,7 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T): (() => void) | undefin
   }
 }
 /** Native React 19 component. Options are direct props; the ref exposes the imperative handle. */
-export function Chart<Row = Record<string, unknown>>(props: ChartProps<Row>) {
+export function Chart<Row = Record<string, any>>(props: ChartProps<Row>): ReactElement {
   const host = useRef<HTMLDivElement>(null);
   const instance = useRef<ChartHandle<Row> | null>(null);
   const latest = useRef(props);

@@ -58,17 +58,13 @@ const snippets: Record<string, string> = {
     } satisfies ChartOptions<Sample>;
     createChart(el, options);`,
   categoryFormatRejected: `
+    const x = { type: 'category', format: (value: number) => String(value) } as const;
     createChart(el, {
       data: [{ m: 'Jan', v: 1 }],
       x: 'm',
       series: [{ type: 'bar', y: 'v' }],
-      axes: {
-        x: {
-          type: 'category',
-          // @ts-expect-error format is not accepted on a category axis
-          format: (value: number) => String(value),
-        },
-      },
+      // @ts-expect-error format is not accepted on a category axis
+      axes: { x },
     });`,
   suffixFormat: `
     createChart(el, { data: samples, x: 'time', series: [{ y: 'cpu' }], axes: { y: { format: { suffix: '%' } } } });`,
@@ -159,23 +155,23 @@ describe('typed rows compile with the public types', () => {
     expect(diagnostics.get('misspelledFieldIsRejected')).toEqual([]);
   });
 
-  it.fails('[dataapi-08] series with different row shapes type each series by its own data', () => {
+  it('[dataapi-08] series with different row shapes type each series by its own data', () => {
     expect(diagnostics.get('perSeriesRows')).toEqual([]);
   });
 
-  it.fails('[dataapi-08] a typed handle is assignable to ChartHandle', () => {
+  it('[dataapi-08] a typed handle is assignable to ChartHandle', () => {
     expect(diagnostics.get('typedHandleIsAChartHandle')).toEqual([]);
   });
 
-  it.fails('[dataapi-08][dxtrial-05] a ChartPlugin is assignable to a typed chart', () => {
+  it('[dataapi-08][dxtrial-05] a ChartPlugin is assignable to a typed chart', () => {
     expect(diagnostics.get('genericPlugin')).toEqual([]);
   });
 
-  it.fails('[dxtrial-05] series built with .map() compile', () => {
+  it('[dxtrial-05] series built with .map() compile', () => {
     expect(diagnostics.get('mappedSeries')).toEqual([]);
   });
 
-  it.fails('[dxtrial-05] a value axis format receives a number', () => {
+  it('[dxtrial-05] a value axis format receives a number', () => {
     expect(diagnostics.get('numericFormat')).toEqual([]);
   });
 
@@ -183,19 +179,19 @@ describe('typed rows compile with the public types', () => {
     expect(diagnostics.get('separateOptions')).toEqual([]);
   });
 
-  it.fails('[dxtrial-05] a format on a category axis is a type error', () => {
+  it('[dxtrial-05] a format on a category axis is a type error', () => {
     expect(diagnostics.get('categoryFormatRejected')).toEqual([]);
   });
 
-  it.fails("[dxtrial-05] format: { suffix: '%' } compiles on a value axis", () => {
+  it("[dxtrial-05] format: { suffix: '%' } compiles on a value axis", () => {
     expect(diagnostics.get('suffixFormat')).toEqual([]);
   });
 
-  it.fails('[dxtrial-05] ticks and min accept Dates', () => {
+  it('[dxtrial-05] ticks and min accept Dates', () => {
     expect(diagnostics.get('dateTicks')).toEqual([]);
   });
 
-  it.fails('[dataapi-08] on<Key>Change options type their payloads', () => {
+  it('[dataapi-08] on<Key>Change options type their payloads', () => {
     expect(diagnostics.get('changePayloads')).toEqual([]);
   });
 
@@ -203,11 +199,11 @@ describe('typed rows compile with the public types', () => {
     expect(diagnostics.get('noOnZoom')).toEqual([]);
   });
 
-  it.fails('[gap-annotations-extensibility-12] a generic plugin factory keeps the chart’s Row', () => {
+  it('[gap-annotations-extensibility-12] a generic plugin factory keeps the chart’s Row', () => {
     expect(diagnostics.get('genericPluginFactory')).toEqual([]);
   });
 
-  it.fails('[gap-annotations-extensibility-12] an axis type is a union, not a string', () => {
+  it('[gap-annotations-extensibility-12] an axis type is a union, not a string', () => {
     expect(diagnostics.get('axisTypeIsAUnion')).toEqual([]);
   });
 });

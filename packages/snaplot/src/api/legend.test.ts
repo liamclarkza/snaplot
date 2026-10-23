@@ -9,7 +9,7 @@ import {
   swatchColumn,
   valueColumn,
 } from './legend';
-import type { ChartHandle, ChartPoint, CursorSnapshot, LegendItem } from './types';
+import type { ChartHandle, ChartPoint, CursorSnapshot, LegendItem } from '../public/types';
 
 function chartFixture() {
   const container = document.createElement('div');

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'solid-js/web';
-import type { ChartHandle, ChartState, LegendItem } from '../api/types';
+import type { ChartHandle, ChartState, LegendItem } from '../public/types';
 import { darkTheme } from '../config/theme';
 import { SeriesLegend } from './SeriesLegend';
 import { LegendTable } from './LegendTable';

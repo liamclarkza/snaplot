@@ -1,3 +1,24 @@
+export type {
+  AxisPosition,
+  ChartStats,
+  CursorSnapshotOptions,
+  InterpolationMode,
+  Layout,
+  ScaleRange,
+  ScatterRenderMode,
+  SelectionRange,
+  ThemeConfig,
+} from './public/types';
+import type {
+  AxisPosition,
+  InterpolationMode,
+  Layout,
+  ScaleRange,
+  ScatterRenderMode,
+  SelectionRange,
+  ThemeConfig,
+} from './public/types';
+
 // ============================================================
 // DATA TYPES
 // ============================================================
@@ -20,14 +41,6 @@ export type ColumnarData = [xValues: Float64Array, ...yValues: Float64Array[]];
  * positive domains. Defaults to `linear` when omitted on an axis.
  */
 export type ScaleType = 'linear' | 'log' | 'time';
-
-/** A closed data-space interval. `min` and `max` are in data units, not pixels. */
-export interface ScaleRange {
-  /** Lower bound, inclusive. May exceed `max` only transiently during a gesture. */
-  min: number;
-  /** Upper bound, inclusive. */
-  max: number;
-}
 
 /**
  * A Scale is a pure function pair: dataToPixel and pixelToData.
@@ -77,22 +90,6 @@ export interface Scale {
 // LAYOUT
 // ============================================================
 
-export interface Layout {
-  /** Total CSS pixel width of the chart container */
-  width: number;
-  /** Total CSS pixel height of the chart container */
-  height: number;
-  /** The data-rendering region */
-  plot: { top: number; left: number; width: number; height: number };
-  /** Axis regions keyed by axis config key, with position and area */
-  axes: Record<
-    string,
-    { position: AxisPosition; area: { left: number; top: number; width: number; height: number } }
-  >;
-  /** Device pixel ratio */
-  dpr: number;
-}
-
 // ============================================================
 // SERIES CONFIGURATION
 // ============================================================
@@ -102,13 +99,6 @@ export interface Layout {
  * histogram series consume explicit binning results. Defaults to `line`.
  */
 export type ChartType = 'line' | 'area' | 'band' | 'scatter' | 'bar' | 'histogram';
-
-/**
- * Scatter draw path. `points` always draws individual marks; `density`
- * always draws a binned heatmap; `auto` (the default) draws points until the
- * visible count crosses the internal density threshold, then switches.
- */
-export type ScatterRenderMode = 'points' | 'density' | 'auto';
 
 /** Mark glyph for non-density scatter rendering. Defaults to `circle`. */
 export type ScatterPointShape = 'circle' | 'square' | 'diamond';
@@ -164,18 +154,6 @@ export interface ScatterTooltipField {
   /** Value formatter. Defaults to the number's default string form. */
   format?: (value: number) => string;
 }
-
-/**
- * Line/area path interpolation. `monotone` is a shape-preserving cubic that
- * never overshoots between points; the three `step-*` variants place the
- * riser before, after, or centered on each point. Defaults to `linear`.
- */
-export type InterpolationMode =
-  | 'linear'
-  | 'monotone'
-  | 'step-before'
-  | 'step-after'
-  | 'step-middle';
 
 export interface SeriesConfig<TMeta = unknown> {
   /** Chart type for this series */
@@ -347,8 +325,6 @@ export interface SeriesConfig<TMeta = unknown> {
 // ============================================================
 // AXIS CONFIGURATION
 // ============================================================
-
-export type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
 
 /**
  * Per-axis gridline styling, independent of tick labels. `false` (or
@@ -616,15 +592,6 @@ export interface SelectionConfig {
   onBrush?: (selection: SelectionRange | null) => void;
 }
 
-/**
- * A persistent brush selection in data space, safe to serialize (e.g. into a
- * URL). `x` is always present; `y` is reserved for a future 2D brush.
- */
-export interface SelectionRange {
-  x: ScaleRange;
-  y?: ScaleRange;
-}
-
 /** A single scatter point captured inside a box selection. */
 export interface SelectedPoint<TMeta = unknown> {
   /** Index of the owning series in `ChartConfig.series`. */
@@ -689,7 +656,7 @@ export interface TooltipConfig {
    * built with `textContent` to avoid an injection hole. Receives the
    * points selected by `mode`.
    */
-  render?: (points: TooltipPoint[]) => string | HTMLElement;
+  render?: (points: TooltipPoint[]) => string | Node;
 }
 
 export interface TouchConfig {
@@ -816,18 +783,6 @@ export interface CursorSnapshot<TMeta = unknown> {
   activeSeriesIndex: number | null;
 }
 
-/** Options accepted by `getCursorSnapshot()` and the reactive primitive. */
-export interface CursorSnapshotOptions {
-  /**
-   * What to return when the cursor is not over the chart.
-   * - `hide`   → empty snapshot, source === 'none'
-   * - `latest` → snapshot at the last X value
-   * - `first`  → snapshot at the first X value
-   * Default: `'hide'`.
-   */
-  fallback?: 'hide' | 'latest' | 'first';
-}
-
 // ============================================================
 // HIGHLIGHT (series highlight + dim)
 // ============================================================
@@ -881,30 +836,6 @@ export interface DebugConfig {
    * but per-layer duration measurement only runs when this is true.
    */
   stats?: boolean;
-}
-
-export interface ChartStats {
-  /** Monotonic counter bumped on every data change; useful as a cache key. */
-  dataVersion: number;
-  /** Number of `setData` calls since creation. */
-  setDataCount: number;
-  /** Number of `appendData` calls since creation. */
-  appendDataCount: number;
-  /** Per-layer paint counts. A layer that never changes stays flat, which is the point of the layer split. */
-  renderCount: {
-    grid: number;
-    data: number;
-    overlay: number;
-  };
-  /**
-   * Per-layer duration of the most recent paint, in milliseconds. Stays `0`
-   * unless `debug.stats` is enabled, since timing each layer has a cost.
-   */
-  lastRenderMs: {
-    grid: number;
-    data: number;
-    overlay: number;
-  };
 }
 
 // ============================================================
@@ -1017,83 +948,6 @@ export type DeepPartial<T> = {
 // ============================================================
 // THEME
 // ============================================================
-
-/**
- * Chart color and typography tokens.
- *
- * Every color field accepts any CSS color the browser can compute,
- * including `var(--token)` references and `oklch(...)`: values are
- * resolved against the chart container when the theme is applied, and
- * re-resolved automatically when the document theme changes (an attribute
- * flip on `<html>`/`<body>` or an OS color-scheme change), so charts in a
- * CSS-variable design system re-theme live with no remount. Alternatively
- * define the `--chart-*` custom properties (see `CHART_CSS_VARS`) on the
- * container and omit `theme` entirely.
- */
-export interface ThemeConfig {
-  /**
-   * Plot background fill. The grid canvas is opaque, so this must resolve to
-   * a solid color. Theme overrides may use the special value `'container'`
-   * to copy the nearest non-transparent ancestor background color.
-   */
-  backgroundColor: string;
-  /** Primary text color for DOM companions. Axis text uses axisLabelColor when set. */
-  textColor: string;
-  /** Shared axis title and tick-label color. Built-in themes use the muted text color. */
-  axisLabelColor?: string;
-  /** CSS font stack for all axis and tooltip text. */
-  fontFamily: string;
-  /** Base text size in CSS pixels. Built-in themes use 11. */
-  fontSize: number;
-  /** Gridline hue. Combined with gridOpacity. Built-in frames share this hue and opacity. */
-  gridColor: string;
-  /** Gridline opacity, 0 to 1. Kept low so lines sit beneath the data. */
-  gridOpacity: number;
-  /**
-   * Legacy and fallback series colour cycle. Kept as the primary API for
-   * compatibility; new themes should treat it as the categorical palette.
-   */
-  palette: string[];
-  /**
-   * Optional categorical series colour cycle for unordered/discrete series
-   * such as lines, grouped bars, and multiple scatter categories.
-   * Falls back to `palette`.
-   */
-  categoricalPalette?: string[];
-  /**
-   * Optional ordered magnitude ramp for density/continuous encodings.
-   * Used by heatmap scatter rendering when `heatmapGradient` is not set.
-   */
-  sequentialPalette?: string[];
-  /** Optional signed/centered-data ramp for future diverging encodings. */
-  divergingPalette?: string[];
-  /** Optional default density ramp for heatmap scatter series. */
-  heatmapGradient?: string[];
-  /** Color of the axis baseline strokes (distinct from gridlines). */
-  axisLineColor: string;
-  /**
-   * Plot-area frame. Kept separate from `axisLineColor` so you can tune
-   * the rectangle around the plot without touching axis ticks. Built-in
-   * themes use the same hue and opacity as the grid.
-   */
-  borderColor: string;
-  /**
-   * Opacity of the plot-area frame. Intentionally distinct from
-   * `gridOpacity` so the border can sit one visual step above the grid
-   * while sharing its hue.
-   */
-  borderOpacity: number;
-  /** Muted companion text color. Built-in themes also use this hue for axisLabelColor. */
-  tickColor: string;
-  /** Default crosshair line color, overridable per chart via `cursor.color`. */
-  crosshairColor: string;
-  /** Tooltip surface fill. Dark themes use a translucent value for a glass look. */
-  tooltipBackground: string;
-  /** Tooltip text color. */
-  tooltipTextColor: string;
-  /** Tooltip border color. */
-  tooltipBorderColor: string;
-}
 
 // ============================================================
 // PLUGIN SYSTEM (internal: createChart bridges public ChartPlugins onto it)

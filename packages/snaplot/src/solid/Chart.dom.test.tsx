@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ChartHandle, ChartOptions } from '../api/types';
+import type { ChartHandle, ChartOptions } from '../public/types';
 const mock = vi.hoisted(() => ({ instances: [] as any[], reconciles: vi.fn(), controls: vi.fn() }));
 vi.mock('../api/createChart', () => ({
   createChart: (container: HTMLElement) => {
@@ -21,6 +21,7 @@ vi.mock('../api/createChart', () => ({
 import { createSignal } from 'solid-js';
 import { render, hydrate } from 'solid-js/web';
 import { Chart } from './Chart';
+import type { ControlledOptionKeys } from '../react/shared';
 let dispose: (() => void) | undefined;
 afterEach(() => {
   dispose?.();
@@ -30,7 +31,11 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 type Row = { x: number; y: number };
-const options: ChartOptions<Row> = { data: [{ x: 0, y: 1 }], x: 'x', series: [{ y: 'y' }] };
+const options: Omit<ChartOptions<Row>, ControlledOptionKeys> = {
+  data: [{ x: 0, y: 1 }],
+  x: 'x',
+  series: [{ y: 'y' }],
+};
 const tick = () => Promise.resolve();
 describe('Solid component lifecycle', () => {
   it('owns a single chart, reconciles reactive direct props, and releases refs', async () => {

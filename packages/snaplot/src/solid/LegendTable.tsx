@@ -8,39 +8,58 @@ import {
   type Accessor,
   type JSX,
 } from 'solid-js';
-import type { ChartHandle, ChartPoint, LegendItem, CursorSnapshot } from '../api/types';
+import type { ChartHandle, ChartPoint, LegendItem, CursorSnapshot } from '../public/types';
 import { applyThemeToElement } from '../config/theme';
 import { createChartState } from './createChartState';
 import { createCursorSnapshot } from './createCursorSnapshot';
 import { legendPoint, type LegendTableFallback } from '../react/shared';
+/** One column of {@link LegendTable}. */
 export interface LegendTableColumn<Row> {
+  /** A stable key for the column. */
   key: string;
+  /** The header text. */
   header: string;
+  /** Text alignment. @defaultValue `'left'` */
   align?: 'left' | 'right' | 'center';
+  /** A CSS width. @defaultValue automatic */
   width?: string;
+  /** The header's title attribute. @defaultValue none */
   title?: string;
+  /** Renders the cell of one series. */
   cell: (
     point: ChartPoint<Row>,
     series: LegendItem,
     api: { setHighlight: (id: string | null) => void },
   ) => JSX.Element;
 }
-export interface LegendTableProps<Row = Record<string, unknown>> {
+/** Props of {@link LegendTable}. */
+export interface LegendTableProps<Row = Record<string, any>> {
+  /** The chart, as an accessor. */
   chart: Accessor<ChartHandle<Row> | null | undefined>;
+  /** What the rows show when the cursor is not over the chart. @defaultValue `'series-only'` */
   fallback?: LegendTableFallback;
+  /** The columns. @defaultValue name and value */
   columns?: readonly LegendTableColumn<Row>[];
+  /** Show the X value above the rows. @defaultValue `true` */
   showStepHeader?: boolean;
+  /** How the X value in the header is written. @defaultValue the X axis format */
   formatStep?: (value: number | string) => string;
+  /** Highlight a series while its row is hovered. @defaultValue `true` */
   highlightOnHover?: boolean;
+  /** A CSS max-height; the table scrolls beyond it. @defaultValue no limit */
   maxHeight?: string;
+  /** Extra class names. @defaultValue none */
   class?: string;
+  /** Inline styles. @defaultValue none */
   style?: string | JSX.CSSProperties;
+  /** Render the table yourself from the cursor snapshot. */
   children?: (
     snapshot: Accessor<CursorSnapshot<Row> | undefined>,
     highlight: Accessor<string | null>,
     setHighlight: (id: string | null) => void,
   ) => JSX.Element;
 }
+/** A table of each series' value at the cursor. */
 export function LegendTable<Row>(props: LegendTableProps<Row>): JSX.Element {
   let root!: HTMLDivElement;
   const state = createChartState(props.chart);

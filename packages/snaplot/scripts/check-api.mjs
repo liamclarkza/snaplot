@@ -25,8 +25,8 @@ const api = join(root, 'api');
 
 /** P4: public declarations never name these engine types. */
 const FORBIDDEN = ['EngineConfig', 'ChartCore', 'SeriesConfig', 'ChartInstance'];
-/** Still present, each tracked by `[research-12]` in test/golden-api.test.ts (M2, M7). */
-const TRACKED = new Set(['SeriesConfig', 'ChartInstance']);
+/** Names reported instead of failed while a ledger marker tracks them (none since M7, research-12). */
+const TRACKED = new Set();
 
 const declarations = (dir) =>
   existsSync(dir)
@@ -89,7 +89,7 @@ for (const file of golden) {
     if (count === 0) continue;
     if (TRACKED.has(name)) {
       console.log(
-        `check-api: api/${file} names ${name} ${count}x (P4, tracked by [research-12] until M2 and M7)`,
+        `check-api: api/${file} names ${name} ${count}x (P4, tracked by a ledger marker)`,
       );
     } else {
       console.error(`check-api: api/${file} names the engine type ${name} (P4).`);

@@ -1,16 +1,13 @@
 import { type ComponentType, useEffect, useState } from 'react';
-import type { ChartOptions } from 'snaplot';
-import { Chart } from 'snaplot/react';
+import { Chart, type ChartProps } from 'snaplot/react';
 import { EXAMPLE_HEIGHT, type ExampleKind } from '../lib/examples';
 
 // The React tab of an <Example>. It loads only the example it shows, after hydration, and renders
 // it exactly as the tab's code does: <Chart {...options} height={280} />, or the example component.
-const optionModules = import.meta.glob<{ default: ChartOptions<any> }>(
-  '../examples/**/*.options.ts',
-);
+const optionModules = import.meta.glob<{ default: ChartProps<any> }>('../examples/**/*.options.ts');
 const componentModules = import.meta.glob<{ default: ComponentType }>('../examples/**/*.react.tsx');
 
-type Loaded = { options: ChartOptions<any> } | { Component: ComponentType };
+type Loaded = { options: ChartProps<any> } | { Component: ComponentType };
 
 export default function ExampleReact({ name, kind }: { name: string; kind: ExampleKind }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createChart, createChartGroup, reconcileChart, setChartControls } from './createChart';
-import type { ChartHandle, ChartOptions, ChartPoint } from './types';
+import type { ChartHandle, ChartOptions, ChartPoint } from '../public/types';
 import { ChartCore } from '../core/Chart';
 
 const live: Array<{ destroy(): void }> = [];
@@ -45,7 +45,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   document.body.replaceChildren();
 });
-function make<Row>(options: ChartOptions<Row>): ChartHandle<Row> {
+function make<Row = Record<string, any>>(options: ChartOptions<Row>): ChartHandle<Row> {
   const element = document.createElement('div');
   document.body.append(element);
   const chart = createChart(element, { width: 640, height: 360, autoResize: false, ...options });

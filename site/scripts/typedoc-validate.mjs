@@ -3,13 +3,12 @@
 // reference but never runs TypeDoc's validation pass, so this script runs it over the same entry
 // points before `astro build`.
 //
-// Undocumented public declarations are warnings until M7 adds the JSDoc; M7 sets STRICT to true,
-// and from then on they fail the build. `--list` prints every warning (the default prints the
-// count and the first few).
+// Undocumented public declarations fail the build (STRICT, from M7, which documented every public
+// declaration). `--list` prints every warning (the default prints the count and the first few).
 import { Application, LogLevel, Logger } from 'typedoc';
 import { fileURLToPath } from 'node:url';
 
-const STRICT = false;
+const STRICT = true;
 
 const library = (path) => fileURLToPath(new URL(`../../packages/snaplot/${path}`, import.meta.url));
 export const ENTRY_POINTS = ['src/index.ts', 'src/react.ts', 'src/solid.ts'].map(library);
@@ -63,7 +62,7 @@ for (const { message } of [...errors, ...otherWarnings, ...shown]) console.warn(
 if (undocumented.length > shown.length) {
   console.warn(`  … and ${undocumented.length - shown.length} more (run with --list)`);
 }
-const mode = STRICT ? 'error' : 'warning until M7';
+const mode = STRICT ? 'error' : 'warning';
 console.log(
   `typedoc-validate: ${undocumented.length} undocumented public declarations (${mode}), ` +
     `${otherWarnings.length} other warnings, ${errors.length} errors.`,

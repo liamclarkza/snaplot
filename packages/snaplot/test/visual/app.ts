@@ -109,7 +109,14 @@ function mountBox(fixture: Fixture): { root: HTMLElement; host: HTMLDivElement }
 }
 
 function withFont(options: ChartOptions<any>): ChartOptions<any> {
-  return { ...options, theme: { fontFamily: FONT_FAMILY, ...(options.theme ?? {}) } };
+  const theme = options.theme;
+  if (typeof theme === 'string')
+    return {
+      ...options,
+      theme:
+        theme === 'auto' ? { fontFamily: FONT_FAMILY } : { mode: theme, fontFamily: FONT_FAMILY },
+    };
+  return { ...options, theme: { fontFamily: FONT_FAMILY, ...(theme ?? {}) } };
 }
 
 async function renderFixture(id: string): Promise<void> {

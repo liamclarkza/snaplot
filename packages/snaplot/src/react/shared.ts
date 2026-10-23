@@ -2,25 +2,49 @@ import type {
   ChartHandle,
   ChartOptions,
   ChartState,
-  Viewport,
+  ViewportRanges,
   LegendItem,
   ChartPoint,
-} from '../api/types';
-import type { SelectionRange } from '../types';
+  SelectionRange,
+} from '../public/types';
+
+/**
+ * Options the framework components take as controlled props instead (see
+ * {@link ChartControls}).
+ */
+export type ControlledOptionKeys =
+  | 'viewport'
+  | 'selection'
+  | 'hiddenSeries'
+  | 'onViewportChange'
+  | 'onSelectionChange'
+  | 'onHiddenSeriesChange';
 
 /** Controlled values are authoritative; defaults are applied only at mount. */
 export interface ChartControls {
+  /** The host's accessible name. @defaultValue `ariaLabel`, else `'Chart'` */
   'aria-label'?: string;
+  /** Ids of elements that describe the chart. @defaultValue none */
   'aria-describedby'?: string;
+  /** Ids of elements that name the chart. @defaultValue none */
   'aria-labelledby'?: string;
-  viewport?: Viewport;
-  defaultViewport?: Viewport;
-  onViewportChange?: (viewport: Viewport) => void;
+  /** Controlled axis ranges: gestures propose changes through `onViewportChange`. @defaultValue uncontrolled */
+  viewport?: ViewportRanges;
+  /** Axis ranges applied once at mount. @defaultValue automatic */
+  defaultViewport?: ViewportRanges;
+  /** Called with proposed axis ranges. */
+  onViewportChange?: (viewport: ViewportRanges) => void;
+  /** The controlled selection. @defaultValue uncontrolled */
   selectionState?: SelectionRange | null;
+  /** A selection applied once at mount. @defaultValue none */
   defaultSelection?: SelectionRange | null;
+  /** Called with a proposed selection. */
   onSelectionChange?: (selection: SelectionRange | null) => void;
+  /** The controlled hidden series ids. @defaultValue uncontrolled */
   hiddenSeries?: readonly string[];
+  /** Series hidden once at mount. @defaultValue none */
   defaultHiddenSeries?: readonly string[];
+  /** Called with proposed hidden series ids. */
   onHiddenSeriesChange?: (ids: readonly string[]) => void;
 }
 export const wrapperKeys = new Set([
@@ -39,7 +63,9 @@ export const wrapperKeys = new Set([
   'defaultHiddenSeries',
   'onHiddenSeriesChange',
 ]);
-export function chartOptions<Row>(props: ChartOptions<Row> & ChartControls): ChartOptions<Row> {
+export function chartOptions<Row>(
+  props: Omit<ChartOptions<Row>, ControlledOptionKeys> & ChartControls,
+): ChartOptions<Row> {
   return {
     ...Object.fromEntries(
       Object.entries(props).filter(([key]) => !wrapperKeys.has(key) && !key.startsWith('aria-')),
@@ -67,6 +93,7 @@ export function applyDefaults<Row>(chart: ChartHandle<Row>, props: ChartControls
       chart.setSeriesVisible(item.id, !props.defaultHiddenSeries.includes(item.id));
   }
 }
+/** What a legend table shows when the cursor is not over the chart. */
 export type LegendTableFallback = 'hide' | 'latest' | 'first' | 'series-only';
 export function legendPoint<Row>(
   item: LegendItem,

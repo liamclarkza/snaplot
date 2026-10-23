@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ChartHandle, ChartOptions, ChartState } from '../api/types';
+import type { ChartHandle, ChartOptions, ChartState } from '../public/types';
 vi.mock('solid-js', async () => vi.importActual('solid-js/dist/solid.js'));
 import { createRoot, createSignal } from 'solid-js';
 const mock = vi.hoisted(() => ({ instances: [] as any[], reconciles: vi.fn() }));

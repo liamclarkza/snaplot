@@ -14,6 +14,30 @@ to [Semantic Versioning](https://semver.org/).
 - Axis options use `title`, `roundBounds`, `rangePadding` and `format`; streaming uses `maxPoints` and `followWindow`. Repository examples, documentation, benchmarks and comparison adapters use the new API. No compatibility aliases are retained.
 - Existing visual defaults are preserved by the API overhaul.
 
+### Types (1.0)
+
+- Every public type is declared and documented in `snaplot` itself; none is derived from the
+  internal engine, so the API reference lists every option with its default.
+- Rows default to `Record<string, any>`: a `ChartHandle<Row>` is a `ChartHandle`, and a plain
+  `ChartPlugin` (or a generic plugin factory) fits any typed chart without changing its `Row`.
+- `Row` is inferred from `data` only. A series with its own `data` names its fields as plain
+  strings or functions of `any` row, so series over different row shapes and series built with
+  `.map()` compile.
+- Axis `format` is typed per axis kind: value axes take `NumberFormat` (a function of a number, or
+  `Intl.NumberFormat` options with `prefix` and `suffix`), time axes take `DateFormat`, and a
+  category axis takes none. `min`, `max` and `ticks` accept `Date`.
+- New option types for the 1.0 surface: `InteractionOptions`, `TooltipOptions`, `LegendOptions`,
+  `StreamingOptions`, `ThemeTokens` (ten tokens), `Viewport` (`{ x?: [from, to] }`), `Selection`,
+  `SelectionChange` and the `on<Key>Change` callbacks. Options that 1.0 removes are still accepted
+  and marked deprecated until their removal lands.
+- Renamed type exports: `ChartType` is `SeriesType`, `ScatterColorEncodingType` is
+  `ColorEncodingType`, the `createTheme()` tokens are `CreateThemeTokens`, and the axis ranges that
+  `getState().viewport`, `setViewport()` and `viewport:change` use are `ViewportRanges`.
+- `getAxis()` reports `type` as `'linear' | 'log' | 'time' | 'category'`, and `setCursor()`
+  accepts a `Date`.
+- The React and Solid `<Chart>` keep their controlled `viewport`, `selectionState` and
+  `hiddenSeries` props, typed with `ViewportRanges` and `SelectionRange`.
+
 ### Changed
 - Plot edges and clips are square; titles and tick labels share a muted color.
   Built-in grid, frame and tick strokes have consistent strength. Grid colors
@@ -39,6 +63,8 @@ to [Semantic Versioning](https://semver.org/).
   stroke opacities automatically.
 
 ### Removed
+- Type exports `SeriesBase`, `AxisGridConfig`, `AxisTickMarksConfig`, `ScatterPointShape`,
+  `InteractionMode` and `DebugConfig`.
 - The engine's key-based sync. A `syncKey` on `cursor`, `highlight` or `zoom`
   (already absent from the public types) no longer links charts when passed
   untyped; link charts with `createChartGroup()`. The engine's `highlight.getKey`

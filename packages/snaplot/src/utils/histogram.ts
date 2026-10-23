@@ -1,3 +1,6 @@
+import type { HistogramBins } from '../public/types';
+
+export type { HistogramBins };
 /**
  * Histogram utility, compute bins from raw data.
  *
@@ -14,17 +17,11 @@
  * histogram series dataset; callers never need to pad counts.
  */
 
-export interface HistogramBins {
-  /** Bin edge values (length = N+1 for N bins) */
-  edges: Float64Array;
-  /** Count per bin (length = N) */
-  counts: Float64Array;
-  /** Maximum count */
-  maxCount: number;
-}
-
+/** Options of {@link histogram}. */
 export interface HistogramOptions {
+  /** The automatic bin-count rule. @defaultValue `'freedman-diaconis'` */
   method?: 'sturges' | 'scott' | 'freedman-diaconis';
+  /** An explicit bin count. @defaultValue automatic */
   binCount?: number;
 }
 

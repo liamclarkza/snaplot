@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore, useRef } from 'react';
 import { createChartGroup } from '../api/createChart';
-import type { ChartHandle, ChartGroupOptions } from '../api/types';
+import type { ChartHandle, ChartGroupOptions } from '../public/types';
 import type { CursorSnapshotOptions } from '../types';
 const emptySubscribe = () => () => {};
 const emptySnapshot = () => undefined;
+/** The chart's state; re-renders on every state change. */
 export function useChartState<Row>(chart: ChartHandle<Row> | null | undefined) {
   const subscribe = useCallback(
     (listener: () => void) => (chart ? chart.subscribe(listener) : emptySubscribe()),
@@ -12,6 +13,7 @@ export function useChartState<Row>(chart: ChartHandle<Row> | null | undefined) {
   const snapshot = useCallback(() => chart?.getState(), [chart]);
   return useSyncExternalStore(subscribe, snapshot, emptySnapshot);
 }
+/** The values under the cursor, or at a fallback position. */
 export function useCursorSnapshot<Row>(
   chart: ChartHandle<Row> | null | undefined,
   options?: CursorSnapshotOptions,
@@ -20,6 +22,7 @@ export function useCursorSnapshot<Row>(
   const fallback = options?.fallback;
   return useMemo(() => state && chart?.getCursorSnapshot({ fallback }), [chart, state, fallback]);
 }
+/** The highlighted series id and a setter. */
 export function useHighlight<Row>(chart: ChartHandle<Row> | null | undefined) {
   const state = useChartState(chart);
   const set = useCallback((id: string | null) => chart?.setHighlight(id), [chart]);

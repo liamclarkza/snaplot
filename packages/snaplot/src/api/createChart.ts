@@ -24,14 +24,15 @@ import type {
   ChartState,
   CursorSnapshot,
   DataSource,
-  Viewport,
-} from './types';
+  SeriesOptions,
+  ViewportRanges,
+} from '../public/types';
 
 export interface ChartControls {
-  viewport?: Viewport;
+  viewport?: ViewportRanges;
   selection?: SelectionRange | null;
   hiddenSeries?: readonly string[];
-  onViewportChange?: (viewport: Viewport) => void;
+  onViewportChange?: (viewport: ViewportRanges) => void;
   onSelectionChange?: (selection: SelectionRange | null) => void;
   onHiddenSeriesChange?: (hiddenSeries: readonly string[]) => void;
 }
@@ -42,7 +43,7 @@ interface GroupMember {
   getAxis(key: string): Readonly<{ type: string; min: number; max: number }> | undefined;
   getLayout(): ReturnType<ChartHandle['getLayout']>;
   syncViewport(key: string, range: ScaleRange, reset: boolean): void;
-  setCursor(x: number | string | null): void;
+  setCursor(x: number | Date | string | null): void;
   setHighlight(id: string | null): void;
   coordinatePadding(left: number | undefined, right: number | undefined): void;
   naturalRange(key: string): { min: number; max: number } | undefined;
@@ -57,6 +58,17 @@ interface GroupRecord {
 }
 const groups = new WeakMap<ChartGroup, GroupRecord>();
 
+/**
+ * Link charts: pass the group as each chart's `group` option. Members share their cursor and
+ * highlight and, with `viewport: true`, their horizontal viewport.
+ *
+ * @example
+ * ```ts
+ * const group = createChartGroup({ viewport: true });
+ * createChart(a, { ...latency, group });
+ * createChart(b, { ...errors, group });
+ * ```
+ */
 export function createChartGroup(options: ChartGroupOptions = {}): ChartGroup {
   const record: GroupRecord = { members: new Set(), broadcasting: false, destroyed: false };
   const group: ChartGroup = {
@@ -233,8 +245,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.lines,
       ...(options.plugins ?? []).map((plugin) => this.bridge(plugin)),
     ];
-    const renderTooltip = options.tooltip?.render;
-    const formatTooltipX = options.tooltip?.xFormat;
+    const tooltipOptions = typeof options.tooltip === 'object' ? options.tooltip : undefined;
+    const renderTooltip = tooltipOptions?.render;
+    const formatTooltipX = tooltipOptions?.xFormat;
     return {
       ...prepared.config,
       tooltip: {
@@ -255,7 +268,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           : {}),
       },
       series: prepared.config.series.map((series, index) => {
-        const fill = options.series[index].fill;
+        const fill = (options.series[index] as { fill?: unknown }).fill;
         return {
           ...series,
           visible: !this.hidden.has(prepared.seriesIds[index]),
@@ -265,7 +278,11 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
                   const currentIndex = this.prepared.seriesIds.indexOf(prepared.seriesIds[index]);
                   const identity = this.prepared.identities[currentIndex];
                   const position = rowIndex + (this.identityHeads[currentIndex] ?? 0);
-                  return fill(value, identity.sourceIndices[position], identity.rows?.[position]);
+                  return (fill as (value: number, index: number, row?: Row) => string)(
+                    value,
+                    identity.sourceIndices[position],
+                    identity.rows?.[position],
+                  );
                 },
               }
             : {}),
@@ -411,7 +428,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     for (const source of this.streamedSources) {
       const input = this.prepared.sourceInputs[source];
       const si = this.prepared.seriesSources.indexOf(source);
-      const declaredInput = this.options.series[si]?.data ?? this.options.data;
+      const declaredInput = (this.options.series[si]?.data ?? this.options.data) as
+        | DataSource<Row>
+        | undefined;
       const identity = this.prepared.identities[si];
       if (Array.isArray(input)) {
         const head = this.identityHeads[si] ?? 0;
@@ -444,8 +463,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
             candidate.id === series.id &&
             ('y' in candidate ? candidate.y : undefined) === ('y' in series ? series.y : undefined),
         );
-        return series.data && old?.data === series.data
-          ? ({ ...series, data: replacement.get(series.data) ?? series.data } as typeof series)
+        const own = series.data as DataSource<Row> | undefined;
+        return own && old?.data === series.data
+          ? ({ ...series, data: replacement.get(own) ?? own } as typeof series)
           : series;
       }),
     };
@@ -496,7 +516,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         throw new Error(
           'Snaplot: update histogram bins atomically with update(); bins are not streaming observations.',
         );
-      return { ...series, data };
+      return { ...series, data } as SeriesOptions<Row>;
     });
     const batch = prepareChart(
       { ...this.options, data, series: appendSeries },
@@ -662,7 +682,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     for (const listener of this.events.get(event) ?? []) listener(value as never);
   }
 
-  setViewport(viewport: Viewport): void {
+  setViewport(viewport: ViewportRanges): void {
     for (const [key, range] of Object.entries(viewport)) {
       const axis = this.engine.getAxis(key);
       if (
@@ -730,9 +750,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const index = id === null ? -1 : this.prepared.seriesIds.indexOf(id);
     this.engine.setHighlight(index < 0 ? null : index);
   }
-  setCursor(x: number | string | null): void {
+  setCursor(x: number | Date | string | null): void {
     const categories = this.prepared.categories.get('x');
-    const value = typeof x === 'string' ? (categories?.indexOf(x) ?? -1) : x;
+    const value =
+      typeof x === 'string' ? (categories?.indexOf(x) ?? -1) : x instanceof Date ? x.getTime() : x;
     this.engine.setCursorDataX(value === -1 ? null : value);
   }
 
@@ -789,8 +810,13 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       ...(values?.radius !== undefined ? { radius: values.radius } : {}),
       ...(fields ? { fields } : {}),
     };
-    const formatter = this.options.series[si]?.format;
-    if (!this.options.tooltip?.yFormat && formatter) point.formattedY = formatter(y, point);
+    const formatter = this.options.series[si]?.format as
+      | ((value: number, point?: ChartPoint<Row>) => string)
+      | undefined;
+    const tooltipOptions =
+      typeof this.options.tooltip === 'object' ? this.options.tooltip : undefined;
+    if (!tooltipOptions?.yFormat && typeof formatter === 'function')
+      point.formattedY = formatter(y, point);
     return point;
   }
   /** A value readout at value precision (plan P9); the axis format still wins here. */
@@ -886,16 +912,17 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.publish();
   }
   coordinatePadding(left: number | undefined, right: number | undefined): void {
+    const padding = this.options.padding as { left?: number; right?: number } | undefined;
     this.engine.setOptions({
       padding: {
-        ...this.options.padding,
-        left: left ?? this.options.padding?.left ?? 56,
-        right: right ?? this.options.padding?.right ?? 24,
+        ...padding,
+        left: left ?? padding?.left ?? 56,
+        right: right ?? padding?.right ?? 24,
       },
     });
   }
   private readState(): ChartState<Row> {
-    const viewport: Viewport = {};
+    const viewport: Record<string, ScaleRange> = {};
     for (const key of Object.keys(this.engine.getOptions().axes ?? {})) {
       const axis = this.engine.getAxis(key);
       if (axis) viewport[key] = Object.freeze({ min: axis.min, max: axis.max });
@@ -1068,7 +1095,20 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 }
 
-export function createChart<Row>(
+/**
+ * Create a chart in `element`. The chart fills the element's width and height.
+ *
+ * @example
+ * ```ts
+ * const chart = createChart(document.getElementById('cpu')!, {
+ *   data: rows,
+ *   x: 'time',
+ *   series: [{ y: 'cpu', label: 'CPU' }],
+ *   axes: { y: { format: { suffix: '%' } } },
+ * });
+ * ```
+ */
+export function createChart<Row = Record<string, any>>(
   element: HTMLElement,
   options: ChartOptions<Row>,
 ): ChartHandle<Row> {

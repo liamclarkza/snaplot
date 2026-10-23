@@ -52,7 +52,10 @@ export interface Fakes {
   style: StyleFake;
   frames: FramesFake;
   /** Create a sized host in `document.body` and a chart in it (default 400 × 200). */
-  mount<Row>(options: ChartOptions<Row>, size?: MountOptions): ChartHandle<Row>;
+  mount<Row = Record<string, any>>(
+    options: ChartOptions<Row>,
+    size?: MountOptions,
+  ): ChartHandle<Row>;
   /** Destroy mounted charts, empty the body and restore every patched global. */
   uninstall(): void;
 }
@@ -75,7 +78,7 @@ export function installFakes(options: FakeOptions = {}): Fakes {
     media,
     style,
     frames,
-    mount<Row>(chartOptions: ChartOptions<Row>, size: MountOptions = {}) {
+    mount<Row = Record<string, any>>(chartOptions: ChartOptions<Row>, size: MountOptions = {}) {
       const host = document.createElement('div');
       layout.setSize(host, size.width ?? 400, size.height ?? 200);
       document.body.append(host);

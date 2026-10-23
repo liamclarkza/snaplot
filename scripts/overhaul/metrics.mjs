@@ -20,6 +20,8 @@
 //   runtime, resolved by esbuild through `export *` (bare imports external).
 // - Option leaves: a type-checker walk of the public types exported from
 //   `src/index.ts`, ported from the audit's `evidence/arch/option-tree.cjs`.
+//   Properties declared by TypeScript's lib files (the Intl options a format
+//   object forwards) are not leaves.
 //   Nested object options are expanded (intersections included); `data`,
 //   `group` and `plugins` are counted as one leaf each and not entered. The
 //   surfaces are ChartOptions, SeriesOptions (union members merged),
@@ -252,8 +254,15 @@ function publicTypes() {
     checker.getPropertiesOfType(t).length > 0 &&
     !BUILTIN.test((t.aliasSymbol ?? t.getSymbol())?.name ?? '');
 
+  // Properties the platform declares (Intl.NumberFormatOptions inside a NumberFormat, …) are
+  // values the option forwards, not option leaves of snaplot's own.
+  const isLibDeclaration = (decl) => {
+    const file = decl.getSourceFile();
+    return file.hasNoDefaultLib || /[\\/]typescript[\\/]lib[\\/]lib\./.test(file.fileName);
+  };
   function walk(type, prefix, out, depth) {
     for (const prop of checker.getPropertiesOfType(type)) {
+      if (prop.declarations?.length && prop.declarations.every(isLibDeclaration)) continue;
       const name = prefix ? `${prefix}.${prop.name}` : prop.name;
       const decl = prop.valueDeclaration ?? prop.declarations?.[0];
       const t = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(prop, decl ?? sf));

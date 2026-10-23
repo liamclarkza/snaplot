@@ -67,7 +67,7 @@ export const CHART_CSS_VARS: Partial<Record<keyof ThemeConfig, string>> = {
 };
 
 /** Semantic product tokens for the common “make the chart match my app” path. */
-export interface ThemeTokens {
+export interface CreateThemeTokens {
   /** Optional named/full theme to extend before semantic tokens are applied. */
   base?: Partial<ThemeConfig>;
   /** Plot surface color, or `'container'` to copy the nearest opaque ancestor. */
@@ -86,13 +86,21 @@ export interface ThemeTokens {
   diverging?: string[];
   /** Density/heatmap ramp; defaults through the normal role cascade. */
   heatmap?: string[];
+  /** The font family of chart text. */
   fontFamily?: string;
+  /** The axis text size in CSS pixels. */
   fontSize?: number;
+  /** The gridline opacity. */
   gridOpacity?: number;
+  /** The frame opacity. */
   borderOpacity?: number;
+  /** The tooltip colours. */
   tooltip?: {
+    /** The tooltip surface. */
     surface?: string;
+    /** The tooltip text colour. */
     text?: string;
+    /** The tooltip border colour. */
     border?: string;
   };
 }
@@ -103,7 +111,7 @@ export interface ThemeTokens {
  * This intentionally returns a partial theme: roles not supplied continue
  * through the normal CSS-variable and light/dark default resolution path.
  */
-export function createTheme(tokens: ThemeTokens): Partial<ThemeConfig> {
+export function createTheme(tokens: CreateThemeTokens): Partial<ThemeConfig> {
   const theme: Partial<ThemeConfig> = { ...(tokens.base ?? {}) };
   if (tokens.surface !== undefined) theme.backgroundColor = tokens.surface;
   if (tokens.text !== undefined) theme.textColor = tokens.text;
@@ -138,11 +146,17 @@ export function createTheme(tokens: ThemeTokens): Partial<ThemeConfig> {
 
 /** CSS variables consumed by Snaplot's DOM companion components. */
 export const SNAPLOT_THEME_CSS_VARS = {
+  /** The text colour. */
   text: '--snaplot-theme-text',
+  /** The muted text colour. */
   muted: '--snaplot-theme-muted',
+  /** The border colour. */
   border: '--snaplot-theme-border',
+  /** The hover background. */
   hover: '--snaplot-theme-hover',
+  /** The highlight background. */
   highlight: '--snaplot-theme-highlight',
+  /** The font family. */
   fontFamily: '--snaplot-theme-font-family',
 } as const;
 

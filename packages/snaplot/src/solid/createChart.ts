@@ -1,6 +1,6 @@
 import { createSignal, createEffect, onCleanup, untrack, type Accessor } from 'solid-js';
 import { createChart as createCoreChart, reconcileChart } from '../api/createChart';
-import type { ChartOptions, ChartHandle } from '../api/types';
+import type { ChartOptions, ChartHandle } from '../public/types';
 /** Own a chart for a reactive host and a complete reactive options snapshot. */
 export function createChart<Row>(
   container: Accessor<HTMLElement | undefined>,

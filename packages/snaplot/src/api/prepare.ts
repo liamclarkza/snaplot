@@ -1,7 +1,7 @@
 import type { AxisConfig, ChartConfig, ColumnarData, SeriesConfig, ScaleType } from '../types';
 import type { ReferenceLine } from '../plugins/builtins/referenceLinesPlugin';
 import type { ReferenceRegion } from '../plugins/builtins/referenceRegionsPlugin';
-import type { ChartOptions, DataSource } from './types';
+import type { ChartOptions, DataSource } from '../public/types';
 
 type Accessor = string | ((row: any, index: number) => unknown);
 type Input =

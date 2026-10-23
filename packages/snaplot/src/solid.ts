@@ -1,3 +1,17 @@
+/**
+ * The Solid components and hooks: `<Chart>` takes the same options as `createChart`.
+ *
+ * @example
+ * ```tsx
+ * import { Chart } from 'snaplot/solid';
+ *
+ * export function Cpu(props: { rows: Sample[] }) {
+ *   return <Chart data={props.rows} x="time" series={[{ y: 'cpu' }]} ariaLabel="CPU" />;
+ * }
+ * ```
+ *
+ * @module snaplot/solid
+ */
 export { Chart } from './solid/Chart';
 export type { ChartProps } from './solid/Chart';
 export { createChart } from './solid/createChart';
@@ -18,6 +32,6 @@ export type {
   CursorSnapshot,
   ChartGroup,
   ChartGroupOptions,
-} from './api/types';
+} from './public/types';
 
 export { nameColumn, valueColumn, swatchColumn, metricColumn, column } from './solid/columns';

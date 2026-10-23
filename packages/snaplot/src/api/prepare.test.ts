@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { prepareChart } from './prepare';
-import type { ChartOptions } from './types';
+import type { ChartOptions } from '../public/types';
 
 describe('public data preparation', () => {
   it('stable-sorts frozen row copies while preserving source identities and gaps', () => {
@@ -418,7 +418,9 @@ describe('public data preparation', () => {
       data: [{ x: 'B', y: 2 }],
       x: 'x',
       series: [{ type: 'bar', y: 'y' }],
-      axes: { x: { categories: ['A', 'B', 'C'], format: (label) => `Group ${label}` } },
+      axes: {
+        x: { categories: ['A', 'B', 'C'], format: (label: string) => `Group ${label}` },
+      } as never,
     });
     expect(result.categories.get('x')).toEqual(['A', 'B', 'C']);
     expect(result.config.axes?.x.tickFormat?.(1)).toBe('Group B');

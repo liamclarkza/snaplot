@@ -1,4 +1,4 @@
-import type { ChartPoint, LegendItem } from '../api/types';
+import type { ChartPoint, LegendItem } from '../public/types';
 import type { LegendTableColumn } from './LegendTable';
 /** Native Solid cells; safe to render on the server. */
 export function swatchColumn<Row>(
@@ -24,6 +24,7 @@ export function swatchColumn<Row>(
     ),
   };
 }
+/** A column with the series swatch and name. */
 export function nameColumn<Row>(
   options: { swatch?: boolean; truncate?: number } = {},
 ): LegendTableColumn<Row> {
@@ -61,6 +62,7 @@ export function nameColumn<Row>(
     ),
   };
 }
+/** A column with the series value. */
 export function valueColumn<Row>(
   options: {
     format?: (value: number, point: ChartPoint<Row>) => string;
@@ -83,6 +85,7 @@ export function valueColumn<Row>(
       ),
   };
 }
+/** A column with a value computed from the point. */
 export function metricColumn<Row>(
   resolve: (point: ChartPoint<Row>, series: LegendItem) => string,
   options: { header?: string; truncate?: number } = {},
@@ -106,6 +109,7 @@ export function metricColumn<Row>(
     ),
   };
 }
+/** Declares a custom column. */
 export function column<Row>(spec: LegendTableColumn<Row>): LegendTableColumn<Row> {
   return spec;
 }

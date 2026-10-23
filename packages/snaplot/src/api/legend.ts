@@ -1,4 +1,10 @@
-import type { ChartPoint, SeriesOptions, ChartHandle, ChartPlugin, LegendItem } from './types';
+import type {
+  ChartPoint,
+  SeriesOptions,
+  ChartHandle,
+  ChartPlugin,
+  LegendItem,
+} from '../public/types';
 
 /**
  * Cell content returned by a column. The plugin treats `string` as
@@ -14,7 +20,7 @@ export type LegendCellContent = string | Node;
  *
  * Generic in `Row` so `application rows remain typed in cell renderers.
  */
-export interface LegendTableColumn<Row = Record<string, unknown>> {
+export interface LegendTableColumn<Row = Record<string, any>> {
   /** Stable key, used for keying the row's cells. */
   key: string;
   /** Header text. Pass empty string for unlabeled columns (e.g. swatch). */
@@ -35,7 +41,7 @@ export interface LegendTableColumn<Row = Record<string, unknown>> {
  * A small color swatch matching the series color. Useful when paired
  * with a `nameColumn` that should not include its own dot.
  */
-export function swatchColumn<Row = Record<string, unknown>>(
+export function swatchColumn<Row = Record<string, any>>(
   opts: { size?: number; shape?: 'dot' | 'bar' } = {},
 ): LegendTableColumn<Row> {
   const size = opts.size ?? 10;
@@ -65,7 +71,7 @@ export function swatchColumn<Row = Record<string, unknown>>(
  * Series name. By default includes a leading swatch dot (matches the
  * typical ML-dashboard look), so you usually want this OR `swatchColumn`, not both.
  */
-export function nameColumn<Row = Record<string, unknown>>(
+export function nameColumn<Row = Record<string, any>>(
   opts: { swatch?: boolean; truncate?: number } = {},
 ): LegendTableColumn<Row> {
   const showSwatch = opts.swatch ?? true;
@@ -99,7 +105,7 @@ export function nameColumn<Row = Record<string, unknown>>(
  * `placeholder` for what to show when the snapshot is in `series-only`
  * fallback (default: `'—'`).
  */
-export function valueColumn<Row = Record<string, unknown>>(
+export function valueColumn<Row = Record<string, any>>(
   opts: {
     format?: (value: number, point: ChartPoint<Row>) => string;
     placeholder?: string;
@@ -129,7 +135,7 @@ export function valueColumn<Row = Record<string, unknown>>(
  * same metric (e.g. "eval/accuracy"), or each series carries its own
  * metric key in `meta`. Caller supplies the resolver.
  */
-export function metricColumn<Row = Record<string, unknown>>(
+export function metricColumn<Row = Record<string, any>>(
   resolve: (point: ChartPoint<Row>, series: SeriesOptions<Row>) => string,
   opts: { header?: string; truncate?: number } = {},
 ): LegendTableColumn<Row> {
@@ -152,26 +158,37 @@ export function metricColumn<Row = Record<string, unknown>>(
  * Generic escape hatch for one-off columns. Mostly here to give the
  * `import { column } from 'snaplot'` ergonomic an obvious entry point.
  */
-export function column<Row = Record<string, unknown>>(
+export function column<Row = Record<string, any>>(
   spec: LegendTableColumn<Row>,
 ): LegendTableColumn<Row> {
   return spec;
 }
 
-export interface LegendOptions {
+/** Where a legend plugin mounts. */
+export interface LegendPluginOptions {
+  /** Above or below the chart. @defaultValue `'bottom'` */
   position?: 'top' | 'bottom';
   /** Mount outside the chart without changing its layout. */
   container?: HTMLElement;
 }
 
-export interface LegendTableOptions<Row = Record<string, unknown>> extends LegendOptions {
+/** Options of {@link createLegendTablePlugin}. */
+export interface LegendTableOptions<Row = Record<string, any>> extends LegendPluginOptions {
+  /** What the rows show when the cursor is not over the chart. @defaultValue `'series-only'` */
   fallback?: 'hide' | 'latest' | 'first' | 'series-only';
+  /** Show the X value above the rows. @defaultValue `true` */
   showStepHeader?: boolean;
+  /** How the X value in the header is written. @defaultValue the X axis format */
   formatStep?: (value: number | string) => string;
+  /** The columns. @defaultValue name and value */
   columns?: readonly LegendTableColumn<Row>[];
+  /** Highlight a series while its row is hovered. @defaultValue `true` */
   highlightOnHover?: boolean;
+  /** Show or hide a series when its row is clicked. @defaultValue `true` */
   toggleVisibilityOnClick?: boolean;
+  /** A CSS max-height; the table scrolls beyond it. @defaultValue no limit */
   maxHeight?: string;
+  /** Extra class names on the table root. @defaultValue none */
   className?: string;
 }
 
@@ -188,7 +205,7 @@ const mounts = new WeakMap<HTMLElement, MountStyle>();
 function mount<Row>(
   chart: ChartHandle<Row>,
   root: HTMLElement,
-  options: LegendOptions,
+  options: LegendPluginOptions,
 ): () => void {
   const parent = options.container ?? chart.container;
   if (!options.container) {
@@ -236,8 +253,8 @@ function setFlag(element: HTMLElement, flag: string, enabled: boolean): void {
 }
 
 /** Accessible, ID-based toggles using the same legend classes as the framework companions. */
-export function createLegendPlugin<Row = Record<string, unknown>>(
-  options: LegendOptions = {},
+export function createLegendPlugin<Row = Record<string, any>>(
+  options: LegendPluginOptions = {},
 ): ChartPlugin<Row> {
   const states = new Map<ChartHandle<Row>, () => void>();
   return {
@@ -355,7 +372,7 @@ function emptyPoint<Row>(item: LegendItem): ChartPoint<Row> {
 }
 
 /** Cursor-synchronised table with stable ID-keyed DOM rows and text-safe custom cells. */
-export function createLegendTablePlugin<Row = Record<string, unknown>>(
+export function createLegendTablePlugin<Row = Record<string, any>>(
   options: LegendTableOptions<Row> = {},
 ): ChartPlugin<Row> {
   const states = new Map<ChartHandle<Row>, () => void>();

@@ -3,7 +3,7 @@ import { act, createElement as h, createRef, StrictMode } from 'react';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ChartHandle, ChartOptions } from '../api/types';
+import type { ChartHandle, ChartOptions } from '../public/types';
 const mock = vi.hoisted(() => ({
   instances: [] as any[],
   reconciles: vi.fn(),
@@ -46,6 +46,7 @@ vi.mock('../api/createChart', () => ({
   },
 }));
 import { Chart } from './Chart';
+import type { ControlledOptionKeys } from './shared';
 import { useChartGroup, useChartState } from './hooks';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let root: Root | undefined;
@@ -60,7 +61,11 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 type Row = { x: number; y: number };
-const options: ChartOptions<Row> = { x: 'x', data: [{ x: 1, y: 2 }], series: [{ y: 'y' }] };
+const options: Omit<ChartOptions<Row>, ControlledOptionKeys> = {
+  x: 'x',
+  data: [{ x: 1, y: 2 }],
+  series: [{ y: 'y' }],
+};
 function mount() {
   const host = document.createElement('div');
   document.body.append(host);
