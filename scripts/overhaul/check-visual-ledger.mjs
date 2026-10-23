@@ -11,8 +11,9 @@
 // the commits listed in `docs/decisions/visual-ledger/baseline-commits.txt` (M3a's initial
 // baselines and M14's approved set).
 //
-// It also checks the format of every row file a commit adds (the heading names its V-id, and
-// the Commit, Milestone and Fixtures lines exist; the Commit line quotes that commit's subject).
+// It also checks the format of every row file a commit adds (plan P13): the heading names its
+// V-id; the Commit, Milestone, Fixtures, Before → after, Finding and Revert lines exist; the
+// Commit line quotes that commit's subject, and the Fixtures line names a fixture in backticks.
 //
 // A listed baseline commit that a rebase rewrote still counts: it is matched by `git patch-id`,
 // with a warning. `--refresh` rewrites baseline-commits.txt with the rebased SHAs.
@@ -74,8 +75,10 @@ function checkRowFormat(sha, path, subject) {
   const problems = [];
   if (!new RegExp(`^# ${id}:\\s*\\S`, 'm').test(text))
     problems.push(`heading "# ${id}: …" missing`);
-  for (const field of ['Commit', 'Milestone', 'Fixtures']) {
-    if (!new RegExp(`\\*\\*${field}:\\*\\*\\s*\\S`).test(text))
+  // A value is on the field's line or, as a nested list, on the indented lines below it
+  // (V0.md's Before → after). An empty field followed by the next field is missing.
+  for (const field of ['Commit', 'Milestone', 'Fixtures', 'Before → after', 'Finding', 'Revert']) {
+    if (!new RegExp(`\\*\\*${field}:\\*\\*[ \\t]*(\\S|\\n[ \\t]+\\S)`).test(text))
       problems.push(`**${field}:** missing`);
   }
   const commitLine = /\*\*Commit:\*\*(.*)/.exec(text)?.[1] ?? '';

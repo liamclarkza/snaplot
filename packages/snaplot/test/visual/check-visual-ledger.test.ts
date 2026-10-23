@@ -61,7 +61,7 @@ describe('check-visual-ledger', () => {
   });
 
   // M3a review #3 note 5: P13 also asks for the before → after, the finding and the revert.
-  it.fails('[repo-10] fails a new row without Before → after, Finding or Revert', () => {
+  it('[repo-10] fails a new row without Before → after, Finding or Revert', () => {
     for (const field of ['Before → after', 'Finding', 'Revert']) {
       const r = runLedgerScenario({
         commits: [
@@ -76,7 +76,7 @@ describe('check-visual-ledger', () => {
     }
   });
 
-  it.fails('[repo-10] fails a field left empty above the next one', () => {
+  it('[repo-10] fails a field left empty above the next one', () => {
     const empty = FULL_ROW.replace(/- \*\*Finding:\*\*.*/, '- **Finding:**');
     const r = runLedgerScenario({
       commits: [
