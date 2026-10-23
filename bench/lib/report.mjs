@@ -45,6 +45,15 @@ export function machineLines(meta) {
   ];
 }
 
+/** `profile scenario` entries, one per re-measurement, as a list with counts. */
+export function retriedSummary(retried) {
+  const counts = new Map();
+  for (const entry of retried) counts.set(entry, (counts.get(entry) ?? 0) + 1);
+  return [...counts]
+    .map(([entry, count]) => (count > 1 ? `${entry} (${count}×)` : entry))
+    .join(', ');
+}
+
 export function abReport({ meta, evaluation }) {
   const lines = [];
   lines.push(`# bench:ab ${meta.base.ref} → ${meta.head.ref}`, '');
@@ -114,7 +123,7 @@ export function abReport({ meta, evaluation }) {
       lines.push(`Outside: ${evaluation.selfTest.outside.join(', ')}.`);
   }
   if (evaluation.retried.length)
-    lines.push('', `Re-measured after a noisy failure: ${evaluation.retried.join(', ')}.`);
+    lines.push('', `Re-measured after a noisy failure: ${retriedSummary(evaluation.retried)}.`);
   lines.push('');
   return lines.join('\n');
 }
