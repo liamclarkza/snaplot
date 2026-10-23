@@ -187,7 +187,7 @@ describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] nu
     for (let i = 1; i < labels.length; i++) expect(labels[i]).not.toBe(labels[i - 1]);
   });
 
-  it.fails('[render-08] histogram X labels are distinct nice values', () => {
+  it('[render-08] histogram X labels are distinct nice values', () => {
     const values = Array.from({ length: 500 }, (_, i) => Math.sin(i * 12.9898) * 2.2);
     const chart = fakes.mount({
       series: [{ type: 'histogram', id: 'z', data: histogram(values) }],

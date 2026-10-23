@@ -113,8 +113,8 @@ export type {
   LegendTableColumn,
   LegendTableOptions,
 } from './public/legend';
-export { histogram } from './utils/histogram';
-export type { HistogramOptions } from './utils/histogram';
+export { histogram } from './public/histogram';
+export type { HistogramOptions, HistogramRule } from './public/histogram';
 export { lttb } from './data/downsampling/lttb';
 export { m4 } from './data/downsampling/m4';
 export { lowerBound, upperBound, nearestIndex, viewportIndices } from './data/binarySearch';

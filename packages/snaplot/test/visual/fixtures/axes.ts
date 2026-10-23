@@ -237,7 +237,7 @@ const edges: Fixture[] = [
             Float64Array.from(
               range(500, (i) => ((((Math.sin(i * 7.1) * 1e4) % 1) + 1) % 1) * 0.003),
             ),
-            { binCount: 12 },
+            { bins: 12 },
           ),
         },
       ],

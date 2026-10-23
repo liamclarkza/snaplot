@@ -33,7 +33,7 @@ test.describe('tooltip rows', () => {
     await page.evaluate(() => {
       const { histogram } = window.harness;
       const values = Array.from({ length: 400 }, (_, i) => 5 + Math.sin(i * 12.9898) * 3);
-      const bins = histogram(values, { binCount: 10 });
+      const bins = histogram(values, { bins: 10 });
       const fit = Array.from(bins.edges.slice(0, -1), (edge, i) => ({
         x: (edge + bins.edges[i + 1]) / 2,
         y: bins.counts[i],

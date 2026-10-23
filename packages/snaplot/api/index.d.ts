@@ -711,11 +711,19 @@ export declare const fogTheme: ThemeConfig;
 export declare const forestTheme: ThemeConfig;
 
 /**
- * Compute histogram bins from raw values.
+ * Count values into bins for a histogram series.
  *
- * Usage:
- *   const bins = histogram(rawValues);
- *   createChart(element, { series: [{ id: 'distribution', type: 'histogram', data: bins }] });
+ * @example
+ * ```ts
+ * const before = histogram(latencyBefore);
+ * const after = histogram(latencyAfter, { thresholds: before.edges });
+ * createChart(element, {
+ *   series: [
+ *     { id: 'before', type: 'histogram', data: before },
+ *     { id: 'after', type: 'histogram', data: after },
+ *   ],
+ * });
+ * ```
  */
 export declare function histogram(values: Float64Array | readonly number[], options?: HistogramOptions): HistogramBins;
 
@@ -732,28 +740,23 @@ export declare interface HistogramBins {
     maxCount: number;
 }
 
-/**
- * Histogram utility, compute bins from raw data.
- *
- * This is a USER-FACING utility, not called internally by the chart.
- * The chart only renders pre-computed bins. The user controls
- * when and how to bin their data (P3: library never touches your data).
- *
- * Bin methods:
- * - Freedman-Diaconis (default): 2 * IQR * n^(-1/3), robust to outliers
- * - Sturges: ceil(log2(n) + 1), simple, good for normal distributions
- * - Scott: 3.5 * sigma / n^(1/3), optimized for Gaussian data
- *
- * Returns N+1 bin edges and N counts. Pass the result directly as a
- * histogram series dataset; callers never need to pad counts.
- */
 /** Options of {@link histogram}. */
 export declare interface HistogramOptions {
-    /** The automatic bin-count rule. @defaultValue `'freedman-diaconis'` */
-    method?: 'sturges' | 'scott' | 'freedman-diaconis';
-    /** An explicit bin count. @defaultValue automatic */
-    binCount?: number;
+    /**
+     * A bin count from 1 to 10,000, or the rule that picks one (capped at 1,000 bins on nice edges).
+     * @defaultValue `'freedman-diaconis'`
+     */
+    bins?: number | HistogramRule;
+    /**
+     * Explicit edges, strictly increasing: pass one histogram's `edges` to bin another dataset the
+     * same way. Values outside the first and last edge are not counted. Not combined with `bins`.
+     * @defaultValue computed from `bins`
+     */
+    thresholds?: ArrayLike<number>;
 }
+
+/** The rules that pick an automatic bin count. */
+export declare type HistogramRule = 'freedman-diaconis' | 'sturges' | 'scott';
 
 /** A histogram from {@link histogram} bins. */
 export declare interface HistogramSeriesOptions {

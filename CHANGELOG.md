@@ -83,6 +83,19 @@ what to use instead, and the chart keeps its default:
   categories (visual V17). A date-only or offset-free string is a wall time in the chart's
   `timeZone`; a string with `Z` or an offset is an instant.
 
+### Histograms (1.0)
+
+- `histogram(values, { bins, thresholds })`: `bins` is a count from 1 to 10,000 or the rule
+  (`'freedman-diaconis'`, the default, `'sturges'` or `'scott'`); `thresholds` takes explicit
+  edges, such as another histogram's `edges`, so two datasets compare bin for bin. `binCount` and
+  `method` are gone, and invalid input throws `snaplot: histogram() …`.
+- Automatic bins sit on nice edges, multiples of a 1, 2, 2.5 or 5 × 10ⁿ width, and are capped at
+  1,000, so one outlier cannot make millions of bins (visual V18). Explicit counts keep even edges
+  that end exactly at the largest value.
+- A value on an edge is counted in the bin above it (the last bin includes its upper edge), and
+  counts always agree with the edges. Edges stay finite and strictly increasing up to
+  `±Number.MAX_VALUE`, and a single repeated value gets one bin around it at any magnitude.
+
 ### Types (1.0)
 
 - Every public type is declared and documented in `snaplot` itself; none is derived from the

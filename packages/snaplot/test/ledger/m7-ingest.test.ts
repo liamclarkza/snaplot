@@ -170,37 +170,37 @@ describe('[dataapi-06][dataapi-19] histogram() binning', () => {
     return values;
   };
 
-  it.fails('[dataapi-06] one outlier cannot make more than 1,000 automatic bins', () => {
+  it('[dataapi-06] one outlier cannot make more than 1,000 automatic bins', () => {
     const bins = histogram(latency(1e7));
     expect(bins.counts.length).toBeLessThanOrEqual(1000);
   });
 
-  it.fails('[dataapi-06] a range near ±Number.MAX_VALUE keeps every value', () => {
+  it('[dataapi-06] a range near ±Number.MAX_VALUE keeps every value', () => {
     const bins = histogram([-1e308, 0, 1e308]);
     expect(bins.counts.reduce((sum, count) => sum + count, 0)).toBe(3);
   });
 
-  it.fails('[dataapi-06] edges stay finite for an extreme range with an explicit bin count', () => {
-    const bins = histogram([-Number.MAX_VALUE, Number.MAX_VALUE], { binCount: 4 });
+  it('[dataapi-06] edges stay finite for an extreme range with an explicit bin count', () => {
+    const bins = histogram([-Number.MAX_VALUE, Number.MAX_VALUE], { bins: 4 });
     expect([...bins.edges].every(Number.isFinite)).toBe(true);
   });
 
-  it.fails('[dataapi-06] a single repeated large value gives strictly increasing edges', () => {
+  it('[dataapi-06] a single repeated large value gives strictly increasing edges', () => {
     const bins = histogram([1e20, 1e20, 1e20]);
     for (let i = 1; i < bins.edges.length; i++) {
       expect(bins.edges[i]).toBeGreaterThan(bins.edges[i - 1]);
     }
   });
 
-  it.fails('[dataapi-06] an unknown method or a huge bin count is rejected', () => {
-    expect(() => histogram([1, 2, 3], { method: 'sturgess' as never })).toThrow();
-    expect(() => histogram([1, 2, 3], { binCount: 2e7 })).toThrow();
+  it('[dataapi-06] an unknown method or a huge bin count is rejected', () => {
+    expect(() => histogram([1, 2, 3], { bins: 'sturgess' as never })).toThrow();
+    expect(() => histogram([1, 2, 3], { bins: 2e7 })).toThrow();
   });
 
-  it.fails('[dataapi-19] a value on a bin edge lands in the upper bin', () => {
+  it('[dataapi-19] a value on a bin edge lands in the upper bin', () => {
     const values = Array.from({ length: 1000 }, (_, i) => i / 10);
     for (const binCount of [30, 333]) {
-      const bins = histogram(values, { binCount });
+      const bins = histogram(values, { bins: binCount });
       const last = bins.edges.length - 1;
       expect(bins.edges[last]).toBeLessThanOrEqual(99.9);
       for (let bin = 0; bin < bins.counts.length; bin++) {

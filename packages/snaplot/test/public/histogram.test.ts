@@ -27,7 +27,7 @@ function countsByEdges(values: readonly number[], edges: Float64Array): number[]
 }
 
 describe('[dataapi-06] bounded and overflow-safe', () => {
-  it.fails('[dataapi-06] an outlier returns in under 5 ms with at most 1,000 bins', () => {
+  it('[dataapi-06] an outlier returns in under 5 ms with at most 1,000 bins', () => {
     const values = latency(1000, 1e7);
     let best = Number.POSITIVE_INFINITY;
     for (let run = 0; run < 3; run++) {
@@ -39,12 +39,12 @@ describe('[dataapi-06] bounded and overflow-safe', () => {
     expect(best).toBeLessThan(5);
   });
 
-  it.fails('[dataapi-06] explicit bins are capped at 10,000', () => {
+  it('[dataapi-06] explicit bins are capped at 10,000', () => {
     expect(bin(latency(100), { bins: 10_000 }).counts.length).toBe(10_000);
     expect(() => bin(latency(100), { bins: 10_001 })).toThrow(/^snaplot: .*10,000/);
   });
 
-  it.fails('[dataapi-06] edges stay finite and strictly increasing at ±Number.MAX_VALUE', () => {
+  it('[dataapi-06] edges stay finite and strictly increasing at ±Number.MAX_VALUE', () => {
     const bins = bin([-Number.MAX_VALUE, 0, Number.MAX_VALUE], { bins: 4 });
     expect([...bins.edges].every(Number.isFinite)).toBe(true);
     for (let i = 1; i < bins.edges.length; i++)
@@ -52,7 +52,7 @@ describe('[dataapi-06] bounded and overflow-safe', () => {
     expect(bins.counts.reduce((sum, count) => sum + count, 0)).toBe(3);
   });
 
-  it.fails('[dataapi-06] invalid input throws with a public message', () => {
+  it('[dataapi-06] invalid input throws with a public message', () => {
     expect(() => bin('1,2,3' as never)).toThrow(/^snaplot: histogram/);
     expect(() => bin([1, 2, 3], { bins: 0 })).toThrow(/^snaplot: /);
     expect(() => bin([1, 2, 3], { bins: 2.5 })).toThrow(/^snaplot: /);
@@ -68,7 +68,7 @@ describe('[dataapi-06] bounded and overflow-safe', () => {
 });
 
 describe('[dataapi-19] edge membership', () => {
-  it.fails('[dataapi-19] counts agree with the edges for explicit and automatic bins', () => {
+  it('[dataapi-19] counts agree with the edges for explicit and automatic bins', () => {
     const values = Array.from({ length: 1000 }, (_, i) => i / 10);
     for (const options of [{ bins: 30 }, { bins: 333 }, {}]) {
       const bins = bin(values, options);
@@ -77,7 +77,7 @@ describe('[dataapi-19] edge membership', () => {
     }
   });
 
-  it.fails('[dataapi-19] explicit bins end exactly at the largest value', () => {
+  it('[dataapi-19] explicit bins end exactly at the largest value', () => {
     const values = Array.from({ length: 1000 }, (_, i) => i / 10);
     const bins = bin(values, { bins: 333 });
     expect(bins.counts.length).toBe(333);
@@ -87,7 +87,7 @@ describe('[dataapi-19] edge membership', () => {
 });
 
 describe('[dxtrial-14] nice and shareable bins', () => {
-  it.fails('[dxtrial-14] automatic edges are multiples of a 1-2-5 width', () => {
+  it('[dxtrial-14] automatic edges are multiples of a 1-2-5 width', () => {
     const bins = bin(latency(10_000).map((v, i) => v + (i % 7) * 0.31));
     const width = bins.edges[1] - bins.edges[0];
     const exponent = Math.floor(Math.log10(width));
@@ -97,7 +97,7 @@ describe('[dxtrial-14] nice and shareable bins', () => {
       expect(Math.abs(edge / width - Math.round(edge / width))).toBeLessThan(1e-6);
   });
 
-  it.fails('[dxtrial-14] thresholds give two datasets the same edges', () => {
+  it('[dxtrial-14] thresholds give two datasets the same edges', () => {
     const control = bin(latency(5000).map((v) => v + 20));
     const variant = bin(latency(5000), { thresholds: control.edges });
     expect([...variant.edges]).toEqual([...control.edges]);

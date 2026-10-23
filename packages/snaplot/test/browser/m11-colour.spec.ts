@@ -187,7 +187,7 @@ test.describe('mark fills', () => {
     await page.evaluate(() => {
       const bins = window.harness.histogram(
         Array.from({ length: 200 }, (_, i) => (i % 10) + 0.5),
-        { binCount: 10 },
+        { bins: 10 },
       );
       window.harness.mount({
         series: [{ type: 'histogram', id: 'h', data: bins, color: '#ff0000' }],
