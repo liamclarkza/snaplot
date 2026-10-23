@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/*.test.mjs\"",
     "bench": "node run.mjs",
+    "bench:ab": "node ab.mjs",
     "bench:compare": "node compare.mjs"
   },
   "dependencies": {

@@ -2,11 +2,12 @@
 // One-sided bench run of this checkout (for profiling and quick checks; the gate is ab.mjs).
 //
 //   npm run bench -- [--profile desktop|mobile|both] [--filter <area|name>[,…]] [--set M<N>]
-//                    [--runs 1] [--raster gpu|software] [--headed] [--heap-profile]
+//                    [--runs 1] [--raster gpu|software] [--api v1] [--skip-build] [--headed]
 //                    [--out bench/results/latest.json]
 //
-// Builds the bench page, runs each scenario on a fresh page and writes the aggregates as JSON
-// (for compare.mjs) plus a Markdown table next to it.
+// Builds packages/snaplot (unless --skip-build), builds the bench page against that dist, runs
+// each scenario on a fresh page and writes the aggregates as JSON (for compare.mjs) plus a
+// Markdown table next to it.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
@@ -18,12 +19,12 @@ import { waitWhileLocked } from './lib/lock.mjs';
 import { matchesFilter, measure } from './lib/measure.mjs';
 import { lockPath, resultsDir } from './lib/paths.mjs';
 import { runReport } from './lib/report.mjs';
-import { buildPage, worktreeSide } from './lib/sides.mjs';
+import { buildPage, prepareWorktree, worktreeSide } from './lib/sides.mjs';
 import { aggregate } from './lib/stats.mjs';
 
 const USAGE = `usage: npm run bench -- [--profile desktop|mobile|both] [--filter <area|name>[,…]]
-       [--set M<N>] [--runs N] [--raster gpu|software] [--headed] [--heap-profile]
-       [--out <file.json>]`;
+       [--set M<N>] [--runs N] [--raster gpu|software] [--api v012|v1|v2] [--skip-build]
+       [--headed] [--heap-profile] [--out <file.json>]`;
 
 const argv = process.argv.slice(2);
 const args = parseArgs(
@@ -34,6 +35,8 @@ const args = parseArgs(
     set: { type: 'string' },
     runs: { type: 'string', default: '1' },
     raster: { type: 'string', default: 'gpu' },
+    api: { type: 'string' },
+    'skip-build': { type: 'boolean', default: false },
     headed: { type: 'boolean', default: false },
     'heap-profile': { type: 'boolean', default: false },
     out: { type: 'string' },
@@ -55,7 +58,7 @@ const out = args.out ?? join(resultsDir, 'latest.json');
 
 // A one-sided run does not hold the lock, but it must not disturb another session's measurement.
 await waitWhileLocked(lockPath(), { log });
-const side = worktreeSide();
+const side = await prepareWorktree(worktreeSide(), { log, skipBuild: args['skip-build'] });
 const page = await buildPage(side, 'run');
 const server = await serve(page);
 const { chromium } = await loadPlaywright();
@@ -66,7 +69,7 @@ try {
     chromium,
     raster: args.raster,
     headed: args.headed,
-    sides: [{ id: 'head', url: server.url }],
+    sides: [{ id: 'head', url: server.url, api: args.api }],
     profiles,
     select: (catalog) =>
       catalog
