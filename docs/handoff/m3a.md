@@ -2,11 +2,11 @@
 
 - **Branch:** `ovh/m3a-visual` · **Worktree:** `.claude/worktrees/m3a` · **Base:** `16547da` (`overhaul`
   at start, = `ovh-m1-done` tip).
-  - `overhaul` has since gained M5 (15 commits, up to `504d934`). None of them touch `src/` or a path
-    M3a owns.
-  - The branch is not rebased; the integrator rebases at merge (Requests 2 and 6 give the one
-    conflict and its resolution).
-- **Status:** complete, after the fixes for review #2 (and review #1 before it).
+  - `overhaul` has since gained M5, M4, M6a and M6b (up to `8faea93`, `ovh-m6b-done`). None of them
+    touch `src/` or a path M3a owns.
+  - The branch is not rebased; the integrator rebases at merge. Requests 6 gives the one conflict
+    and its resolution, simulated onto `8faea93` in this attempt.
+- **Status:** complete, after the fixes for review #3 (and reviews #1 and #2 before it).
   - The visual platform is local macOS Chromium (EXECUTION.md rule 1), so the committed baselines are
     the `-darwin` set.
   - Refresh the Linux baselines with the `update-snapshots` workflow.
@@ -66,9 +66,13 @@
   - IBM Plex Sans (`@fontsource`) is loaded with `document.fonts.load` before the chart exists, and
     `theme.fontFamily` is set explicitly.
   - The app reports ready after `document.fonts.ready`, two frames and an idle callback, and only once
-    the grid and data layers have rendered and the data layer holds ink.
+    the grid and data layers have rendered and the data layer holds ink (`paint.ts`, unit-tested in
+    `paint.test.ts`).
     - For a fixture declaring `blankData` (empty, single point, isolated points), the grid layer must
       hold ink instead.
+    - A `blankData` fixture that also declares `blankGrid` needs no ink, only both renders. This is
+      for plan §5.1's empty state (no ticks, no grid), which M10 gives `axes/empty` (review #3 note 3).
+      No fixture sets it yet.
     - It waits up to 5 s. It never asks for a redraw, so a chart that does not paint fails its tests.
   - Data is seeded.
   - The config fixes the viewport (1280 × 800), `contextOptions.reducedMotion: 'reduce'`, `en-US` and
@@ -97,14 +101,14 @@
     - Two runs against the same SHA take turns through `<sha>/capture.lock` (a `mkdir` lock with
       `owner.json`). The second waits, then reads the cache. A lock whose owner has exited, or older
       than 2 hours, is moved aside, never deleted.
-    - `meta.json` records the reference outcome: `against.exit`, `verifyExit`, `complete`, `declared`
-      and `shots`.
-    - Only a complete reference is cached (`capture.json`, format 3). Otherwise the runner exits
-      non-zero.
+    - `meta.json` records the reference outcome: `against.exit`, `verifyExit`, `complete`, `declared`,
+      `shots` and `hashes`.
+    - Only a complete reference is cached (`capture.json`, format 4). Otherwise the runner exits
+      non-zero. Entries in an older format are captured again.
     - It reuses the head's `node_modules` when the lockfiles match: a symlink, replaced if dangling.
       Otherwise it runs `npm ci` there and keys the cache by the ref's Playwright version.
-    - It then compares the working tree with the reference exactly.
-    - It never writes into the tracked `__screenshots__/`.
+    - It then compares the working tree exactly with its own copy of the reference.
+    - It never writes into the tracked `__screenshots__/` or into the cache.
   - `--strict`: compares the committed baselines exactly too.
   - `--update`: rewrites the committed set and prunes stale files.
   - `--serve`: serves the fixture app.
@@ -117,6 +121,18 @@
   - Each run writes `test-results/visual/{report.json, meta.json, contact-sheet.html}`. `meta.json`
     records the head's SHA, dirty flag and `inputs` (below).
   - A head run that dies before reporting leaves an empty report, never the previous one.
+  - **Refused flags (review #3).** `run-args.mjs` parses the command line. It refuses (exit 2) the
+    Playwright flags that would write, skip or relocate the expected images: `-u`,
+    `--update-snapshots[=…]`, `--update-source-method`, `--ignore-snapshots` and `--config` (also
+    inside a short cluster such as `-xu`, and after `--`). `--update` stays the only way to rewrite
+    the committed baselines.
+  - **The head never writes into the cache (review #3).**
+    - `capture.json` (format 4) and `meta.json`'s `against.hashes` record the SHA-256 of every usable
+      reference image.
+    - The head compares against a per-run copy in `test-results/visual/reference/`, checked against
+      those hashes as it is made.
+    - A cached reference whose images no longer match is moved aside to
+      `shots-….damaged-<time>` (never deleted) and captured again.
 - **Geometry specs** (`geometry` project, blocking on every platform). Five checks in `checks.ts`, with
   unit tests in `checks.test.ts`. They run over facts that `probe.ts` collects in the page:
   - DOM label boxes (`getBoundingClientRect`), attributed to axes through the debug `labelBoxes()`;
@@ -129,8 +145,9 @@
   - M10: `visuals-21:def-01` ×3, `visuals-21:def-03`, `render-02`, `render-06`, `render-08`,
     `render-14`, `render-19`, `dxtrial-10`, `gap-environments-07` ×2.
   - M11: `visuals-21:def-04`, `render-05`.
-- **`scripts/overhaul/check-visual-diffs.mjs`** (G10), locked by 26 scenario tests in
-  `test/visual/check-visual-diffs.test.ts`, plus 4 tests of the settings in `record.test.ts`:
+- **`scripts/overhaul/check-visual-diffs.mjs`** (G10), locked by 38 scenario tests in
+  `test/visual/check-visual-diffs.test.ts`, plus 4 tests of the settings in `record.test.ts` and 6 of
+  the runner's command line in `run-args.test.ts`:
   - **Zero changes** for M2, M9a and M9b.
   - **Rows.** Otherwise, every changed or removed shot's fixture is named in a row file of the merging
     milestone. That is a `V<n>.md` that differs from the base and whose `**Milestone:**` line names
@@ -144,20 +161,38 @@
   - **Stale report.** `head.inputs` fingerprints the working-tree content of `packages/snaplot`,
     `package.json` and `package-lock.json`. If the working tree no longer matches it, the report is
     stale and the check fails. `--any-head` judges it anyway, with a note. Row files and handoffs are
-    outside the fingerprint.
+    outside the fingerprint. The tracked baselines are inside it, so a committed-baseline run that
+    wrote into them is stale.
+  - **Reference images (review #3).** In a run against a ref, every image of the head's reference
+    copy must match the hash recorded at capture. An image that changed, is gone, or was never
+    captured fails the check, even with `--allow-partial`. A `meta.json` without the hashes is
+    refused.
+  - **Merge base (review #3).** On a milestone branch (`ovh/m<N>-…`), a run against a ref must have
+    compared against the branch's merge base with `overhaul`. Otherwise the check fails and names
+    the merge base, because against the branch's own commits a change compares with itself. An
+    explicit `--base <ref>` judges another reference deliberately, with a note. A merge base older
+    than the fixture app (M3a's own branch) and a clone without `overhaul` print a note instead.
+  - **A base that does not resolve** (a clone without a local `overhaul`) exits 2 and asks for
+    `--base <ref>`. The zero-change rule reads no rows, so it goes on without one.
   - **Failures:**
     - a reference that compared nothing (0 shots, or no committed baselines);
+    - a reference image written after its capture;
+    - on a milestone branch, a reference other than the merge base (without `--base`);
     - a run against a ref that was not exact, and a non-exact zero-change run;
-    - a stale report, or a `meta.json` that lacks the comparison, the inputs or the reference
-      outcome;
+    - a stale report, or a `meta.json` that lacks the comparison, the inputs, the reference outcome
+      or the reference hashes;
     - geometry failures and broken shots;
     - unverified shots, incomplete references, and partial or narrowed runs (`--allow-partial`
       overrides these three).
   - **Diff images** are copied to `notes/overhaul-audit/visual-diffs/<m>/`.
-- **`scripts/overhaul/check-visual-ledger.mjs`** (P13):
+- **`scripts/overhaul/check-visual-ledger.mjs`** (P13), locked by 7 scenario tests in
+  `test/visual/check-visual-ledger.test.ts` (`ledger-scenario.mjs` runs it over a throwaway
+  history):
   - per commit in `overhaul-baseline..HEAD`: screenshots or a `visual:` paragraph require a row file
     (and each named V-id);
-  - it validates the format of every added row;
+  - it validates the format of every added row: the heading, and the Commit, Milestone, Fixtures,
+    Before → after, Finding and Revert lines (the last three since review #3). A value is on the
+    field's line or in a nested list below it, so an empty field fails;
   - the commits in `baseline-commits.txt` are exempt, matched by SHA or, after a rebase, by
     `git patch-id` (`--refresh` rewrites the file).
 - **`scripts/visual-docker.sh`:** the optional Linux path (Playwright 1.61.1 noble image,
@@ -193,14 +228,96 @@ Commits (oldest first):
 | `1bd429c` | test(visual): take turns on a shared reference capture, honour SNAPLOT_BENCH_LOCK |
 | `eb8f8a1` | test(visual): find the main checkout through an absolute common directory |
 | `c1faeb0` | test(visual): record the measured pixel counts of the fixture self-test |
-| (tip) | docs(handoff): record the M3a review #2 fixes and gates |
+| `bfbe43e` | docs(handoff): record the M3a review #2 fixes and gates |
+| `1b49a1c` | test(visual): move the runner's argument parsing into run-args.mjs |
+| `11e564b` | test(visual): record a reference written after capture as repo-10 expected failures |
+| `5fde1fd` | test(visual): hash the reference, compare the head against a copy, refuse -u |
+| `e5c8938` | test(visual): record an off-merge-base reference and an unresolved base as repo-10 expected failures |
+| `c23be72` | test(visual): check the reference against the merge base, and a base that does not resolve |
+| `3e0c576` | test(visual): lock check-visual-ledger with scenarios, a row without the P13 fields as a repo-10 expected failure |
+| `631cad0` | test(visual): record an empty visual-ledger field as a repo-10 expected failure |
+| `8183973` | chore(scripts): require every P13 field in a new visual-ledger row |
+| `0e05ac8` | test(visual): let an empty-state fixture declare a blank grid layer |
+| `6634839` | test(visual): document the refused flags, the reference copy and hashes, the merge-base check |
+| (tip) | docs(handoff): record the M3a review #3 fixes and gates |
 
 Departures from the brief's commit list:
 - Commit 3 says "darwin" instead of "Linux" (EXECUTION.md rule 1).
 - Commit 5 is a robustness follow-up to the runner, found while running the exit commands.
-- `c039f61` to `85e4a57` are the review #1 fixes, and `7ee510a` to `c1faeb0` the review #2 fixes.
+- `c039f61` to `85e4a57` are the review #1 fixes, `7ee510a` to `c1faeb0` the review #2 fixes, and
+  `1b49a1c` to `6634839` the review #3 fixes.
 
 Closes: repo-10.
+
+## Review #3 response
+
+Review #3 (`notes/overhaul-audit/state/M3a-final-review.json`) asked for changes: 1 blocking item and
+6 notes. The worktree was clean at `bfbe43e`, the reviewed tip: the interrupted earlier attempt at
+this step had left no commits, changes or stashes (`stash@{0}` belongs to M6b and is untouched).
+This attempt added 10 commits and updated this handoff, then re-ran every gate and exit command at
+`6634839` (Gates).
+
+**Blocking: `--against <ref> -u` poisoned the shared reference cache, and the next run passed.**
+Fixed, tests first, with three defences. Each is enough on its own for the gate.
+
+- **The problem.** The head run pointed `SNAPLOT_VISUAL_EXPECTED_DIR` at the cached reference and
+  appended the passthrough after `--update-snapshots=none`. So `-u` (or `-- --update-snapshots=all`)
+  wrote the head's screenshots into `<cache>/<sha>/shots-…/`, `capture.json` still said complete,
+  and the next plain run against that SHA reported 0 changed shots and OK, for every worktree with
+  that merge base.
+- **`1b49a1c`** moves the argument parsing into `run-args.mjs` (a pure move, with 4 tests of the
+  current behaviour), so the command line can be tested without starting Playwright.
+- **`11e564b` (tests).** Seven tests; six start as `it.fails` with `[repo-10]`:
+  - `check-visual-diffs.test.ts`: a reference image rewritten after capture (under the zero-change
+    rule, also with `--allow-partial`, and under the row rule with a covering `marks/*` row), an
+    image the capture never produced, a captured image that is gone (with `--allow-partial`), and a
+    `meta.json` without the hashes. `diff-scenario.mjs` records the hashes that run.mjs will write,
+    and can write into the reference after the "run".
+  - `run-args.test.ts`: the runner refuses `-u`, `--update-snapshots` (bare, `=all`, and with a
+    separate value), `--update-source-method`, `--ignore-snapshots`, `-xu`, `--config` and `-c`,
+    before and after `--`, with or without `--against`. A normal test keeps a `--grep` pattern that
+    looks like a flag.
+- **`5fde1fd` (fix).**
+  - `run-args.mjs` refuses those flags (exit 2). It reads short clusters the way Playwright's parser
+    does, and skips the values of options that take one.
+  - `record.mjs` gains `listPngs`, `sha256`, `shotHashes` and `compareShots`, shared by the runner and
+    the checker.
+  - `run.mjs`:
+    - records the SHA-256 of every usable shot in `capture.json` (format 4) and in `meta.json`'s
+      `against.hashes`;
+    - verifies a cached reference before using it, and moves a damaged one aside, then captures
+      again;
+    - compares the head against a per-run copy in `test-results/visual/reference/`, checked against
+      the hashes as it is made. The cache is never a write target for the head.
+  - `check-visual-diffs` verifies the copy against the hashes. A changed, missing or uncaptured image
+    fails the check, and `--allow-partial` does not override it.
+  - `visual-docker.sh` no longer copies the reference itself; run.mjs's copy comes back with the
+    results.
+  - The six tests flip. One existing scenario ("does not trust a reference shot that did not
+    reproduce itself") now models the copy, which leaves non-reproduced shots out.
+- **The reviewer's repro, re-run at `6634839`** (Gates, "Review #3 self-tests"):
+  - `--against HEAD -u` and `-- --update-snapshots=all` exit 2 before anything runs, and the cache is
+    byte-identical afterwards.
+  - The cache poisoned the way the old runner did it (Playwright run directly into the cache with
+    `--update-snapshots=changed`, after the `axes/y2-dual` title edit): the next
+    `--against HEAD` warns, moves the damaged directory aside, captures again, and reports the
+    2 changed shots. `check-visual-diffs` FAILs without a row.
+  - A head that writes into its own copy (Playwright `-u` against the copy: the report says 688
+    passed, 0 changed): `check-visual-diffs` FAILs on "changed after capture: axes/y2-dual,
+    axes/y2-dual@2x", also with `--allow-partial` and under `--milestone M9a`. The cache is untouched.
+    The plain re-run, which gave OK before the fix, now reports the 2 changed shots, and
+    `check-visual-diffs --milestone M9a` FAILs.
+
+**Notes:**
+
+| # | Note | Outcome |
+|---|---|---|
+| 1 | `check-visual-diffs` never checked that the reference is the merge base; after a milestone's commits, `--against HEAD` passes either rule | `e5c8938` (tests; 3 `[repo-10]` `it.fails`) and `c23be72` (fix). On a milestone branch (`ovh/m<N>-…`), a run against a ref other than `git merge-base HEAD overhaul` FAILs and names the merge base. An explicit `--base` judges another reference deliberately, with a note. A merge base older than the fixture app (only M3a's own branch) and a clone without `overhaul` print a note. End to end in a scratch clone: a commit on a simulated `ovh/m10-sim`, then `--against HEAD` gives 0 changed shots and FAIL (merge base); `--against overhaul` gives the 2 changed shots, FAIL without a row and OK with a `V30.md` row for M10. |
+| 2 | M2 is zero-change, so the M1 mount fix cannot ride in M2 | Requests 1 is rewritten. Land the fix as its own integrator step after M3a merges, with its own row (V90+) and the two refreshed annotation baselines in the same commit, judged under the row rule. This matches state/runs.md's plan. |
+| 3 | The paint wait needs canvas ink; plan §5.1's empty state may leave both canvases blank, and M10 could not fix that from `fixtures/axes.ts` | `0e05ac8`: `blankGrid` (with `blankData`) means no ink is expected, only both renders. The rule moves to `paint.ts` with 4 unit tests. Every current fixture behaves as before (Gates: 688 passed). M10 adds `blankGrid` to `axes/empty` in the commit that removes its grid. |
+| 4 | `check-visual-diffs` exited 2 with "bad revision 'overhaul'" in a clone without a local `overhaul`, even under the zero-change rule | Fixed in `c23be72` (tests in `e5c8938`, 2 `[repo-10]` `it.fails`). The zero-change rule reads no rows and goes on. The row rule exits 2 with "the base overhaul does not resolve (a clone without a local overhaul branch?) … pass --base <ref>". |
+| 5 | `check-visual-ledger` checked only the heading and the Commit, Milestone and Fixtures lines | `3e0c576` adds `check-visual-ledger.test.ts` (5 tests over throwaway histories; 1 `[repo-10]` `it.fails`), `631cad0` two more (an `it.fails`: an empty field followed by the next one passed, because `\s*\S` matched across the line; and a normal test: a value in a nested list passes), and `8183973` the fix: Before → after, Finding and Revert are required too, each with a value on its line or in a nested list below it (V0.md's shape, kept passing by a test). `diff-scenario.mjs`'s `row()` writes every field. |
+| 6 | Checked and fine | No action. |
 
 ## Review #2 response
 
@@ -300,44 +417,42 @@ The broken-reference self-tests below re-run review #1's cases at this tip.
 
 ## Gates
 
-All gates ran at `c1faeb0`, the last source commit, in the worktree, with three exceptions:
-- the per-commit proof ran in a scratch clone;
-- so did the two default-change cases, at `eb8f8a1`;
-- exit 4 and two committed-baseline checks ran in the worktree at `eb8f8a1`.
+All gates ran at `6634839`, the last source commit of this attempt, in the worktree, except the
+per-commit proof, the merge-base self-test and the rebase simulation, which ran in a scratch clone.
+Every `--against` run used a fresh reference cache in the session scratchpad
+(`SNAPLOT_SNAPSHOT_DIR`), so the first run captured from scratch. The bench lock (M4) was free before
+every Playwright run; the runner waits on it in any case.
 
-`c1faeb0` changed only a README and a comment after `eb8f8a1`. Every `--against` run used a fresh
-reference cache in the session scratchpad (`SNAPLOT_SNAPSHOT_DIR`), so each first run captured from
-scratch. The bench lock (M4) was free before every Playwright run; the runner waits on it in any case.
-
-`$S` below is `/private/tmp/claude-501/-Users-liam-Projects-snaplot/76647906-acb8-4a29-8fd6-6a20ecda8e45/scratchpad/m3a-r2`,
+`$S` below is `/private/tmp/claude-501/-Users-liam-Projects-snaplot/76647906-acb8-4a29-8fd6-6a20ecda8e45/scratchpad/m3a-r3`,
 which holds every log of this attempt.
 
-**`npm run verify`** (exit 0). Test total: 520 at M1, + 8 (`checks.test.ts`), + 26
-(`check-visual-diffs.test.ts`), + 4 (`record.test.ts`) = 558.
+**`npm run verify`** (exit 0). Test total: 520 at M1, + 8 (`checks.test.ts`), + 38
+(`check-visual-diffs.test.ts`), + 7 (`check-visual-ledger.test.ts`), + 6 (`run-args.test.ts`), + 4
+(`record.test.ts`), + 4 (`paint.test.ts`) = 587.
 
 ```
 > biome ci . && npm run typecheck && npm test && npm run build
-Checked 185 files in 99ms. No fixes applied.
+Checked 193 files in 111ms. No fixes applied.
 > tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json
- Test Files  50 passed (50)
-      Tests  557 passed | 1 expected fail (558)
-[vite:dts] Declaration files built in 1197ms.
-✓ built in 1.59s
-✓ built in 391ms
+ Test Files  53 passed (53)
+      Tests  586 passed | 1 expected fail (587)
+[vite:dts] Declaration files built in 1227ms.
+✓ built in 1.62s
+✓ built in 382ms
 ```
 
 The one expected failure is M1's `[arch-01]` (owned by M8).
 
 **Per-commit proof.** EXECUTION rule 4 requires it, since the branch has more than 6 commits.
 
-- It ran in the scratch clone (`$S/clone`, at `c1faeb0`), from the merge-base `16547da`, so nothing
-  moved onto the newer `overhaul`.
-- Every pick fast-forwarded, so no SHA changed (the clone ended at `c1faeb0`).
+- It ran in a scratch clone (`$S/clone`, at `6634839`, with APFS-cloned `node_modules`), from the
+  merge-base `16547da`, so nothing moved onto the newer `overhaul`.
+- Every pick fast-forwarded, so no SHA changed (the clone ended at `6634839`).
 - The lockfile never changed, so `npm ci` never ran.
 
 ```
 $ git rebase -x 'git diff --quiet HEAD~1 -- package-lock.json || npm ci; npm test' 16547da
-Rebasing (2/44)Executing: git diff --quiet HEAD~1 -- package-lock.json || npm ci; npm test
+Rebasing (2/66)Executing: git diff --quiet HEAD~1 -- package-lock.json || npm ci; npm test
       Tests  519 passed | 1 expected fail (520)        # eeb1a7c
       Tests  527 passed | 1 expected fail (528)        # 9089696
       Tests  527 passed | 1 expected fail (528)        # 4597c43
@@ -360,42 +475,59 @@ Rebasing (2/44)Executing: git diff --quiet HEAD~1 -- package-lock.json || npm ci
       Tests  557 passed | 1 expected fail (558)        # 1bd429c
       Tests  557 passed | 1 expected fail (558)        # eb8f8a1
       Tests  557 passed | 1 expected fail (558)        # c1faeb0
+      Tests  557 passed | 1 expected fail (558)        # bfbe43e
+      Tests  561 passed | 1 expected fail (562)        # 1b49a1c
+      Tests  562 passed | 7 expected fail (569)        # 11e564b
+      Tests  568 passed | 1 expected fail (569)        # 5fde1fd
+      Tests  570 passed | 6 expected fail (576)        # e5c8938
+      Tests  575 passed | 1 expected fail (576)        # c23be72
+      Tests  579 passed | 2 expected fail (581)        # 3e0c576
+      Tests  580 passed | 3 expected fail (583)        # 631cad0
+      Tests  582 passed | 1 expected fail (583)        # 8183973
+      Tests  586 passed | 1 expected fail (587)        # 0e05ac8
+      Tests  586 passed | 1 expected fail (587)        # 6634839
 Successfully rebased and updated refs/heads/ovh/m3a-visual.
 rebase-exit=0
 ```
 
-The SHA column is added here; the raw log (`$S/rebase-x.log`) has one `Executing` line per commit. The
-counts show the tests-first order:
+The SHA column is added here; the raw log (`$S/rebase-x.log`) has one `Executing` line per commit.
+The counts show the tests-first order:
 - review #1: `c039f61` adds 16 tests, 9 of them `[repo-10]` expected failures; `e62c59f` flips 7 and
   `90ffd44` the other 2;
 - review #2: `7ee510a` adds 6 tests, 5 of them expected failures; `19e859b` flips them and adds the 4
-  in `record.test.ts`; `c76018d` adds 4 tests, 3 of them expected failures; `518005e` flips them.
+  in `record.test.ts`; `c76018d` adds 4 tests, 3 of them expected failures; `518005e` flips them;
+- review #3: `1b49a1c` adds 4 tests of the moved parser; `11e564b` adds 7, 6 of them expected
+  failures, and `5fde1fd` flips them; `e5c8938` adds 7, 5 of them expected failures, and `c23be72`
+  flips them; `3e0c576` adds 5 (1 expected failure) and `631cad0` 2 (1 expected failure), and
+  `8183973` flips both; `0e05ac8` adds the 4 in `paint.test.ts`.
 
 **Exit 1: `npm run test:visual -- --against HEAD` twice in a row shows zero diffs.** Run 1 extracts the
-ref, renders it, renders it again exactly, then compares the head exactly. Run 2 uses the cache.
+ref, renders it, renders it again exactly, records the hashes, copies the reference, then compares the
+head exactly. Run 2 uses the cache (verified against the hashes).
 
 ```
 $ npm run test:visual -- --against HEAD      # run 1, exit 0
-visual: extracting HEAD (c1faeb0eff) into $S/cache-final/c1faeb0effed3b53ba56144af3059449b1dccd49/tree
-  137 passed (12.9s)
+visual: extracting HEAD (663483992f) into $S/cache-final/663483992f2450b98996876c4442e448f477e6fa/tree
+  137 passed (14.3s)
 visual: rendering the reference again; every shot must reproduce exactly
-  137 passed (11.6s)
+  137 passed (9.5s)
 visual: captured 137 reference screenshots (each reproduced)
 visual: comparing exact (threshold 0, maxDiffPixels 0)
   4 skipped
-  688 passed (24.3s)
+  688 passed (21.5s)
 $ node scripts/overhaul/check-visual-diffs.mjs       # exit 0
-check-visual-diffs: head c1faeb0eff vs HEAD (c1faeb0eff)
+check-visual-diffs: head 663483992f vs HEAD (663483992f)
   reference: complete, 137 shots; comparison exact (threshold 0, maxDiffPixels 0)
-  milestone M3a, rows of this milestone changed since c1faeb0effed: none
+  note: the merge base with overhaul (16547da580) predates the fixture app (M3a's own branch), so the reference is not checked against it
+  milestone M3a, rows of this milestone changed since 663483992f24: none
   137 shots: 0 changed, 0 added, 0 removed, 0 broken, 0 unverified; geometry: 555 checks, 0 failing
 check-visual-diffs: OK
 
 $ npm run test:visual -- --against HEAD      # run 2, exit 0
-visual: reference HEAD (c1faeb0eff) from cache $S/cache-final/c1faeb0…/shots-darwin-arm64-pw1.61.1-chromium1228 (137 shots)
+visual: reference HEAD (663483992f) from cache $S/cache-final/663483992f…/shots-darwin-arm64-pw1.61.1-chromium1228 (137 shots)
 visual: comparing exact (threshold 0, maxDiffPixels 0)
   4 skipped
-  688 passed (18.4s)
+  688 passed (19.9s)
 $ node scripts/overhaul/check-visual-diffs.mjs       # exit 0
   reference: complete, 137 shots (cached); comparison exact (threshold 0, maxDiffPixels 0)
   137 shots: 0 changed, 0 added, 0 removed, 0 broken, 0 unverified; geometry: 555 checks, 0 failing
@@ -406,34 +538,7 @@ $ node scripts/overhaul/check-visual-diffs.mjs --milestone M2 --no-copy      # e
 check-visual-diffs: OK
 ```
 
-The committed-baseline mode passes with the new tolerance. Under the zero-change rule it now
-needs `--strict`:
-
-```
-$ npm run test:visual      # exit 0
-visual: comparing tolerance (threshold 0, maxDiffPixelRatio 0.002)
-  4 skipped
-  688 passed (18.4s)
-$ node scripts/overhaul/check-visual-diffs.mjs       # exit 0
-check-visual-diffs: head c1faeb0eff vs committed darwin baselines
-  reference: 137 committed darwin baselines; comparison tolerance (threshold 0, maxDiffPixelRatio 0.002)
-  note: a committed-baseline run within the tolerance is not the merge gate. The gate is npm run test:visual -- --against <merge-base>, which compares exactly
-  milestone M3a, rows of this milestone changed since overhaul: none (ignored: V0.md (initial baselines))
-  137 shots: 0 changed, 0 added, 0 removed, 0 broken, 0 unverified; geometry: 555 checks, 0 failing
-check-visual-diffs: OK
-$ node scripts/overhaul/check-visual-diffs.mjs --milestone M2 --no-copy      # exit 1 (at eb8f8a1)
-check-visual-diffs: FAIL: the zero-change rule needs an exact comparison, and this committed-baseline run used a tolerance (threshold 0, maxDiffPixelRatio 0.002): run npm run test:visual -- --against <merge-base>
-$ npm run test:visual -- --strict      # exit 0 (at eb8f8a1)
-visual: comparing exact (threshold 0, maxDiffPixels 0)
-  688 passed (18.7s)
-$ node scripts/overhaul/check-visual-diffs.mjs --milestone M2 --no-copy      # exit 0 (at eb8f8a1)
-  reference: 137 committed darwin baselines; comparison exact (threshold 0, maxDiffPixels 0)
-check-visual-diffs: OK
-```
-
-The last three commands ran at `eb8f8a1`, on that commit's own committed-baseline run. The `--strict`
-run shows that the committed darwin set also reproduces exactly on this machine.
-
+`meta.json` records `expectedDir: test-results/visual/reference` (137 PNGs) and 137 `against.hashes`.
 The 688 tests are 137 shots + 551 geometry checks. The 4 skips are:
 - the paint check on the two density fixtures;
 - `axes/empty`'s paint and minimum-label checks (the §5.1 empty state).
@@ -441,14 +546,14 @@ The 688 tests are 137 shots + 551 geometry checks. The 4 skips are:
 **Exit 2: the committed baselines number ≤ 150 and total ≤ 10 MB.** Unchanged since V0:
 
 ```
-$ find packages/snaplot/test/visual/__screenshots__ -name '*-darwin.png' | wc -l
+$ git ls-files 'packages/snaplot/test/visual/__screenshots__/*-darwin.png' | wc -l
      137
-3.50 MB (3667350 bytes)
+3667350 bytes (3.50 MB)
 @2x: 20
 ```
 
 **Exit 3: the geometry specs pass, or are `test.fail` with an `[id]`.** 0 unexpected results. The tagged
-tests, from `report.json` of the committed-baseline run:
+tests, from `report.json` of the final `--against HEAD` run at `6634839`:
 
 ```
 axes/titles-320           | no two label boxes overlap [visuals-21:def-01]                    | expected (failed)
@@ -483,64 +588,257 @@ recorded:
 - the 60 ISO date labels overlap their neighbours (hundreds of pairs);
 - at a 24 px minimum font, the Y labels overflow by 45 px and `2021` overlaps `1200000`.
 
-Reviews #1 and #2 re-checked all 15.
+Reviews #1, #2 and #3 re-checked all 15. All 15 fail inside the check's own assertion.
 
 **Exit 4: a deliberately changed fixture fails `check-visual-diffs`, and a row file that names it
-passes.** This is review #2's case 1, run in the default mode (no `--strict`) in the worktree, at
-`eb8f8a1`.
-- The change was a local edit to `fixtures/layout.ts:47`: `layout/axis-titles` `lineWidth: 2` → `3`.
-  It was not committed.
-- The row was an untracked `V99.md` with `**Milestone:** M3a` naming `layout/axis-titles`.
-- Both were reverted afterwards. The final clean runs (exit 1, above) exited 0.
+passes.** The reviewer's edit, in the worktree: `axes/y2-dual`'s y title `'Requests'` →
+`'Requests per second'` (`fixtures/axes.ts:310`), uncommitted and reverted afterwards. These ran on
+the report of the plain re-run in the review #3 self-tests below (2 changed shots).
 
 ```
-$ npm run test:visual -- --against HEAD      # exit 1
-visual: comparing exact (threshold 0, maxDiffPixels 0)
-  1) [visual] › layout/axis-titles › matches its reference      246 pixels (ratio 0.01 of all image pixels) are different.
-  2) [visual] › layout/axis-titles@2x › matches its reference   72 pixels (ratio 0.01 of all image pixels) are different.
-  2 failed
-  686 passed (19.5s)
 $ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 1
-check-visual-diffs: head eb8f8a1705 + working tree vs HEAD (eb8f8a1705)
-  reference: complete, 137 shots (cached); comparison exact (threshold 0, maxDiffPixels 0)
-  milestone M3a, rows of this milestone changed since eb8f8a1705c0: none
-  137 shots: 2 changed, 0 added, 0 removed, 0 broken, 0 unverified; geometry: 555 checks, 0 failing
-  changed  layout/axis-titles
-  changed  layout/axis-titles@2x
-check-visual-diffs: FAIL: changed or removed fixtures without a visual-ledger row from this milestone: layout/axis-titles
-+ untracked docs/decisions/visual-ledger/V99.md naming layout/axis-titles (Milestone M3a)
+check-visual-diffs: FAIL: changed or removed fixtures without a visual-ledger row from this milestone: axes/y2-dual
++ untracked docs/decisions/visual-ledger/V99.md naming axes/y2-dual (Milestone M3a)
 $ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 0
-  milestone M3a, rows of this milestone changed since eb8f8a1705c0: V99.md
-  changed  layout/axis-titles  (V99.md: layout/axis-titles)
-  changed  layout/axis-titles@2x  (V99.md: layout/axis-titles)
+  milestone M3a, rows of this milestone changed since 663483992f24: V99.md
+  changed  axes/y2-dual  (V99.md: axes/y2-dual)
+  changed  axes/y2-dual@2x  (V99.md: axes/y2-dual)
+check-visual-diffs: OK
++ the row names `axes/y2-*` instead
+$ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 0
+  changed  axes/y2-dual  (V99.md: axes/y2-*)
 check-visual-diffs: OK
 $ node scripts/overhaul/check-visual-diffs.mjs --no-copy --milestone M2      # exit 1
-check-visual-diffs: FAIL: M2 must not change any fixture (zero-change rule): layout/axis-titles, layout/axis-titles@2x
-+ the same row with **Milestone:** M10 (another milestone)
+check-visual-diffs: FAIL: M2 must not change any fixture (zero-change rule): axes/y2-dual, axes/y2-dual@2x
++ the row with **Milestone:** M10
 $ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 1
-  milestone M3a, rows of this milestone changed since eb8f8a1705c0: none (ignored: V99.md (Milestone M10))
-check-visual-diffs: FAIL: changed or removed fixtures without a visual-ledger row from this milestone: layout/axis-titles
-+ the row back to M3a, and the fixture edit reverted (the report is now stale; review #2 note 1)
+  milestone M3a, rows of this milestone changed since 663483992f24: none (ignored: V99.md (Milestone M10))
+check-visual-diffs: FAIL: changed or removed fixtures without a visual-ledger row from this milestone: axes/y2-dual
++ the row removed and the fixture edit reverted
 $ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 1
-check-visual-diffs: FAIL: the report is stale: packages/snaplot, package.json, package-lock.json changed in the working tree since the run at eb8f8a1705 + working tree. Run npm run test:visual again, or pass --any-head to judge this report anyway
-$ node scripts/overhaul/check-visual-diffs.mjs --no-copy --any-head      # exit 0
-  note: --any-head: the report is stale (packages/snaplot, package.json, package-lock.json changed since the run); judging it anyway
+check-visual-diffs: FAIL: the report is stale: packages/snaplot, package.json, package-lock.json changed in the working tree since the run at 663483992f + working tree. Run npm run test:visual again, or pass --any-head to judge this report anyway
+```
+
+**Review #3 self-tests: the reviewer's `-u` repro, and the two other defences.** In the worktree,
+with the same `axes/y2-dual` edit, against the `$S/cache-final` entry of `6634839` from exit 1.
+"Cache digest" is the SHA-256 over the per-file SHA-256 of the cached PNGs.
+
+```
+$ npm run test:visual -- --against HEAD -u      # exit 2, nothing ran
+visual: -u would let Playwright write, skip or relocate the expected images, which run.mjs owns: the head always compares with --update-snapshots=none, and a reference from --against is never updated. To rewrite the committed baselines (M3a and M14 only), use --update
+$ npm run test:visual -- --against HEAD -- --update-snapshots=all      # exit 2, nothing ran
+visual: --update-snapshots would let Playwright write, skip or relocate the expected images, …
+cache digest before and after: af3a49b9f028…  (unchanged)
+
+# The cache poisoned the way the old runner did it: Playwright straight into the cache.
+$ SNAPLOT_VISUAL_EXPECTED_DIR=<cache shots> SNAPLOT_VISUAL_STRICT=1 npx playwright test --project visual --update-snapshots=changed
+  137 passed (9.3s)                       # cache digest changed; capture.json still format 4, complete
+$ npm run test:visual -- --against HEAD      # exit 1
+visual: WARNING: the cached reference $S/cache-final/663483992f…/shots-darwin-arm64-pw1.61.1-chromium1228 no longer matches its capture (changed: axes/y2-dual, axes/y2-dual@2x). Moved it aside to …/shots-darwin-arm64-pw1.61.1-chromium1228.damaged-1792754984986; capturing again
+visual: extracting HEAD (663483992f) into $S/cache-final/663483992f…/tree
+visual: rendering the reference again; every shot must reproduce exactly
+visual: captured 137 reference screenshots (each reproduced)
+      388 pixels (ratio 0.01 of all image pixels) are different.
+      829 pixels (ratio 0.01 of all image pixels) are different.
+  2 failed
+  686 passed (17.9s)
+$ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 1
+  137 shots: 2 changed, 0 added, 0 removed, 0 broken, 0 unverified; geometry: 555 checks, 0 failing
+check-visual-diffs: FAIL: changed or removed fixtures without a visual-ledger row from this milestone: axes/y2-dual
+
+# A head that writes into its own reference copy (the -u the runner now refuses).
+$ npm run test:visual -- --against HEAD      # exit 1, 2 changed (cache digest recorded)
+$ SNAPLOT_VISUAL_EXPECTED_DIR=$PWD/test-results/visual/reference SNAPLOT_VISUAL_STRICT=1 npx playwright test --project visual --project geometry --update-snapshots=changed
+  4 skipped
+  688 passed (17.7s)                      # report.json: {"expected":688,"skipped":4,"unexpected":0,"flaky":0}
+$ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 1 (also with --allow-partial, and --milestone M9a --allow-partial)
+  reference images differ from the capture: changed after capture: axes/y2-dual, axes/y2-dual@2x
+  137 shots: 0 changed, 0 added, 0 removed, 0 broken, 0 unverified; geometry: 555 checks, 0 failing
+check-visual-diffs: FAIL: the reference images no longer match their capture (changed after capture: axes/y2-dual, axes/y2-dual@2x): something wrote into the reference after it was captured, such as a Playwright -u or --update-snapshots run. Run npm run test:visual -- --against HEAD again
+cache digest: unchanged by the write into the copy
+
+# The reviewer's "natural next step", which gave OK before the fix.
+$ npm run test:visual -- --against HEAD      # exit 1
+visual: reference HEAD (663483992f) from cache … (137 shots)
+  2 failed
+  686 passed (18.0s)
+$ node scripts/overhaul/check-visual-diffs.mjs --no-copy --milestone M9a      # exit 1
+  milestone M9a, zero-change rule
+  137 shots: 2 changed, 0 added, 0 removed, 0 broken, 0 unverified; geometry: 555 checks, 0 failing
+check-visual-diffs: FAIL: M9a must not change any fixture (zero-change rule): axes/y2-dual, axes/y2-dual@2x
+```
+
+Along the way, the recaptured reference differed from the first capture in 3 pixels of
+`overlay/hover-scatter-3` (the left edge of the tooltip's three swatch dots, at most 4 levels in one
+channel; each capture reproduced itself exactly). Playwright's exact comparison classifies them as
+anti-aliasing: compared with `threshold: 0, maxDiffPixels: 0`, the two images match, and the head
+matched both captures. The hashes are checked only against the capture they came from, so this does
+not affect them (Known gaps).
+
+**Review #3 self-test: the merge base** (note 1). In the scratch clone: a local `overhaul` at
+`6634839` (as if M3a had merged), a branch `ovh/m10-sim` with one commit making the `axes/y2-dual`
+title edit, `SNAPLOT_BENCH_LOCK` pointing at the main checkout's lock.
+
+```
+$ npm run test:visual -- --against HEAD      # exit 0: the change compared with itself
+visual: captured 137 reference screenshots (each reproduced)
+  688 passed (17.8s)
+$ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 1
+check-visual-diffs: head 16ed8f341f vs HEAD (16ed8f341f)
+  milestone M10, rows of this milestone changed since 16ed8f341fc3: none
+  137 shots: 0 changed, 0 added, 0 removed, 0 broken, 0 unverified; geometry: 555 checks, 0 failing
+check-visual-diffs: FAIL: the run compared against HEAD (16ed8f341f), but this branch's merge base with overhaul is 663483992f. Against the branch's own commits, a change compares with itself. Run npm run test:visual -- --against 663483992f (the merge gate), or pass --base HEAD to judge against HEAD deliberately
+$ npm run test:visual -- --against overhaul      # exit 1 (reference from the shared cache)
+  2 failed
+  686 passed (18.1s)
+$ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 1
+check-visual-diffs: FAIL: changed or removed fixtures without a visual-ledger row from this milestone: axes/y2-dual
++ untracked V30.md (Milestone M10) naming axes/y2-dual
+$ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 0
+  milestone M10, rows of this milestone changed since 663483992f24: V30.md
 check-visual-diffs: OK
 ```
 
-The same edit in committed-baseline mode (`threshold: 0`, `maxDiffPixelRatio: 0.002`) flags only the
-DPR 1 shot. The `@2x` shot's 72 px fall under 0.2 % of its pixels:
+**Synthetic scenarios** (inside `npm test`):
+- `check-visual-diffs.test.ts` (38 tests):
+  - the reference: a complete reference that matches; a change under the zero-change rule; an added
+    shot; 0 reference shots, with and without `--allow-partial`; an incomplete reference, then with
+    `--allow-partial`; a non-reproduced shot; a `meta.json` without the outcome; a head shot that
+    threw (broken);
+  - committed baselines: a match, an added shot, and no baselines at all;
+  - the comparison (review #2): a tolerant `--against` run under both rules; a `meta.json` without the
+    comparison; a tolerant and an exact committed-baseline run under the zero-change rule; the
+    not-the-merge-gate note;
+  - a stale report (review #2): an edit to the render inputs after the run; a `meta.json` without the
+    inputs; edits outside the inputs; `--any-head`;
+  - visual-ledger rows: a missing row, a good row, an edit to `V0.md`, and another milestone's row;
+  - a reference written after capture (review #3): an image rewritten (both rules, and with
+    `--allow-partial`), an image never captured, an image gone (with `--allow-partial`), and a
+    `meta.json` without the hashes;
+  - the merge base (review #3): a run against the branch tip fails; the merge base passes; `--base`
+    judges another ref; a pre-harness merge base and a clone without `overhaul` print notes;
+  - a base that does not resolve (review #3): the zero-change rule goes on; the row rule asks for
+    `--base`.
+- `check-visual-ledger.test.ts` (7): a complete row; a screenshot without a row; a `visual:`
+  paragraph without its row; a Commit line that does not quote the subject; a row without Before →
+  after, Finding or Revert; an empty field; a nested-list value.
+- `run-args.test.ts` (6), `record.test.ts` (4), `paint.test.ts` (4) and `checks.test.ts` (8).
+
+31 tests carry `[repo-10]`: 27 in `check-visual-diffs.test.ts`, 2 in `check-visual-ledger.test.ts`,
+1 in `record.test.ts` and 1 in `run-args.test.ts`. None is an `it.fails` any more.
+
+**`check-visual-ledger`** at the tip (exit 0):
 
 ```
-$ npm run test:visual      # exit 1
-visual: comparing tolerance (threshold 0, maxDiffPixelRatio 0.002)
-      246 pixels (ratio 0.01 of all image pixels) are different.
-  1 failed
-$ node scripts/overhaul/check-visual-diffs.mjs --no-copy      # exit 0 (V99.md names it)
-  note: a committed-baseline run within the tolerance is not the merge gate. …
-  137 shots: 1 changed, …
-  changed  layout/axis-titles  (V99.md: layout/axis-titles)
+  baseline  4597c43a12 test(visual): initial darwin baselines (137 screenshots, V0)
+check-visual-ledger: 63 commits in overhaul-baseline..HEAD, 1 with visual changes, 1 listed baseline commit(s)
+check-visual-ledger: OK
 ```
+
+V0.md passes the stricter row check. The first implementation ran the script's self-tests in a
+scratch clone, and review #1 re-ran them; `check-visual-ledger.test.ts` now locks them (a screenshot
+without a row, a `visual:` paragraph without a row, a malformed row, a good row). The patch-id match
+after a rebase, and `--refresh`, were last exercised by review #3's rebase simulation and this
+attempt's (below).
+
+**Rebase simulation onto `overhaul` at `8faea93`** (`ovh-m6b-done`), in the scratch clone, with the
+main checkout's `node_modules` (APFS clones of the root, `packages/snaplot` and `site` ones):
+- `git rebase origin/overhaul` stops once, on `packages/snaplot/package.json`'s `scripts` block in
+  `eeb1a7c`. Resolved as Requests 6 says; the other 32 commits apply cleanly.
+- `npm run verify`: exit 0. Biome 320 files. The library: 55 files, 588 passed + 2 expected fail
+  (590). The bench tests pass; the site: 77 passed, 1 skipped.
+- `check:api`, `check:size` and `check:package` (with `check-consumers`): exit 0.
+- `check-visual-ledger`: OK, with "listed as 4597c43a12 before a rebase; run with --refresh"
+  (Requests 2).
+- `npm run test:visual -- --strict`: exact against the committed darwin baselines, 688 passed, 4
+  skipped (Vite 7.3.7); `check-visual-diffs --milestone M2`: OK.
+- `npm run test:visual -- --against HEAD`: captured 137 (each reproduced), 688 passed;
+  `check-visual-diffs`: OK, with the note that the merge base `8faea93` predates the fixture app.
+
+**Final state.** After the self-tests (the fixture edit reverted), and again after the
+broken-reference self-tests below:
+- a committed-baseline run (`npm run test:visual`): 688 passed, 4 skipped, exit 0;
+  `check-visual-diffs` OK with the not-the-merge-gate note;
+- a last `npm run test:visual -- --against HEAD` (from the cache): 688 passed, exit 0;
+  `check-visual-diffs` OK with 0 changed, 0 added, 0 removed, 0 broken and 0 unverified.
+
+The worktree is clean apart from this handoff before its commit. No server is left on ports 5333 or
+5334.
+
+**Metrics** (`node scripts/overhaul/metrics.mjs`, exit 0). Unchanged from M1, because M3a touches no
+library source:
+
+| Metric | Value |
+|---|---|
+| Code / physical lines | 15,381 / 20,236 |
+| Source files | 69 |
+| Largest file | `core/Chart.ts`, 4,525 lines |
+| Runtime exports `.` / `./core` / `react` / `solid` | 35 / 35 / 12 / 13 |
+| Option leaves / handle members | 169 / 24 |
+| Legend implementations | 4 |
+
+**Not applicable yet:**
+- `ledger`, `trace-check` and `test:browser` (M3b);
+- `bench:ab` (M4; M3a touches no `src/`);
+- `check:package`, `check:size` and `check:api`: they arrived on `overhaul` (M5) after this branch's
+  base, so they ran in the rebase simulation above (OK). M3a changes no library source, export or
+  type;
+- `build:site` (M6a): the rebase simulation's `npm run verify` ran the site's tests; M3a touches no
+  site path.
+
+**Broken-reference self-tests (review #1's blocking item), re-run at `6634839`** with a fresh cache
+(`$S/cache-broken`). Each reference is a commit object made with `git commit-tree` from `de0ac26`
+plus a 1–5 line change to the ref's `test/visual/app.ts` (Data notes). The head is the clean tip.
+The outcomes are the same as at `c1faeb0`: the head's reference copy holds only the usable shots,
+so a shot the reference did not produce is still "unverified".
+
+- **A, review #1's case: the reference's fixture app does not build.** Before review #1's fix this
+  gave "137 added … OK".
+
+  ```
+  $ npm run test:visual -- --against d56f222      # exit 1
+    137 failed
+    551 passed (31.3s)
+  visual: the reference d56f222 is incomplete (0 of 0 shots usable): this run cannot pass check-visual-diffs; run it again
+  $ node scripts/overhaul/check-visual-diffs.mjs --milestone M2 --no-copy      # exit 1
+    reference: INCOMPLETE (capture exit 1; 0 of 0 declared shots usable); comparison exact (threshold 0, maxDiffPixels 0)
+    137 shots: 0 changed, 0 added, 0 removed, 0 broken, 137 unverified; geometry: 555 checks, 0 failing
+  check-visual-diffs: FAIL: the reference d56f222 produced no shots (capture exit 1; 0 of 0 declared shots usable): nothing was compared
+  check-visual-diffs: FAIL: the reference capture did not complete (capture exit 1; 0 of 0 declared shots usable): 137 head shot(s) unverified. Run npm run test:visual -- --against d56f222 again, or pass --allow-partial to judge only the shots the reference produced
+  ```
+
+  - `--allow-partial` still fails on "nothing was compared" (exit 1).
+  - No `capture.json` was written, and the capture lock was released.
+- **B: one reference fixture throws** (`marks/basic-line`). This is the partial failure.
+
+  ```
+  $ npm run test:visual -- --against ce497d7      # exit 1
+  visual: comparing exact (threshold 0, maxDiffPixels 0)
+    2 failed
+    686 passed (17.9s)
+  visual: the reference ce497d7 is incomplete (135 of 137 shots usable): this run cannot pass check-visual-diffs; run it again
+  $ node scripts/overhaul/check-visual-diffs.mjs --milestone M2 --no-copy      # exit 1
+    137 shots: 0 changed, 0 added, 0 removed, 0 broken, 2 unverified; geometry: 555 checks, 0 failing
+  check-visual-diffs: FAIL: the reference capture did not complete (capture exit 1; 135 of 137 declared shots usable): 2 head shot(s) unverified. …
+  ```
+
+  - `--milestone M10` gives the same FAIL (exit 1).
+  - `--milestone M2 --allow-partial` gives OK (exit 0), judging only the 135 shots the reference
+    produced. The copy held 135 images.
+  - No `capture.json` was written.
+- **C3 and C4** (a reference shot that does not reproduce) were not re-run. The second-render code
+  did not change in reviews #2 and #3; `85e4a57`'s runs (in `98dbec4`'s handoff) gave FAIL with
+  exit 1 for both, and the scenario test "does not trust a reference shot that did not reproduce
+  itself" locks the check's side.
+
+A last `npm run test:visual -- --against HEAD` after these (from `$S/cache-final`): 688 passed,
+exit 0; `check-visual-diffs`: OK.
+
+### Earlier self-tests (not re-run in this attempt)
+
+These exercised the comparison settings and the pre-M3a refusal, which review #3 did not change.
+Their logs are in the review #2 attempt's scratch directory (`…/scratchpad/m3a-r2`, called `$S`
+inside these blocks).
 
 **Default changes (review #2's cases 2 and 3).** These ran in a scratch clone of `eb8f8a1`
 (`$S/clone`, with APFS-cloned `node_modules` and `SNAPLOT_BENCH_LOCK` pointing at the main checkout's
@@ -572,88 +870,7 @@ check-visual-diffs: FAIL: M2 must not change any fixture (zero-change rule): axe
 
 Before the fix, review #2 measured 0 and 1 changed shots, with check-visual-diffs OK.
 
-**Broken-reference self-tests (review #1's blocking item), re-run at this tip.** Each reference is a
-commit object made with `git commit-tree` from `de0ac26` plus a 1–5 line change to the ref's
-`test/visual/app.ts` (Data notes). The head is the clean tip.
-
-- **A, the reviewer's case: the reference's fixture app does not build.** Before review #1's fix this
-  gave "137 added … OK".
-
-  ```
-  $ npm run test:visual -- --against d56f222      # exit 1
-  [WebServer] ✗ Build failed in 25ms
-  visual: WARNING: the reference is incomplete: capture exit 1; 0 of 0 declared shots usable. See $S/cache-brokenA/d56f2228…/out/capture-report.json. check-visual-diffs fails on this run; re-run it.
-  visual: comparing exact (threshold 0, maxDiffPixels 0)
-    137 failed
-  visual: the reference d56f222 is incomplete (0 of 0 shots usable): this run cannot pass check-visual-diffs; run it again
-  $ node scripts/overhaul/check-visual-diffs.mjs --milestone M2 --no-copy      # exit 1
-    reference: INCOMPLETE (capture exit 1; 0 of 0 declared shots usable); comparison exact (threshold 0, maxDiffPixels 0)
-    milestone M2, zero-change rule
-    137 shots: 0 changed, 0 added, 0 removed, 0 broken, 137 unverified; geometry: 555 checks, 0 failing
-  check-visual-diffs: FAIL: the reference d56f222 produced no shots (capture exit 1; 0 of 0 declared shots usable): nothing was compared
-  check-visual-diffs: FAIL: the reference capture did not complete (capture exit 1; 0 of 0 declared shots usable): 137 head shot(s) unverified. Run npm run test:visual -- --against d56f222 again, or pass --allow-partial to judge only the shots the reference produced
-  ```
-
-  - `--allow-partial` still fails on "nothing was compared" (exit 1).
-  - No `capture.json` was written, and the capture lock was released.
-- **B: one reference fixture throws** (`marks/basic-line`). This is the partial failure.
-
-  ```
-  $ npm run test:visual -- --against ce497d7      # exit 1
-    2 failed
-    135 passed (12.7s)
-  visual: WARNING: the reference is incomplete: capture exit 1; 135 of 137 declared shots usable. …
-  visual: comparing exact (threshold 0, maxDiffPixels 0)
-  visual: the reference ce497d7 is incomplete (135 of 137 shots usable): this run cannot pass check-visual-diffs; run it again
-  $ node scripts/overhaul/check-visual-diffs.mjs --milestone M2 --no-copy      # exit 1
-    reference: INCOMPLETE (capture exit 1; 135 of 137 declared shots usable); comparison exact (threshold 0, maxDiffPixels 0)
-    137 shots: 0 changed, 0 added, 0 removed, 0 broken, 2 unverified; geometry: 555 checks, 0 failing
-    unverified marks/basic-line: no usable reference image
-    unverified marks/basic-line@2x: no usable reference image
-  check-visual-diffs: FAIL: the reference capture did not complete (capture exit 1; 135 of 137 declared shots usable): 2 head shot(s) unverified. …
-  ```
-
-  - `--milestone M10` gives the same FAIL (exit 1).
-  - `--milestone M2 --allow-partial` gives OK (exit 0), judging only the 135 shots the reference
-    produced.
-  - No `capture.json` was written.
-- **C3 and C4** (a reference shot that does not reproduce) were not re-run. The second-render code
-  did not change in review #2; `85e4a57`'s runs (in `98dbec4`'s handoff) gave FAIL with exit 1 for
-  both, and the scenario test "does not trust a reference shot that did not reproduce itself" locks
-  the check's side.
-
-**Synthetic scenarios.** `check-visual-diffs.test.ts` (26 tests, inside `npm test`) covers:
-- the reference: a complete reference that matches; a change under the zero-change rule; an added
-  shot; 0 reference shots, with and without `--allow-partial`; an incomplete reference, then with
-  `--allow-partial`; a non-reproduced shot; a `meta.json` without the outcome; a head shot that threw
-  (broken);
-- committed baselines: a match, an added shot, and no baselines at all;
-- the comparison (review #2): a tolerant `--against` run under both rules; a `meta.json` without the
-  comparison; a tolerant and an exact committed-baseline run under the zero-change rule; the
-  not-the-merge-gate note;
-- a stale report (review #2): an edit to the render inputs after the run; a `meta.json` without the
-  inputs; edits outside the inputs; `--any-head`;
-- visual-ledger rows: a missing row, a good row, an edit to `V0.md`, and another milestone's row.
-
-18 of the tests carry `[repo-10]`, 17 in this file and 1 in `record.test.ts`.
-
-**`check-visual-ledger`** at the tip (exit 0):
-
-```
-  baseline  4597c43a12 test(visual): initial darwin baselines (137 screenshots, V0)
-check-visual-ledger: 52 commits in overhaul-baseline..HEAD, 1 with visual changes, 1 listed baseline commit(s)
-check-visual-ledger: OK
-```
-
-The first implementation ran its self-tests in a scratch clone, and review #1 re-ran them; both found
-they behave as described:
-- a screenshot without a row fails;
-- a `visual:` paragraph without a row fails;
-- a malformed row fails;
-- a good row passes;
-- after a rebase, a commit matches by patch-id, and `--refresh` works.
-
-**A pre-M3a ref is refused**, before anything is extracted. Run in the plain clone without
+**A pre-M3a ref is refused**, before anything is extracted (run at `eb8f8a1`, unchanged since). Run in the plain clone without
 `SNAPLOT_BENCH_LOCK`, this also shows the new warning, which now names the clone's own `.claude`:
 
 ```
@@ -663,31 +880,6 @@ visual: 16547da (16547da580) has no visual fixture app: refs older than the M3a 
 ```
 
 Before `eb8f8a1`, the same run named `$S/.claude`, two levels above the clone (review #2 note 4).
-
-**Final state.** After the self-tests, a last committed-baseline run gave 688 passed and 4 skipped
-(exit 0), and `check-visual-diffs` gave OK with 0 changed, 0 added, 0 removed, 0 broken and
-0 unverified. The worktree is clean apart from this handoff before its commit. No server is left on
-ports 5333 or 5334.
-
-**Metrics** (`node scripts/overhaul/metrics.mjs`, exit 0). Unchanged from M1, because M3a touches no
-library source:
-
-| Metric | Value |
-|---|---|
-| Code / physical lines | 15,381 / 20,236 |
-| Source files | 69 |
-| Largest file | `core/Chart.ts`, 4,525 lines |
-| Runtime exports `.` / `./core` / `react` / `solid` | 35 / 35 / 12 / 13 |
-| Option leaves / handle members | 169 / 24 |
-| Legend implementations | 4 |
-
-**Not applicable yet:**
-- `ledger`, `trace-check` and `test:browser` (M3b);
-- `bench:ab` (M4; M3a touches no `src/`);
-- `check:package`, `check:size` and `check:api`: M5 merged them after this branch's base. The
-  integrator runs them after the rebase. Review #2's rebase simulation found them OK (Requests 6). M3a
-  changes no library source, export or type;
-- `build:site` (M6a).
 
 ## Visual-ledger rows
 
@@ -700,8 +892,8 @@ library source:
 ## Requests for integrator
 
 1. **A regression on `overhaul` from M1: plugins installed at creation are not painted at mount.** This
-   covers the built-in reference lines and regions and user `plugins` with draw hooks. Reviews #1 and
-   #2 confirmed it.
+   covers the built-in reference lines and regions and user `plugins` with draw hooks. Reviews #1,
+   #2 and #3 confirmed it, and M3b found it independently (`[gap-annotations-extensibility-06:mount]`).
    - **Symptom.** `createChart(el, { …, referenceLines, referenceRegions })` paints the chart once
      (`debug(chart).renderCount` = `{ grid: 1, data: 1, overlay: 1 }`). The annotations appear only
      after the next unrelated render (a hover, an update or a real resize).
@@ -720,15 +912,25 @@ library source:
      `setLines`/`setRegions` after `use()`. Lock it with a test that a chart created with a
      `referenceLines` entry has data-layer ink on that line after the first frame (fakes plus
      `debug()`).
-   - **Visual row.** The fix changes `axes/annotations-390` and `axes/annotations-390@2x`, so it needs
-     a visual-ledger row. That is V17–V29 if M7 or M8 lands it; otherwise allocate one from V90+.
-   - **If the fix lands on `overhaul` before M3a merges,** regenerate those two baselines after
-     rebasing this branch:
+   - **Not inside M2 (review #3 note 2).** M2 is a zero-change milestone, and the fix changes
+     `axes/annotations-390` and `axes/annotations-390@2x`, so M2's `check-visual-diffs` would FAIL.
+     Land it as its own integrator step after M3a merges, as state/runs.md plans:
+     - one commit with the fix, its test, a `visual: V90` paragraph and a new
+       `docs/decisions/visual-ledger/V90.md` (V90+ is the integrator's range; every P13 field, since
+       `check-visual-ledger` now requires them all);
+     - the gate: `npm run test:visual -- --against <overhaul before the fix>`, then
+       `node scripts/overhaul/check-visual-diffs.mjs --milestone <the row's Milestone>` (for example
+       `M1`). Expect exactly those two shots changed, covered by the row.
+     - The two committed baselines then show the old rendering until M14's approved set. If you
+       refresh them in the same commit instead (`npm run test:visual -- --update`, then check that
+       only those two files changed), the row covers the screenshots for `check-visual-ledger`.
+   - **If the fix lands on `overhaul` before M3a merges** (not the planned order), regenerate those
+     two baselines after rebasing this branch:
      - run `npm run test:visual -- --update`, then check that only those two files changed;
      - commit them separately (for example `test(visual): refresh the annotation baselines after the
        mount fix`);
      - list that commit in `baseline-commits.txt`, since it is part of M3a's initial set.
-2. **After rebasing this branch onto the newer `overhaul`** (merge order M5 → M3a), the SHA in
+2. **After rebasing this branch onto the newer `overhaul`**, the SHA in
    `docs/decisions/visual-ledger/baseline-commits.txt` goes stale.
    - `check-visual-ledger` still passes, matching by patch-id with a warning.
    - Run `node scripts/overhaul/check-visual-ledger.mjs --refresh` and commit the one-line change
@@ -737,9 +939,11 @@ library source:
    - Each owning milestone edits its own `packages/snaplot/test/visual/expected/m<N>.ts` (M7, M10, M11,
      M12a; M12b adds `m12b.ts`), the same way as its `fixtures/<area>.ts`.
    - Flipping a geometry finding means changing `fails(` to `fixed(` on its line.
-   - The shared harness stays with M3a, then the integrator: `checks.ts`, `probe.ts`, the specs,
-     `run.mjs`, `record.mjs` (with `record.d.mts` and `record.test.ts`), `expected/index.ts`,
-     `diff-scenario.mjs` and `check-visual-diffs.test.ts`.
+   - The shared harness stays with M3a, then the integrator: `checks.ts`, `probe.ts`, `paint.ts`, the
+     specs, `run.mjs`, `run-args.mjs`, `record.mjs` (each with its `.d.mts` and `.test.ts`),
+     `expected/index.ts`, `diff-scenario.mjs`, `ledger-scenario.mjs`, `check-visual-diffs.test.ts`
+     and `check-visual-ledger.test.ts`.
+   - A fixture owner may set `blankData` or `blankGrid` in its own `fixtures/<area>.ts`.
    - **One exception, for M8.** M8 removes `getLayout`, `getAxis` and `setHighlight` and renames
      `theme.backgroundColor` (§4.4). In the same commit, it updates these call sites:
      - `probe.ts`: `getLayout()` → the plugin `plot` rect or a debug field; `getAxis()` →
@@ -757,7 +961,8 @@ library source:
    - Playwright reports them as `test.fail` with `[<id>]` in the title, so the "executed markers equal
      ledger length" exit holds once they are counted.
    - `trace-check` can read the titles from `packages/snaplot/test-results/visual/report.json`.
-   - The 18 `[repo-10]` tests (17 in `check-visual-diffs.test.ts`, 1 in `record.test.ts`) are normal
+   - The 31 `[repo-10]` tests (27 in `check-visual-diffs.test.ts`, 2 in
+     `check-visual-ledger.test.ts`, 1 in `record.test.ts`, 1 in `run-args.test.ts`) are normal
      passing vitest tests. repo-10 is closed by M3a.
    - `test:browser` goes into the same `packages/snaplot/playwright.config.ts`, which M3a owns:
      - add a `browser` project with `testMatch: 'browser/**/*.spec.ts'`;
@@ -785,19 +990,23 @@ library source:
      it fails with "no committed linux baselines … nothing was compared". That is deliberate
      (review #1).
 6. **`packages/snaplot/package.json`** gains one line (`"test:visual": "node test/visual/run.mjs"`).
-   Review #2 simulated the rebase onto `overhaul` (`504d934`) in a scratch clone:
-   - The only conflict is the `scripts` block of `packages/snaplot/package.json`.
-   - **Resolution:** keep M5's block as it is. M5 dropped `test:consumers`, so do not bring it back.
-     Add `"test:visual": "node test/visual/run.mjs"`.
-   - With overhaul's `node_modules`, the reviewer then found:
-     - `npm run verify` exits 0 (Biome 199 files; 51 test files, 545 passed + 2 expected fail = 547);
-     - `check:api` and `check:size` are OK;
+   This attempt simulated the rebase onto `overhaul` at `8faea93` (`ovh-m6b-done`) in a scratch clone
+   (Gates, "Rebase simulation"):
+   - The only conflict is the `scripts` block of `packages/snaplot/package.json`, in `eeb1a7c`. The
+     other 32 commits apply cleanly.
+   - **Resolution:** keep `overhaul`'s block as it is. M5 dropped `test:consumers`, so do not bring
+     it back. Add `"test:visual": "node test/visual/run.mjs"` after `test:conformance`.
+   - Then run `npm ci`: M5, M4 and M6a changed `package-lock.json` (and M6a added the `site`
+     workspace).
+   - Expect, as the simulation found with the main checkout's `node_modules`:
+     - `npm run verify` exits 0: Biome 320 files; the library 590 tests (588 passed + 2 expected
+       fail); the bench and site tests pass;
+     - `check:api`, `check:size` and `check:package` are OK;
      - `check-visual-ledger` is OK with the patch-id warning, so make the `--refresh` commit
-       (Requests 2).
-   - This attempt adds 14 tests and no `package.json` change, so expect 561 tests (559 passed and
-     2 expected failures).
-   - The root `test:visual` delegation from M0 already exists. M5 changed `package-lock.json`, so run
-     `npm ci` after the rebase.
+       (Requests 2);
+     - `npm run test:visual -- --strict` and `-- --against HEAD`: 688 passed; `check-visual-diffs`
+       OK, with a note that the merge base predates the fixture app.
+   - The root `test:visual` delegation from M0 already exists.
 7. **Merge-time gate for later milestones** (every milestone, M2/M9a/M9b included):
    1. `npm run test:visual -- --against <merge-base>`. It compares exactly by default, so no
       `--strict` is needed;
@@ -811,8 +1020,14 @@ library source:
      - geometry failures;
      - any reference that is incomplete or empty;
      - a run against a ref that was not exact;
+     - a reference image that changed after its capture (review #3);
+     - on a milestone branch, a reference other than the branch's merge base with `overhaul`
+       (review #3): after the milestone's commits, `--against HEAD` compares the change with
+       itself. Pass `--base <ref>` only to judge another reference deliberately;
      - a stale report: an edit under `packages/snaplot` or to the root package files after step 1.
        Re-run step 1.
+   - The runner refuses `-u`, `--update-snapshots`, `--update-source-method`, `--ignore-snapshots`
+     and `--config` (exit 2). A reference is never updated; it is captured from its ref.
    - Because the comparison is exact, a library-wide default change shows every shot it touches. A
      row may name them with `<area>/*` patterns (e.g. `marks/*`), but must name them all.
    - A FAIL saying the reference "did not complete" means: re-run step 1 (a failed reference is
@@ -826,6 +1041,9 @@ library source:
    `maxDiffPixelRatio: 0.002`. At 0.002, Playwright's default 0.2 per-pixel threshold hid a theme-wide
    grid colour change (0 of 137 shots changed). Committed baselines keep 0.002 with `threshold: 0`
    (M3a review #2)." For plan §11.3 G10's settings line, record it the same way.
+9. **M10 (review #3 note 3).** When plan §5.1's empty state (no ticks, no grid; visuals-23) lands,
+   add `blankGrid: '<reason>'` next to `blankData` on `axes/empty` in `fixtures/axes.ts`, in the same
+   commit. Without it, the fixture times out as "did not paint" if both canvases stay blank.
 
 ## Known gaps
 
@@ -857,6 +1075,11 @@ library source:
   - M14 could make it exact for the `-linux` set, which renders in one pinned image.
 - **Exact still keeps pixelmatch's anti-alias detection**, which Playwright does not expose. A change
   made only of pixels it classifies as anti-aliasing would pass. None of the measured cases did.
+  - It also absorbs real render noise. In this attempt, two separate captures of the same ref
+    differed in 3 pixels of `overlay/hover-scatter-3` (the left edge of the tooltip's swatch dots,
+    at most 4 levels in one channel). Each capture reproduced itself, and the exact comparison
+    classed the 3 pixels as anti-aliasing, so the head matched both. This is why the reference
+    hashes are compared only with the capture they came from, never across renders.
 - **The reference's second render is exact.** A reference fails to complete when any shot does not
   reproduce exactly, apart from pixels that pixelmatch classifies as anti-aliasing.
   - Locally, every run reproduced all 137 shots exactly.
@@ -868,12 +1091,28 @@ library source:
 - **The capture lock is best effort.** If two runs judge the same dead lock stale at the same moment,
   both may capture. That fails safe, as before review #2: an incomplete reference gives FAIL, then
   re-run.
+- **The reference hashes guard what the head compares against, not the head itself** (review #3).
+  - Anything that writes into the head's reference copy, or into the cache, is caught: the runner
+    refuses the Playwright flags that would do it, recaptures a damaged cache, and
+    `check-visual-diffs` fails a changed copy.
+  - A process that rewrites both an image and `meta.json`'s hash list would not be caught. Nothing
+    in the harness does that; it would take a deliberate edit.
+  - The flag refusal reads Playwright's command line the way its parser does, with a fixed list of
+    options that take a value. A Playwright release that adds a new snapshot-writing flag needs a line
+    in `run-args.mjs`; the hashes catch its effect meanwhile.
+  - The cache entries written before review #3 (format 3, no hashes) are captured again on first
+    use.
+- **`--allow-partial` accepts a narrowed run** (`--grep`, extra Playwright arguments, one project) and
+  judges only what ran. It never overrides an empty reference, a changed reference image, a
+  non-exact run against a ref, or the merge-base rule. Use it only for a deliberate partial look,
+  never for a merge.
 - **The paint check is weaker for bars and histograms.** It probes at half height across the slot,
   so a grouped bar can be satisfied by its neighbour. Density series are not probed, and both density
   fixtures skip the check.
 - **Paint readiness is by ink, not content.** The app waits until the data layer has any ink. It
   does not check that every series painted. That is the geometry paint check's job, which runs on
-  the head only.
+  the head only. A `blankGrid` fixture waits only for both layers to render, so the screenshot alone
+  shows whether it painted what it should.
 - **Tooltip-text specs** (G10 mentions them with geometry) belong to M3b (`m10-tooltip-format.spec.ts`,
   `m12a-tooltip-rows.spec.ts`). The overlay fixtures capture tooltips only as pixels.
 - **The geometry thresholds are the plan's, with a 0.5 px slack:**
@@ -895,18 +1134,21 @@ library source:
     earlier SHA of commit 4);
   - entries from the review #1 fix attempts: `90ffd44…`, `c5a7cab…` and `de0ac26…`.
 
-  Entries in an older `capture.json` format are captured again on use, never trusted. This attempt
-  wrote nothing there.
-- **This attempt's runs** used scratch caches and logs in
-  `/private/tmp/claude-501/-Users-liam-Projects-snaplot/76647906-acb8-4a29-8fd6-6a20ecda8e45/scratchpad/m3a-r2/`:
-  - `cache-final` (exit 1);
-  - `cache-exit1` (exit 4, at `eb8f8a1`);
-  - `cache-clone` (the default-change cases);
-  - `cache-conc` (the concurrent capture);
-  - `cache-stale` (the dead-owner lock);
-  - `cache-dev*` (development runs);
-  - `clone/`, a scratch clone of the branch with APFS-cloned `node_modules`. It also holds the
-    per-commit proof's log (`rebase-x.log`).
+  All of them are in `capture.json` format 3 or older (no hashes), so they are captured again on use,
+  never trusted. Neither the review #2 nor the review #3 attempt wrote there.
+- **This attempt's runs** (review #3) used scratch caches and logs in
+  `/private/tmp/claude-501/-Users-liam-Projects-snaplot/76647906-acb8-4a29-8fd6-6a20ecda8e45/scratchpad/m3a-r3/`:
+  - `cache-final`: exit 1, the review #3 self-tests and the merge-base self-test. It holds
+    `shots-….damaged-1792754984986`, the directory poisoned on purpose and moved aside by the runner;
+  - `cache-broken`: the broken-reference self-tests (no `capture.json`, by design);
+  - `cache-rebased`: the rebase simulation;
+  - `cache-dev`: a development run;
+  - `poison-out`: the output of the direct Playwright run that poisoned the cache;
+  - `hover/`: the two `overlay/hover-scatter-3` captures compared in Known gaps;
+  - `clone/`, a scratch clone with APFS-cloned `node_modules`: the per-commit proof (`rebase-x.log`),
+    the `ovh/m10-sim` merge-base self-test, and the rebase simulation (branch `rebase-sim`, with the
+    main checkout's `node_modules`; the branch's own are in `nm-m3a/`);
+  - the review #2 attempt's logs and caches stay in `…/scratchpad/m3a-r2/`.
 - **The broken-reference self-tests** use commit objects made with `git commit-tree` from `de0ac26`
   during review #1. No ref points at them, and they are pruned with the repository's normal gc:
   - `d56f222` (A): the app does not build;
