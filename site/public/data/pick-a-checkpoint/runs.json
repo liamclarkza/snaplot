@@ -1,0 +1,29 @@
+{
+  "model": "MLP 64-32-10, ReLU, softmax; inputs scaled to [0, 1]",
+  "optimiser": "mini-batch SGD, batch 4, no momentum",
+  "epochs": 60,
+  "stepsPerEpoch": 956,
+  "logEvery": 20,
+  "seed": 482,
+  "trainRows": 3823,
+  "valRows": 1797,
+  "input": "UCI optdigits.tra / optdigits.tes",
+  "runs": [
+    {
+      "id": "A",
+      "name": "baseline",
+      "lr": 0.05,
+      "schedule": "constant",
+      "l2": 0,
+      "labelSmoothing": 0
+    },
+    {
+      "id": "B",
+      "name": "regularised",
+      "lr": 0.1,
+      "schedule": "cosine",
+      "l2": 0.0001,
+      "labelSmoothing": 0.1
+    }
+  ]
+}

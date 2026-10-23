@@ -1,0 +1,35 @@
+{
+  "household": "DE_KN_residential4",
+  "columns": [
+    "DE_KN_residential4_pv",
+    "DE_KN_residential4_grid_import",
+    "DE_KN_residential4_grid_export"
+  ],
+  "year": 2017,
+  "timeZone": "Europe/Berlin",
+  "hours": 8760,
+  "measuredHours": 8704,
+  "interpolatedHours": 56,
+  "gapHours": 0,
+  "meter": {
+    "pv": { "first": 12230.121, "last": 23940.155 },
+    "grid_import": { "first": 5073.57, "last": 9469.928 },
+    "grid_export": { "first": 9447.889, "last": 18811.297 }
+  },
+  "totals": { "pv": 11710.034, "import": 4396.358, "export": 9363.408 },
+  "model": {
+    "capacityKWh": 5,
+    "powerKW": 2.5,
+    "roundTrip": 0.9,
+    "importEurPerKWh": 0.3,
+    "feedInEurPerKWh": 0.08,
+    "installedEurPerKWh": 700
+  },
+  "answer": {
+    "dischargedKWh": 1346.9555,
+    "chargedKWh": 1496.617222,
+    "savingsEur": 284.36,
+    "installedEur": 3500,
+    "paybackYears": 12.31
+  }
+}

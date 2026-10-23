@@ -1,0 +1,45 @@
+{
+  "file": "recording.mp3",
+  "kind": "recording",
+  "identifier": "12-02-21_Space-to-Ground-Comm_PDAM-prep-conversation",
+  "title": "12-02-21_Space-to-Ground-Comm_PDAM-prep-conversation",
+  "sampleRate": 44100,
+  "channels": 2,
+  "samples": 4538034,
+  "durationSeconds": 102.903,
+  "sha256": "acbea8c6fb59100dd965f34c3f136a5bf61cdb632976fbadce2bf22fb8595c41",
+  "rule": {
+    "clipDbfs": -0.1,
+    "minClipSamples": 3,
+    "silenceDbfs": -50,
+    "silenceWindowMs": 50,
+    "minSilenceMs": 2000
+  },
+  "reference": {
+    "clippedRuns": 12,
+    "longestRun": { "start": 1546672, "samples": 4, "ms": 0.1 },
+    "silences": 5,
+    "peak": 1,
+    "runs": [
+      [921372, 3],
+      [1389367, 3],
+      [1516671, 3],
+      [1546672, 4],
+      [1546682, 3],
+      [1671997, 3],
+      [1819914, 3],
+      [1819920, 3],
+      [2144188, 4],
+      [2144194, 3],
+      [2144198, 4],
+      [3524634, 3]
+    ],
+    "silenceSpans": [
+      [114660, 445410],
+      [2337300, 130095],
+      [2789325, 132300],
+      [3896235, 92610],
+      [4068225, 469809]
+    ]
+  }
+}
