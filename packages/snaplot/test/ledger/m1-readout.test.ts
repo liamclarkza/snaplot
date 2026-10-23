@@ -46,7 +46,7 @@ function readout(chart: ChartHandle<Row>, t: number, y: number) {
 }
 
 describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
-  it.fails('[visuals-01] 0.4567 at an integer step reads 0.46', () => {
+  it('[visuals-01] 0.4567 at an integer step reads 0.46', () => {
     const chart = lineChart([0, 0.4567, 6, 0.0004567, 3]);
     expectIntegerStep(chart);
     const { tokens, snapshot } = readout(chart, 1, 0.4567);
@@ -54,7 +54,7 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
     expect(tokens).toContain('0.46');
   });
 
-  it.fails('[visuals-01] 0.0004567 at an integer step reads 0.00046', () => {
+  it('[visuals-01] 0.0004567 at an integer step reads 0.00046', () => {
     const chart = lineChart([0, 0.4567, 6, 0.0004567, 3]);
     expectIntegerStep(chart);
     const { tokens, snapshot } = readout(chart, 3, 0.0004567);
@@ -62,7 +62,7 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
     expect(tokens).toContain('0.00046');
   });
 
-  it.fails('[visuals-01] 39.27 at an integer step reads 39.27', () => {
+  it('[visuals-01] 39.27 at an integer step reads 39.27', () => {
     const chart = lineChart([0, 39.27, 100, 50]);
     expectIntegerStep(chart);
     const { tokens, snapshot } = readout(chart, 1, 39.27);
@@ -70,7 +70,7 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
     expect(tokens).toContain('39.27');
   });
 
-  it.fails('[visuals-01] 1138371 at an integer step reads 1,138,371', () => {
+  it('[visuals-01] 1138371 at an integer step reads 1,138,371', () => {
     // Ticks step by 200,000 here (labels may later use compact notation, so
     // the integer-step precondition is not re-checked through them).
     const chart = lineChart([0, 1138371, 1200000, 400000]);
@@ -79,7 +79,7 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
     expect(tokens).toContain('1,138,371');
   });
 
-  it.fails('[dxtrial-02] cursor snapshot keeps value precision', () => {
+  it('[dxtrial-02] cursor snapshot keeps value precision', () => {
     // Grouped bars (the dxtrial EMEA/APAC task) on an integer-step axis.
     type Bar = { q: string; emea: number; apac: number };
     const bars = fakes.mount<Bar>({

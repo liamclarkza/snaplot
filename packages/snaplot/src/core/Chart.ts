@@ -50,6 +50,7 @@ import {
   TOUCH_INTERACTION_POINTS_PER_PIXEL,
 } from '../constants';
 
+import { formatValue, scaleStepDecimals } from '../engine/format';
 import { deepMerge } from '../config/merge';
 import { DEFAULT_CONFIG } from '../config/defaults';
 import { applyThemeToElement, resolveTheme } from '../config/theme';
@@ -417,6 +418,15 @@ export class ChartCore implements ChartInstance {
   private debugCounters = { ingestCount: 0, materializeCount: 0 };
   private lastDataPass: DataPassSeries[] = [];
   private lastAxisLabels: AxesRenderResult['labels'] | null = null;
+
+  // Readout precision per axis (plan P9), recomputed when the domain or the
+  // tick settings change; read on the cursor hot path.
+  private readoutSteps = new Map<
+    string,
+    { scale: Scale; min: number; max: number; ticks?: number[]; count?: number; decimals: number }
+  >();
+  private readonly readoutY = (value: number, seriesIndex: number): string =>
+    this.formatReadout(this.config.series[seriesIndex]?.yAxisKey ?? 'y', value);
 
   /**
    * Per-axis "reset-zoom" extent, the scale's min/max after the last
@@ -3713,7 +3723,7 @@ export class ChartCore implements ChartInstance {
           const fallback = series.stroke ?? palette[si % palette.length];
           return this.scatterResolvers(si, series, fallback).logicalResolver;
         },
-        this.tooltipFormatters(),
+        { ...this.tooltipFormatters(), readout: this.readoutY },
         (si) => this.storeForSeries(si),
       );
     }
@@ -3773,7 +3783,9 @@ export class ChartCore implements ChartInstance {
         y: count,
         color,
         formattedX: this.formatHistogramBinRange(binMin, binMax, si),
-        formattedY: fmt?.y ? fmt.y(count, si) : this.formatAxisValue(series.yAxisKey ?? 'y', count),
+        formattedY: fmt?.y
+          ? fmt.y(count, si)
+          : this.formatAxisReadout(series.yAxisKey ?? 'y', count),
       });
     }
 
@@ -3815,7 +3827,6 @@ export class ChartCore implements ChartInstance {
       if (!Number.isFinite(yVal)) continue;
 
       const color = series.stroke ?? palette[si % palette.length];
-      const yScale = this.scales.get(series.yAxisKey ?? 'y');
       const fmt = this.tooltipFormatters();
 
       points.push({
@@ -3826,11 +3837,7 @@ export class ChartCore implements ChartInstance {
         y: yVal,
         color,
         formattedX: fmt?.x ? fmt.x(xVal) : this.formatAxisValue(series.xAxisKey ?? 'x', xVal),
-        formattedY: fmt?.y
-          ? fmt.y(yVal, si)
-          : yScale
-            ? yScale.tickFormat(yVal)
-            : String(Math.round(yVal)),
+        formattedY: fmt?.y ? fmt.y(yVal, si) : this.formatReadout(series.yAxisKey ?? 'y', yVal),
       });
     }
 
@@ -3911,9 +3918,7 @@ export class ChartCore implements ChartInstance {
       const value = this.store.yAt(colIdx - 1, idx);
       const yScale = this.scales.get(s.yAxisKey ?? 'y');
       const formattedValue = Number.isFinite(value)
-        ? yScale
-          ? yScale.tickFormat(value)
-          : String(value)
+        ? this.formatReadout(s.yAxisKey ?? 'y', value)
         : '';
       const color = s.stroke ?? palette[si % palette.length];
 
@@ -4018,7 +4023,7 @@ export class ChartCore implements ChartInstance {
       const value = store.valueAt(column, dataIndex);
       const yScale = this.scales.get(series.yAxisKey ?? 'y');
       const formattedValue = Number.isFinite(value)
-        ? this.formatAxisValue(series.yAxisKey ?? 'y', value)
+        ? this.formatAxisReadout(series.yAxisKey ?? 'y', value)
         : '';
       const point =
         target.points[count] ??
@@ -4402,6 +4407,43 @@ export class ChartCore implements ChartInstance {
       min: store.xAt(dataIndex),
       max: store.xAt(dataIndex + 1),
     };
+  }
+
+  /**
+   * A value readout on `axisKey` at value precision (plan P9): never the tick
+   * formatter, whose precision is the tick step's. Internal; also used by the
+   * public controller.
+   */
+  formatReadout(axisKey: string, value: number): string {
+    const scale = this.scales.get(axisKey);
+    if (!scale) return formatValue(value);
+    const axis = this.config.axes?.[axisKey];
+    let step = this.readoutSteps.get(axisKey);
+    if (
+      !step ||
+      step.scale !== scale ||
+      step.min !== scale.min ||
+      step.max !== scale.max ||
+      step.ticks !== axis?.ticks ||
+      step.count !== axis?.tickCount
+    ) {
+      step = {
+        scale,
+        min: scale.min,
+        max: scale.max,
+        ticks: axis?.ticks,
+        count: axis?.tickCount,
+        decimals: scaleStepDecimals(scale, axis?.ticks, axis?.tickCount),
+      };
+      this.readoutSteps.set(axisKey, step);
+    }
+    return formatValue(value, { stepDecimals: step.decimals });
+  }
+
+  /** A readout where the axis's own format already applied (histogram counts, multi-source rows). */
+  private formatAxisReadout(axisKey: string, value: number): string {
+    const axisFormat = this.config.axes?.[axisKey]?.tickFormat;
+    return axisFormat ? axisFormat(value) : this.formatReadout(axisKey, value);
   }
 
   private formatAxisValue(axisKey: string, value: number): string {

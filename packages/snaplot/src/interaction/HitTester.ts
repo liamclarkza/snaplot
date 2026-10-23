@@ -1,6 +1,7 @@
 import type { Scale, SeriesConfig, TooltipPoint } from '../types';
 import type { DataStore } from '../data/DataStore';
 import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
+import { formatValue, scaleStepDecimals } from '../engine/format';
 import {
   createScatterStyleResolver,
   type ScatterStyleResolver,
@@ -31,6 +32,23 @@ export type PointerKind = 'mouse' | 'touch' | 'pen';
 export interface TooltipFormatters {
   x?: (x: number) => string;
   y?: (y: number, seriesIndex: number) => string;
+  /**
+   * The chart's value readout (plan P9), used for formattedY when `y` is
+   * not set. Without it, the readout derives its precision from the Y scale.
+   */
+  readout?: (y: number, seriesIndex: number) => string;
+}
+
+/** formattedY: tooltip.yFormat, else a value readout, never the tick format. */
+function formatY(
+  formatters: TooltipFormatters | undefined,
+  yScale: Scale | undefined,
+  value: number,
+  seriesIndex: number,
+): string {
+  if (formatters?.y) return formatters.y(value, seriesIndex);
+  if (formatters?.readout) return formatters.readout(value, seriesIndex);
+  return formatValue(value, yScale ? { stepDecimals: scaleStepDecimals(yScale) } : {});
 }
 
 export class HitTester {
@@ -181,11 +199,7 @@ export class HitTester {
         y: yVal,
         color: sc.stroke ?? palette[si % palette.length],
         formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
-        formattedY: formatters?.y
-          ? formatters.y(yVal, si)
-          : yScale
-            ? yScale.tickFormat(yVal)
-            : String(yVal),
+        formattedY: formatY(formatters, yScale, yVal, si),
       });
     }
 
@@ -280,7 +294,7 @@ export class HitTester {
             y: yVal,
             color: sc.stroke ?? palette[si % palette.length],
             formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
-            formattedY: formatters?.y ? formatters.y(yVal, si) : yScale.tickFormat(yVal),
+            formattedY: formatY(formatters, yScale, yVal, si),
           };
         }
       }
@@ -373,7 +387,7 @@ export class HitTester {
         color: style.colorAt(bestIdx),
         radius: style.radiusAt(bestIdx),
         formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
-        formattedY: formatters?.y ? formatters.y(yVal, seriesIndex) : yScale.tickFormat(yVal),
+        formattedY: formatY(formatters, yScale, yVal, seriesIndex),
         fields: scatterTooltipFields(sc, bestIdx, store.seriesCount + 1, (columnIdx, index) =>
           store.valueAt(columnIdx, index),
         ),

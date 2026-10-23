@@ -775,7 +775,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       x: actualX,
       y,
       formattedX: values?.formattedX ?? this.format(axis, x),
-      formattedY: values?.formattedY ?? this.format(series.yAxisKey ?? 'y', y),
+      formattedY: values?.formattedY ?? this.readout(series.yAxisKey ?? 'y', y),
       color: values?.color ?? this.engine.getLegendItems()[si]?.color ?? '',
       meta: series.meta,
       ...(values?.xRange ? { xRange: { ...values.xRange } } : {}),
@@ -785,6 +785,12 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const formatter = this.options.series[si]?.format;
     if (!this.options.tooltip?.yFormat && formatter) point.formattedY = formatter(y, point);
     return point;
+  }
+  /** A value readout at value precision (plan P9); the axis format still wins here. */
+  private readout(axis: string, value: number): string {
+    if (!Number.isFinite(value)) return '';
+    const formatter = this.prepared.config.axes?.[axis]?.tickFormat;
+    return formatter ? formatter(value) : this.engine.formatReadout(axis, value);
   }
   private format(axis: string, value: number): string {
     if (!Number.isFinite(value)) return '';

@@ -168,8 +168,8 @@ describe('HitTester tooltip formatters', () => {
     expect(points[0].formattedY).toBe('20 req/s (s0)');
   });
 
-  it('falls back to axis tick formatting when no formatters are set', () => {
-    const store = new ColumnarStore([f([0, 50, 100]), f([10, 20, 30])]);
+  it('falls back to the X tick format and a Y value readout when no formatters are set', () => {
+    const store = new ColumnarStore([f([0, 50, 100]), f([10, 20.125, 30])]);
     const scales = new Map<string, Scale>([
       ['x', scale('x', 0, 100)],
       ['y', scale('y', 0, 100)],
@@ -188,7 +188,8 @@ describe('HitTester tooltip formatters', () => {
     );
 
     expect(points[0].formattedX).toBe('x:50');
-    expect(points[0].formattedY).toBe('y:20');
+    // Readouts keep value precision (plan P9), never the tick format's.
+    expect(points[0].formattedY).toBe('20.13');
   });
 });
 
