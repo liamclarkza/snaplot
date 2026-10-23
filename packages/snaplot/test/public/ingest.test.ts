@@ -436,3 +436,33 @@ describe('appends are validated before anything changes', () => {
     expect(at(chart, 3)).toMatchObject({ x: 3, rowIndex: 3, rowId: 'b3' });
   });
 });
+
+// Category codes are positions on the axis. A cursor, a pinned or controlled viewport and a
+// group's X range hold codes, so a label keeps its code while its rows are retained (D23).
+describe('[dataapi-05] category codes stay with their labels', () => {
+  /** The points the cursor finds at a category label, as [series, label, y]. */
+  const pointsAt = (chart: ChartHandle<any>, label: string) => {
+    chart.setCursor(label);
+    return chart.getCursorSnapshot().points.map((point) => [point.seriesId, point.x, point.y]);
+  };
+
+  it.fails('[dataapi-05] sources on one axis that append different new labels in one call keep them apart', () => {
+    const chart = mount({
+      data: [{ a: 'P', b: 'Q', y1: 1, y2: 2 }],
+      x: 'a',
+      series: [
+        { id: 's1', type: 'scatter', y: 'y1' },
+        { id: 's2', type: 'scatter', y: 'y2', x: 'b' },
+      ],
+    });
+    chart.appendData([{ a: 'C', b: 'D', y1: 3, y2: 4 }]);
+    // Four labels, four slots: P and Q from the data, then C and D.
+    expect(chart.getAxis('x')).toMatchObject({ type: 'category', min: 0, max: 3 });
+    expect(pointsAt(chart, 'C')).toContainEqual(['s1', 'C', 3]);
+    expect(pointsAt(chart, 'D')).toContainEqual(['s2', 'D', 4]);
+    chart.update({ axes: { y: { title: 'Load' } } });
+    expect(chart.getAxis('x')).toMatchObject({ type: 'category', min: 0, max: 3 });
+    expect(pointsAt(chart, 'C')).toContainEqual(['s1', 'C', 3]);
+    expect(pointsAt(chart, 'D')).toContainEqual(['s2', 'D', 4]);
+  });
+});
