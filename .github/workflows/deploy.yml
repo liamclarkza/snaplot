@@ -1,31 +1,72 @@
-name: Deploy to GitHub Pages
+name: Deploy docs
 
-# The legacy docs site was removed in overhaul M0. The Astro site (M6a) restores
-# the site build and the Pages steps; deploys move to v* tags (D32, M5).
+# Builds the library, then the docs site, and deploys it to GitHub Pages (D32: the docs follow
+# npm). It runs after the full CI workflow passes, and refuses to deploy a version that npm does
+# not serve yet: a prerelease must be `snaplot@next`, a release `snaplot@latest` (D1).
+#
+# Manual dispatch only until M6a adds the site and enables the v* tag trigger below.
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+  # push:
+  #   tags: ['v*']
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+# One deploy at a time; a queued deploy waits instead of cancelling a running one.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build the site
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
       - uses: actions/setup-node@v6
         with:
-          node-version: "lts/*"
+          node-version-file: .nvmrc
           cache: npm
-
-      - run: npm install
+      - name: Refuse a version npm does not serve yet
+        run: |
+          VERSION=$(node -p "require('./packages/snaplot/package.json').version")
+          if [[ "$VERSION" == *-* ]]; then TAG=next; else TAG=latest; fi
+          PUBLISHED=$(npm view "snaplot@$TAG" version 2>/dev/null || true)
+          if [[ "$PUBLISHED" != "$VERSION" ]]; then
+            echo "::error::snaplot@$TAG on npm is '${PUBLISHED:-none}', not $VERSION. Publish first (scripts/release.sh), then deploy the docs."
+            exit 1
+          fi
+          echo "Deploying the docs for snaplot@$TAG = $VERSION."
+      - run: npm ci
       - run: npm run build
+      - name: Build the site
+        run: |
+          if [[ ! -f site/package.json ]]; then
+            echo "::error::There is no site workspace yet (plan M6a)."
+            exit 1
+          fi
+          npm run build:site
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

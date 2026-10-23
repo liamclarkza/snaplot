@@ -28,13 +28,49 @@ Requires Node ≥ 22. Uses npm workspaces (`packages/snaplot` + `site`).
 
 ## Quality gates
 
-Three gates enforce the same standards locally and in CI:
+`npm run verify` runs G1 to G3 (and the build). CI (`.github/workflows/ci.yml`) runs every gate
+as its own job on each pull request and push to `main`; `deploy.yml` and `publish.yml` call it
+and run only if it passes. Every workflow declares its `permissions:`.
 
-1. **Pre-commit hook** (lefthook): Biome check on staged files, typecheck when library source changed.
-2. **Pre-push hook**: full `npm test`.
-3. **CI** (`.github/workflows/quality.yml`): lint + typecheck + tests + both builds on every PR and push to `main`.
+| # | Gate | Command | CI |
+|---|---|---|---|
+| G1 | Lint and format | `npx biome ci .` | blocking |
+| G2 | Types | `npm run typecheck` (library: `tsconfig.json` and `tsconfig.test.json`; every workspace) | blocking |
+| G3 | Unit | `npm test` (CI adds v8 coverage), `npm run test:tz`, `node scripts/check-architecture.mjs` | blocking; architecture rules warn until M13 (P3) and M14 (P2) |
+| G4 | Ledger | `npm run ledger`, `npm run trace-check`, `node scripts/overhaul/check-visual-ledger.mjs` | blocking (overhaul tooling, removed at M17) |
+| G5 | Package | `npm run build && npm run check:package` | blocking, on Node 22.12.0 and `.nvmrc` |
+| G6 | Size | `npm run build && npm run check:size` | blocking |
+| G7 | API | `npm run build && npm run check:api` | blocking |
+| G8 | Palettes | `npm run check:palettes` | advisory until M11 (the script decides) |
+| G9 | Browser | `npm run test:browser` (Chromium, WebKit and Firefox smoke) | blocking |
+| G10 | Visual | `npx playwright test --project visual` in the pinned Playwright image | advisory until M14 |
+| G11 | Docs | `npm run build:site`, `npm run check:examples` | from M6a |
+| G12 | Perf | `npm run bench:ab -- --base <ref>` | advisory in CI |
 
-Bypass a hook only with `--no-verify` and say why in the commit body.
+What the package, size and API gates check:
+
+- **`check:package`**: `publint --strict`, `attw --pack --profile esm-only` (ESM only, D39), then
+  `scripts/check-consumers.mjs`. That packs the library, installs the tarball into a throwaway
+  project outside the repository and runs `test/consumers/` there under vitest: TypeScript under
+  `bundler`, `node16` and `nodenext` without `skipLibCheck`; `import()` and `require()` of every
+  entry; the Solid export conditions (server and client agree with `solid-js/web`, a
+  `workerd`/`worker` bundle, the `solid` JSX source built by `vite-plugin-solid`); React and Solid
+  SSR then hydration; the `'use client'` banner; the packed file list. Known defects are
+  `it.fails('[id] …')` entries, listed by `npm run ledger`. `--keep` keeps the project for
+  debugging.
+- **`check:size`**: `scripts/size.mjs` bundles each import in `scripts/size-budgets.json` from
+  the build (esbuild, minified, browser conditions, peers external) and gzips it at level 9.
+  `node scripts/size.mjs --json` lists bytes per source module. Raise a budget
+  (`node scripts/size.mjs --update` sets measured + 2%) only with the reason in the commit body.
+- **`check:api`**: the rolled-up `dist/*.d.ts` must equal `packages/snaplot/api/*.d.ts`, and
+  those must not name engine types (P4). After an intended public API change, run
+  `npm run build && npm run api:update` and commit the reviewed diff. Never hand-merge
+  `api/*.d.ts`, `package-lock.json` or screenshots: regenerate them.
+
+Hooks (lefthook): pre-commit runs Biome on staged files and the type-check when library
+source, tests or a `tsconfig*.json` changed; pre-push runs `npm test`. Bypass a hook only with
+`--no-verify` and say why in the commit body. Node: `.nvmrc` for development; the package
+supports Node 22.12 and later.
 
 ## Code style
 

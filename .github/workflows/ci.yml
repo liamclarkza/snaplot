@@ -1,0 +1,252 @@
+name: CI
+
+# The quality gates (plan §11.3), one job per gate, running the same commands as
+# `npm run verify` and the gate scripts do locally. deploy.yml and publish.yml call this
+# workflow and `needs:` it, so nothing deploys or publishes unless every blocking job passes.
+#
+# Blocking: lint (G1), types (G2), unit (G3), ledger (G4), package (G5), size (G6), api (G7),
+# palettes (G8, advisory inside the script until M11), browser (G9), conformance (from M13).
+# Advisory: visual (G10, blocking from M14) and bench (G12).
+# The docs job (G11) arrives with the site in M6a.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Browser jobs run in the pinned Playwright image (`container:` cannot read `env`, so the tag
+# is repeated per job). Keep it in step with @playwright/test in packages/snaplot.
+
+jobs:
+  lint:
+    name: Lint and format (G1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx biome ci .
+
+  types:
+    name: Types (G2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  unit:
+    name: Unit tests (G3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Unit tests with v8 coverage
+        run: npm test -w packages/snaplot -- --coverage
+      - name: Time tests under three time zones
+        run: npm run test:tz
+      - name: Architecture rules (warn mode until M14)
+        run: node scripts/check-architecture.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage
+          path: packages/snaplot/coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  ledger:
+    name: Ledger and traceability (G4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # check-visual-ledger walks overhaul-baseline..HEAD.
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run ledger
+      - run: npm run trace-check
+      - run: node scripts/overhaul/check-visual-ledger.mjs
+
+  package:
+    name: Package (G5, Node ${{ matrix.node || 'from .nvmrc' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The engines floor (require(esm) unflagged) and the current version.
+        node: ['22.12.0', '']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run check:package
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: consumers-${{ matrix.node || 'current' }}
+          path: packages/snaplot/test-results/consumers.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  size:
+    name: Size (G6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run check:size
+      - name: Bytes per module (explains a miss)
+        if: failure()
+        run: node scripts/size.mjs --json
+
+  api:
+    name: Golden API (G7)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run check:api
+
+  palettes:
+    name: Palettes (G8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Prints the result; exits non-zero only once M11 switches the script to enforce.
+      - run: npm run check:palettes
+
+  browser:
+    name: Browser specs (G9)
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Chromium in full, plus the WebKit and Firefox smoke subset (D25, gap-environments-08).
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-report
+          path: |
+            packages/snaplot/playwright-report/
+            packages/snaplot/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  conformance:
+    name: Conformance (from M13)
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run conformance:install
+      - run: npm run test:conformance
+
+  visual:
+    name: Visual (G10, advisory until M14)
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    # Report-only until M14 approves the final baselines; M14 removes this line.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Compares against the committed Linux baselines (refresh them with update-snapshots.yml).
+      - run: npx playwright test --project visual
+        working-directory: packages/snaplot
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: visual-report
+          path: |
+            packages/snaplot/playwright-report/
+            packages/snaplot/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  bench:
+    name: Bench A/B (G12, advisory)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # CI rasterises in software on shared runners; the numbers are a signal, not a gate.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run bench:ab -- --base ${{ github.event.pull_request.base.sha }} --raster software --profile desktop
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-results
+          path: bench/results/
+          if-no-files-found: ignore
+          retention-days: 14
