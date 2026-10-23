@@ -9,7 +9,7 @@
  */
 import { DARK_THEME, DEFAULT_THEME } from '../constants';
 import { createTheme } from '../config/theme';
-import { fail, suggest, warnOnce } from '../engine/errors';
+import { fail, hint, unknownSeries, warnOnce } from '../engine/errors';
 import { dateFormatter, type NumberFormatSpec, numberFormatter } from '../engine/format';
 import type { AxisSpec, ChartSpec, SeriesSpec, ThemeConfig } from '../engine/spec';
 import type {
@@ -190,14 +190,10 @@ function checkKeys(value: Record<string, unknown>, known: Keys, path: string): v
     if (known.has(name) || item === undefined) continue;
     const full = path ? `${path}.${name}` : name;
     const general = full.replace(/\[\d+\]/g, '.*').replace(/^axes\.[^.]+/, 'axes.*');
-    const hint =
-      HINTS[full] ??
-      HINTS[general] ??
-      HINTS[name] ??
-      (suggest(name, known) ? `Did you mean "${suggest(name, known)}"?` : '');
+    const reason = HINTS[full] ?? HINTS[general] ?? HINTS[name];
     warnOnce(
       'unknown-option',
-      `"${full}" is not an option and is ignored.${hint ? ` ${hint}` : ''}`,
+      `"${full}" is not an option and is ignored.${reason ? ` ${reason}` : hint(name, known)}`,
     );
     // A removed object can hold keys with their own hint (`zoom.onZoom`).
     if (isPlain(item))
@@ -349,6 +345,8 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
   }
   const state: NormalizedState = {};
   if (raw.highlight !== undefined) {
+    if (typeof raw.highlight === 'string' && !ids.has(raw.highlight))
+      unknownSeries('highlight', raw.highlight, ids);
     if (raw.highlight === null || typeof raw.highlight === 'string')
       state.highlight = raw.highlight;
     else if (isPlain(raw.highlight)) removedValue('highlight');
@@ -422,10 +420,7 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
     if (!Array.isArray(raw.hiddenSeries) || raw.hiddenSeries.some((id) => typeof id !== 'string'))
       fail('hiddenSeries must be an array of series ids.');
     for (const id of raw.hiddenSeries as string[])
-      if (!ids.has(id))
-        fail(
-          `hiddenSeries names "${id}", which is not a series id.${suggest(id, ids) ? ` Did you mean "${suggest(id, ids)}"?` : ''}`,
-        );
+      if (!ids.has(id)) unknownSeries('hiddenSeries', id, ids);
     state.hiddenSeries = [...(raw.hiddenSeries as string[])];
   }
 

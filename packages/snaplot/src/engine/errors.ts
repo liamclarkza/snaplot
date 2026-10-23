@@ -56,6 +56,20 @@ export function suggest(name: string, candidates: Iterable<string>): string | un
   return best !== undefined && bestDistance <= limit ? best : undefined;
 }
 
+/** ` Did you mean "<closest>"?` for the end of a message, or '' when nothing is close. */
+export function hint(name: string, candidates: Iterable<string>): string {
+  const best = suggest(name, candidates);
+  return best ? ` Did you mean "${best}"?` : '';
+}
+
+/**
+ * Throw for a series id the chart does not have. Every state option and setter that names a
+ * series uses it, so an unknown id is one error everywhere (dataapi-22).
+ */
+export function unknownSeries(where: string, id: string, ids: Iterable<string>): never {
+  return fail(`${where} names "${id}", which is not a series id.${hint(id, ids)}`);
+}
+
 /** Levenshtein distance, for short option and field names. */
 function editDistance(a: string, b: string): number {
   if (a === b) return 0;

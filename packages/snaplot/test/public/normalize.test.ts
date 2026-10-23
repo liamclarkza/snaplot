@@ -5,7 +5,7 @@
 // array- and object-valued options on intake, and maps every public option
 // leaf onto the engine. Public API, the shared fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ChartHandle } from '../../src/index';
+import { type ChartHandle, createChartGroup } from '../../src/index';
 import {
   clientPoint,
   debug,
@@ -150,6 +150,107 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
     );
     expect(message).toMatch(/^snaplot: .*maxPoints/);
     expect(message).not.toMatch(/maxLen/);
+  });
+});
+
+describe('[dataapi-22] one policy for unknown series ids and cursor labels: throw, with a suggestion', () => {
+  const two = { data: rows, x: 't', series: [{ y: 'cpu' }, { y: 'mem' }] };
+
+  it('[dataapi-22] hiddenSeries and highlight name series ids, at creation and in update()', () => {
+    for (const [key, value] of [
+      ['hiddenSeries', ['cpus']],
+      ['highlight', 'cpus'],
+    ] as const) {
+      const message = thrown(() => mount({ ...two, [key]: value }));
+      expect(message).toMatch(
+        new RegExp(`^snaplot: ${key} names "cpus", which is not a series id`),
+      );
+      expect(message).toMatch(/Did you mean "cpu"\?/);
+    }
+    const chart = mount({ ...two, highlight: 'mem' });
+    expect(thrown(() => chart.update({ highlight: 'zzz' }))).toMatch(
+      /^snaplot: highlight names "zzz", which is not a series id/,
+    );
+    expect(thrown(() => chart.update({ hiddenSeries: ['zzz'] }))).toMatch(
+      /^snaplot: hiddenSeries names "zzz", which is not a series id/,
+    );
+    expect(chart.getState()).toMatchObject({ highlightedSeries: 'mem', hiddenSeries: [] });
+  });
+
+  it('[dataapi-22] setHighlight() throws on an unknown id, as setSeriesVisible() does', () => {
+    const chart = mount(two);
+    for (const run of [
+      () => chart.setHighlight('cpus'),
+      () => chart.setSeriesVisible('cpus', false),
+    ]) {
+      expect(thrown(run)).toMatch(
+        /^snaplot: set\w+\(\) names "cpus", which is not a series id\. Did you mean "cpu"\?/,
+      );
+    }
+    expect(chart.getState()).toMatchObject({ highlightedSeries: null, hiddenSeries: [] });
+    chart.setHighlight('mem');
+    expect(chart.getState().highlightedSeries).toBe('mem');
+  });
+
+  it('[dataapi-22] setCursor() throws on a string a numeric axis cannot read', () => {
+    const chart = mount(two);
+    for (const value of ['nope', '12']) {
+      expect(thrown(() => chart.setCursor(value))).toMatch(
+        new RegExp(
+          `^snaplot: setCursor\\(\\) got "${value}", but axis "x" is numeric: give a number`,
+        ),
+      );
+    }
+    chart.setCursor(12);
+    expect(chart.getCursorSnapshot().x).toBe(12);
+  });
+
+  it('[dataapi-22] setCursor() throws on a label that is not a category, and reads ISO dates on a time axis', () => {
+    const bars = mount({
+      data: [
+        { m: 'Jan', v: 1 },
+        { m: 'Feb', v: 2 },
+      ],
+      x: 'm',
+      series: [{ type: 'bar', y: 'v' }],
+    });
+    expect(thrown(() => bars.setCursor('Fev'))).toMatch(
+      /^snaplot: setCursor\(\) got "Fev", which is not a category of axis "x"\. Did you mean "Feb"\?/,
+    );
+    bars.setCursor('Feb');
+    expect(bars.getCursorSnapshot().points[0]?.y).toBe(2);
+
+    const days = mount({
+      data: [
+        { d: '2026-03-01', v: 1 },
+        { d: '2026-03-02', v: 2 },
+      ],
+      x: 'd',
+      series: [{ y: 'v' }],
+    });
+    expect(thrown(() => days.setCursor('2 March'))).toMatch(
+      /^snaplot: setCursor\(\) got "2 March", which is not an ISO-8601 date for time axis "x"/,
+    );
+    days.setCursor('2026-03-02');
+    expect(days.getCursorSnapshot().points[0]?.y).toBe(2);
+    days.setCursor(new Date(2026, 2, 1));
+    expect(days.getCursorSnapshot().points[0]?.y).toBe(1);
+  });
+
+  it('[dataapi-22] a group highlights a series some members lack, and throws on one none has', () => {
+    const group = createChartGroup();
+    const a = mount({ data: rows, x: 't', group, series: [{ y: 'cpu' }] });
+    const b = mount({ data: rows, x: 't', group, series: [{ y: 'mem' }] });
+    group.setHighlight('cpu');
+    expect([a.getState().highlightedSeries, b.getState().highlightedSeries]).toEqual(['cpu', null]);
+    b.setHighlight('mem');
+    expect([a.getState().highlightedSeries, b.getState().highlightedSeries]).toEqual([null, 'mem']);
+    expect(thrown(() => group.setHighlight('mems'))).toMatch(
+      /^snaplot: setHighlight\(\) names "mems", which is not a series id\. Did you mean "mem"\?/,
+    );
+    expect(thrown(() => group.setCursor('nope'))).toMatch(/^snaplot: setCursor\(\) got "nope"/);
+    group.setCursor(4);
+    expect([a.getCursorSnapshot().x, b.getCursorSnapshot().x]).toEqual([4, 4]);
   });
 });
 

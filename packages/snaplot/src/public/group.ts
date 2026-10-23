@@ -4,7 +4,7 @@
  * group model; this module holds today's.
  */
 import type { ScaleRange } from '../engine/spec';
-import { fail, suggest, warnOnce } from '../engine/errors';
+import { fail, suggest, unknownSeries, warnOnce } from '../engine/errors';
 import { equivalent } from './options';
 import type { ChartGroup, ChartGroupOptions, ChartHandle, ChartOptions, ChartState } from './types';
 
@@ -15,8 +15,11 @@ export interface GroupMember {
   getAxis(key: string): Readonly<{ type: string; min: number; max: number }> | undefined;
   getLayout(): ReturnType<ChartHandle['getLayout']>;
   syncViewport(key: string, range: ScaleRange, reset: boolean): void;
-  setCursor(x: number | Date | string | null): void;
-  setHighlight(id: string | null): void;
+  /** The data X of a cursor value; throws on one the member's X axis cannot read. */
+  cursorX(x: number | Date | string | null): number | null;
+  syncCursor(x: number | Date | string | null): void;
+  syncHighlight(id: string | null): void;
+  seriesIds(): readonly string[];
   coordinatePadding(left: number | undefined, right: number | undefined): void;
   naturalRange(key: string): { min: number; max: number } | undefined;
   coordinateRange(key: string, range: { min: number; max: number }): void;
@@ -66,11 +69,20 @@ export function createChartGroup(options: ChartGroupOptions = {}): ChartGroup {
   }
   const group: ChartGroup = {
     options: Object.freeze({ cursor: true, highlight: true, ...known }),
+    // Members share their X kind and categories (validateGroup), so one member checks a cursor
+    // value. A highlight may name a series only some members have; one none has throws
+    // (dataapi-22).
     setCursor(value) {
-      broadcast(group, (member) => member.setCursor(value));
+      for (const member of record.members) {
+        member.cursorX(value);
+        break;
+      }
+      broadcast(group, (member) => member.syncCursor(value));
     },
     setHighlight(id) {
-      broadcast(group, (member) => member.setHighlight(id));
+      const ids = [...record.members].flatMap((member) => member.seriesIds());
+      if (id !== null && ids.length && !ids.includes(id)) unknownSeries('setHighlight()', id, ids);
+      broadcast(group, (member) => member.syncHighlight(id));
     },
     destroy() {
       if (record.destroyed) return;

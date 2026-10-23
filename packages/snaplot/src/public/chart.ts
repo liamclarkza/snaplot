@@ -6,7 +6,7 @@
 import { ChartCore } from '../core/Chart';
 import { inferPosition } from '../core/Layout';
 import { ColumnarStore } from '../data/ColumnarStore';
-import { fail, warnOnce } from '../engine/errors';
+import { fail, hint, unknownSeries, warnOnce } from '../engine/errors';
 import { formatValue } from '../engine/format';
 import type {
   CursorSnapshotOptions,
@@ -32,6 +32,7 @@ import {
   type Ingested,
   type IngestContext,
   type Retained,
+  parseIso,
   type SourceState,
   sourceKey,
 } from './sources';
@@ -742,8 +743,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.engine.setSelection(selection);
   }
   setSeriesVisible(id: string, visible: boolean): void {
-    const index = this.ingested.seriesIds.indexOf(id);
-    if (index < 0) fail(`setSeriesVisible() names series "${id}", which this chart does not have.`);
+    const ids = this.ingested.seriesIds;
+    if (!ids.includes(id)) unknownSeries('setSeriesVisible()', id, ids);
     const hidden = new Set(this.hidden);
     if (visible) hidden.delete(id);
     else hidden.add(id);
@@ -768,17 +769,52 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     coordinate(this.options.group);
   }
   setHighlight(id: string | null): void {
+    const ids = this.ingested.seriesIds;
+    if (id !== null && !ids.includes(id)) unknownSeries('setHighlight()', id, ids);
+    this.syncHighlight(id);
+  }
+  /** A group's highlight: a series this chart lacks clears its highlight. */
+  syncHighlight(id: string | null): void {
     const index = id === null ? -1 : this.ingested.seriesIds.indexOf(id);
     this.engine.setHighlight(index < 0 ? null : index);
   }
+  seriesIds(): readonly string[] {
+    return this.ingested.seriesIds;
+  }
   setCursor(x: number | Date | string | null): void {
-    const value =
-      typeof x === 'string'
-        ? (this.ingested.categories.get('x')?.codes.get(x) ?? -1)
-        : x instanceof Date
-          ? x.getTime()
-          : x;
-    this.engine.setCursorDataX(value === -1 ? null : value);
+    this.engine.setCursorDataX(this.cursorX(x));
+  }
+  /** A group's cursor: a value this chart cannot read hides its cursor. */
+  syncCursor(x: number | Date | string | null): void {
+    let value: number | null = null;
+    try {
+      value = this.cursorX(x);
+    } catch {}
+    this.engine.setCursorDataX(value);
+  }
+  /**
+   * The data X of a cursor value. A string is a category label, or an ISO-8601 date on a time
+   * axis; anything else the X axis cannot read throws (dataapi-22).
+   */
+  cursorX(x: number | Date | string | null): number | null {
+    if (x === null || typeof x === 'number') return x;
+    if (x instanceof Date) return x.getTime();
+    if (typeof x !== 'string')
+      fail('setCursor() takes a number, a Date, a category label or null.');
+    const where = `setCursor() got "${x}"`;
+    const registry = this.ingested.categories.get('x');
+    if (registry) {
+      const code = registry.codes.get(x);
+      if (code === undefined)
+        fail(`${where}, which is not a category of axis "x".${hint(x, registry.codes.keys())}`);
+      return code;
+    }
+    if (this.ingested.kinds.get('x') === 'date' || this.ingested.spec.axes?.x?.type === 'time') {
+      const ms = parseIso(x, this.normalized.timeZone);
+      if (Number.isFinite(ms)) return ms;
+      fail(`${where}, which is not an ISO-8601 date for time axis "x".`);
+    }
+    return fail(`${where}, but axis "x" is numeric: give a number.`);
   }
 
   private point(
@@ -967,7 +1003,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         this.emit('cursor:change', this.state.cursor);
         this.callback('onCursorChange', this.state.cursor);
         if (this.options.group?.options.cursor)
-          broadcast(this.options.group, (member) => member.setCursor(this.state.cursor.x), this);
+          broadcast(this.options.group, (member) => member.syncCursor(this.state.cursor.x), this);
       }),
       this.engine.on('viewport:change', (key, range) => {
         if (this.mutating) return;
@@ -995,7 +1031,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         if (this.options.group?.options.highlight)
           broadcast(
             this.options.group,
-            (member) => member.setHighlight(this.state.highlightedSeries),
+            (member) => member.syncHighlight(this.state.highlightedSeries),
             this,
           );
       }),
@@ -1084,8 +1120,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (selection && (!Number.isFinite(selection.x.min) || !Number.isFinite(selection.x.max)))
       fail('a selection needs finite bounds.');
     for (const id of controls.hiddenSeries ?? []) {
-      if (!ingested.seriesIds.includes(id))
-        fail(`hiddenSeries names "${id}", which is not a series id.`);
+      if (!ingested.seriesIds.includes(id)) unknownSeries('hiddenSeries', id, ingested.seriesIds);
     }
   }
 

@@ -367,11 +367,14 @@ export interface ChartHandle<Row = Record<string, any>> {
   resumeFollow(): void;
   /** Set or clear the persistent selection. */
   setSelection(selection: SelectionRange | null): void;
-  /** Show or hide a series. */
+  /** Show or hide a series. An id the chart does not have throws. */
   setSeriesVisible(id: string, visible: boolean): void;
-  /** Highlight a series, or clear the highlight with `null`. */
+  /** Highlight a series, or clear the highlight with `null`. An id the chart does not have throws. */
   setHighlight(id: string | null): void;
-  /** Move the cursor to an X value (a number, Date or category label), or hide it with `null`. */
+  /**
+   * Move the cursor to an X value, or hide it with `null`. A string is a category label, or an
+   * ISO-8601 date on a time axis; a string the X axis cannot read throws.
+   */
   setCursor(x: number | Date | string | null): void;
   /** The values under the cursor, or at a fallback position. */
   getCursorSnapshot(options?: CursorSnapshotOptions): CursorSnapshot<Row>;
@@ -415,9 +418,12 @@ export interface ChartGroupOptions {
 export interface ChartGroup {
   /** The options the group was created with. */
   readonly options: Readonly<ChartGroupOptions>;
-  /** Move every member's cursor. */
+  /** Move every member's cursor. A value the members' X axis cannot read throws. */
   setCursor(value: number | Date | string | null): void;
-  /** Highlight a series in every member. */
+  /**
+   * Highlight a series in every member. Members without that series clear their highlight; an id
+   * no member has throws.
+   */
   setHighlight(id: string | null): void;
   /** Unlink every member. */
   destroy(): void;

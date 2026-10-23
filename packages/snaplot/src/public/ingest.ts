@@ -16,7 +16,7 @@
  * - String X builds a category registry per axis: rebuilt on every full
  *   ingest, and labels leave it with their last row.
  */
-import { fail, suggest, warnOnce } from '../engine/errors';
+import { fail, hint, warnOnce } from '../engine/errors';
 import type { AxisSpec, ChartSpec, ColumnarData, SeriesSpec } from '../engine/spec';
 import type { AccessorLike, NormalizedOptions, NormalizedSeries } from './normalize';
 import {
@@ -580,11 +580,6 @@ function ingestRows<Row>(
 function rowKeys(rows: readonly unknown[]): string[] {
   const first = rows.find((row) => row && typeof row === 'object');
   return first ? Object.keys(first) : [];
-}
-
-function hint(name: string, candidates: Iterable<string>): string {
-  const best = suggest(name, candidates);
-  return best ? ` Did you mean "${best}"?` : '';
 }
 
 /** Add the value columns every series of the source reads. */

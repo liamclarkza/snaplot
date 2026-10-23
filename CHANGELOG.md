@@ -35,6 +35,11 @@ to [Semantic Versioning](https://semver.org/).
 - A `format` on a category axis throws. `appendData({ seriesId })` on a series that shares its data
   with other series throws. Re-reading a source of 10,000 rows or more because an accessor
   function keeps getting a new identity warns once.
+- A series id the chart does not have throws, with the closest id, wherever one is named:
+  `hiddenSeries`, `highlight`, `setSeriesVisible()` and `setHighlight()` (a group's
+  `setHighlight()` throws only when no member has that series). `setCursor()` throws on a label
+  that is not a category and on a string a numeric axis cannot read, and reads an ISO-8601 date
+  on a time axis.
 
 ### Removed options (1.0)
 

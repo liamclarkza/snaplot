@@ -216,9 +216,12 @@ declare interface ChartEvents<Row = Record<string, any>> {
 export declare interface ChartGroup {
     /** The options the group was created with. */
     readonly options: Readonly<ChartGroupOptions>;
-    /** Move every member's cursor. */
+    /** Move every member's cursor. A value the members' X axis cannot read throws. */
     setCursor(value: number | Date | string | null): void;
-    /** Highlight a series in every member. */
+    /**
+     * Highlight a series in every member. Members without that series clear their highlight; an id
+     * no member has throws.
+     */
     setHighlight(id: string | null): void;
     /** Unlink every member. */
     destroy(): void;
@@ -228,9 +231,12 @@ export declare interface ChartGroup {
 declare interface ChartGroup_2 {
     /** The options the group was created with. */
     readonly options: Readonly<ChartGroupOptions_2>;
-    /** Move every member's cursor. */
+    /** Move every member's cursor. A value the members' X axis cannot read throws. */
     setCursor(value: number | Date | string | null): void;
-    /** Highlight a series in every member. */
+    /**
+     * Highlight a series in every member. Members without that series clear their highlight; an id
+     * no member has throws.
+     */
     setHighlight(id: string | null): void;
     /** Unlink every member. */
     destroy(): void;
@@ -298,11 +304,14 @@ export declare interface ChartHandle<Row = Record<string, any>> {
     resumeFollow(): void;
     /** Set or clear the persistent selection. */
     setSelection(selection: SelectionRange | null): void;
-    /** Show or hide a series. */
+    /** Show or hide a series. An id the chart does not have throws. */
     setSeriesVisible(id: string, visible: boolean): void;
-    /** Highlight a series, or clear the highlight with `null`. */
+    /** Highlight a series, or clear the highlight with `null`. An id the chart does not have throws. */
     setHighlight(id: string | null): void;
-    /** Move the cursor to an X value (a number, Date or category label), or hide it with `null`. */
+    /**
+     * Move the cursor to an X value, or hide it with `null`. A string is a category label, or an
+     * ISO-8601 date on a time axis; a string the X axis cannot read throws.
+     */
     setCursor(x: number | Date | string | null): void;
     /** The values under the cursor, or at a fallback position. */
     getCursorSnapshot(options?: CursorSnapshotOptions): CursorSnapshot<Row>;
@@ -386,7 +395,11 @@ export declare interface ChartOptions<Row = Record<string, any>> {
     interaction?: 'readonly' | InteractionOptions;
     /** Show the crosshair and point indicators. @defaultValue `true` */
     cursor?: boolean;
-    /** The highlighted series id; the others dim. `null` highlights none. @defaultValue `null` */
+    /**
+     * The highlighted series id; the others dim. `null` highlights none. An id the chart does not
+     * have throws.
+     * @defaultValue `null`
+     */
     highlight?: string | null;
     /** The tooltip: `false` hides it, an object configures it. @defaultValue `true` */
     tooltip?: boolean | TooltipOptions<Row>;
@@ -415,7 +428,7 @@ export declare interface ChartOptions<Row = Record<string, any>> {
     viewport?: Viewport;
     /** The selection, with `interaction: { drag: 'select' }`. @defaultValue `null` */
     selection?: Selection_2 | null;
-    /** The ids of hidden series. @defaultValue `[]` */
+    /** The ids of hidden series. An id the chart does not have throws. @defaultValue `[]` */
     hiddenSeries?: readonly string[];
     /** Called with the point a click hits. */
     onPointClick?: Callback<ChartPoint<Row>>;

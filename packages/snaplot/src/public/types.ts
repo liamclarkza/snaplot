@@ -720,7 +720,11 @@ export interface ChartOptions<Row = Record<string, any>> {
   interaction?: 'readonly' | InteractionOptions;
   /** Show the crosshair and point indicators. @defaultValue `true` */
   cursor?: boolean;
-  /** The highlighted series id; the others dim. `null` highlights none. @defaultValue `null` */
+  /**
+   * The highlighted series id; the others dim. `null` highlights none. An id the chart does not
+   * have throws.
+   * @defaultValue `null`
+   */
   highlight?: string | null;
   /** The tooltip: `false` hides it, an object configures it. @defaultValue `true` */
   tooltip?: boolean | TooltipOptions<Row>;
@@ -749,7 +753,7 @@ export interface ChartOptions<Row = Record<string, any>> {
   viewport?: Viewport;
   /** The selection, with `interaction: { drag: 'select' }`. @defaultValue `null` */
   selection?: Selection | null;
-  /** The ids of hidden series. @defaultValue `[]` */
+  /** The ids of hidden series. An id the chart does not have throws. @defaultValue `[]` */
   hiddenSeries?: readonly string[];
   /** Called with the point a click hits. */
   onPointClick?: Callback<ChartPoint<Row>>;
