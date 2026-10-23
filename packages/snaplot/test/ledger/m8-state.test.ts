@@ -52,6 +52,18 @@ describe('[dxtrial-04][frameworks-04][frameworks-05] the viewport names only pin
     expect(reported).toEqual([{}]);
   });
 
+  // D3: update() always applies a state key it names, so an empty viewport is a reset.
+  it.fails('[frameworks-04] update({ viewport: {} }) resets a zoomed chart', () => {
+    const chart = mountLine();
+    fakes.frames.flush();
+    const full = { ...chart.getAxis('x') };
+    wheelZoom(chart, 50, 24);
+    expect(chart.getAxis('x')?.max).toBeLessThan(full.max ?? 0);
+    chart.update({ viewport: {} } as never);
+    fakes.frames.flush();
+    expect(chart.getAxis('x')).toMatchObject({ min: full.min, max: full.max });
+  });
+
   it.fails('[dxtrial-04] echoing the reported viewport keeps Y automatic', () => {
     const chart = mountLine();
     // The owner echoes what the chart reports: today through setViewport,
