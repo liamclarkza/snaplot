@@ -204,7 +204,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.engine = new ChartCore(
       element,
       { ...config, plugins: [] },
-      this.prepared.sources[0],
       this.prepared,
       /* deferFirstPaint */ true,
     );
@@ -272,10 +271,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
             : {}),
         };
       }),
-      highlight: {
-        ...prepared.config.highlight,
-        getKey: (_series: unknown, index: number) => prepared.seriesIds[index],
-      },
       plugins,
     };
   }

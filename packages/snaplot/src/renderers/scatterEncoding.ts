@@ -396,16 +396,9 @@ export function parseHex(hex: string): [number, number, number] {
 }
 
 /**
- * Sample a multi-stop gradient at t in [0, 1]. Stops are spaced evenly;
- * interpolation is linear in sRGB.
+ * Sample a multi-stop gradient of pre-parsed stops at t in [0, 1]. Stops are
+ * spaced evenly; interpolation is linear in sRGB.
  */
-export function sampleGradient(stops: string[], t: number): string {
-  if (stops.length === 0) return '#000000';
-  if (stops.length === 1) return stops[0];
-  return sampleGradientRgb(stops.map(parseHex), t);
-}
-
-/** sampleGradient over pre-parsed stops, for callers that sample repeatedly. */
 function sampleGradientRgb(rgbStops: [number, number, number][], t: number): string {
   if (rgbStops.length === 0) return '#000000';
   if (rgbStops.length === 1) return rgbToHex(rgbStops[0]);

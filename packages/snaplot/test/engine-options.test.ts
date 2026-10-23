@@ -65,7 +65,7 @@ describe('engine runtime options', () => {
     const chart = fakes.engine(
       {
         axes: { y2: { position: 'right', type: 'linear' } },
-        cursor: { syncKey: 'old-group' },
+        cursor: { color: '#ff0000' },
         series: [{ label: 'loss', dataIndex: 1, yAxisKey: 'y2' }],
       },
       [f([1, 2]), f([10, 20])],
@@ -75,7 +75,7 @@ describe('engine runtime options', () => {
 
     expect(chart.getOptions().axes?.y2).toBeUndefined();
     expect(chart.getAxis('y2')).toBeUndefined();
-    expect(chart.getOptions().cursor?.syncKey).toBeUndefined();
+    expect(chart.getOptions().cursor?.color).toBeUndefined();
   });
 
   it('emits options:update after runtime config changes', () => {

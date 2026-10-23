@@ -17,7 +17,6 @@ export interface DataStore {
   getPhysicalColumn(index: number): Float64Array;
   getData(): ColumnarData;
 
-  setData(data: ColumnarData): void;
   append(data: ColumnarData): boolean;
   /**
    * Overwrite the last row in place, one value per column (row[0] is X).

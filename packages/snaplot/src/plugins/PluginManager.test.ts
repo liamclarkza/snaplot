@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PluginManager } from './PluginManager';
-import type { ChartInstance, Plugin } from '../types';
+import type { EngineHost, Plugin } from '../types';
 
 describe('PluginManager', () => {
   it('returns false for duplicate plugin ids and keeps the original', () => {
@@ -10,7 +10,7 @@ describe('PluginManager', () => {
 
     expect(manager.register(first)).toBe(true);
     expect(manager.register(second)).toBe(false);
-    manager.installAll({} as ChartInstance);
+    manager.installAll({} as EngineHost);
 
     expect(first.install).toHaveBeenCalledTimes(1);
     expect(second.install).not.toHaveBeenCalled();
@@ -28,7 +28,7 @@ describe('PluginManager', () => {
 
     const result = manager.dispatch(
       'beforeDrawData',
-      {} as ChartInstance,
+      {} as EngineHost,
       {} as CanvasRenderingContext2D,
     );
 
@@ -48,7 +48,7 @@ describe('PluginManager', () => {
 
     const result = manager.dispatch(
       'beforeDrawData',
-      {} as ChartInstance,
+      {} as EngineHost,
       {} as CanvasRenderingContext2D,
     );
 

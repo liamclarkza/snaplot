@@ -24,38 +24,6 @@ export interface BarRenderSegment {
  *   barWidth = groupWidth / seriesCount
  */
 
-export function renderBars(
-  ctx: CanvasRenderingContext2D,
-  xData: Float64Array,
-  yData: Float64Array,
-  startIdx: number,
-  endIdx: number,
-  scaleX: Scale,
-  scaleY: Scale,
-  layout: Layout,
-  series: SeriesConfig,
-  color: string,
-  /** Index of this series among bar-type series */
-  barSeriesIndex: number,
-  /** Total number of bar-type series (for grouped width) */
-  totalBarSeries: number,
-  /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
-  opacityMultiplier: number = 1,
-): void {
-  renderBarsSegments(
-    ctx,
-    [{ xData, yData, startIdx, endIdx }],
-    scaleX,
-    scaleY,
-    layout,
-    series,
-    color,
-    barSeriesIndex,
-    totalBarSeries,
-    opacityMultiplier,
-  );
-}
-
 export function renderBarsSegments(
   ctx: CanvasRenderingContext2D,
   segments: BarRenderSegment[],

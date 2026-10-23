@@ -2,6 +2,9 @@ import type {
   ChartConfig as EngineConfig,
   AxisConfig as EngineAxis,
   SeriesConfig as EngineSeries,
+  CursorConfig,
+  ZoomConfig,
+  HighlightConfig,
   ThemeConfig,
   ScaleRange,
   SelectionRange,
@@ -216,9 +219,9 @@ export interface ChartOptions<Row = Record<string, unknown>>
   referenceRegions?: readonly ReferenceRegion[];
   plugins?: readonly ChartPlugin<Row>[];
   group?: ChartGroup;
-  cursor?: Omit<NonNullable<EngineConfig['cursor']>, 'syncKey'>;
-  zoom?: Omit<NonNullable<EngineConfig['zoom']>, 'syncKey'>;
-  highlight?: Omit<NonNullable<EngineConfig['highlight']>, 'syncKey' | 'getKey'>;
+  cursor?: CursorConfig;
+  zoom?: ZoomConfig;
+  highlight?: HighlightConfig;
   selection?: Omit<NonNullable<EngineConfig['selection']>, 'onSelect' | 'onBrush'>;
   tooltip?: Omit<
     NonNullable<EngineConfig['tooltip']>,

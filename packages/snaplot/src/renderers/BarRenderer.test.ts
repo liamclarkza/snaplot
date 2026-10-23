@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderBars, renderBarsSegments } from './BarRenderer';
+import { renderBarsSegments } from './BarRenderer';
 import type { Layout, Scale, SeriesConfig } from '../types';
 
 const f = (xs: number[]) => Float64Array.from(xs);
@@ -54,7 +54,7 @@ function context() {
 
 const series: SeriesConfig = { label: 'bar', dataIndex: 1, type: 'bar' };
 
-describe('renderBars baseline', () => {
+describe('renderBarsSegments baseline', () => {
   it('anchors bars to the scale minimum on a log Y axis', () => {
     const { ctx, fill } = context();
     const scaleX = linearScale('x');
@@ -67,12 +67,9 @@ describe('renderBars baseline', () => {
       dataToPixel: (value: number) => (value > 0 ? 100 - value : Number.NaN),
     };
 
-    renderBars(
+    renderBarsSegments(
       ctx,
-      f([1, 2, 3]),
-      f([10, 20, 30]),
-      0,
-      2,
+      [{ xData: f([1, 2, 3]), yData: f([10, 20, 30]), startIdx: 0, endIdx: 2 }],
       scaleX,
       scaleY,
       layout(),
@@ -88,12 +85,9 @@ describe('renderBars baseline', () => {
   it('uses a translucent default fill and a one-pixel series outline', () => {
     const { ctx, fill, stroke } = context();
 
-    renderBars(
+    renderBarsSegments(
       ctx,
-      f([1]),
-      f([10]),
-      0,
-      0,
+      [{ xData: f([1]), yData: f([10]), startIdx: 0, endIdx: 0 }],
       linearScale('x'),
       linearScale('y'),
       layout(),
@@ -113,12 +107,9 @@ describe('renderBars baseline', () => {
   it('keeps explicit opacity and highlight dimming', () => {
     const { ctx } = context();
 
-    renderBars(
+    renderBarsSegments(
       ctx,
-      f([1]),
-      f([10]),
-      0,
-      0,
+      [{ xData: f([1]), yData: f([10]), startIdx: 0, endIdx: 0 }],
       linearScale('x'),
       linearScale('y'),
       layout(),
@@ -139,12 +130,9 @@ describe('renderBars baseline', () => {
       dataToPixel: (value: number) => 100 - value,
     };
 
-    renderBars(
+    renderBarsSegments(
       ctx,
-      f([10, 20]),
-      f([20, -20]),
-      0,
-      1,
+      [{ xData: f([10, 20]), yData: f([20, -20]), startIdx: 0, endIdx: 1 }],
       linearScale('x'),
       scaleY,
       layout(),
@@ -180,7 +168,7 @@ function pathWidth(ctx: CanvasRenderingContext2D): number {
   return Math.max(...xs) - Math.min(...xs);
 }
 
-describe('renderBars width', () => {
+describe('renderBarsSegments width', () => {
   // gap-overhaul-delta-06: the probe measured the first moveTo-to-lineTo
   // span, which is 0 for a positive bar on a real (inverted) Y axis and was
   // only positive because the mock Y axis was not inverted.
@@ -193,7 +181,17 @@ describe('renderBars width', () => {
     const yData = f([1, 2, 3, 4, 5, 6, 7, 8]);
 
     // Viewport culling leaves a single bar (index 5) in range.
-    renderBars(ctx, xData, yData, 5, 5, scaleX, scaleY, layout(), series, '#4e79a7', 0, 1);
+    renderBarsSegments(
+      ctx,
+      [{ xData, yData, startIdx: 5, endIdx: 5 }],
+      scaleX,
+      scaleY,
+      layout(),
+      series,
+      '#4e79a7',
+      0,
+      1,
+    );
 
     expect(fill).toHaveBeenCalledTimes(1);
     // The whole path's x extent, so the measurement holds for either path direction.
@@ -204,15 +202,12 @@ describe('renderBars width', () => {
   });
 });
 
-describe('renderBars per-datum fill', () => {
+describe('renderBarsSegments per-datum fill', () => {
   it('honors a static series.fill string over the series color', () => {
     const { ctx, fill } = context();
-    renderBars(
+    renderBarsSegments(
       ctx,
-      f([10, 20, 30]),
-      f([5, 6, 7]),
-      0,
-      2,
+      [{ xData: f([10, 20, 30]), yData: f([5, 6, 7]), startIdx: 0, endIdx: 2 }],
       linearScale('x'),
       linearScale('y'),
       layout(),
@@ -234,12 +229,9 @@ describe('renderBars per-datum fill', () => {
       styles.push(ctx.fillStyle as string);
     });
 
-    renderBars(
+    renderBarsSegments(
       ctx,
-      f([10, 20, 30]),
-      f([5, 6, 7]),
-      0,
-      2,
+      [{ xData: f([10, 20, 30]), yData: f([5, 6, 7]), startIdx: 0, endIdx: 2 }],
       linearScale('x'),
       linearScale('y'),
       layout(),

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderScatter, renderScatterSegments, ScatterSeriesCache } from './ScatterRenderer';
+import { renderScatterSegments, ScatterSeriesCache } from './ScatterRenderer';
 import type { ScatterStyleResolver } from './scatterEncoding';
 import type { Layout, Scale, SeriesConfig } from '../types';
 
@@ -75,7 +75,7 @@ class MockDocument {
   }
 }
 
-describe('renderScatter cache keys', () => {
+describe('renderScatterSegments cache keys', () => {
   beforeEach(() => {
     createImageDataCalls = 0;
     vi.stubGlobal('document', new MockDocument());
@@ -103,12 +103,9 @@ describe('renderScatter cache keys', () => {
     const cache = new ScatterSeriesCache();
     const palettes = { categorical: [] };
 
-    renderScatter(
+    renderScatterSegments(
       ctx,
-      xData,
-      yDataA,
-      0,
-      3,
+      [{ xData, yData: yDataA, startIdx: 0, endIdx: 3 }],
       xScale,
       yScale,
       layout,
@@ -118,12 +115,9 @@ describe('renderScatter cache keys', () => {
       palettes,
       cache,
     );
-    renderScatter(
+    renderScatterSegments(
       ctx,
-      xData,
-      yDataB,
-      0,
-      3,
+      [{ xData, yData: yDataB, startIdx: 0, endIdx: 3 }],
       xScale,
       yScale,
       layout,
@@ -133,12 +127,9 @@ describe('renderScatter cache keys', () => {
       palettes,
       cache,
     );
-    renderScatter(
+    renderScatterSegments(
       ctx,
-      xData,
-      yDataB,
-      0,
-      3,
+      [{ xData, yData: yDataB, startIdx: 0, endIdx: 3 }],
       xScale,
       yScale,
       layout,
@@ -175,12 +166,9 @@ describe('renderScatter cache keys', () => {
     const cacheB = new ScatterSeriesCache();
     const palettes = { categorical: [] };
 
-    renderScatter(
+    renderScatterSegments(
       ctx,
-      xData,
-      yDataA,
-      0,
-      3,
+      [{ xData, yData: yDataA, startIdx: 0, endIdx: 3 }],
       xScale,
       yScale,
       layout,
@@ -190,12 +178,9 @@ describe('renderScatter cache keys', () => {
       palettes,
       cacheA,
     );
-    renderScatter(
+    renderScatterSegments(
       ctx,
-      xData,
-      yDataB,
-      0,
-      3,
+      [{ xData, yData: yDataB, startIdx: 0, endIdx: 3 }],
       xScale,
       yScale,
       layout,
@@ -205,12 +190,9 @@ describe('renderScatter cache keys', () => {
       palettes,
       cacheB,
     );
-    renderScatter(
+    renderScatterSegments(
       ctx,
-      xData,
-      yDataA,
-      0,
-      3,
+      [{ xData, yData: yDataA, startIdx: 0, endIdx: 3 }],
       xScale,
       yScale,
       layout,
@@ -220,12 +202,9 @@ describe('renderScatter cache keys', () => {
       palettes,
       cacheA,
     );
-    renderScatter(
+    renderScatterSegments(
       ctx,
-      xData,
-      yDataB,
-      0,
-      3,
+      [{ xData, yData: yDataB, startIdx: 0, endIdx: 3 }],
       xScale,
       yScale,
       layout,
@@ -255,12 +234,9 @@ describe('renderScatter cache keys', () => {
       pointRadius: 3,
     };
 
-    renderScatter(
+    renderScatterSegments(
       ctx,
-      xData,
-      yData,
-      0,
-      0,
+      [{ xData, yData, startIdx: 0, endIdx: 0 }],
       xScale,
       yScale,
       layout,
@@ -272,12 +248,9 @@ describe('renderScatter cache keys', () => {
     );
     const firstStamp = vi.mocked(ctx.drawImage).mock.calls[0][0];
 
-    renderScatter(
+    renderScatterSegments(
       ctx,
-      xData,
-      yData,
-      0,
-      0,
+      [{ xData, yData, startIdx: 0, endIdx: 0 }],
       xScale,
       yScale,
       layout,

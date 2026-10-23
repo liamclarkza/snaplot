@@ -113,38 +113,6 @@ function quantizeRadius(radius: number): number {
   return Math.round(radius * 10) / 10;
 }
 
-export function renderScatter(
-  ctx: CanvasRenderingContext2D,
-  xData: Float64Array,
-  yData: Float64Array,
-  startIdx: number,
-  endIdx: number,
-  scaleX: Scale,
-  scaleY: Scale,
-  layout: Layout,
-  series: SeriesConfig,
-  color: string,
-  /** Multiplied with the per-point alpha. Used by the highlight system to dim non-highlighted series. */
-  opacityMultiplier: number = 1,
-  palettes: ScatterPalettes = { categorical: [] },
-  cache?: ScatterSeriesCache,
-  resolver?: ScatterStyleResolver,
-): void {
-  renderScatterSegments(
-    ctx,
-    [{ xData, yData, startIdx, endIdx }],
-    scaleX,
-    scaleY,
-    layout,
-    series,
-    color,
-    opacityMultiplier,
-    palettes,
-    cache,
-    resolver,
-  );
-}
-
 export function renderScatterSegments(
   ctx: CanvasRenderingContext2D,
   segments: ScatterRenderSegment[],

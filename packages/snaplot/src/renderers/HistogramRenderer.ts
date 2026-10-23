@@ -18,32 +18,6 @@ export interface HistogramRenderSegment {
  * the result as chart data. The renderer only draws.
  */
 
-export function renderHistogram(
-  ctx: CanvasRenderingContext2D,
-  xData: Float64Array,
-  yData: Float64Array,
-  startIdx: number,
-  endIdx: number,
-  scaleX: Scale,
-  scaleY: Scale,
-  layout: Layout,
-  series: SeriesConfig,
-  color: string,
-  /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
-  opacityMultiplier: number = 1,
-): void {
-  renderHistogramSegments(
-    ctx,
-    [{ xData, yData, startIdx, endIdx }],
-    scaleX,
-    scaleY,
-    layout,
-    series,
-    color,
-    opacityMultiplier,
-  );
-}
-
 export function renderHistogramSegments(
   ctx: CanvasRenderingContext2D,
   segments: HistogramRenderSegment[],

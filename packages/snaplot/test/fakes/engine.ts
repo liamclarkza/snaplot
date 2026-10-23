@@ -48,7 +48,7 @@ export function installEngineFakes(options: FakeOptions = {}): EngineFakes {
       const sources: EngineSources = isSources(data)
         ? data
         : { sources: [data], seriesSources: config.series.map(() => 0) };
-      const chart = new ChartCore(host, config, undefined, sources);
+      const chart = new ChartCore(host, config, sources);
       engines.push(chart);
       return chart;
     },

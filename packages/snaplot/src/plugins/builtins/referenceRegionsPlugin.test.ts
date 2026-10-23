@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { lightTheme } from '../../config/theme';
-import type { ChartInstance } from '../../types';
+import type { EngineHost } from '../../types';
 import { createReferenceRegionsPlugin } from './referenceRegionsPlugin';
 
-function chart(redraw = vi.fn()): ChartInstance {
+function chart(redraw = vi.fn()): EngineHost {
   return {
     redraw,
     getLayout: () => ({
@@ -26,7 +26,7 @@ function chart(redraw = vi.fn()): ChartInstance {
       setPixelRange: () => {},
     }),
     getTheme: () => lightTheme,
-  } as unknown as ChartInstance;
+  } as unknown as EngineHost;
 }
 
 function context(): CanvasRenderingContext2D {

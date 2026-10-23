@@ -71,10 +71,6 @@ export class RingColumnarStore implements DataStore {
     return this.materialize() as unknown as ColumnarData;
   }
 
-  setData(data: ColumnarData): void {
-    this.reset(data);
-  }
-
   append(data: ColumnarData): boolean {
     ColumnarStore.validate(data);
     this.validateShape(data);

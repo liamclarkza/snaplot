@@ -18,13 +18,13 @@ function describeType(v: unknown): string {
  * ColumnarStore wraps ColumnarData, validates invariants, and provides
  * efficient viewport slicing and streaming append.
  *
- * Per P3: the store never mutates user data. setData() swaps references.
- * append() creates new arrays internally.
+ * Per P3: the store never mutates user data. The constructor keeps
+ * references; append() creates new arrays internally.
  */
 export class ColumnarStore implements DataStore {
   private columns: Float64Array[];
   /**
-   * setData stores references to the caller's arrays (zero copy), so
+   * The constructor stores references to the caller's arrays (zero copy), so
    * in-place mutation is forbidden until append() has swapped in arrays
    * the store allocated itself. replaceLast() clones once when needed.
    */
@@ -140,7 +140,7 @@ export class ColumnarStore implements DataStore {
    * Returns the store's live internal column array by reference (no copy) for
    * the hot path. The caller MUST treat the result as read-only: do not push,
    * splice, or reorder the outer array, and do not write into any column in
-   * place. After setData() these are the caller's own arrays; after append()
+   * place. Until the first append() these are the caller's own arrays; after it
    * they are store-owned buffers. Either way, in-place mutation bypasses
    * validation and can break the sorted-finite-X invariant that binary-search
    * culling and hit-testing depend on, and it will not bump the data version,
@@ -196,13 +196,6 @@ export class ColumnarStore implements DataStore {
         physicalEnd: logicalEnd,
       },
     ];
-  }
-
-  /** Replace all data */
-  setData(data: ColumnarData): void {
-    ColumnarStore.validate(data);
-    this.columns = [...data];
-    this.ownsColumns = false;
   }
 
   replaceLast(row: number[]): void {

@@ -88,7 +88,7 @@ describe('engine lifecycle + config integrity', () => {
     const moves: Array<[number | null, number | null]> = [];
     chart.on('cursor:move', (dataX, dataIdx) => moves.push([dataX, dataIdx]));
 
-    chart.setCursorDataX(1.5, 'sync');
+    chart.setCursorDataX(1.5);
 
     // The cursor stays at the raw X; no column-0 row index is reported.
     expect(moves).toEqual([[1.5, null]]);

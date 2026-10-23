@@ -31,32 +31,6 @@ export interface BandRenderSegment {
  * break and connects across the gap instead.
  */
 
-export function renderLine(
-  ctx: CanvasRenderingContext2D,
-  xData: Float64Array,
-  yData: Float64Array,
-  startIdx: number,
-  endIdx: number,
-  scaleX: Scale,
-  scaleY: Scale,
-  layout: Layout,
-  series: SeriesConfig,
-  color: string,
-  /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
-  opacityMultiplier: number = 1,
-): void {
-  renderLineSegments(
-    ctx,
-    [{ xData, yData, startIdx, endIdx }],
-    scaleX,
-    scaleY,
-    layout,
-    series,
-    color,
-    opacityMultiplier,
-  );
-}
-
 export function renderLineSegments(
   ctx: CanvasRenderingContext2D,
   segments: LineRenderSegment[],
@@ -102,32 +76,6 @@ export function renderLineSegments(
 
   ctx.stroke();
   ctx.restore();
-}
-
-export function renderArea(
-  ctx: CanvasRenderingContext2D,
-  xData: Float64Array,
-  yData: Float64Array,
-  startIdx: number,
-  endIdx: number,
-  scaleX: Scale,
-  scaleY: Scale,
-  layout: Layout,
-  series: SeriesConfig,
-  color: string,
-  /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
-  opacityMultiplier: number = 1,
-): void {
-  renderAreaSegments(
-    ctx,
-    [{ xData, yData, startIdx, endIdx }],
-    scaleX,
-    scaleY,
-    layout,
-    series,
-    color,
-    opacityMultiplier,
-  );
 }
 
 export function renderAreaSegments(
@@ -276,33 +224,6 @@ export function renderAreaSegments(
  * Tooltip and cursor snapping use `dataIndex` (the center line). The
  * upper/lower fill is purely decorative.
  */
-export function renderBand(
-  ctx: CanvasRenderingContext2D,
-  xData: Float64Array,
-  centerYData: Float64Array,
-  upperYData: Float64Array,
-  lowerYData: Float64Array,
-  startIdx: number,
-  endIdx: number,
-  scaleX: Scale,
-  scaleY: Scale,
-  layout: Layout,
-  series: SeriesConfig,
-  color: string,
-  opacityMultiplier: number = 1,
-): void {
-  renderBandSegments(
-    ctx,
-    [{ xData, centerYData, upperYData, lowerYData, startIdx, endIdx }],
-    scaleX,
-    scaleY,
-    layout,
-    series,
-    color,
-    opacityMultiplier,
-  );
-}
-
 export function renderBandSegments(
   ctx: CanvasRenderingContext2D,
   segments: BandRenderSegment[],

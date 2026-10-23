@@ -24,7 +24,7 @@ function pair(extra: Record<string, unknown>) {
 }
 
 describe('[arch-10] the removed engine sync is unreachable through untyped options', () => {
-  it.fails('[arch-10] an untyped cursor.syncKey does not link two charts', () => {
+  it('[arch-10] an untyped cursor.syncKey does not link two charts', () => {
     const [a, b] = pair({ cursor: { syncKey: 'k' } });
 
     hover(a, 50, 0);
@@ -33,7 +33,7 @@ describe('[arch-10] the removed engine sync is unreachable through untyped optio
     expect(b.getState().cursor.x).toBeNull();
   });
 
-  it.fails('[arch-10] an untyped highlight.syncKey does not link two charts', () => {
+  it('[arch-10] an untyped highlight.syncKey does not link two charts', () => {
     const [a, b] = pair({ highlight: { syncKey: 'k' } });
 
     a.setHighlight('v');
@@ -42,7 +42,7 @@ describe('[arch-10] the removed engine sync is unreachable through untyped optio
     expect(b.getState().highlightedSeries).toBeNull();
   });
 
-  it.fails('[arch-10] an untyped zoom.syncKey does not link two charts', () => {
+  it('[arch-10] an untyped zoom.syncKey does not link two charts', () => {
     const [a, b] = pair({ zoom: { syncKey: 'k' } });
     const before = b.getAxis('x');
 

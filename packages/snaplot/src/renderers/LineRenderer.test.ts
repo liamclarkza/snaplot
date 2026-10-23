@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderArea, renderBand, renderLine } from './LineRenderer';
+import { renderAreaSegments, renderBandSegments, renderLineSegments } from './LineRenderer';
 import type { Layout, Scale, SeriesConfig } from '../types';
 
 const f = (xs: number[]) => Float64Array.from(xs);
@@ -60,7 +60,15 @@ describe('filled line renderers', () => {
     const layout = createLayout();
     const series: SeriesConfig = { label: 'area', dataIndex: 1, type: 'area' };
 
-    renderArea(ctx, f([0, 1, 2]), f([10, NaN, 20]), 0, 2, scale, scale, layout, series, '#4e79a7');
+    renderAreaSegments(
+      ctx,
+      [{ xData: f([0, 1, 2]), yData: f([10, NaN, 20]), startIdx: 0, endIdx: 2 }],
+      scale,
+      scale,
+      layout,
+      series,
+      '#4e79a7',
+    );
 
     expect(ctx.fill).toHaveBeenCalledTimes(2);
     expect(ctx.stroke).toHaveBeenCalledTimes(1);
@@ -79,7 +87,15 @@ describe('filled line renderers', () => {
     const series: SeriesConfig = { label: 'area', dataIndex: 1, type: 'area' };
 
     // A named color (not #rrggbb) previously yielded 'rgba(NaN,NaN,NaN,...)'.
-    renderArea(ctx, f([0, 1, 2]), f([10, 15, 20]), 0, 2, scale, scale, layout, series, 'red');
+    renderAreaSegments(
+      ctx,
+      [{ xData: f([0, 1, 2]), yData: f([10, 15, 20]), startIdx: 0, endIdx: 2 }],
+      scale,
+      scale,
+      layout,
+      series,
+      'red',
+    );
 
     expect(stops.length).toBe(2);
     for (const stop of stops) expect(stop).not.toContain('NaN');
@@ -93,14 +109,18 @@ describe('filled line renderers', () => {
     const layout = createLayout();
     const series: SeriesConfig = { label: 'band', dataIndex: 1, type: 'band' };
 
-    renderBand(
+    renderBandSegments(
       ctx,
-      f([0, 1, 2]),
-      f([15, 16, 17]),
-      f([20, NaN, 30]),
-      f([10, NaN, 20]),
-      0,
-      2,
+      [
+        {
+          xData: f([0, 1, 2]),
+          centerYData: f([15, 16, 17]),
+          upperYData: f([20, NaN, 30]),
+          lowerYData: f([10, NaN, 20]),
+          startIdx: 0,
+          endIdx: 2,
+        },
+      ],
       scale,
       scale,
       layout,
@@ -125,12 +145,16 @@ describe('line gap rendering', () => {
       interpolation: 'monotone',
     };
 
-    renderLine(
+    renderLineSegments(
       ctx,
-      f([0, 1, 2, 3, 4, 5, 6]),
-      f([1, 2, 3, NaN, 4, 5, 6]),
-      0,
-      6,
+      [
+        {
+          xData: f([0, 1, 2, 3, 4, 5, 6]),
+          yData: f([1, 2, 3, NaN, 4, 5, 6]),
+          startIdx: 0,
+          endIdx: 6,
+        },
+      ],
       scale,
       scale,
       layout,
@@ -153,7 +177,15 @@ describe('line gap rendering', () => {
     const layout = createLayout();
     const series: SeriesConfig = { label: 'loss', dataIndex: 1, type: 'line' };
 
-    renderLine(ctx, f([0, 1, 2]), f([1, 0, 2]), 0, 2, xScale, yScale, layout, series, '#4e79a7');
+    renderLineSegments(
+      ctx,
+      [{ xData: f([0, 1, 2]), yData: f([1, 0, 2]), startIdx: 0, endIdx: 2 }],
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+    );
 
     expect(ctx.moveTo).toHaveBeenCalledTimes(2);
     expect(ctx.lineTo).not.toHaveBeenCalled();

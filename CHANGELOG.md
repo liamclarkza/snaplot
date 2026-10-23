@@ -38,6 +38,12 @@ to [Semantic Versioning](https://semver.org/).
   primary companion text. `createTheme({ muted })` supplies this role and quiet
   stroke opacities automatically.
 
+### Removed
+- The engine's key-based sync. A `syncKey` on `cursor`, `highlight` or `zoom`
+  (already absent from the public types) no longer links charts when passed
+  untyped; link charts with `createChartGroup()`. The engine's `highlight.getKey`
+  goes with it.
+
 ### Development
 - Added a native-defaults comparison audit with text/size/data edge cases,
   reproduced layout failures, correction-work tracking, and API/expected-behavior

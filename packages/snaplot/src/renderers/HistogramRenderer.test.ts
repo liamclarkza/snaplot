@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderHistogram } from './HistogramRenderer';
+import { renderHistogramSegments } from './HistogramRenderer';
 import type { Layout, Scale, SeriesConfig } from '../types';
 
 const f = (xs: number[]) => Float64Array.from(xs);
@@ -29,7 +29,7 @@ function layout(): Layout {
   };
 }
 
-describe('renderHistogram baseline', () => {
+describe('renderHistogramSegments baseline', () => {
   it('anchors bins to the scale minimum on a log Y axis', () => {
     const fillRect = vi.fn();
     const ctx = {
@@ -57,12 +57,9 @@ describe('renderHistogram baseline', () => {
     const series: SeriesConfig = { label: 'hist', dataIndex: 1, type: 'histogram' };
 
     // 3 edges → 2 bins (last count is padding).
-    renderHistogram(
+    renderHistogramSegments(
       ctx,
-      f([0, 1, 2]),
-      f([10, 20, 0]),
-      0,
-      2,
+      [{ xData: f([0, 1, 2]), yData: f([10, 20, 0]), startIdx: 0, endIdx: 2 }],
       scaleX,
       scaleY,
       layout(),

@@ -1,4 +1,4 @@
-import type { Plugin, ChartInstance } from '../../types';
+import type { Plugin, EngineHost } from '../../types';
 
 /**
  * Configuration for a single reference line, a horizontal or vertical
@@ -49,12 +49,12 @@ export function createReferenceLinesPlugin(options: {
   lines: ReferenceLine[];
 }): Plugin & { setLines(lines: ReferenceLine[]): void } {
   let lines = options.lines;
-  let chartRef: ChartInstance | null = null;
+  let chartRef: EngineHost | null = null;
 
   return {
     id: 'builtin:reference-lines',
 
-    install(chart: ChartInstance) {
+    install(chart: EngineHost) {
       chartRef = chart;
     },
 
@@ -64,7 +64,7 @@ export function createReferenceLinesPlugin(options: {
       chartRef?.redraw();
     },
 
-    afterDrawData(chart: ChartInstance, ctx: CanvasRenderingContext2D) {
+    afterDrawData(chart: EngineHost, ctx: CanvasRenderingContext2D) {
       const layout = chart.getLayout();
       const { left, top, width, height } = layout.plot;
       const theme = chart.getTheme();

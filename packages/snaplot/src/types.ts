@@ -2,9 +2,6 @@
 // DATA TYPES
 // ============================================================
 
-/** Supported typed array types for data columns */
-export type TypedArray = Float64Array | Float32Array;
-
 /**
  * Columnar data format: index 0 is always X values, indices 1..N are Y series.
  * All arrays must have identical length. X values (index 0) MUST be sorted
@@ -506,11 +503,6 @@ export interface CursorConfig {
    */
   dash?: number[];
   /**
-   * Sync key for cross-chart cursor coordination. Charts sharing a key
-   * mirror each other's cursor X position. `null` (default) disables sync.
-   */
-  syncKey?: string | null;
-  /**
    * On a synced chart, also show this chart's tooltip when the cursor is
    * driven by a peer. Default: `false`, synced charts show crosshair only
    * so a dashboard does not sprout duplicate tooltips.
@@ -578,15 +570,6 @@ export interface ZoomConfig {
    * For non-X changes use the `viewport:change` event.
    */
   onZoom?: (xMin: number, xMax: number) => void;
-  /**
-   * Sync key for cross-chart zoom coordination. Charts sharing the same
-   * key will synchronize their X-axis viewport: zooming or panning one
-   * chart applies the same range to all peers. Reset-zoom propagates too.
-   *
-   * Uses the same SyncGroup registry as cursor/highlight sync. An
-   * equality guard prevents infinite broadcast loops.
-   */
-  syncKey?: string | null;
 }
 
 export interface PanConfig {
@@ -812,9 +795,6 @@ export interface CursorSeriesPoint<TMeta = unknown> {
 /**
  * Snapshot of all visible series at a given cursor (or fallback) index.
  * Returned by `chart.getCursorSnapshot()` and consumed by the legend table.
- *
- * Safe to read on every `cursor:move`: the `points` array is reused
- * across calls (mutated in place) when you use `getCursorSnapshotInto()`.
  */
 export interface CursorSnapshot<TMeta = unknown> {
   /** Index into the X column. `null` when source === 'none'. */
@@ -849,26 +829,10 @@ export interface CursorSnapshotOptions {
 }
 
 // ============================================================
-// HIGHLIGHT (cross-chart series highlight + dim)
+// HIGHLIGHT (series highlight + dim)
 // ============================================================
 
-/**
- * Stable cross-chart identity for a series, returned by `highlight.getKey`.
- * Lets linked charts with different series order highlight the same logical
- * run/metric.
- */
-export type HighlightSyncKey = string | number;
-
-/**
- * Wire format broadcast over a highlight sync group. `index` carries a raw
- * `seriesIndex` (identical-order charts); `key` carries a `getKey` identity
- * that each receiver maps to its own local series. `null` clears.
- */
-export type HighlightSyncPayload =
-  | { type: 'index'; seriesIndex: number | null }
-  | { type: 'key'; key: HighlightSyncKey | null };
-
-export interface HighlightConfig<TMeta = unknown> {
+export interface HighlightConfig {
   /** Master switch. Default: true. */
   enabled?: boolean;
   /**
@@ -877,32 +841,12 @@ export interface HighlightConfig<TMeta = unknown> {
    */
   dimOpacity?: number;
   /**
-   * Sync key for cross-chart highlight propagation. Mirrors
-   * `cursor.syncKey` semantics, charts sharing a key publish/receive
-   * highlight changes from each other.
-   */
-  syncKey?: string | null;
-  /**
    * Auto-highlight the series nearest the cursor when its hit-tested
    * point is within this many CSS pixels vertically; clear the highlight
-   * when nothing qualifies. Off when unset. Propagates through `syncKey`
-   * like a manual `setHighlight()`, so linked charts dim together.
+   * when nothing qualifies. Off when unset. Propagates through a chart
+   * group like a manual `setHighlight()`, so linked charts dim together.
    */
   proximity?: number;
-  /**
-   * Optional stable identity resolver for cross-chart highlight sync.
-   *
-   * By default, sync publishes the local numeric `seriesIndex`, which is
-   * correct for simple charts with identical series ordering. Provide
-   * `getKey` when peers can have different series subsets/order; receiving
-   * charts map the published key back to their own local series index.
-   *
-   * Example: `(series) => series.meta?.runId`.
-   */
-  getKey?: (
-    series: SeriesConfig<TMeta>,
-    seriesIndex: number,
-  ) => HighlightSyncKey | null | undefined;
 }
 
 // ============================================================
@@ -982,7 +926,7 @@ export interface StreamingConfig {
    * following; `chart.scrollToLatest()` or a double-click reset resumes it.
    * Without this, a following chart tracks the full data extent instead of a
    * fixed trailing window. Follows the default `x` axis (and any horizontal
-   * axis) and propagates through `zoom.syncKey`.
+   * axis).
    */
   follow?: number;
 }
@@ -1038,8 +982,8 @@ export interface ChartConfig<TMeta = unknown> {
   tooltip?: TooltipConfig;
   /** Touch-specific gesture overrides layered on top of the mode preset. */
   touch?: TouchConfig;
-  /** Series highlight + dim config, including cross-chart sync. */
-  highlight?: HighlightConfig<TMeta>;
+  /** Series highlight + dim config. */
+  highlight?: HighlightConfig;
   /** Ring-buffer window for `appendData` streaming. */
   streaming?: StreamingConfig;
   /** Large-dataset interaction tuning. */
@@ -1152,66 +1096,62 @@ export interface ThemeConfig {
 }
 
 // ============================================================
-// PLUGIN SYSTEM
+// PLUGIN SYSTEM (internal: createChart bridges public ChartPlugins onto it)
 // ============================================================
+
+/**
+ * What an engine plugin sees of the chart: the current plot rect, scales and
+ * theme to draw against, and a way to ask for a repaint.
+ */
+export interface EngineHost {
+  /** Get current layout */
+  getLayout(): Layout;
+  /** Get a scale by axis key */
+  getAxis(key: string): Scale | undefined;
+  /**
+   * Resolved theme after defaults, light/dark detection, and CSS variable
+   * overrides. Plugins should color against this rather than re-deriving
+   * palettes from the config, which holds only the caller's partial
+   * overrides.
+   */
+  getTheme(): ThemeConfig;
+  /** Force full redraw */
+  redraw(): void;
+}
 
 export interface Plugin {
   /** Unique id. Registering a second plugin with the same id is rejected. */
   id: string;
   /** Called once when the plugin is added. Set up DOM / listeners here. */
-  install?(chart: ChartInstance): void;
+  install?(chart: EngineHost): void;
   /** Called once when the plugin is removed or the chart is destroyed. Tear down here. */
-  destroy?(chart: ChartInstance): void;
+  destroy?(chart: EngineHost): void;
 
-  /** Runs before layout is computed; adjust reserved space here. */
-  beforeLayout?(chart: ChartInstance): void;
-  /** Runs after layout, with the resolved plot/axis rects. */
-  afterLayout?(chart: ChartInstance, layout: Layout): void;
-
-  /** Before gridlines/axes paint. Return `false` to suppress the default grid draw. */
-  beforeDrawGrid?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
   /** After gridlines/axes paint. Draw under the data here. */
-  afterDrawGrid?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
+  afterDrawGrid?(chart: EngineHost, ctx: CanvasRenderingContext2D): void;
 
   /** Before series marks paint. Return `false` to suppress the default data draw. */
-  beforeDrawData?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
+  beforeDrawData?(chart: EngineHost, ctx: CanvasRenderingContext2D): boolean | void;
   /** After series marks paint. Annotations that sit above data go here (see `createReferenceLinesPlugin`). */
-  afterDrawData?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
+  afterDrawData?(chart: EngineHost, ctx: CanvasRenderingContext2D): void;
 
-  /** Before the overlay (crosshair, selection) paints. Return `false` to suppress it. */
-  beforeDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): boolean | void;
   /** After the overlay paints, the topmost draw layer. */
-  afterDrawOverlay?(chart: ChartInstance, ctx: CanvasRenderingContext2D): void;
+  afterDrawOverlay?(chart: EngineHost, ctx: CanvasRenderingContext2D): void;
 
+  /** Fires after the chart's data changes: a replacement or an append. */
+  onSetData?(chart: EngineHost, data: ColumnarData): void;
   /**
-   * Cursor moved. `dataX`/`dataIdx` are `null` when the cursor left the plot.
-   * `origin` distinguishes local pointer input from sync/programmatic moves,
-   * use it to avoid echoing sync-driven updates back out.
+   * Fires after the chart's options change. Use this for plugins whose DOM /
+   * visual state depends on config (series, axes, theme) rather than data,
+   * legends, toolbars, stat readouts. Avoid listening on `onSetData` for
+   * those: at high streaming rates it rebuilds the DOM underneath the user's
+   * cursor.
    */
-  onCursorMove?(
-    chart: ChartInstance,
-    dataX: number | null,
-    dataIdx: number | null,
-    origin: CursorEventOrigin,
-  ): void;
-  /** A scale's viewport changed via zoom/pan, with the affected axis key and new range. */
-  onZoom?(chart: ChartInstance, scaleKey: string, range: ScaleRange): void;
-  /** Reserved click hook. Not currently invoked by the core (see the DX audit). */
-  onClick?(chart: ChartInstance, dataX: number, dataIdx: number): void;
-  /** Fires after chart data changes through `setData()` or `appendData()`. */
-  onSetData?(chart: ChartInstance, data: ColumnarData): void;
-  /**
-   * Fires after `chart.setOptions()` merges a partial config. Use this
-   * for plugins whose DOM / visual state depends on config (series,
-   * axes, theme) rather than data, legends, toolbars, stat readouts.
-   * Avoid listening on `onSetData` for those: at high streaming rates
-   * it rebuilds the DOM underneath the user's cursor.
-   */
-  onSetOptions?(chart: ChartInstance): void;
+  onSetOptions?(chart: EngineHost): void;
 }
 
 // ============================================================
-// CHART INSTANCE (public interface)
+// DATA UPDATES
 // ============================================================
 
 export interface AppendDataOptions {
@@ -1220,153 +1160,11 @@ export interface AppendDataOptions {
    * instead of a new point: the last row is overwritten in place and any
    * remaining rows append normally. This is the streaming verb for
    * in-progress buckets (a live epoch aggregate, a forming candle) and
-   * avoids the full-window reallocation that `setData` implies. The
+   * avoids the full-window reallocation that a data replacement implies. The
    * replacement X must keep the X column sorted; it is usually the same
    * X the row was first appended with.
    */
   updateLast?: boolean;
-}
-
-export interface ChartInstance {
-  /** Replace all data */
-  setData(data: ColumnarData): void;
-  /** Append data for streaming */
-  appendData(data: ColumnarData, opts?: AppendDataOptions): void;
-  /** Get current data */
-  getData(): ColumnarData;
-
-  /** Update axis domain */
-  setAxis(key: string, range: Partial<ScaleRange>): void;
-  /** Get a scale by axis key */
-  getAxis(key: string): Scale | undefined;
-
-  /** Merge config updates. Arrays such as `series` replace by value. */
-  setOptions(config: DeepPartial<ChartConfig>): void;
-  /**
-   * Replace the chart config declaratively, resolving defaults again and
-   * dropping keys omitted from the new config. Solid wrappers use this for
-   * full `config` signal updates.
-   */
-  replaceOptions(config: ChartConfig): void;
-  /** Get resolved config */
-  getOptions(): ChartConfig;
-
-  /**
-   * Resolved theme after defaults, light/dark detection, and CSS variable
-   * overrides. Plugins should color against this rather than re-deriving
-   * palettes from `getOptions().theme`, which holds only the caller's
-   * partial overrides.
-   */
-  getTheme(): ThemeConfig;
-
-  /**
-   * Resolved series legend model for application-owned headers, sidebars, or
-   * custom renderers. Colors follow the active theme and mark fields retain
-   * enough geometry to distinguish lines, areas, bands, bars, and points.
-   */
-  getLegendItems(): LegendItem[];
-
-  /**
-   * Re-resolve the theme against the container's current CSS cascade and
-   * repaint if anything changed. Charts already call this automatically
-   * when an attribute changes on `<html>`/`<body>` (the `[data-theme]`
-   * pattern) or the OS color scheme flips; call it manually only when
-   * tokens change through some other mechanism (for example a variable
-   * swapped on a mid-tree ancestor). No-ops when the resolved theme is
-   * value-identical.
-   */
-  refreshTheme(): void;
-
-  /** Get current layout */
-  getLayout(): Layout;
-
-  /** Force full redraw */
-  redraw(): void;
-  /** Resize chart */
-  resize(width: number, height: number): void;
-
-  /**
-   * The current persistent brush selection in data space, or `null`. Set by
-   * a `selection.mode: 'brush'` gesture or `setSelection()`. Safe to
-   * serialize; feed it back to `setSelection()` to restore.
-   */
-  getSelection(): SelectionRange | null;
-  /**
-   * Set or clear the persistent brush selection programmatically (`null`
-   * clears). Fires `selection:change` / `selection.onBrush` on a real
-   * change. Independent of `selection.mode`, so a zoom-mode chart can still
-   * carry a brush set from code.
-   */
-  setSelection(selection: SelectionRange | null): void;
-
-  /**
-   * Resume live-follow and snap the X viewport to the newest data. With
-   * `streaming.follow` set this jumps to the trailing window; otherwise it
-   * resets X to the full data extent. Re-enables following after the user
-   * paused it by panning or zooming, and fires `follow:change`.
-   */
-  scrollToLatest(): void;
-  /**
-   * Whether the X viewport is tracking new data (live) rather than pinned by
-   * a user pan/zoom (paused). Starts `true`; a horizontal pan or zoom sets it
-   * `false`; `scrollToLatest()` and a double-click reset set it `true`.
-   */
-  isFollowing(): boolean;
-
-  /** Destroy and clean up all resources */
-  destroy(): void;
-
-  /** Register a plugin. Returns false when a plugin with the same id is already registered. */
-  use(plugin: Plugin): boolean;
-
-  /** Subscribe to chart events */
-  on<K extends keyof ChartEventMap>(event: K, handler: ChartEventMap[K]): () => void;
-
-  /** Set cursor position from external source (sync/programmatic) */
-  setCursorDataX(dataX: number | null, origin?: CursorEventOrigin): void;
-
-  /**
-   * Snapshot of all visible series at the current cursor position
-   * (or fallback). Allocates a fresh snapshot, use
-   * `getCursorSnapshotInto()` in the cursor hot path to reuse buffers.
-   */
-  getCursorSnapshot(opts?: CursorSnapshotOptions): CursorSnapshot;
-
-  /**
-   * Zero-allocation variant of `getCursorSnapshot`. Mutates and returns
-   * `target`. The `target.points` array is grown but never shrunk; use
-   * `target.points.length` (after this call) as the row count.
-   */
-  getCursorSnapshotInto(target: CursorSnapshot, opts?: CursorSnapshotOptions): CursorSnapshot;
-
-  /**
-   * Set the highlighted series. Pass `null` to clear. Triggers a data-layer
-   * redraw (non-highlighted series dim per `highlight.dimOpacity`) and
-   * publishes to the sync group when `highlight.syncKey` is set.
-   * No-op when the value is unchanged.
-   */
-  setHighlight(seriesIndex: number | null): void;
-
-  /** Currently highlighted series index, or `null`. */
-  getHighlight(): number | null;
-
-  /**
-   * Highlight by stable identity. Requires `highlight.getKey`; when no
-   * visible series resolves to the key the highlight is cleared.
-   */
-  setHighlightKey(key: HighlightSyncKey | null): void;
-
-  /** Currently highlighted stable identity key, or `null`. */
-  getHighlightKey(): HighlightSyncKey | null;
-
-  /**
-   * Lightweight diagnostics for benchmark demos and local debugging.
-   * Returns a copy so callers cannot mutate internal counters.
-   */
-  getStats(): ChartStats;
-
-  /** The root DOM container */
-  readonly container: HTMLElement;
 }
 
 // ============================================================
@@ -1375,10 +1173,10 @@ export interface ChartInstance {
 
 /**
  * What produced a cursor change. `local` is this chart's own pointer;
- * `sync` came from a peer over a sync group; `programmatic` came from
- * `setCursorDataX`. Handlers use it to break sync feedback loops.
+ * `programmatic` came from `setCursorDataX` (a chart group's cursor sync, or
+ * application code).
  */
-export type CursorEventOrigin = 'local' | 'sync' | 'programmatic';
+export type CursorEventOrigin = 'local' | 'programmatic';
 
 /** Event name to handler-signature map for `chart.on()`. */
 export interface ChartEventMap {
@@ -1404,16 +1202,10 @@ export interface ChartEventMap {
   'follow:change': (following: boolean) => void;
   /** Chart resized, with the new CSS-pixel dimensions. */
   resize: (width: number, height: number) => void;
-  /** Reserved click event. Not currently emitted by the core (see the DX audit). */
-  click: (dataX: number, dataIdx: number) => void;
   /** Box selection resolved. Mirror of `selection.onSelect`. */
   select: (selection: SelectionResult) => void;
   /** Persistent brush selection changed (`null` when cleared). Mirror of `selection.onBrush`. */
   'selection:change': (selection: SelectionRange | null) => void;
-  /** Emitted while the data layer paints, for canvas-level custom drawing without a plugin. */
-  drawData: (ctx: CanvasRenderingContext2D, layout: Layout) => void;
-  /** Emitted while the overlay layer paints, above the data. */
-  drawOverlay: (ctx: CanvasRenderingContext2D, layout: Layout) => void;
 }
 
 // ============================================================
@@ -1435,18 +1227,4 @@ export enum DirtyFlag {
   OVERLAY = 1 << 2,
   /** GRID | DATA | OVERLAY, a full repaint. */
   ALL = 0b111,
-}
-
-/** The resolved state handed to renderers for one paint. Read-only per frame. */
-export interface RenderContext {
-  /** Fully resolved config (defaults + user overrides applied). */
-  config: ChartConfig;
-  /** The current data snapshot. */
-  data: ColumnarData;
-  /** Scales keyed by axis key. */
-  scales: Map<string, Scale>;
-  /** Plot and axis rects plus dpr for this paint. */
-  layout: Layout;
-  /** The resolved theme (defaults + CSS vars + overrides). */
-  theme: ThemeConfig;
 }

@@ -1,10 +1,5 @@
 import type { SeriesConfig } from '../types';
 
-export interface BarRenderPoint {
-  centerX: number;
-  ordinal: number;
-}
-
 export interface BarRect {
   left: number;
   width: number;

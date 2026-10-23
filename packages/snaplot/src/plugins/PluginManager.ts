@@ -1,4 +1,4 @@
-import type { Plugin, ChartInstance } from '../types';
+import type { Plugin, EngineHost } from '../types';
 
 /**
  * Manages plugin registration and lifecycle hook dispatch.
@@ -16,15 +16,11 @@ export class PluginManager {
     return true;
   }
 
-  unregister(id: string): void {
-    this.plugins = this.plugins.filter((p) => p.id !== id);
-  }
-
   hasHook(hook: keyof Plugin): boolean {
     return this.plugins.some((plugin) => typeof plugin[hook] === 'function');
   }
 
-  installAll(chart: ChartInstance): void {
+  installAll(chart: EngineHost): void {
     for (const plugin of this.plugins) {
       plugin.install?.(chart);
     }
@@ -51,7 +47,7 @@ export class PluginManager {
     return true;
   }
 
-  destroyAll(chart: ChartInstance): void {
+  destroyAll(chart: EngineHost): void {
     for (const plugin of this.plugins) {
       plugin.destroy?.(chart);
     }

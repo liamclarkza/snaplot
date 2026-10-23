@@ -1,4 +1,4 @@
-import type { ChartInstance, Plugin } from '../../types';
+import type { EngineHost, Plugin } from '../../types';
 import { withAlpha } from '../../utils/color';
 
 /** A labelled X or Y interval rendered beneath the series marks. */
@@ -25,9 +25,9 @@ export function createReferenceRegionsPlugin(options: {
   regions: ReferenceRegion[];
 }): ReferenceRegionsPlugin {
   let regions = options.regions;
-  const charts = new Set<ChartInstance>();
+  const charts = new Set<EngineHost>();
 
-  const visibleGeometry = (chart: ChartInstance, region: ReferenceRegion) => {
+  const visibleGeometry = (chart: EngineHost, region: ReferenceRegion) => {
     const { left, top, width, height } = chart.getLayout().plot;
     const scale = chart.getAxis(region.axisKey ?? region.axis);
     if (!scale) return null;
