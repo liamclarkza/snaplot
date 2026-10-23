@@ -537,3 +537,26 @@ session scratchpad (`m3b-fix/`).
 ## Human steps
 
 None for this milestone. Real-device touch and scroll checks remain in M17's list.
+
+## Merge onto `overhaul` (integrator)
+
+- **Rebase.** Onto `c1778b9` (`ovh-m2-done`; M3a, M4, M6a, M6b, M1b and M2 had merged). Only
+  `packages/snaplot/package.json` changed on both sides, and git merged its scripts block cleanly: every
+  script is kept (M3a's `test:visual`, M3b's `test:browser`, `ledger` and `trace-check`). The lockfile is
+  `overhaul`'s, unchanged by this branch.
+- **The two `[gap-annotations-extensibility-06:mount]` markers** in `test/ledger/m8-plugins.test.ts` passed
+  unexpectedly after the rebase: M1b (`4a042b7`) fixed the regression in Request 1. With that fix reverted
+  in the working tree (temporarily), both fail, and so do M1b's two locks in `m1-mount.test.ts`; with it,
+  all pass. `fd8f306` flips both markers to plain tests. M2 changed no marker's state.
+- **Per-commit state.** The history was not rewritten, so each commit from `a481073` to `a8c107a` still has
+  those two `it.fails`. On `overhaul` they fail vitest there with exactly those 2 unexpected passes
+  (checked on `git archive` extractions of every commit; everything else as expected). A bisect that runs
+  the whole suite should skip that range or exclude `m8-plugins.test.ts`.
+- **Gates at `fd8f306`** (worktree): `npm run verify` exit 0 (603 passed, 141 expected fail, 744);
+  `test:browser` 73 passed (64 expected failures, 0 unexpected); `npm run ledger` 224 markers (vitest 141,
+  consumers 4, browser 64, visual 15; 175 distinct ids), each suite's executed expected failures equal;
+  `trace-check` OK (merged M0, M1, M1b, M2, M3a, M4, M5, M6a, M6b; 21 of 21 closed units locked);
+  `--milestone M3b` OK; `--coverage` 0 of 192 uncovered; `trace-ids.mjs --check` OK; `test:visual --against
+  c1778b9` exact, then `check-visual-diffs --milestone M3b`: 137 shots, 0 changed, geometry 555 checks, 0
+  failing; `check-visual-ledger` OK; `check:package`, `check:size`, `check:api`, `build:site` and
+  `metrics.mjs` exit 0.
