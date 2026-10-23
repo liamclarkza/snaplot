@@ -182,6 +182,7 @@ import { Icon } from '@astrojs/starlight/components';
 
     #render(pages: PagefindData[]): void {
       const options: HTMLLIElement[] = [];
+      const base = (this.dataset.base ?? '/').replace(/\/?$/, '/');
       const option = (title: string, excerpt: string, url: string, section: boolean) => {
         const li = document.createElement('li');
         li.id = `snaplot-search-option-${options.length}`;
@@ -195,12 +196,24 @@ import { Icon } from '@astrojs/starlight/components';
         const text = document.createElement('span');
         text.className = 'result-excerpt';
         text.append(...excerptNodes(excerpt));
-        li.append(heading, text);
+        li.append(heading);
+        if (!section) {
+          // The path tells same-named pages apart (LegendTable in snaplot/react and snaplot/solid).
+          const path = document.createElement('span');
+          path.className = 'result-path';
+          path.textContent = url.replace(base, '').replace(/\/(#.*)?$/, '').replaceAll('/', ' › ');
+          li.append(path);
+        }
+        li.append(text);
         options.push(li);
       };
       for (const page of pages) {
-        option(page.meta.title ?? page.url, page.excerpt, page.url, false);
-        const sections = (page.sub_results ?? []).filter((s) => s.url !== page.url);
+        const title = page.meta.title ?? page.url;
+        option(title, page.excerpt, page.url, false);
+        // Skip sections that only repeat the page: its own URL or its own title.
+        const sections = (page.sub_results ?? []).filter(
+          (s) => s.url !== page.url && s.title !== title,
+        );
         for (const sub of sections.slice(0, MAX_SECTIONS)) option(sub.title, sub.excerpt, sub.url, true);
       }
       this.#list.replaceChildren(...options);
@@ -362,7 +375,8 @@ import { Icon } from '@astrojs/starlight/components';
     padding: 0;
     overflow-y: auto;
   }
-  [role='option'] {
+  /* The options are created by the script, so they carry no scoping attribute: :global(). */
+  [role='listbox'] :global([role='option']) {
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
@@ -370,24 +384,29 @@ import { Icon } from '@astrojs/starlight/components';
     border-radius: var(--snaplot-radius);
     cursor: pointer;
   }
-  [role='option'][data-section] {
+  [role='listbox'] :global([role='option'][data-section]) {
     padding-inline-start: 1.75rem;
   }
-  [role='option']:hover,
-  [role='option'][aria-selected='true'] {
+  [role='listbox'] :global([role='option']:hover),
+  [role='listbox'] :global([role='option'][aria-selected='true']) {
     background-color: var(--snaplot-surface);
   }
-  [role='option'][aria-selected='true'] .result-title {
+  [role='listbox'] :global([role='option'][aria-selected='true'] .result-title) {
     color: var(--snaplot-accent);
   }
-  .result-title {
+  [role='listbox'] :global(.result-title) {
     font-weight: 600;
   }
-  .result-excerpt {
-    font-size: var(--sl-text-sm);
+  [role='listbox'] :global(.result-path) {
+    font-size: var(--sl-text-xs);
     color: var(--snaplot-ink-secondary);
   }
-  .result-excerpt :global(mark) {
+  [role='listbox'] :global(.result-excerpt) {
+    font-size: var(--sl-text-sm);
+    color: var(--snaplot-ink-secondary);
+    overflow-wrap: anywhere;
+  }
+  [role='listbox'] :global(.result-excerpt mark) {
     background: none;
     color: var(--snaplot-ink);
     font-weight: 600;

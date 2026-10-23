@@ -76,3 +76,11 @@
   --sl-text-h4: 1rem;
   --sl-text-h5: 1rem;
 }
+
+/* Narrow screens: a smaller h1, as on the custom pages. */
+@media (max-width: 50rem) {
+  :root,
+  :root[data-theme="light"] {
+    --sl-text-h1: 2rem;
+  }
+}

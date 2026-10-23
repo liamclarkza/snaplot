@@ -74,6 +74,7 @@ a:hover {
   align-items: center;
   gap: 0.5rem 1.5rem;
   min-height: 4rem;
+  padding-block: 0.75rem;
 }
 .brand {
   font-weight: 600;
@@ -137,6 +138,11 @@ h3 {
 }
 p {
   max-width: 68ch;
+}
+@media (max-width: 50rem) {
+  h1 {
+    font-size: 2rem;
+  }
 }
 
 .lede {

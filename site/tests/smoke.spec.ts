@@ -305,6 +305,9 @@ test.describe('[uisite-14][docs-11] search', () => {
       await input.fill('createChart');
       const options = page.getByRole('listbox', { name: 'Results' }).getByRole('option');
       await expect(options.first()).toContainText('createChart');
+      // Styled as a list of options, although the script creates them after the page loads.
+      await expect(options.first()).toHaveCSS('display', 'flex');
+      await expect(options.first().locator('mark').first()).toHaveCSS('font-weight', '600');
       await expect(input).toHaveAttribute('aria-expanded', 'true');
       await expect(input).toHaveAttribute('aria-controls', 'snaplot-search-results');
       const first = await options.first().getAttribute('id');
