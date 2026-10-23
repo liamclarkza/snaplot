@@ -109,7 +109,7 @@ describe('[gap-scale-longevity-01] resize paints synchronously', () => {
     expect(resets(chart)).toEqual(afterResize);
   });
 
-  it.fails('[gap-scale-longevity-01] a chart updated while hidden re-lays out when shown at the same size', () => {
+  it('[gap-scale-longevity-01] a chart updated while hidden re-lays out when shown at the same size', () => {
     const chart = mount(2);
     fakes.resizeObserver.deliver();
     fakes.frames.flush();

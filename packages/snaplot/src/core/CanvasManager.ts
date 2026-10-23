@@ -81,14 +81,20 @@ export class CanvasManager {
     return this.container.clientHeight;
   }
 
-  /** Enable ResizeObserver for auto-resize */
+  /**
+   * Enable ResizeObserver for auto-resize. Every non-zero delivery re-lays
+   * out (`onResize`), even when the backing stores need no reallocation:
+   * a box shown again at its old size after `display: none` (deliveries of
+   * 0 × 0 are skipped) still carries the fallback layout made while hidden.
+   */
   enableAutoResize(): void {
     if (this.resizeObserver) return;
     this.resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
       const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0 && this.resize(width, height)) {
+      if (width > 0 && height > 0) {
+        this.resize(width, height);
         this.onResize?.(width, height);
       }
     });

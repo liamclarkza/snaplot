@@ -460,9 +460,10 @@ export class ChartCore implements ChartInstance {
 
     // 2. Create canvas layers
     // Resize and DPR callbacks run outside the frame loop (a ResizeObserver
-    // delivers after this frame's rAF callbacks and before paint), and the
+    // delivers after this frame's rAF callbacks and before paint), and a
     // reallocation cleared every layer. Paint now, or the cleared, opaque grid
-    // is composited as a black frame (gap-scale-longevity-01).
+    // is composited as a black frame (gap-scale-longevity-01). A delivery
+    // that reallocates nothing still re-lays out and paints here.
     this.canvasManager = new CanvasManager(parent, (w, h) => {
       this.onResize(w, h);
       this.scheduler.flush();
