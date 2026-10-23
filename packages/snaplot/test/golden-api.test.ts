@@ -12,8 +12,22 @@ const manifest = JSON.parse(manifestText) as {
   exports: Record<string, string | { types?: string }>;
 };
 
-/** P4: public declarations never name these engine types. */
-const FORBIDDEN = ['EngineConfig', 'ChartCore', 'SeriesSpec', 'ChartInstance'];
+/**
+ * P4: public declarations never name these engine types (engine/spec.ts, core/Chart.ts). The
+ * public LegendItem, CursorSnapshot and SelectionResult are written by hand under the same names.
+ */
+const FORBIDDEN = [
+  'EngineConfig',
+  'ChartCore',
+  'EngineHost',
+  'SeriesConfig',
+  'ChartInstance',
+  'ChartSpec',
+  'AxisSpec',
+  'SeriesSpec',
+  'StreamingSpec',
+  'ZoomBoundsSpec',
+];
 
 describe('golden public declarations (api/*.d.ts)', () => {
   it('exist for exactly the entries the exports map types', () => {

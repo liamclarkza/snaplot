@@ -23,8 +23,22 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const dist = join(root, 'dist');
 const api = join(root, 'api');
 
-/** P4: public declarations never name these engine types. */
-const FORBIDDEN = ['EngineConfig', 'ChartCore', 'SeriesConfig', 'ChartInstance'];
+/**
+ * P4: public declarations never name these engine types (engine/spec.ts, core/Chart.ts). The
+ * public LegendItem, CursorSnapshot and SelectionResult are written by hand under the same names.
+ */
+const FORBIDDEN = [
+  'EngineConfig',
+  'ChartCore',
+  'EngineHost',
+  'SeriesConfig',
+  'ChartInstance',
+  'ChartSpec',
+  'AxisSpec',
+  'SeriesSpec',
+  'StreamingSpec',
+  'ZoomBoundsSpec',
+];
 /** Names reported instead of failed while a ledger marker tracks them (none since M7, research-12). */
 const TRACKED = new Set();
 
