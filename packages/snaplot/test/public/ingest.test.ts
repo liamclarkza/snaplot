@@ -465,4 +465,62 @@ describe('[dataapi-05] category codes stay with their labels', () => {
     expect(pointsAt(chart, 'C')).toContainEqual(['s1', 'C', 3]);
     expect(pointsAt(chart, 'D')).toContainEqual(['s2', 'D', 4]);
   });
+
+  it.fails('[dataapi-05] a streamed category axis keeps its codes through an unrelated update', () => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
+    const chart = mount({
+      data: [{ m: 'Jan', y: 1 }],
+      x: 'm',
+      series: [{ y: 'y' }],
+      streaming: { maxPoints: 5 },
+    });
+    for (const [i, m] of months.entries()) if (i > 0) chart.appendData([{ m, y: i + 1 }]);
+    // Apr to Aug are retained, at the codes they were appended with.
+    const full = chart.getAxis('x');
+    expect(full).toMatchObject({ type: 'category', min: 3, max: 7 });
+    // Zoom to Jun and Jul, as a gesture or a controlled viewport pins them.
+    const zoom = { min: 4.75, max: 6.25 };
+    chart.setViewport({ x: zoom });
+    fakes.frames.flush();
+    expect(debug(chart).inViewPoints).toBe(2);
+    chart.update({ axes: { y: { title: 'Load' } } });
+    fakes.frames.flush();
+    expect(chart.getAxis('x')).toMatchObject(zoom);
+    expect(debug(chart).inViewPoints).toBe(2);
+    expect(pointsAt(chart, 'Jun')).toEqual([['y', 'Jun', 6]]);
+    chart.appendData([{ m: 'Sep', y: 9 }]);
+    chart.resetViewport();
+    expect(chart.getAxis('x')).toMatchObject({ min: 4, max: 8 });
+    // Replacing the data rebuilds the categories from the new rows.
+    chart.update({
+      data: [
+        { m: 'Oct', y: 10 },
+        { m: 'Nov', y: 11 },
+      ],
+    });
+    chart.resetViewport();
+    expect(chart.getAxis('x')).toMatchObject({ min: 0, max: 1 });
+  });
+
+  it.fails('[dataapi-05] sources on one axis keep their slot order through an update', () => {
+    const chart = mount({
+      data: [{ a: 'P', b: 'Q', y1: 1, y2: 2 }],
+      x: 'a',
+      series: [
+        { id: 's1', type: 'scatter', y: 'y1' },
+        { id: 's2', type: 'scatter', y: 'y2', x: 'b' },
+      ],
+    });
+    chart.appendData([{ a: 'C', b: 'D', y1: 3, y2: 4 }]);
+    /** The label of each slot, read by moving the cursor to its code. */
+    const slots = () =>
+      [0, 1, 2, 3].map((code) => {
+        chart.setCursor(code);
+        return chart.getCursorSnapshot().x;
+      });
+    expect(slots()).toEqual(['P', 'Q', 'C', 'D']);
+    chart.update({ axes: { y: { title: 'Load' } } });
+    expect(slots()).toEqual(['P', 'Q', 'C', 'D']);
+    expect(pointsAt(chart, 'Q')).toContainEqual(['s2', 'Q', 2]);
+  });
 });
