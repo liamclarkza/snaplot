@@ -1,0 +1,107 @@
+# Visual and geometry harness
+
+The pixel and geometry safety net of the overhaul (plan §11.3 G10, M3a). Two Playwright projects run
+over one fixture app:
+
+- **`visual`**: one screenshot per fixture shot, compared at `maxDiffPixelRatio: 0.002`.
+- **`geometry`**: five platform-independent checks over DOM label boxes and data-layer ink. They are
+  blocking on every platform.
+
+Agents run them in local macOS Chromium. The committed baselines are the `-darwin` set.
+`scripts/visual-docker.sh` is the optional Linux path for CI and the `update-snapshots` workflow, which
+produce the `-linux` set.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `npm run test:visual` | Both projects against the committed `__screenshots__/<area>/<name>-<platform>.png` |
+| `npm run test:visual -- --against <ref>` | Renders `<ref>`'s own fixture app into the reference cache, then compares the working tree with it |
+| `node scripts/overhaul/check-visual-diffs.mjs` | Judges the last run: zero changes for M2/M9a/M9b, else every changed fixture needs a visual-ledger row from this milestone |
+| `node scripts/overhaul/check-visual-ledger.mjs` | P13: every commit that touches screenshots or has a `visual:` paragraph adds or edits its row file |
+| `npm run test:visual -- --update` | Rewrites the committed baselines and prunes stale ones (M3a and M14 only) |
+| `npm run test:visual -- --serve` | Serves the fixture app; open `/index.html` for the list, `?fixture=<id>` for one |
+
+Other flags: `--project visual|geometry`, `--grep <re>`, `--workers <n>`, and anything after `--` goes to
+Playwright. The port is `$PORT`, else 5333 (EXECUTION.md rule 6), else a free one.
+
+Every run writes `packages/snaplot/test-results/visual/`:
+- `report.json` (Playwright JSON);
+- `meta.json` (mode, head, reference, where the expected images live);
+- `contact-sheet.html` (open it from disk to review every shot, with diffs for changed ones).
+
+The reference cache is `$SNAPLOT_SNAPSHOT_DIR/<sha>/`, default `<main checkout>/.claude/visual-cache/`.
+A ref is extracted with `git archive` and renders its own fixtures with its own config. A fixture whose
+options a milestone renamed therefore still compares like with like. Refs older than the M3a merge have
+no fixture app and are not valid references. The runner never deletes anything outside the worktree,
+and waits while `.claude/bench.lock` exists.
+
+## Fixtures
+
+`fixtures/<area>.ts`, one area per owner from W5:
+
+| Area | Owner | Content |
+|---|---|---|
+| `axes/` | M10 | DEFAULTS_FINDINGS cases (DEF-01…05), time, log, categories, annotations, y2, 24 px minimum font, explicit ticks |
+| `marks/` | M11 | `#/visual` ports, the gap-overhaul-delta basics, mark edge cases, the audit grid (6 marks × {1, 3, 8} series × 3 sizes) |
+| `theme/` | M11 | White, cream and dark cards, swatches, transparent and CSS-variable surfaces, each under OS light and dark |
+| `layout/` | M11 | Axis titles and box sizes |
+| `overlay/` | M12a | Tooltip, hover and highlight states (real pointer moves) |
+
+Rules:
+- Ids are `<area>/<name>` and never change. A milestone that renames an option (M7, M8) edits the
+  fixture in the same commit and keeps the id.
+- Fixtures use only options that survive plan §4.4: no `padding`, `tickCount`, `rangePadding`,
+  `heatmap*`, `fillGradient`, `pointShape` or legend plugins. Legend fixtures arrive with M8.
+- Data is seeded (`fixtures/data.ts`).
+- Fixtures `import type` from the library only. Runtime helpers come through `FixtureLib`, so the specs
+  can read the registry in Node.
+
+Shots:
+- every fixture at DPR 1 under the light scheme;
+- `dpr2: true` adds `<id>@2x` (the crispness set);
+- `schemes: true`, for theme fixtures only, gives `<id>@light` and `<id>@dark`.
+
+Budget: ≤ 150 PNGs and ≤ 10 MB per committed set.
+
+Determinism:
+- IBM Plex Sans (`@fontsource`) is loaded before the chart exists, and `theme.fontFamily` is set
+  explicitly.
+- The page reports ready after `document.fonts.ready`, two frames and an idle callback.
+- The Playwright config fixes the viewport (1280 × 800), reduced motion, `en-US` and UTC.
+- `minFontSize` fixtures run in a persistent full-Chromium profile, because the headless shell ignores
+  the font preference.
+
+## Geometry checks and expected failures
+
+`checks.ts` holds five checks; `checks.test.ts` unit-tests them under vitest:
+- no overlapping label boxes;
+- no two adjacent labels with the same text;
+- at least 2 labels per axis when the plot is 120 px or more along it;
+- every finite datum paints at least 1 pixel (ink within 2 px on the data layer; bars and histograms are
+  probed at half height across their slot);
+- no label outside the chart box.
+
+`probe.ts` collects the facts in the page. It reads the public handle and the debug symbol (D31), and
+prefers `scale(key).toPixel` once M8 adds it.
+
+A check that today's code fails is listed in `expected/m<N>.ts` for its owning milestone:
+- `fails('<owner>', '<fixture>', '<check>', '<finding id>')`: the test runs as `test.fail` with
+  `[<finding id>]` in its title, so an unexpected pass turns the run red.
+- The fixing commit flips `fails(` to `fixed(` on the same line. The passing test keeps the id in its
+  title as the finding's lock.
+- A fixture may skip a check that does not apply (`skip: { minLabels: 'reason' }`).
+
+## The in-page contract
+
+`page-api.ts`: the app publishes `window.__snaplotFixture` with `status`, `chart`, `plotPoint(fx, fy)`,
+`geometry()` and `frames(n)`. `playwright.config.ts` reads these variables:
+
+| Variable | Use |
+|---|---|
+| `PORT` | The preview port |
+| `SNAPLOT_VISUAL_EXPECTED_DIR` | Expected screenshots, instead of the committed set |
+| `SNAPLOT_VISUAL_OUTPUT_DIR` | Artifacts and report |
+| `SNAPLOT_VISUAL_WORKERS` | The worker count |
+
+Keep these stable: `--against` drives an older ref's config through them.
