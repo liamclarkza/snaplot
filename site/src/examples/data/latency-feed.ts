@@ -5,9 +5,12 @@
  * second. The example calls `chart.appendData(rows)` with what this hands over.
  *
  * It plays only while the chart is on screen, the tab is visible and the hero is playing. Under
- * `prefers-reduced-motion` the hero starts paused (WCAG 2.2.2), and the Pause button the page
- * binds with `bindHeroToggle` pauses and resumes every feed on the page.
+ * `prefers-reduced-motion` the hero starts paused (WCAG 2.2.2). The toggle the page binds with
+ * `bindHeroToggle` pauses and plays every feed on the page, and follows each chart's own state: a
+ * pan or a zoom stops a chart following the stream, the toggle then reads "Back to live", and
+ * going back to live (or playing) calls `chart.resumeFollow()`.
  */
+import type { ChartHandle } from 'snaplot';
 import { createSimulator, DEFAULT_SEED } from '../../demos/deploy-482/simulator';
 
 /** One row of the hero's chart. */
@@ -25,10 +28,23 @@ const SKIP_SECONDS = 15 * 60;
 const HISTORY_SECONDS = 4 * 60;
 const TICK_MS = 100;
 
+/** One chart a feed streams to. */
+interface Feed {
+  /** Whether the chart shows the latest rows (`getState().following`). */
+  following: boolean;
+  /** Whether the chart is on screen. */
+  visible: boolean;
+  /** Starts or stops the feed's timer to match the page. */
+  sync(): void;
+  chart: ChartHandle<Latency>;
+}
+
 interface HeroState {
   playing: boolean;
   /** Rows streamed after the history, for the page's tests. */
   streamed: number;
+  feeds: Set<Feed>;
+  /** The toggles' renderers. */
   listeners: Set<() => void>;
 }
 
@@ -39,35 +55,54 @@ function hero(): HeroState {
   let state = scope[key];
   if (!state) {
     const reduce = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    state = { playing: !reduce, streamed: 0, listeners: new Set() };
+    state = { playing: !reduce, streamed: 0, feeds: new Set(), listeners: new Set() };
     scope[key] = state;
   }
   return state;
 }
 
-function setPlaying(playing: boolean): void {
+function notify(): void {
   const state = hero();
-  state.playing = playing;
+  for (const feed of state.feeds) feed.sync();
   for (const listener of state.listeners) listener();
 }
 
-/** Makes `button` the hero's Pause/Play control. */
+/** Whether every chart on screen follows the stream. */
+function live(): boolean {
+  return [...hero().feeds].every((feed) => !feed.visible || feed.following);
+}
+
+/** Playing also brings every chart that a pan or a zoom left behind back to the latest rows. */
+function setPlaying(playing: boolean): void {
+  const state = hero();
+  state.playing = playing;
+  if (playing) for (const feed of state.feeds) if (!feed.following) feed.chart.resumeFollow();
+  notify();
+}
+
+/** Makes `button` the hero's Pause / Play / Back to live control. */
 export function bindHeroToggle(button: HTMLButtonElement): void {
   const state = hero();
   const render = () => {
-    button.textContent = state.playing ? 'Pause' : 'Play';
+    const following = live();
+    button.textContent = !following ? 'Back to live' : state.playing ? 'Pause' : 'Play';
     button.dataset.playing = String(state.playing);
+    button.dataset.live = String(following);
   };
-  button.addEventListener('click', () => setPlaying(!hero().playing));
+  button.addEventListener('click', () => setPlaying(!(hero().playing && live())));
   state.listeners.add(render);
   render();
 }
 
 /**
- * Streams /search latency to `onRows` while `element` is on screen; returns the function that
- * stops it. The chart opens with four minutes of history, three minutes before deploy #482.
+ * Streams /search latency to `onRows` while `chart` is on screen; returns the function that stops
+ * it. The chart opens with four minutes of history, three minutes before deploy #482.
  */
-export function searchLatency(element: HTMLElement, onRows: (rows: Latency[]) => void): () => void {
+export function searchLatency(
+  chart: ChartHandle<Latency>,
+  onRows: (rows: Latency[]) => void,
+): () => void {
+  const element = chart.container;
   const simulator = createSimulator({ seed: DEFAULT_SEED });
   const next = (): Latency => {
     const [search] = simulator.step();
@@ -75,32 +110,43 @@ export function searchLatency(element: HTMLElement, onRows: (rows: Latency[]) =>
   };
   const state = hero();
   let stopped = false;
-  let visible = false;
   let timer: ReturnType<typeof setInterval> | undefined;
 
-  const sync = () => {
-    const run = !stopped && visible && !document.hidden && state.playing;
-    if (run && timer === undefined) {
-      timer = setInterval(() => {
-        if (!element.isConnected) return stop();
-        onRows([next()]);
-        state.streamed++;
-      }, TICK_MS);
-    } else if (!run && timer !== undefined) {
-      clearInterval(timer);
-      timer = undefined;
-    }
+  const feed: Feed = {
+    chart,
+    following: chart.getState().following,
+    visible: false,
+    sync() {
+      const run = !stopped && feed.visible && !document.hidden && state.playing;
+      if (run && timer === undefined) {
+        timer = setInterval(() => {
+          if (!element.isConnected) return stop();
+          onRows([next()]);
+          state.streamed++;
+        }, TICK_MS);
+      } else if (!run && timer !== undefined) {
+        clearInterval(timer);
+        timer = undefined;
+      }
+    },
   };
-  const observer = new IntersectionObserver((entries) => {
-    visible = entries.some((entry) => entry.isIntersecting);
-    sync();
+  const offFollowing = chart.on('following:change', (following) => {
+    feed.following = following;
+    notify();
   });
+  const observer = new IntersectionObserver((entries) => {
+    feed.visible = entries.some((entry) => entry.isIntersecting);
+    notify();
+  });
+  const sync = () => feed.sync();
   function stop(): void {
     stopped = true;
-    sync();
+    feed.sync();
     observer.disconnect();
+    offFollowing();
     document.removeEventListener('visibilitychange', sync);
-    state.listeners.delete(sync);
+    state.feeds.delete(feed);
+    notify();
   }
 
   // The skipped minutes run in slices, so opening the page never blocks for long.
@@ -114,9 +160,9 @@ export function searchLatency(element: HTMLElement, onRows: (rows: Latency[]) =>
     }
     if (skipped < SKIP_SECONDS) return void setTimeout(warm);
     onRows(history);
+    state.feeds.add(feed);
     observer.observe(element);
     document.addEventListener('visibilitychange', sync);
-    state.listeners.add(sync);
   };
   warm();
   return stop;

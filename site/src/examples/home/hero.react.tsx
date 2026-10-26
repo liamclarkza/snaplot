@@ -10,7 +10,7 @@ export default function Hero() {
   const chart = useRef<ChartHandle<Latency>>(null);
   useEffect(() => {
     const c = chart.current;
-    if (c) return searchLatency(c.container, (r) => c.appendData(r));
+    if (c) return searchLatency(c, (r) => c.appendData(r));
   }, []);
   return (
     <Chart

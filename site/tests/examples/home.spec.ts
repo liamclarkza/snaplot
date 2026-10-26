@@ -53,10 +53,18 @@ async function moving(page: Page): Promise<boolean> {
   return (await frame(page)) !== before;
 }
 
+/** The vanilla hero's chart, scrolled into view. */
+async function heroBox(page: Page) {
+  const mount = page.locator(`${VANILLA} snaplot-vanilla-mount`);
+  await mount.scrollIntoViewIfNeeded();
+  const box = await mount.boundingBox();
+  if (!box) throw new Error('no hero');
+  return box;
+}
+
 /** Drags across the middle of the vanilla hero's plot: the default drag zooms X. */
 async function dragAcrossHero(page: Page): Promise<void> {
-  const box = await page.locator(`${VANILLA} snaplot-vanilla-mount`).boundingBox();
-  if (!box) throw new Error('no hero');
+  const box = await heroBox(page);
   const y = box.y + box.height * 0.5;
   await page.mouse.move(box.x + box.width * 0.3, y);
   await page.mouse.down();
@@ -154,7 +162,6 @@ test.describe('the homepage', () => {
   test('[uisite-13] after a zoom the toggle reads "Back to live" and brings the hero back', async ({
     page,
   }) => {
-    test.fail(true, '[uisite-13] the toggle ignores the chart’s following state');
     await page.goto(BASE);
     await page.locator(HERO).scrollIntoViewIfNeeded();
     const toggle = page.locator('[data-hero-toggle]');
@@ -181,8 +188,8 @@ test.describe('the homepage', () => {
     // A double-click, the chart's own reset, also follows the stream again.
     await dragAcrossHero(page);
     await expect(toggle).toHaveText('Back to live');
-    const box = await page.locator(`${VANILLA} snaplot-vanilla-mount`).boundingBox();
-    await page.mouse.dblclick((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + 100);
+    const box = await heroBox(page);
+    await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
     await expect(toggle).toHaveText('Pause');
   });
 

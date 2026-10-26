@@ -9,7 +9,7 @@ export default function Hero() {
   let stop: (() => void) | undefined;
   const ready = (c: ChartHandle<Latency> | undefined) => {
     stop?.();
-    stop = c && searchLatency(c.container, (r) => c.appendData(r));
+    stop = c && searchLatency(c, (r) => c.appendData(r));
   };
   return (
     <Chart

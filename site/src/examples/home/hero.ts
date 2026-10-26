@@ -19,6 +19,6 @@ export default function hero(el: HTMLElement) {
     height: 280,
     ariaLabel: 'Latency of /search, p50 and p99, streaming',
   });
-  searchLatency(el, (rows) => chart.appendData(rows));
+  searchLatency(chart, (rows) => chart.appendData(rows));
   return chart;
 }
