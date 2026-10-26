@@ -33,6 +33,39 @@ async function rowsDuring(page: Page, ms: number): Promise<number> {
   return (await streamed(page)) - before;
 }
 
+const VANILLA = `${HERO} [role="tabpanel"][data-framework="vanilla"]`;
+
+/** A fingerprint of what the vanilla hero has painted. */
+const frame = (page: Page) =>
+  page.evaluate((selector) => {
+    let hash = 2166136261;
+    for (const canvas of document.querySelectorAll<HTMLCanvasElement>(`${selector} canvas`)) {
+      const url = canvas.toDataURL();
+      for (let i = 0; i < url.length; i++) hash = Math.imul(hash ^ url.charCodeAt(i), 16777619);
+    }
+    return hash >>> 0;
+  }, VANILLA);
+
+/** Whether the vanilla hero's picture changes within half a second, as a live chart's does. */
+async function moving(page: Page): Promise<boolean> {
+  const before = await frame(page);
+  await page.waitForTimeout(500);
+  return (await frame(page)) !== before;
+}
+
+/** Drags across the middle of the vanilla hero's plot: the default drag zooms X. */
+async function dragAcrossHero(page: Page): Promise<void> {
+  const box = await page.locator(`${VANILLA} snaplot-vanilla-mount`).boundingBox();
+  if (!box) throw new Error('no hero');
+  const y = box.y + box.height * 0.5;
+  await page.mouse.move(box.x + box.width * 0.3, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, y, { steps: 8 });
+  await page.mouse.up();
+  // Off the plot, so the crosshair does not repaint the overlay.
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height + 120);
+}
+
 /** The client position of a painted line pixel in the middle column of the hero's plot. */
 async function linePixel(page: Page, panel: string) {
   return page.evaluate((selector) => {
@@ -116,6 +149,41 @@ test.describe('the homepage', () => {
     await toggle.click();
     await expect(toggle).toHaveText('Pause');
     await expect.poll(() => rowsDuring(page, 400)).toBeGreaterThan(0);
+  });
+
+  test('[uisite-13] after a zoom the toggle reads "Back to live" and brings the hero back', async ({
+    page,
+  }) => {
+    test.fail(true, '[uisite-13] the toggle ignores the chart’s following state');
+    await page.goto(BASE);
+    await page.locator(HERO).scrollIntoViewIfNeeded();
+    const toggle = page.locator('[data-hero-toggle]');
+    await expect.poll(() => moving(page)).toBe(true);
+
+    // Playing: a zoom stops following the stream, and the toggle says how to get back.
+    await dragAcrossHero(page);
+    await expect(toggle).toHaveText('Back to live');
+    await expect(toggle).toHaveAttribute('data-live', 'false');
+    await toggle.click();
+    await expect(toggle).toHaveText('Pause');
+    await expect.poll(() => moving(page)).toBe(true);
+    await expect.poll(() => rowsDuring(page, 400)).toBeGreaterThan(0);
+
+    // Paused: the same, and going back to live also plays.
+    await toggle.click();
+    await expect(toggle).toHaveText('Play');
+    await dragAcrossHero(page);
+    await expect(toggle).toHaveText('Back to live');
+    await toggle.click();
+    await expect(toggle).toHaveText('Pause');
+    await expect.poll(() => moving(page)).toBe(true);
+
+    // A double-click, the chart's own reset, also follows the stream again.
+    await dragAcrossHero(page);
+    await expect(toggle).toHaveText('Back to live');
+    const box = await page.locator(`${VANILLA} snaplot-vanilla-mount`).boundingBox();
+    await page.mouse.dblclick((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + 100);
+    await expect(toggle).toHaveText('Pause');
   });
 
   test('[uisite-13] the stream pauses while the hero is offscreen', async ({ page }) => {
