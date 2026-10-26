@@ -338,7 +338,7 @@ describe('[research-14][frameworks-04] a state option given at creation does not
     expect(onHiddenSeriesChange.mock.calls).toEqual([[expected]]);
   }
 
-  it.fails('[research-14][frameworks-04] the first zoom after viewport: {} emits viewport:change once', () => {
+  it('[research-14][frameworks-04] the first zoom after viewport: {} emits viewport:change once', () => {
     firstZoom({});
   });
 
@@ -346,11 +346,11 @@ describe('[research-14][frameworks-04] a state option given at creation does not
     firstZoom({ x: [10, 90] });
   });
 
-  it.fails('[research-14][frameworks-04] the first legend click after hiddenSeries: [] emits hiddenSeries:change once', () => {
+  it('[research-14][frameworks-04] the first legend click after hiddenSeries: [] emits hiddenSeries:change once', () => {
     firstToggle([], ['w']);
   });
 
-  it.fails("[research-14][frameworks-04] the first legend click after hiddenSeries: ['w'] emits hiddenSeries:change once", () => {
+  it("[research-14][frameworks-04] the first legend click after hiddenSeries: ['w'] emits hiddenSeries:change once", () => {
     firstToggle(['w'], []);
   });
 
@@ -373,7 +373,7 @@ describe('[research-14][frameworks-04] a state option given at creation does not
     expect(onSelectionChange.mock.calls).toEqual([[selection]]);
   });
 
-  it.fails('[research-14][frameworks-04] the first legend hover after highlight: null emits highlight:change once', () => {
+  it('[research-14][frameworks-04] the first legend hover after highlight: null emits highlight:change once', () => {
     const onHighlightChange = vi.fn();
     const chart = mount<Row>(fakes, {
       ...base,

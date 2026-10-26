@@ -65,9 +65,17 @@ export class Dispatcher<Events extends object> {
     private readonly option: (event: keyof Events, value: unknown) => void,
   ) {}
 
-  /** Start reporting from the current state, without events. */
+  /**
+   * Start reporting from the current state, without events. What the construction left
+   * pending goes too: a state option whose application raised no engine event (`viewport: {}`,
+   * the default `hiddenSeries`) would otherwise stay marked silent, and the first gesture that
+   * changes it would settle as if applied from options, unreported (plan D3).
+   */
   reset(): void {
     for (const key of REPORTED) this.reported.set(key, this.read(key));
+    this.pending.clear();
+    this.silent.clear();
+    this.committed = false;
   }
 
   on<K extends keyof Events>(event: K, listener: (value: Events[K]) => void): () => void {
