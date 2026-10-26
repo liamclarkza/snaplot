@@ -1,10 +1,21 @@
 ---
 /**
- * The examples hub (plan §10.3), a skeleton until M16a: an index, not a landing page. M16a adds
- * each row's thumbnail and its Open and Source links as the demo pages land.
+ * The examples hub (plan §10.3): an index, not a landing page. One sentence, then one row per
+ * example: its question, who decides what with it, a thumbnail Playwright took of the real page
+ * (`npm run thumbs`), the dataset with its licence and size, the framework, and Open and Source
+ * links. No hero, statistics or call to action.
  */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import Site from '../../layouts/Site.astro';
-import { DEMOS } from '../../lib/demos';
+import { DEMOS, sourceUrl } from '../../lib/demos';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const examples = DEMOS.map((demo) => ({
+  ...demo,
+  page: existsSync(join(process.cwd(), `src/pages/examples/${demo.slug}.astro`)),
+  thumbnail: existsSync(join(process.cwd(), `public/examples/${demo.slug}.jpg`)),
+}));
 ---
 
 <Site
@@ -14,15 +25,37 @@ import { DEMOS } from '../../lib/demos';
 >
   <h1>Examples</h1>
   <p>Each example answers one question with real or documented data.</p>
-  <ul class="demo-list">
+  <ul class="demo-list examples">
     {
-      DEMOS.map((demo) => (
-        <li data-demo={demo.slug}>
-          <h2 class="demo-question">{demo.question}</h2>
-          <p>{demo.task}</p>
-          <p class="demo-meta">
-            {demo.framework} · {demo.dataset} ({demo.licence})
-          </p>
+      examples.map((demo) => (
+        <li data-demo={demo.slug} data-framework={demo.framework}>
+          {demo.thumbnail ? (
+            <img
+              class="thumb"
+              src={`${base}examples/${demo.slug}.jpg`}
+              alt=""
+              width="320"
+              height="200"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <span class="thumb thumb-missing" />
+          )}
+          <div class="row-text">
+            <h2 class="demo-question">
+              {demo.page ? <a href={`${base}examples/${demo.slug}/`}>{demo.question}</a> : demo.question}
+            </h2>
+            <p>{demo.task}</p>
+            <p class="demo-meta">
+              {demo.dataset} · {demo.licence} · <span class="num">{demo.rows}</span>
+            </p>
+            <p class="demo-links">
+              <span class="badge">{demo.framework}</span>
+              {demo.page && <a href={`${base}examples/${demo.slug}/`}>Open</a>}
+              <a href={sourceUrl(demo.slug)}>Source</a>
+            </p>
+          </div>
         </li>
       ))
     }
@@ -30,11 +63,59 @@ import { DEMOS } from '../../lib/demos';
 </Site>
 
 <style>
+  .examples > li {
+    grid-template-columns: 320px minmax(0, 1fr);
+    column-gap: 1.5rem;
+    align-items: start;
+    padding-block: 1.25rem;
+  }
+
+  .thumb {
+    display: block;
+    width: 320px;
+    height: auto;
+    aspect-ratio: 8 / 5;
+    border: 1px solid var(--snaplot-rule);
+    border-radius: 2px;
+  }
+
+  /* A demo whose page has not been built yet keeps its column, without a stand-in picture. */
+  .thumb-missing {
+    border-color: transparent;
+  }
+
   .demo-question {
     font-size: 1.125rem;
-    margin: 0;
+    margin: 0 0 0.25rem;
   }
-  .demo-list p {
-    margin: 0;
+
+  .row-text p {
+    margin: 0 0 0.25rem;
+  }
+
+  .demo-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .badge {
+    padding: 0 0.5rem;
+    color: var(--snaplot-ink-secondary);
+    border: 1px solid var(--snaplot-rule);
+    border-radius: 3px;
+  }
+
+  @media (max-width: 44rem) {
+    .examples > li {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: 0.75rem;
+    }
+
+    .thumb {
+      width: 100%;
+    }
   }
 </style>
