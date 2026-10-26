@@ -47,7 +47,8 @@ export default function firstChart(element: HTMLElement) {
       { y: 'low', label: 'Low' },
     ],
     axes: { y: { format: { suffix: ' °F' } } },
-    ariaLabel: 'Daily high and low in Central Park, first week of June 2025',
+    ariaLabel:
+      'Daily high and low in Central Park, first week of June 2025',
   });
 }
 ```
