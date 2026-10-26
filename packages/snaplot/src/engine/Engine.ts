@@ -21,41 +21,27 @@ import type {
 } from './spec';
 import { DirtyFlag } from './spec';
 
+// The canvases, the frame loop and the input.
 import { CanvasManager } from './render/surface';
 import { RenderScheduler } from './render/scheduler';
 import { EventBus } from './interaction/bus';
-import {
-  inferPosition,
-  type PlotInsets,
-  setPlotInsets,
-  naturalGutters,
-  layoutIsStale,
-  updateLayout,
-  updateScalePixelRanges,
-} from './layout';
+import { GestureManager } from './interaction/gestures';
+import { TooltipManager } from '../interaction/TooltipManager';
 
+// Data, scales, options and theme.
 import type { DataStore } from './data/DataStore';
 import { validateMaxLen } from './data/DataStore';
 import { ColumnarStore } from './data/ColumnarStore';
 import type { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeIndex';
 import { RingColumnarStore } from './data/RingColumnarStore';
 import { createScale } from './scales/createScale';
-
 import { formatValue, scaleStepDecimals } from './format';
 import { deepMerge } from './merge';
 import { DEFAULT_CONFIG } from './defaults';
 import { applyThemeToElement, resolveTheme } from './theme/resolve';
-
-import { renderAxes } from './axes/render';
-import { type AxesRenderResult, updateDOMLabels } from './axes/labels';
-import type { ScatterSeriesCache } from './marks/scatter';
-import type { ScatterStyleResolver, ScatterPalettes } from './marks/scatterEncoding';
-
-import { GestureManager } from './interaction/gestures';
-import { HitTester } from './hit';
-import { TooltipManager } from '../interaction/TooltipManager';
-
 import { type HostedPlugin, PluginHost } from './plugins';
+
+// The engine's modules: functions of the engine, which own the logic named in their files.
 import { rangeForDataChange, autoRange, invalidateRangeCache, type BarXAxisPlan } from './ranging';
 import {
   applyFollowWindow,
@@ -76,19 +62,38 @@ import {
   getCursorSnapshot,
 } from './cursor';
 import { setHighlight } from './highlight';
+import { HitTester } from './hit';
 import { computeCustomXTicks } from './axes/ticks';
-import { debugSnapshot, type DataPassSeries, type DebugSnapshot } from './debug';
+import { renderAxes } from './axes/render';
+import { type AxesRenderResult, updateDOMLabels } from './axes/labels';
+import {
+  inferPosition,
+  type PlotInsets,
+  setPlotInsets,
+  naturalGutters,
+  layoutIsStale,
+  updateLayout,
+  updateScalePixelRanges,
+} from './layout';
 import { renderAllSeries } from './marks/index';
+import type { ScatterSeriesCache } from './marks/scatter';
+import type { ScatterStyleResolver, ScatterPalettes } from './marks/scatterEncoding';
 import { renderOverlay } from './render/overlay';
 import { wireEvents } from './interaction/actions';
+import { debugSnapshot, type DataPassSeries, type DebugSnapshot } from './debug';
 
 /**
- * Chart, the composition root.
+ * The engine's composition root (plan §3.1): it owns the state (the sources' stores, the scales,
+ * the layout, the theme, the cursor, selection and viewport state) and the parts that hold DOM
+ * or timers (canvases, scheduler, gestures, tooltip, plugins), and paints the three layers.
  *
- * Wires together: CanvasManager, RenderScheduler, EventBus, ColumnarStore,
- * Scales, Layout, Renderers, Interaction handlers, Plugins.
- *
- * Render pipeline follows the exact order from §2.3 of the plan.
+ * The logic lives in the modules beside it, as functions that take the engine first:
+ * ranging.ts (domains), viewport.ts (pinned axes, follow, zoom and pan, bounds), selection.ts,
+ * cursor.ts (hover and the cursor snapshot), highlight.ts, hit.ts, axes/ (ticks, grid, labels),
+ * layout.ts, marks/index.ts (the series pass), render/overlay.ts (the overlay pass),
+ * interaction/actions.ts (what each gesture does) and debug.ts (the D31 counters). Members
+ * without `private` are the state those modules read and write; the engine methods the public
+ * layer calls delegate to them. The class is internal: no public declaration names it.
  */
 export class ChartCore implements EngineHost {
   coordinatingAxis = false;
@@ -901,7 +906,7 @@ export class ChartCore implements EngineHost {
     if (!axisConfigs.y) {
       axisConfigs.y = { type: 'linear' };
     }
-    // Write back so Layout and AxesRenderer can see all axes
+    // Write back so layout.ts and axes/render.ts can see all axes
     this.config.axes = axisConfigs;
 
     for (const key of Array.from(this.scales.keys())) {
@@ -930,8 +935,6 @@ export class ChartCore implements EngineHost {
     // after a config replace, as long as the user has not paused following.
     if (this.following) applyFollowWindow(this);
   }
-
-  // ─── Private: Event wiring ──────────────────────────────────
 
   // ─── Private: Render pipeline ───────────────────────────────
 

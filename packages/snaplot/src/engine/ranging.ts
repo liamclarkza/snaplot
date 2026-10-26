@@ -571,7 +571,7 @@ export function planBarXAxis(
   let centerMin = Math.floor(xMin / interval + roundingEpsilon) * interval;
   let centerMax = Math.ceil(xMax / interval - roundingEpsilon) * interval;
 
-  // BarRenderer sizes each category from its nearest local neighbor. For
+  // The bar mark sizes each category from its nearest local neighbor. For
   // irregular spacing, the outermost bar can therefore extend beyond a
   // simple half-interval edge. Keep expanding by whole tick intervals until
   // every category slot fits while retaining a regular grid.

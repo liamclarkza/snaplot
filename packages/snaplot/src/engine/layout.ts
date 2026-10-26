@@ -134,7 +134,7 @@ export function computeLayout(
       // Mirror the renderer's tick selection (explicit ticks clamped to the
       // domain, else generated at the configured density) so the gutter is
       // measured for the labels actually drawn. Inlined rather than imported
-      // from AxesRenderer to keep Layout free of renderer dependencies.
+      // from axes/ to keep the layout free of renderer dependencies.
       const lo = Math.min(scale.min, scale.max);
       const hi = Math.max(scale.min, scale.max);
       const ticks =
