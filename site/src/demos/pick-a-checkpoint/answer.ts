@@ -6,6 +6,8 @@
  *   the earlier epoch, then the first run);
  * - a run overfits when its validation loss at the last epoch is at least 5% above its own
  *   minimum; the rise is reported from that minimum to the last epoch.
+ * - M16b adds the other criterion the page offers: the epoch with the highest validation
+ *   accuracy (ties: the earlier epoch, then the first run).
  */
 
 export interface EpochRow {
@@ -56,7 +58,10 @@ export function parseTrain(csv: string): StepRow[] {
 
 export interface RunSummary {
   run: string;
+  /** The epoch with the lowest validation loss. */
   best: EpochRow;
+  /** The epoch with the highest validation accuracy. */
+  bestAcc: EpochRow;
   last: EpochRow;
   /** (last − best) / best validation loss. */
   rise: number;
@@ -70,28 +75,37 @@ export function summarizeRuns(rows: readonly EpochRow[]): RunSummary[] {
     const own = rows.filter((r) => r.run === run).sort((a, b) => a.epoch - b.epoch);
     let best = own[0];
     for (const r of own) if (r.valLoss < best.valLoss) best = r;
+    let bestAcc = own[0];
+    for (const r of own) if (r.valAcc > bestAcc.valAcc) bestAcc = r;
     const last = own[own.length - 1];
     const rise = (last.valLoss - best.valLoss) / best.valLoss;
     // 1e-12 absorbs float error, so an exact +5% (0.21 over 0.2) counts.
     const overfits = last.epoch > best.epoch && rise + 1e-12 >= OVERFIT_RISE;
-    return { run, best, last, rise, overfits };
+    return { run, best, bestAcc, last, rise, overfits };
   });
 }
 
+/** What "best" means: the lowest validation loss or the highest validation accuracy. */
+export type Criterion = 'valLoss' | 'valAcc';
+
 export interface Decision {
+  by: Criterion;
   ship: EpochRow;
   runs: RunSummary[];
 }
 
-export function decide(rows: readonly EpochRow[]): Decision {
+export function decide(rows: readonly EpochRow[], by: Criterion = 'valLoss'): Decision {
   if (rows.length === 0) throw new Error('no validation rows');
   const runs = summarizeRuns(rows);
-  let ship = runs[0].best;
+  const pick = (r: RunSummary) => (by === 'valLoss' ? r.best : r.bestAcc);
+  // A positive score is better: lower loss, higher accuracy.
+  const score = (r: EpochRow) => (by === 'valLoss' ? -r.valLoss : r.valAcc);
+  let ship = pick(runs[0]);
   for (const r of runs) {
-    const b = r.best;
-    if (b.valLoss < ship.valLoss || (b.valLoss === ship.valLoss && b.epoch < ship.epoch)) ship = b;
+    const b = pick(r);
+    if (score(b) > score(ship) || (score(b) === score(ship) && b.epoch < ship.epoch)) ship = b;
   }
-  return { ship, runs };
+  return { by, ship, runs };
 }
 
 export const pct = (fraction: number, digits = 1): string => `${(fraction * 100).toFixed(digits)}%`;
@@ -113,6 +127,23 @@ export function headline(d: Decision): string[] {
     );
   }
   return out;
+}
+
+/**
+ * The checkpoint the other criterion would ship, when it differs: the decision depends on what
+ * the model is judged by, and the panel says so.
+ */
+export function otherPick(rows: readonly EpochRow[], by: Criterion): string | null {
+  const other: Criterion = by === 'valLoss' ? 'valAcc' : 'valLoss';
+  const mine = decide(rows, by).ship;
+  const theirs = decide(rows, other).ship;
+  if (mine.run === theirs.run && mine.epoch === theirs.epoch) return null;
+  const metric =
+    other === 'valAcc'
+      ? `accuracy ${pct(theirs.valAcc)}`
+      : `validation loss ${theirs.valLoss.toFixed(4)}`;
+  const label = other === 'valAcc' ? 'highest accuracy' : 'lowest validation loss';
+  return `By ${label} instead, it would be run ${theirs.run} at epoch ${theirs.epoch} (${metric}).`;
 }
 
 /**

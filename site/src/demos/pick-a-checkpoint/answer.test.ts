@@ -6,7 +6,6 @@ import {
   type EpochRow,
   decide,
   headline,
-  // @ts-expect-error M16b adds otherPick with the accuracy criterion (tests first).
   otherPick,
   parseTrain,
   parseVal,
@@ -39,8 +38,7 @@ describe('[pick-a-checkpoint] answer', () => {
     expect(ship.valAcc).toBe(Number(best[iAcc]));
   });
 
-  // Tests first: the accuracy criterion lands with the page (M16b); until then these fail.
-  it.fails('oracle: an independent argmax of accuracy over the committed CSV (no answer.ts)', () => {
+  it('oracle: an independent argmax of accuracy over the committed CSV (no answer.ts)', () => {
     const lines = valCsv.trim().split('\n');
     const header = lines[0].split(',');
     const [iRun, iEpoch, iAcc] = ['run', 'epoch', 'valAcc'].map((k) => header.indexOf(k));
@@ -55,19 +53,25 @@ describe('[pick-a-checkpoint] answer', () => {
           Number(a[iEpoch]) - Number(b[iEpoch]) ||
           runOrder.indexOf(a[iRun]) - runOrder.indexOf(b[iRun]),
       );
-    // @ts-expect-error M16b adds the criterion argument.
     const { ship } = decide(val, 'valAcc');
     expect(ship.run).toBe(best[iRun]);
     expect(ship.epoch).toBe(Number(best[iEpoch]));
     expect(ship.valAcc).toBe(Number(best[iAcc]));
   });
 
-  it.fails('says which checkpoint the other criterion would ship', () => {
+  it('says which checkpoint the other criterion would ship', () => {
+    expect(headline(decide(val, 'valAcc'))[0]).toBe(
+      'Ship run B at epoch 29: validation loss 0.2317, accuracy 97.7%.',
+    );
     expect(otherPick(val, 'valLoss')).toBe(
       'By highest accuracy instead, it would be run B at epoch 29 (accuracy 97.7%).',
     );
     expect(otherPick(val, 'valAcc')).toBe(
       'By lowest validation loss instead, it would be run A at epoch 11 (validation loss 0.1241).',
+    );
+    // The overfitting verdict is about loss whichever criterion picks the checkpoint.
+    expect(headline(decide(val, 'valAcc'))[1]).toBe(
+      'Run A overfits after epoch 11 (+37.1% from its minimum).',
     );
   });
 
@@ -118,6 +122,13 @@ describe('[pick-a-checkpoint] answer', () => {
       'Ship run A at epoch 2: validation loss 0.3000, accuracy 90.0%.',
       'Neither run overfits within 3 epochs.',
     ]);
+    // The criteria agree here: no other pick to name.
+    const agree = [...rows('A', [0.5, 0.3, 0.31]), ...rows('B', [0.6, 0.4, 0.45])];
+    agree[1] = { ...agree[1], valAcc: 0.95 };
+    expect(decide(agree, 'valAcc').ship).toMatchObject({ run: 'A', epoch: 2 });
+    expect(otherPick(agree, 'valLoss')).toBeNull();
+    // Accuracy ties go to the earlier epoch.
+    expect(decide(flat, 'valAcc').ship).toMatchObject({ run: 'A', epoch: 1 });
     // A minimum on the last epoch is never "overfitting", whatever came before.
     expect(summarizeRuns(rows('C', [0.4, 0.5, 0.2]))[0].overfits).toBe(false);
     // Exactly +5% at the last epoch counts.

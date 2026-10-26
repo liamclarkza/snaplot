@@ -1,0 +1,356 @@
+/*
+ * R1's identity (plan §10.2), from TensorBoard and Weights & Biases run comparison: cool-neutral
+ * tool chrome #F1F3F5, white chart panels with hairline borders, two run colours (#1F4FB0 and
+ * #D2492A) used on every chart, table and swatch, charts two-thirds and the decision panel
+ * one-third. Roboto is the one webfont. The page is light only, so the charts pin light roles.
+ */
+:root {
+  color-scheme: light;
+  --r1-chrome: #f1f3f5;
+  --r1-panel: #ffffff;
+  --r1-ink: #212529;
+  --r1-ink-2: #495057;
+  --r1-rule: #dee2e6;
+  --r1-focus: #343a40;
+}
+
+body.r1 {
+  margin: 0;
+  background: var(--r1-chrome);
+  color: var(--r1-ink);
+  font:
+    14px / 1.45 Roboto,
+    system-ui,
+    sans-serif;
+}
+
+.r1 a {
+  color: #1f4fb0;
+}
+.r1 a:hover {
+  color: #163a82;
+}
+.r1 :focus-visible {
+  outline: 2px solid var(--r1-focus);
+  outline-offset: 2px;
+}
+
+.r1-header {
+  background: var(--r1-panel);
+  border-bottom: 1px solid var(--r1-rule);
+  padding: 12px 16px;
+}
+.r1-header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+.r1-meta {
+  margin: 2px 0 0;
+  color: var(--r1-ink-2);
+  font-size: 13px;
+}
+
+.r1-main {
+  padding: 16px;
+}
+
+.r1-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.r1-charts {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.r1-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  background: var(--r1-panel);
+  border: 1px solid var(--r1-rule);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+.r1-runs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.r1-runs label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  cursor: pointer;
+}
+.r1-run-name {
+  font-weight: 500;
+}
+.r1-run-label {
+  font-weight: 400;
+}
+.r1-run-config {
+  color: var(--r1-ink-2);
+  font-size: 12px;
+}
+.r1-swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+}
+
+.r1-smoothing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.r1-smoothing input {
+  width: 140px;
+  accent-color: var(--r1-ink-2);
+}
+.r1-smoothing output {
+  min-width: 3ch;
+}
+
+.r1-panel {
+  margin: 0;
+  background: var(--r1-panel);
+  border: 1px solid var(--r1-rule);
+  border-radius: 4px;
+  padding: 8px 12px 4px;
+  min-width: 0;
+}
+.r1-panel figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 12px;
+}
+.r1-panel h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+.r1-panel-note {
+  color: var(--r1-ink-2);
+  font-size: 12px;
+}
+.r1-chart {
+  height: 200px;
+}
+.r1-panel:first-of-type .r1-chart {
+  height: 230px;
+}
+
+.r1-help {
+  margin: 0;
+  color: var(--r1-ink-2);
+  font-size: 13px;
+}
+
+.r1-decision {
+  position: sticky;
+  top: 16px;
+  background: var(--r1-panel);
+  border: 1px solid var(--r1-rule);
+  border-radius: 4px;
+  padding: 12px 16px 16px;
+  min-width: 0;
+}
+.r1-decision h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.r1-decision h3 {
+  margin: 20px 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--r1-ink-2);
+}
+.r1-decision p {
+  margin: 0 0 8px;
+}
+
+.r1-criterion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.r1-criterion legend {
+  padding: 0;
+  margin-bottom: 4px;
+  color: var(--r1-ink-2);
+  font-size: 13px;
+}
+.r1-criterion label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.r1-criterion input {
+  margin: 0;
+  accent-color: var(--r1-ink);
+}
+
+.r1-answer {
+  border-left: 3px solid var(--r1-ink);
+  padding-left: 10px;
+  margin-bottom: 8px;
+}
+.r1-answer p:first-child {
+  font-size: 16px;
+  font-weight: 500;
+}
+.r1-other {
+  color: var(--r1-ink-2);
+}
+.r1-hint {
+  color: var(--r1-ink-2);
+}
+
+.r1-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.r1-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--r1-ink-2);
+  border-bottom: 1px solid var(--r1-rule);
+  padding: 4px 6px 4px 0;
+}
+.r1-table td {
+  border-bottom: 1px solid var(--r1-rule);
+  padding: 4px 6px 4px 0;
+}
+/* Figures line up in the tables and readouts, and only there (uisite-07). */
+table.r1-table td,
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.r1-table td .r1-swatch {
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+.r1-unpin {
+  border: 0;
+  background: none;
+  color: var(--r1-ink-2);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.r1-unpin:hover {
+  background: var(--r1-chrome);
+  color: var(--r1-ink);
+}
+
+.r1-pin-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.r1-pin-form select,
+.r1-pin-form input {
+  font: inherit;
+  padding: 2px 4px;
+  border: 1px solid #adb5bd;
+  border-radius: 3px;
+  background: var(--r1-panel);
+  color: var(--r1-ink);
+}
+.r1-pin-form input {
+  width: 4.5em;
+}
+.r1-pin-form button {
+  font: inherit;
+  padding: 3px 12px;
+  border: 1px solid #adb5bd;
+  border-radius: 3px;
+  background: var(--r1-chrome);
+  color: var(--r1-ink);
+  cursor: pointer;
+}
+.r1-pin-form button:hover:not(:disabled) {
+  background: var(--r1-rule);
+}
+.r1-pin-form button:disabled {
+  color: var(--r1-ink-2);
+  cursor: default;
+}
+
+/* The legend table takes the page's ink through its custom properties. */
+.r1-legend {
+  font-size: 13px;
+  --snaplot-legend-muted: var(--r1-ink-2);
+  --snaplot-legend-step-color: var(--r1-ink-2);
+  --snaplot-legend-border: var(--r1-rule);
+}
+.r1-legend .snaplot-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.r1-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.r1-footer {
+  padding: 12px 16px 24px;
+  color: var(--r1-ink-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* One column: the answer first, then the charts it comes from. */
+@media (max-width: 900px) {
+  .r1-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .r1-decision {
+    position: static;
+    order: -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .r1-main {
+    padding: 12px;
+  }
+  .r1-chart,
+  .r1-panel:first-of-type .r1-chart {
+    height: 180px;
+  }
+  .r1-smoothing input {
+    width: 120px;
+  }
+}
