@@ -32,7 +32,6 @@ import {
   layoutIsStale,
   updateLayout,
   updateScalePixelRanges,
-  isInPlotArea,
 } from './layout';
 
 import type { DataStore } from './data/DataStore';
@@ -41,7 +40,6 @@ import { ColumnarStore } from './data/ColumnarStore';
 import type { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeIndex';
 import { RingColumnarStore } from './data/RingColumnarStore';
 import { createScale } from './scales/createScale';
-import { MIN_DRAG_DISTANCE } from '../constants';
 
 import { formatValue, scaleStepDecimals } from './format';
 import { deepMerge } from './merge';
@@ -54,7 +52,7 @@ import type { ScatterSeriesCache } from './marks/scatter';
 import type { ScatterStyleResolver, ScatterPalettes } from './marks/scatterEncoding';
 
 import { GestureManager } from './interaction/gestures';
-import { HitTester, emitPointClick } from './hit';
+import { HitTester } from './hit';
 import { TooltipManager } from '../interaction/TooltipManager';
 
 import { type HostedPlugin, PluginHost } from './plugins';
@@ -69,36 +67,20 @@ import {
   applyViewport,
   resetZoom,
   scrollToLatest,
-  zoomedScaleRange,
-  canZoomFromAnchor,
-  applyUniformZoom,
-  scaleDomainSpan,
-  pannedScaleRange,
-  applyViewportChange,
 } from './viewport';
-import {
-  getSelection,
-  setSelection,
-  reconcileSelectionForDataChange,
-  isBrushMode,
-  brushStart,
-  brushUpdate,
-  brushEnd,
-  scatterPointsInSelection,
-} from './selection';
+import { getSelection, setSelection, reconcileSelectionForDataChange } from './selection';
 import {
   setCursorDataX,
-  updateLocalCursorFromPoint,
   refreshCursor,
-  queueTouchCursor,
   cancelPendingTouchCursor,
   getCursorSnapshot,
 } from './cursor';
-import { setHighlight, clearProximityHighlight } from './highlight';
+import { setHighlight } from './highlight';
 import { computeCustomXTicks } from './axes/ticks';
 import { debugSnapshot, type DataPassSeries, type DebugSnapshot } from './debug';
 import { renderAllSeries } from './marks/index';
 import { renderOverlay } from './render/overlay';
+import { wireEvents } from './interaction/actions';
 
 /**
  * Chart, the composition root.
@@ -117,7 +99,7 @@ export class ChartCore implements EngineHost {
   // Internal modules
   canvasManager: CanvasManager;
   scheduler: RenderScheduler;
-  private eventBus: EventBus;
+  eventBus: EventBus;
   sourceStores: DataStore[] = [];
   seriesSources: readonly number[] = [];
   scales: Map<string, Scale> = new Map();
@@ -382,7 +364,7 @@ export class ChartCore implements EngineHost {
     // user's through setPlugins() once the owner's handle exists (plan D21).
 
     // 10. Wire EventBus listeners
-    this.wireEvents();
+    wireEvents(this);
 
     // 11. Attach gesture manager
     this.gestureManager.attach();
@@ -950,234 +932,6 @@ export class ChartCore implements EngineHost {
   }
 
   // ─── Private: Event wiring ──────────────────────────────────
-
-  private wireEvents(): void {
-    // ── Cursor tracking ──
-    this.eventBus.on('action:cursor', ({ x, y, pointerType }) => {
-      if (pointerType === 'touch' || pointerType === 'pen') {
-        queueTouchCursor(this, x, y, pointerType);
-        return;
-      }
-      cancelPendingTouchCursor(this);
-      updateLocalCursorFromPoint(this, x, y, pointerType);
-    });
-
-    // ── Cursor leave ──
-    this.eventBus.on('action:cursor-leave', () => {
-      cancelPendingTouchCursor(this);
-      this.cursorX = null;
-      this.cursorY = null;
-      this.mouseX = null;
-      this.mouseY = null;
-      this.cursorDataX = null;
-      this.cursorDataIdx = null;
-      this.tooltipPoints = [];
-      this.tooltipManager.hide();
-      clearProximityHighlight(this);
-      this.scheduler.markDirty(DirtyFlag.OVERLAY);
-
-      // Notify listeners that the cursor is gone, without this, a fast
-      // mouse-leave skips the "cursor outside plot area" path in
-      // action:cursor and the legend table never blanks its values.
-      this.emitEvent('cursor:move', null, null, 'local');
-    });
-
-    // ── Pan (incremental pixel delta) ──
-    this.eventBus.on('action:pan', ({ dx, dy, axis }) => {
-      const pan = this.config.pan ?? { enabled: true, x: true };
-      if (!pan.enabled) return;
-
-      const axisConfigs = this.config.axes ?? {};
-
-      if (axis) {
-        if (pan.axis !== true) return;
-        // Drag started on a specific axis, only pan that axis
-        const scale = this.scales.get(axis);
-        if (scale) {
-          const pos = inferPosition(axis, axisConfigs[axis]?.position);
-          const isHoriz = pos === 'bottom' || pos === 'top';
-          const delta = isHoriz ? dx : dy;
-          const [min, max] = pannedScaleRange(scale, delta);
-          applyViewportChange(this, axis, min, max);
-        }
-      } else {
-        // Drag in plot area, pan all enabled axes. Axes the user has actively
-        // zoomed are also pannable even if pan.x/pan.y is off, mirroring how
-        // scroll-on-axis can zoom an axis with zoom.x/zoom.y off: once the
-        // user has engaged an axis, drag gestures on it should respond.
-        for (const [key, scale] of this.scales) {
-          const pos = inferPosition(key, axisConfigs[key]?.position);
-          const isHoriz = pos === 'bottom' || pos === 'top';
-          const userZoomed = this.userZoomedAxes.has(key);
-          if (isHoriz && (pan.x !== false || userZoomed)) {
-            const [min, max] = pannedScaleRange(scale, dx);
-            applyViewportChange(this, key, min, max);
-          } else if (!isHoriz && (pan.y || userZoomed)) {
-            const [min, max] = pannedScaleRange(scale, dy);
-            applyViewportChange(this, key, min, max);
-          }
-        }
-      }
-    });
-
-    // ── Zoom (factor at anchor point) ──
-    this.eventBus.on('action:zoom', ({ factor, anchorX, anchorY, axis }) => {
-      const zoom = this.config.zoom ?? { enabled: true, x: true };
-      if (!zoom.enabled) return;
-
-      const axisConfigs = this.config.axes ?? {};
-      if (!canZoomFromAnchor(this, axis, anchorX, anchorY, zoom.axis === true, axisConfigs)) return;
-
-      if (axis === 'xy') {
-        applyUniformZoom(this, factor, anchorX, anchorY);
-      } else {
-        // Zoom a specific axis by key
-        const scale = this.scales.get(axis);
-        if (scale) {
-          const pos = inferPosition(axis, axisConfigs[axis]?.position);
-          const isHoriz = pos === 'bottom' || pos === 'top';
-          const anchorPx = isHoriz ? anchorX : anchorY;
-          const [newMin, newMax] = zoomedScaleRange(scale, anchorPx, factor);
-          // minRange/maxRange are enforced in the scale's own span metric
-          // (`scaleDomainSpan`): a data-unit span for linear/time axes, a
-          // log10-decade span for log axes. Measuring in that metric keeps the
-          // limit consistent with how `zoomedScaleRange` applies the factor,
-          // and applies to vertical axes too, not just horizontal.
-          const span = scaleDomainSpan(scale, newMin, newMax);
-          if (zoom.minRange && span < zoom.minRange) return;
-          if (zoom.maxRange && span > zoom.maxRange) return;
-          if (isHoriz) {
-            if (zoom.x !== false) applyViewportChange(this, axis, newMin, newMax);
-          } else {
-            applyViewportChange(this, axis, newMin, newMax);
-          }
-        }
-      }
-    });
-
-    // ── Box selection (start/update/end) ──
-    this.eventBus.on('action:box-start', ({ x, y }) => {
-      if (isBrushMode(this)) {
-        brushStart(this, x);
-        this.scheduler.markDirty(DirtyFlag.OVERLAY);
-        return;
-      }
-      this.selectionBox = { x1: x, y1: y, x2: x, y2: y };
-      updateLocalCursorFromPoint(this, x, y, this.lastPointerType);
-      this.scheduler.markDirty(DirtyFlag.OVERLAY);
-    });
-
-    this.eventBus.on('action:box-update', ({ x, y }) => {
-      if (isBrushMode(this)) {
-        brushUpdate(this, x);
-        this.scheduler.markDirty(DirtyFlag.OVERLAY);
-        return;
-      }
-      if (!this.selectionBox) {
-        this.selectionBox = { x1: x, y1: y, x2: x, y2: y };
-      }
-      const zoom = this.config.zoom ?? { enabled: true, x: true };
-      const { plot } = this.layout;
-
-      // Constrain box to enabled axes
-      this.selectionBox.x2 = x;
-      this.selectionBox.y2 = y;
-      if (!zoom.y) {
-        this.selectionBox.y1 = plot.top;
-        this.selectionBox.y2 = plot.top + plot.height;
-      }
-      if (zoom.y && !zoom.x) {
-        this.selectionBox.x1 = plot.left;
-        this.selectionBox.x2 = plot.left + plot.width;
-      }
-
-      this.scheduler.markDirty(DirtyFlag.OVERLAY);
-    });
-
-    this.eventBus.on('action:box-end', ({ x1, y1, x2, y2 }) => {
-      if (isBrushMode(this)) {
-        brushEnd(this);
-        this.scheduler.markDirty(DirtyFlag.OVERLAY);
-        return;
-      }
-      this.selectionBox = null;
-      this.scheduler.markDirty(DirtyFlag.OVERLAY);
-
-      // Zero-area box = cancelled
-      if (x1 === 0 && y1 === 0 && x2 === 0 && y2 === 0) return;
-
-      // Clamp the drag coordinates to the plot area. Without this, a drag
-      // that continues past the chart edge reads the cursor's absolute
-      // pixel position and zooms the axes to a range outside the data extent.
-      const { plot } = this.layout;
-      const clampX = (px: number) => Math.max(plot.left, Math.min(plot.left + plot.width, px));
-      const clampY = (py: number) => Math.max(plot.top, Math.min(plot.top + plot.height, py));
-      x1 = clampX(x1);
-      x2 = clampX(x2);
-      y1 = clampY(y1);
-      y2 = clampY(y2);
-
-      const zoom = this.config.zoom ?? { enabled: true, x: true };
-      const dx = Math.abs(x2 - x1);
-      const dy = Math.abs(y2 - y1);
-
-      // Check overall drag distance (not per-axis) to distinguish from a click
-      const totalDist = Math.sqrt(dx * dx + dy * dy);
-      if (totalDist < MIN_DRAG_DISTANCE) return;
-
-      const xScale = this.scales.get('x');
-      const yScale = this.scales.get('y');
-      const selectionX = xScale
-        ? {
-            min: xScale.pixelToData(Math.min(x1, x2)),
-            max: xScale.pixelToData(Math.max(x1, x2)),
-          }
-        : null;
-      const selectionY =
-        yScale && zoom.y
-          ? {
-              min: yScale.pixelToData(Math.max(y1, y2)),
-              max: yScale.pixelToData(Math.min(y1, y2)),
-            }
-          : undefined;
-
-      if (selectionX) {
-        const selection = {
-          x: selectionX,
-          ...(selectionY ? { y: selectionY } : {}),
-          points: selectionY ? scatterPointsInSelection(this, selectionX, selectionY) : undefined,
-        };
-        this.emitEvent('select', selection);
-        this.config.selection?.onSelect?.(selection);
-      }
-
-      if (zoom.enabled !== false) {
-        if (zoom.x !== false && selectionX) {
-          applyViewportChange(this, 'x', selectionX.min, selectionX.max);
-        }
-        if (zoom.y && selectionY) {
-          applyViewportChange(this, 'y', selectionY.min, selectionY.max);
-        }
-      }
-    });
-
-    // ── Reset zoom ──
-    this.eventBus.on('action:reset-zoom', () => {
-      this.resetZoom();
-    });
-
-    // ── Tap (touch: show/persist tooltip) ──
-    this.eventBus.on('action:tap', ({ x, y, pointerType }) => {
-      cancelPendingTouchCursor(this);
-      const inPlot = isInPlotArea(this, x, y);
-      updateLocalCursorFromPoint(this, x, y, pointerType);
-      if (inPlot) emitPointClick(this, x, y);
-      if (inPlot && pointerType !== 'mouse') {
-        // Leave a short-lived ring so the user can see the tap landed.
-        this.tapFeedback = { x, y, startTime: performance.now() };
-      }
-    });
-  }
 
   // ─── Private: Render pipeline ───────────────────────────────
 
