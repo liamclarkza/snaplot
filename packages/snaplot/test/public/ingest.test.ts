@@ -638,3 +638,194 @@ describe('[dataapi-05] category codes stay with their labels', () => {
     expect(pointsAt(chart, 'Q')).toContainEqual(['s2', 'Q', 2]);
   });
 });
+
+// The ring keeps the last streaming.maxPoints rows of data longer than that, and the chart's rows,
+// row indices and ids keep the same window: each point reports its own row, and the ids and
+// categories of rows outside the window are not the chart's any more (D23).
+describe('[dataapi-03] data longer than streaming.maxPoints keeps its last maxPoints rows', () => {
+  const rows = Array.from({ length: 10 }, (_, i) => ({ t: i, v: i * 10, id: `r${i}` }));
+  const t = Float64Array.from(rows, (row) => row.t);
+  const v = Float64Array.from(rows, (row) => row.v);
+  const ids = rows.map((row) => row.id);
+
+  it.fails("[dataapi-03] data longer than streaming.maxPoints reports each point's own row, rowIndex and rowId", () => {
+    const chart = mount({
+      data: rows,
+      x: 't',
+      rowId: 'id',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 3 },
+    });
+    expect(latest(chart)).toMatchObject({ x: 9, y: 90, rowIndex: 9, rowId: 'r9' });
+    expect(latest(chart).row).toBe(rows[9]);
+    expect(first(chart)).toMatchObject({ x: 7, y: 70, rowIndex: 7, rowId: 'r7' });
+    expect(first(chart).row).toBe(rows[7]);
+    chart.appendData([{ t: 10, v: 100, id: 'new10' }]);
+    expect(latest(chart)).toMatchObject({ x: 10, rowIndex: 10, rowId: 'new10' });
+    expect(first(chart)).toMatchObject({ x: 8, rowIndex: 8, rowId: 'r8' });
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect(latest(chart)).toMatchObject({ x: 10, rowIndex: 10, rowId: 'new10' });
+    expect(first(chart)).toMatchObject({ x: 8, rowIndex: 8, rowId: 'r8' });
+    expect(first(chart).row).toBe(rows[8]);
+    // Newest-first rows are sorted first, so the window is the latest X with original indices.
+    const reversed = mount({
+      data: [...rows].reverse(),
+      x: 't',
+      rowId: 'id',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 3 },
+    });
+    expect(latest(reversed)).toMatchObject({ x: 9, rowIndex: 0, rowId: 'r9' });
+    expect(first(reversed)).toMatchObject({ x: 7, rowIndex: 2, rowId: 'r7' });
+    // An unsorted scatter keeps its row order, so the window is its last rows in that order.
+    const scatter = mount({
+      data: [5, 1, 4, 2, 3].map((x) => ({ t: x, v: x * 10, id: `s${x}` })),
+      x: 't',
+      rowId: 'id',
+      series: [{ type: 'scatter', y: 'v' }],
+      streaming: { maxPoints: 2 },
+    });
+    expect(first(scatter)).toMatchObject({ x: 2, rowIndex: 3, rowId: 's2' });
+    expect(latest(scatter)).toMatchObject({ x: 3, rowIndex: 4, rowId: 's3' });
+  });
+
+  it.fails('[dataapi-03] data longer than streaming.maxPoints maps { columns, rowIds } and an id column to the kept rows', () => {
+    const chart = mount({
+      data: { columns: { t, v }, rowIds: ids },
+      x: 't',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 3 },
+    });
+    expect(latest(chart)).toMatchObject({ x: 9, y: 90, rowIndex: 9, rowId: 'r9' });
+    expect(first(chart)).toMatchObject({ x: 7, y: 70, rowIndex: 7, rowId: 'r7' });
+    chart.appendData({
+      columns: { t: Float64Array.of(10), v: Float64Array.of(100) },
+      rowIds: ['new10'],
+    });
+    expect(latest(chart)).toMatchObject({ x: 10, rowIndex: 10, rowId: 'new10' });
+    expect(first(chart)).toMatchObject({ x: 8, rowIndex: 8, rowId: 'r8' });
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect(latest(chart)).toMatchObject({ x: 10, rowIndex: 10, rowId: 'new10' });
+    expect(first(chart)).toMatchObject({ x: 8, rowIndex: 8, rowId: 'r8' });
+    const keyed = mount({
+      data: { columns: { t, v, key: Float64Array.from(rows, (row) => 100 + row.t) } },
+      x: 't',
+      rowId: 'key',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 3 },
+    });
+    expect(latest(keyed)).toMatchObject({ x: 9, rowIndex: 9, rowId: 109 });
+    expect(first(keyed)).toMatchObject({ x: 7, rowIndex: 7, rowId: 107 });
+  });
+
+  it.fails('[dataapi-03] data longer than streaming.maxPoints gives a bar colour function each kept row and its index', () => {
+    const seen = new Set<string>();
+    const color = (value: number, row: { t: number } | undefined, index: number) => {
+      seen.add(`${value}:${row?.t}:${index}`);
+      return 'red';
+    };
+    mount({
+      data: rows,
+      x: 't',
+      series: [{ type: 'bar', y: 'v', color }],
+      streaming: { maxPoints: 3 },
+    });
+    fakes.frames.flush();
+    expect([...seen].sort()).toEqual(['70:7:7', '80:8:8', '90:9:9']);
+  });
+
+  it.fails('[dataapi-03] update({ data }) and update({ streaming }) keep the rows the window keeps', () => {
+    const replaced = mount({
+      data: [],
+      x: 't',
+      rowId: 'id',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 3 },
+    });
+    replaced.update({ data: rows });
+    expect(latest(replaced)).toMatchObject({ x: 9, rowIndex: 9, rowId: 'r9' });
+    expect(first(replaced)).toMatchObject({ x: 7, rowIndex: 7, rowId: 'r7' });
+    const bounded = mount({ data: rows, x: 't', rowId: 'id', series: [{ y: 'v' }] });
+    bounded.update({ streaming: { maxPoints: 3 } });
+    expect(latest(bounded)).toMatchObject({ x: 9, rowIndex: 9, rowId: 'r9' });
+    expect(first(bounded)).toMatchObject({ x: 7, rowIndex: 7, rowId: 'r7' });
+    // A streamed source whose window shrinks keeps its latest rows, and frees the other ids.
+    const streamed = mount({
+      data: rows.slice(0, 5),
+      x: 't',
+      rowId: 'id',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 5 },
+    });
+    streamed.appendData(rows.slice(5));
+    streamed.update({ streaming: { maxPoints: 2 } });
+    expect(latest(streamed)).toMatchObject({ x: 9, rowIndex: 9, rowId: 'r9' });
+    expect(first(streamed)).toMatchObject({ x: 8, rowIndex: 8, rowId: 'r8' });
+    streamed.appendData([{ t: 10, v: 100, id: 'r7' }]);
+    expect(latest(streamed)).toMatchObject({ x: 10, rowIndex: 10, rowId: 'r7' });
+  });
+
+  it.fails('[dataapi-03] an id whose row is outside the initial window may be appended', () => {
+    const chart = mount({
+      data: rows,
+      x: 't',
+      rowId: 'id',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 3 },
+    });
+    chart.appendData([{ t: 10, v: 100, id: 'r0' }]);
+    expect(latest(chart)).toMatchObject({ x: 10, rowIndex: 10, rowId: 'r0' });
+    // Ids in the window are still taken.
+    expect(thrown(() => chart.appendData([{ t: 11, v: 110, id: 'r9' }]))).toMatch(
+      /rowId "r9" is already in the chart/,
+    );
+    expect(latest(chart)).toMatchObject({ x: 10, rowId: 'r0' });
+    // Ids must be unique in the window only, so a repeat among the rows outside it is no error.
+    const repeated = mount({
+      data: rows.map((row) => ({ ...row, id: row.t < 7 ? 'old' : row.id })),
+      x: 't',
+      rowId: 'id',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 3 },
+    });
+    expect(first(repeated)).toMatchObject({ x: 7, rowId: 'r7' });
+    const typed = mount({
+      data: { columns: { t, v }, rowIds: ids },
+      x: 't',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 3 },
+    });
+    typed.appendData({
+      columns: { t: Float64Array.of(10), v: Float64Array.of(100) },
+      rowIds: ['r0'],
+    });
+    expect(latest(typed)).toMatchObject({ x: 10, rowIndex: 10, rowId: 'r0' });
+  });
+
+  it.fails('[gap-scale-longevity-03:ingest] categories of rows outside the initial window leave the registry', () => {
+    const labels = Array.from({ length: 10 }, (_, i) => ({ c: `L${i}`, v: i }));
+    const chart = mount({
+      data: labels,
+      x: 'c',
+      series: [{ y: 'v' }],
+      streaming: { maxPoints: 3 },
+    });
+    const span = () => {
+      const x = chart.getAxis('x');
+      return (x?.max ?? 0) - (x?.min ?? 0);
+    };
+    expect(span()).toBeLessThanOrEqual(2);
+    expect(first(chart)).toMatchObject({ x: 'L7', rowIndex: 7 });
+    expect(latest(chart)).toMatchObject({ x: 'L9', rowIndex: 9 });
+    expect(thrown(() => chart.setCursor('L0'))).toMatch(
+      /"L0", which is not a category of axis "x"/,
+    );
+    chart.update({ axes: { y: { title: 'Kept' } } });
+    expect(span()).toBeLessThanOrEqual(2);
+    expect(first(chart)).toMatchObject({ x: 'L7', rowIndex: 7 });
+    chart.appendData([{ c: 'L10', v: 10 }]);
+    expect(span()).toBeLessThanOrEqual(2);
+    expect(first(chart)).toMatchObject({ x: 'L8', rowIndex: 8 });
+    expect(thrown(() => chart.setCursor('L7'))).toMatch(/not a category/);
+  });
+});
