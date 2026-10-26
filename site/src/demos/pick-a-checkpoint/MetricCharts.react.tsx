@@ -21,15 +21,8 @@ import type { Pin } from './url';
 /** The two run colours, used by every chart, the run list and both tables (plan §10.2). */
 export const RUN_COLORS: Readonly<Record<string, string>> = { A: '#1F4FB0', B: '#D2492A' };
 
-/**
- * The page is light whatever the OS says, so the charts are pinned to light roles, on the white
- * of their panels, in the page's typeface.
- */
-const THEME = {
-  mode: 'light',
-  surface: '#ffffff',
-  fontFamily: 'Roboto, system-ui, sans-serif',
-} as const;
+/** The charts take light or dark from the page behind them; only the typeface is the page's. */
+const THEME = { fontFamily: 'Roboto, system-ui, sans-serif' } as const;
 
 type Key = 'train' | 'validation' | 'accuracy';
 

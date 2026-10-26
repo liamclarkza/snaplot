@@ -9,8 +9,6 @@ import { type CostRow, type Hour, type MonthRow, typicalDay } from './answer';
 
 /** Solar in amber, the household in indigo; grey without a battery, teal with one. */
 const COLORS = { pv: '#B45309', use: '#3B4A8C', without: '#767B83', with: '#0E6E73' };
-/** The article is white whatever the OS says: light roles, painted on the page's white. */
-const THEME = { mode: 'light', surface: '#ffffff' } as const;
 const SOURCE = 'Source: Open Power System Data, Household Data 2020-04-15 (DE_KN_residential4).';
 
 type Ref = (chart: ChartHandle | null) => void;
@@ -78,7 +76,6 @@ export function TypicalDay(props: { hours: readonly Hour[]; year: number; chartR
             y: { min: 0, title: 'kWh', format: { maximumFractionDigits: 2 } },
           }}
           interaction="readonly"
-          theme={THEME}
           ariaLabel="Median hourly solar output and household use, with 10th to 90th percentile bands"
         />
       </div>
@@ -114,7 +111,6 @@ export function MonthlyCharts(props: {
     group,
     axes: { x: { type: 'category' }, y: { format: { maximumFractionDigits: 0, suffix: ' kWh' } } },
     interaction: 'readonly',
-    theme: THEME,
   } as const;
   return (
     <Figure
@@ -184,7 +180,6 @@ export function CostChart(props: {
           ]}
           axes={{ y: { format: { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 } } }}
           timeZone="UTC"
-          theme={THEME}
           onViewportChange={(viewport) => setZoom(viewport.x)}
           ariaLabel="Cumulative electricity cost through the year, without and with the battery"
         />
