@@ -15,6 +15,7 @@ import { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeInd
 import { ColumnarStore } from './data/ColumnarStore';
 import { niceStep } from './scales/niceNumbers';
 import { followWindow, applyFollowWindow } from './viewport';
+import { createScale } from './scales/createScale';
 
 export type BarXAxisPlan = {
   values: number[];
@@ -621,4 +622,48 @@ export function niceIntervalAtLeast(value: number): number {
   const fraction = value / magnitude;
   const niceFraction = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
   return niceFraction * magnitude;
+}
+
+/**
+ * Create, keep or drop each axis' scale for the options (`x` and `y` always exist), pin the
+ * configured bounds, range the axes, and apply a configured follow window.
+ */
+export function initAxes(engine: ChartCore): void {
+  const axisConfigs = engine.config.axes ?? {};
+
+  // Ensure X and Y axes exist
+  if (!axisConfigs.x) {
+    axisConfigs.x = { type: 'linear' };
+  }
+  if (!axisConfigs.y) {
+    axisConfigs.y = { type: 'linear' };
+  }
+  // Write back so layout.ts and axes/render.ts can see all axes
+  engine.config.axes = axisConfigs;
+
+  for (const key of Array.from(engine.scales.keys())) {
+    if (!axisConfigs[key]) {
+      engine.scales.delete(key);
+      engine.naturalExtent.delete(key);
+      engine.userZoomedAxes.delete(key);
+    }
+  }
+
+  for (const [key, ac] of Object.entries(axisConfigs)) {
+    if (!engine.scales.has(key) || engine.scales.get(key)!.type !== (ac.type ?? 'linear')) {
+      const scale = createScale(ac.type ?? 'linear', key, ac.min, ac.max);
+      engine.scales.set(key, scale);
+    } else {
+      const existing = engine.scales.get(key)!;
+      if (!engine.userZoomedAxes.has(key)) {
+        if (ac.min !== undefined) existing.min = ac.min;
+        if (ac.max !== undefined) existing.max = ac.max;
+      }
+    }
+  }
+
+  autoRange(engine);
+  // A configured follow window overrides full-extent X on first paint and
+  // after a config replace, as long as the user has not paused following.
+  if (engine.following) applyFollowWindow(engine);
 }

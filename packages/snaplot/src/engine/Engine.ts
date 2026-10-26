@@ -14,8 +14,6 @@ import type {
   Scale,
   ScaleRange,
   SelectionRange,
-  SeriesSpec,
-  StreamingSpec,
   ThemeConfig,
   TooltipPoint,
 } from './spec';
@@ -23,29 +21,34 @@ import { DirtyFlag } from './spec';
 
 // The canvases, the frame loop and the input.
 import { CanvasManager } from './render/surface';
-import { RenderScheduler } from './render/scheduler';
+import { RenderScheduler, watchTheme } from './render/scheduler';
 import { EventBus } from './interaction/bus';
 import { GestureManager } from './interaction/gestures';
 import { TooltipManager } from '../dom/tooltip';
 
-// Data, scales, options and theme.
+// Data, options and theme.
 import type { DataStore } from './data/DataStore';
-import { validateMaxLen } from './data/DataStore';
-import { ColumnarStore } from './data/ColumnarStore';
 import type { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeIndex';
-import { RingColumnarStore } from './data/RingColumnarStore';
-import { createScale } from './scales/createScale';
 import { axisReadout } from './format';
 import { deepMerge } from './merge';
 import { DEFAULT_CONFIG } from './defaults';
 import { applyThemeToElement, resolveTheme } from './theme/resolve';
 import { type HostedPlugin, PluginHost } from './plugins';
+import { EngineEvents } from './events';
 
 // The engine's modules: functions of the engine, which own the logic named in their files.
-import { rangeForDataChange, autoRange, invalidateRangeCache, type BarXAxisPlan } from './ranging';
+import {
+  appendToSource,
+  createDataStore,
+  ensureStoreMatchesStreaming,
+  getSourceData,
+  replaceSources,
+  sourceExtent,
+  validateSources,
+} from './sources';
+import { autoRange, type BarXAxisPlan, initAxes } from './ranging';
 import {
   applyFollowWindow,
-  unpinMissedAxes,
   setAxis,
   getNaturalRange,
   setCoordinatedAxis,
@@ -54,13 +57,8 @@ import {
   resetZoom,
   scrollToLatest,
 } from './viewport';
-import { getSelection, setSelection, reconcileSelectionForDataChange } from './selection';
-import {
-  setCursorDataX,
-  refreshCursor,
-  cancelPendingTouchCursor,
-  getCursorSnapshot,
-} from './cursor';
+import { getSelection, setSelection } from './selection';
+import { setCursorDataX, cancelPendingTouchCursor, getCursorSnapshot } from './cursor';
 import { setHighlight } from './highlight';
 import { HitTester } from './hit';
 import { computeCustomXTicks } from './axes/ticks';
@@ -78,9 +76,10 @@ import {
 } from './layout';
 import { legendItems, renderAllSeries } from './marks/index';
 import type { ScatterSeriesCache } from './marks/scatter/draw';
-import type { ScatterStyleResolver, ScatterPalettes } from './marks/scatter/encoding';
+import type { ScatterPalettes, ScatterResolvers } from './marks/scatter/encoding';
 import { renderOverlay } from './render/overlay';
 import { wireEvents } from './interaction/actions';
+import { applyModePresets } from './interaction/modes';
 import { debugSnapshot, type DataPassSeries, type DebugSnapshot } from './debug';
 
 /**
@@ -89,14 +88,14 @@ import { debugSnapshot, type DataPassSeries, type DebugSnapshot } from './debug'
  * or timers (canvases, scheduler, gestures, tooltip, plugins), and paints the three layers.
  *
  * The logic lives in the modules beside it, as functions that take the engine first:
- * ranging.ts (domains), viewport.ts (pinned axes, follow, zoom and pan, bounds), selection.ts,
- * cursor.ts (hover and the cursor snapshot), highlight.ts, hit.ts, axes/ (ticks, grid, labels),
- * layout.ts, marks/index.ts (the series pass), render/overlay.ts (the overlay pass),
- * interaction/actions.ts (what each gesture does) and debug.ts (the D31 counters). Fields
- * without `private` are the state those modules read and write, and the helpers they call back
- * (stores, palettes, readouts, `emitEvent`) are public for them too; the engine methods the
- * public layer calls delegate to the modules. The class is internal: no public declaration
- * names it.
+ * sources.ts (stores, replacement, appends), ranging.ts (domains), viewport.ts (pinned axes,
+ * follow, zoom and pan, bounds), selection.ts, cursor.ts (hover and the cursor snapshot),
+ * highlight.ts, hit.ts, format.ts, axes/ (ticks, grid, labels), layout.ts, marks/ (the mark
+ * registry and the series pass), render/overlay.ts (the overlay pass), interaction/actions.ts
+ * (what each gesture does) and debug.ts (the D31 counters); docs/architecture.md maps them.
+ * Fields without `private` are the state those modules read and write, and the helpers they call
+ * back (stores, palettes, `emitEvent`) are public for them too; the engine methods the public
+ * layer calls delegate to the modules. The class is internal: no public declaration names it.
  */
 export class ChartCore implements EngineHost {
   coordinatingAxis = false;
@@ -141,27 +140,8 @@ export class ChartCore implements EngineHost {
   viewportActiveUntil = 0;
   refineTimer: ReturnType<typeof setTimeout> | null = null;
   sampledLastDataRender = false;
-  /**
-   * Scatter style resolvers cached per series index. Building one scans
-   * the encoded columns (colorBy/sizeBy domains, category detection), so
-   * it must happen once per data/config/theme change, not once per frame
-   * or per pointer move. Domains derive from the full column: a point's
-   * color and size stay stable while the viewport pans.
-   *
-   * Two views share one scan: the render loop addresses points by
-   * physical index (segment ranges), hit-testing and selection by logical
-   * index.
-   */
-  scatterEncodingCache = new Map<
-    number,
-    {
-      series: SeriesSpec;
-      theme: ThemeConfig;
-      version: number;
-      renderResolver: ScatterStyleResolver;
-      logicalResolver: ScatterStyleResolver;
-    }
-  >();
+  /** Scatter style resolvers per series index (marks/scatter/encoding.ts `scatterResolvers`). */
+  scatterEncodingCache = new Map<number, ScatterResolvers>();
 
   private gestureManager: GestureManager;
   hitTester: HitTester;
@@ -187,15 +167,11 @@ export class ChartCore implements EngineHost {
   pendingTouchCursor: { x: number; y: number; pointerType: 'touch' | 'pen' } | null = null;
   touchCursorFrame: number | null = null;
   /**
-   * Re-resolves the theme when the document's theming context changes: an
-   * attribute flip on <html>/<body> (the [data-theme] pattern) or an OS
-   * color-scheme change. Only repaints when the resolved theme actually
-   * differs, so the observer is effectively free outside real theme flips.
+   * Stops re-resolving the theme when the document's theming context changes (render/scheduler.ts
+   * `watchTheme`). Only a theme that actually differs repaints, so the watch is effectively free
+   * outside real theme flips.
    */
-  private themeObserver: MutationObserver | null = null;
-  private colorSchemeQuery: MediaQueryList | null = null;
-  private themeRefreshQueued = false;
-  private boundSchemeChange = () => this.queueThemeRefresh();
+  private unwatchTheme: () => void;
   /** Active selection box (shift+drag) */
   selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
   /** Persistent brush selection in data space (selection.mode: 'brush'). */
@@ -224,10 +200,8 @@ export class ChartCore implements EngineHost {
    */
   following = true;
 
-  // Event listeners. Handlers have per-event signatures (see ChartEventMap);
-  // the storage is a contravariant-friendly callable so every event's
-  // handler shape assigns in without a cast (Function is banned by lint).
-  private listeners = new Map<string, Set<(...args: never[]) => unknown>>();
+  /** The outward events to the public layer (events.ts). */
+  private events = new EngineEvents();
 
   // Cleanup
   destroyed = false;
@@ -286,10 +260,10 @@ export class ChartCore implements EngineHost {
     ) as unknown as ChartSpec;
 
     // 1b. Apply interaction mode presets (if zoom/pan not explicitly configured)
-    this.applyModePresets(config);
+    applyModePresets(this.config, config);
 
     // 1c. Validate the merged config against the initial sources.
-    this.validateSources(this.config, sources.sources, sources.seriesSources, trusted);
+    validateSources(this.config, sources.sources, sources.seriesSources, trusted);
 
     // 2. Create canvas layers
     // Resize and DPR callbacks run outside the frame loop (a ResizeObserver
@@ -310,18 +284,10 @@ export class ChartCore implements EngineHost {
     // and a canvas cannot track CSS variables by itself the way SVG can.
     this.theme = resolveTheme(parent, this.config.theme);
     applyThemeToElement(parent, this.theme);
-    if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
-      this.themeObserver = new MutationObserver(() => this.queueThemeRefresh());
-      this.themeObserver.observe(document.documentElement, { attributes: true });
-      if (document.body) this.themeObserver.observe(document.body, { attributes: true });
-    }
-    if (typeof matchMedia !== 'undefined') {
-      this.colorSchemeQuery = matchMedia('(prefers-color-scheme: dark)');
-      this.colorSchemeQuery.addEventListener?.('change', this.boundSchemeChange);
-    }
+    this.unwatchTheme = watchTheme(() => this.refreshTheme());
 
     // 4. Create data stores
-    this.sourceStores = sources.sources.map((source) => this.createDataStore(source, trusted));
+    this.sourceStores = sources.sources.map((source) => createDataStore(this, source, trusted));
     this.seriesSources = sources.seriesSources.slice();
     this.debugCounters.ingestCount++;
 
@@ -337,7 +303,7 @@ export class ChartCore implements EngineHost {
     });
 
     // 6. Create scales
-    this.initAxes();
+    initAxes(this);
 
     // 7. Compute initial layout
     updateLayout(this);
@@ -436,37 +402,11 @@ export class ChartCore implements EngineHost {
     seriesSources: readonly number[],
     trusted = false,
   ): void {
-    if (this.destroyed) return;
-    // Resolve and validate the complete candidate before replacing any live store.
-    const resolved = deepMerge(
-      DEFAULT_CONFIG as unknown as Record<string, unknown>,
-      config as unknown as Record<string, unknown>,
-    ) as unknown as ChartSpec;
-    this.validateSources(resolved, sources, seriesSources, trusted);
-    const maxLen = resolved.streaming?.maxPoints;
-    if (maxLen !== undefined) validateMaxLen(maxLen);
-    const build = () =>
-      sources.map((data) =>
-        maxLen === undefined
-          ? new ColumnarStore(data)
-          : new RingColumnarStore(data, maxLen, this.debugCounters),
-      );
-    const stores = trusted ? ColumnarStore.trusted(build) : build();
-    this.sourceStores = stores;
-    this.seriesSources = seriesSources.slice();
-    invalidateRangeCache(this);
-    unpinMissedAxes(this, resolved);
-    this.dataVersion++;
-    this.debugCounters.ingestCount++;
-    this.replaceOptions(config);
-    reconcileSelectionForDataChange(this);
-    refreshCursor(this);
+    replaceSources(this, config, sources, seriesSources, trusted);
   }
 
   getSourceData(sourceIndex: number): ColumnarData {
-    const store = this.sourceStores[sourceIndex];
-    if (!store) throw new Error(`Unknown data source ${sourceIndex}`);
-    return store.getData();
+    return getSourceData(this, sourceIndex);
   }
 
   getSourceLength(sourceIndex: number): number {
@@ -475,24 +415,6 @@ export class ChartCore implements EngineHost {
 
   getSourceValue(sourceIndex: number, columnIndex: number, rowIndex: number): number {
     return this.sourceStores[sourceIndex]?.valueAt(columnIndex, rowIndex) ?? Number.NaN;
-  }
-
-  private validateSources(
-    config: ChartSpec,
-    sources: readonly ColumnarData[],
-    indices: readonly number[],
-    trusted: boolean,
-  ): void {
-    if (sources.length === 0) throw new Error('At least one data source is required');
-    if (indices.length !== config.series.length)
-      throw new Error('Each series requires a data source index');
-    if (!trusted) for (const source of sources) ColumnarStore.validate(source);
-    for (let si = 0; si < config.series.length; si++) {
-      const sourceIndex = indices[si];
-      if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sources.length) {
-        throw new Error(`Invalid data source for series ${si}`);
-      }
-    }
   }
 
   storeForSeries(seriesIndex: number): DataStore {
@@ -504,24 +426,7 @@ export class ChartCore implements EngineHost {
   }
 
   sourceExtent(axisKey?: string): [number, number] | null {
-    let min = Infinity;
-    let max = -Infinity;
-    const stores =
-      axisKey === undefined
-        ? this.sourceStores
-        : new Set(
-            this.config.series.flatMap((series, si) =>
-              series.visible !== false && (series.xAxis ?? 'x') === axisKey
-                ? [this.storeForSeries(si)]
-                : [],
-            ),
-          );
-    for (const store of stores) {
-      if (!store.length) continue;
-      min = Math.min(min, store.xAt(0));
-      max = Math.max(max, store.xAt(store.length - 1));
-    }
-    return min === Infinity ? null : [min, max];
+    return sourceExtent(this, axisKey);
   }
 
   appendToSource(
@@ -531,37 +436,7 @@ export class ChartCore implements EngineHost {
     /** The public ingest validated the batch and its order. */
     trusted = false,
   ): void {
-    if (this.destroyed) return;
-    if (!this.sourceStores[sourceIndex]) throw new Error(`Unknown data source ${sourceIndex}`);
-    this.ensureStoreMatchesStreaming();
-    const store = this.sourceStores[sourceIndex];
-    if (!trusted) ColumnarStore.validate(data);
-    if (data.length !== store.seriesCount + 1)
-      throw new Error('Appended columns must match the source schema');
-    if (!trusted && data[0].length && store.length) {
-      const previousIndex = opts?.updateLast ? store.length - 2 : store.length - 1;
-      if (previousIndex >= 0 && data[0][0] < store.xAt(previousIndex))
-        throw new Error('Appended X values must preserve source order');
-    }
-
-    const write = () => {
-      if (opts?.updateLast && store.length > 0 && data.length > 0 && data[0].length > 0) {
-        store.replaceLast(Array.from(data, (col) => col[0]));
-        if (data[0].length > 1) {
-          store.append(data.map((col) => col.subarray(1)) as ColumnarData);
-        }
-        return true;
-      }
-      return store.append(data);
-    };
-    const changed = trusted ? ColumnarStore.trusted(write) : write();
-    if (!changed) return;
-
-    this.dataVersion++;
-    const gridDirty = rangeForDataChange(this);
-    reconcileSelectionForDataChange(this);
-    refreshCursor(this);
-    this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
+    appendToSource(this, sourceIndex, data, opts, trusted);
   }
 
   setAxis(key: string, range: Partial<ScaleRange>): void {
@@ -615,7 +490,7 @@ export class ChartCore implements EngineHost {
   private applyConfigSideEffects(partial: DeepPartial<ChartSpec>, fullReplace: boolean): void {
     let themeChanged = false;
     if (fullReplace || partial.mode) {
-      this.applyModePresets(partial);
+      applyModePresets(this.config, partial);
       this.gestureManager.updateTouchAction();
     }
 
@@ -627,8 +502,8 @@ export class ChartCore implements EngineHost {
       this.tooltipManager.applyTheme(this.theme);
     }
 
-    this.ensureStoreMatchesStreaming();
-    this.initAxes();
+    ensureStoreMatchesStreaming(this);
+    initAxes(this);
     updateLayout(this);
     updateScalePixelRanges(this);
     autoRange(this);
@@ -664,16 +539,6 @@ export class ChartCore implements EngineHost {
     this.tooltipManager.applyTheme(next);
     this.scheduler.markDirty(DirtyFlag.ALL);
     this.emitEvent('theme:update', next);
-  }
-
-  /** Collapse observer bursts (class + style + data-theme often flip together). */
-  private queueThemeRefresh(): void {
-    if (this.themeRefreshQueued || this.destroyed) return;
-    this.themeRefreshQueued = true;
-    setTimeout(() => {
-      this.themeRefreshQueued = false;
-      this.refreshTheme();
-    }, 0);
   }
 
   getLayout(): Layout {
@@ -727,10 +592,7 @@ export class ChartCore implements EngineHost {
       clearTimeout(this.refineTimer);
       this.refineTimer = null;
     }
-    this.themeObserver?.disconnect();
-    this.themeObserver = null;
-    this.colorSchemeQuery?.removeEventListener?.('change', this.boundSchemeChange);
-    this.colorSchemeQuery = null;
+    this.unwatchTheme();
 
     this.scheduler.destroy();
     this.gestureManager.detach();
@@ -738,7 +600,7 @@ export class ChartCore implements EngineHost {
     this.eventBus.destroy();
     this.plugins.destroy(this);
     this.canvasManager.destroy();
-    this.listeners.clear();
+    this.events.clear();
   }
 
   /** Add a built-in plugin (the reference lines and regions), drawn before the user's. */
@@ -759,13 +621,7 @@ export class ChartCore implements EngineHost {
   }
 
   on<K extends keyof ChartEventMap>(event: K, handler: ChartEventMap[K]): () => void {
-    let set = this.listeners.get(event);
-    if (!set) {
-      set = new Set();
-      this.listeners.set(event, set);
-    }
-    set.add(handler);
-    return () => set!.delete(handler);
+    return this.events.on(event, handler);
   }
 
   setCursorDataX(dataX: number | null, origin: CursorEventOrigin = 'programmatic'): void {
@@ -795,124 +651,6 @@ export class ChartCore implements EngineHost {
 
   debugSnapshot(): DebugSnapshot {
     return debugSnapshot(this);
-  }
-
-  // ─── Private: Initialization ────────────────────────────────
-
-  /**
-   * Apply interaction mode presets to zoom/pan config.
-   * Mode presets provide default zoom/pan axes while preserving explicit
-   * zoom/pan fields supplied by the caller.
-   */
-  private applyModePresets(source?: DeepPartial<ChartSpec>): void {
-    const mode = this.config.mode;
-    if (!mode) return;
-
-    const zoom = source?.zoom;
-    const pan = source?.pan;
-
-    if (mode === 'analytical') {
-      this.config.zoom = {
-        ...this.config.zoom,
-        enabled: zoom?.enabled ?? true,
-        x: zoom?.x ?? true,
-        y: zoom?.y ?? true,
-      };
-      this.config.pan = {
-        ...this.config.pan,
-        enabled: pan?.enabled ?? true,
-        x: pan?.x ?? true,
-        y: pan?.y ?? true,
-      };
-    } else if (mode === 'timeseries') {
-      this.config.zoom = {
-        ...this.config.zoom,
-        enabled: zoom?.enabled ?? true,
-        x: zoom?.x ?? true,
-        y: zoom?.y ?? false,
-      };
-      this.config.pan = {
-        ...this.config.pan,
-        enabled: pan?.enabled ?? true,
-        x: pan?.x ?? true,
-        y: pan?.y ?? false,
-      };
-    } else if (mode === 'readonly') {
-      this.config.zoom = { enabled: false };
-      this.config.pan = { enabled: false };
-    }
-  }
-
-  private createDataStore(data: ColumnarData, trusted = false): DataStore {
-    const maxLen = this.streamingMaxLen();
-    const build = () =>
-      maxLen === undefined
-        ? new ColumnarStore(data)
-        : new RingColumnarStore(data, maxLen, this.debugCounters);
-    return trusted ? ColumnarStore.trusted(build) : build();
-  }
-
-  private ensureStoreMatchesStreaming(): void {
-    const maxLen = this.streamingMaxLen();
-    // The stores' data was validated when it was stored.
-    this.sourceStores = ColumnarStore.trusted(() =>
-      this.sourceStores.map((store) => {
-        if (maxLen !== undefined) {
-          if (store instanceof RingColumnarStore && store.maxLen === maxLen) return store;
-          invalidateRangeCache(this);
-          return new RingColumnarStore(store.getData(), maxLen, this.debugCounters);
-        }
-        if (!(store instanceof RingColumnarStore)) return store;
-        invalidateRangeCache(this);
-        return new ColumnarStore(store.getData());
-      }),
-    );
-  }
-
-  private streamingMaxLen(): number | undefined {
-    const maxLen = (this.config.streaming as StreamingSpec | undefined)?.maxPoints;
-    if (maxLen !== undefined) validateMaxLen(maxLen);
-    return maxLen;
-  }
-
-  private initAxes(): void {
-    const axisConfigs = this.config.axes ?? {};
-
-    // Ensure X and Y axes exist
-    if (!axisConfigs.x) {
-      axisConfigs.x = { type: 'linear' };
-    }
-    if (!axisConfigs.y) {
-      axisConfigs.y = { type: 'linear' };
-    }
-    // Write back so layout.ts and axes/render.ts can see all axes
-    this.config.axes = axisConfigs;
-
-    for (const key of Array.from(this.scales.keys())) {
-      if (!axisConfigs[key]) {
-        this.scales.delete(key);
-        this.naturalExtent.delete(key);
-        this.userZoomedAxes.delete(key);
-      }
-    }
-
-    for (const [key, ac] of Object.entries(axisConfigs)) {
-      if (!this.scales.has(key) || this.scales.get(key)!.type !== (ac.type ?? 'linear')) {
-        const scale = createScale(ac.type ?? 'linear', key, ac.min, ac.max);
-        this.scales.set(key, scale);
-      } else {
-        const existing = this.scales.get(key)!;
-        if (!this.userZoomedAxes.has(key)) {
-          if (ac.min !== undefined) existing.min = ac.min;
-          if (ac.max !== undefined) existing.max = ac.max;
-        }
-      }
-    }
-
-    autoRange(this);
-    // A configured follow window overrides full-extent X on first paint and
-    // after a config replace, as long as the user has not paused following.
-    if (this.following) applyFollowWindow(this);
   }
 
   // ─── Private: Render pipeline ───────────────────────────────
@@ -1003,18 +741,6 @@ export class ChartCore implements EngineHost {
   }
 
   emitEvent(event: string, ...args: any[]): void {
-    const handlers = this.listeners.get(event);
-    if (!handlers) return;
-    for (const handler of handlers) {
-      try {
-        // The per-event handler signature lives in ChartEventMap and is
-        // enforced at `.on()` registration time; the dispatch side is
-        // variadic by design.
-        (handler as (...a: unknown[]) => unknown)(...args);
-      } catch (err) {
-        // One bad handler must not stop the render loop or other subscribers.
-        console.error(`[snaplot] '${event}' handler threw:`, err);
-      }
-    }
+    this.events.emit(event, ...args);
   }
 }

@@ -10,6 +10,7 @@ import type {
   ScatterSizeEncoding,
   ScatterTooltipField,
   SeriesSpec,
+  ThemeConfig,
   TooltipFieldValue,
 } from '../../spec';
 
@@ -413,12 +414,21 @@ function rgbToHex(rgb: [number, number, number]): string {
  * loop addresses points by physical index (segment ranges), hit testing and selection by logical
  * index.
  */
+/** A series' cached style resolvers, and what they were built for. */
+export interface ScatterResolvers {
+  series: SeriesSpec;
+  theme: ThemeConfig;
+  version: number;
+  renderResolver: ScatterStyleResolver;
+  logicalResolver: ScatterStyleResolver;
+}
+
 export function scatterResolvers(
   engine: ChartCore,
   si: number,
   series: SeriesSpec,
   fallbackColor: string,
-) {
+): ScatterResolvers {
   const store = engine.storeForSeries(si);
   const cached = engine.scatterEncodingCache.get(si);
   if (

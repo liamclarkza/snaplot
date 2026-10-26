@@ -71,3 +71,38 @@ export function nextFrame(callback: () => void): () => void {
   const id = requestAnimationFrame(() => callback());
   return () => cancelAnimationFrame(id);
 }
+
+/**
+ * Watch the document's theming context for `onChange`: an attribute change on `<html>` or
+ * `<body>` (the `[data-theme]` and class patterns) or an OS colour-scheme change. A burst (class,
+ * style and data-theme often flip together) coalesces into one call on the next task. Returns
+ * the stop function. M11 makes this one coalesced observer per document (D4).
+ */
+export function watchTheme(onChange: () => void): () => void {
+  let queued = false;
+  let stopped = false;
+  const queue = () => {
+    if (queued || stopped) return;
+    queued = true;
+    setTimeout(() => {
+      queued = false;
+      onChange();
+    }, 0);
+  };
+  let observer: MutationObserver | null = null;
+  if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+    observer = new MutationObserver(queue);
+    observer.observe(document.documentElement, { attributes: true });
+    if (document.body) observer.observe(document.body, { attributes: true });
+  }
+  let scheme: MediaQueryList | null = null;
+  if (typeof matchMedia !== 'undefined') {
+    scheme = matchMedia('(prefers-color-scheme: dark)');
+    scheme.addEventListener?.('change', queue);
+  }
+  return () => {
+    stopped = true;
+    observer?.disconnect();
+    scheme?.removeEventListener?.('change', queue);
+  };
+}
