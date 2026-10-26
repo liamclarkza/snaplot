@@ -1,5 +1,7 @@
 import type { InteractionMode, Layout, PanConfig, TouchConfig, ZoomConfig } from '../spec';
 import type { EventBus } from './bus';
+import type { ActivePressState, AreaResult, GestureState, PointerState } from './gesture-state';
+import { handleChartKey } from './keyboard';
 import {
   MIN_DRAG_DISTANCE,
   DEFAULT_WHEEL_STEP,
@@ -21,81 +23,10 @@ import {
  * - touch: drag=cursor by default, or pan when `touch.drag` is `'pan'`
  * - touch selection: double-tap+drag by default, long-press only by opt-in
  * - readonly: tooltip only
+ *
+ * Keys go through the key table (keyboard.ts); the state machine's types are in gesture-state.ts,
+ * and what each emitted action does is the action table (actions.ts).
  */
-
-interface PointerState {
-  id: number;
-  x: number;
-  y: number;
-  startX: number;
-  startY: number;
-  startTime: number;
-  pointerType: string;
-}
-
-interface AreaResult {
-  type: 'plot' | 'axis' | 'outside';
-  axisKey?: string;
-}
-
-type GestureState =
-  | { kind: 'idle' }
-  | ActivePressState
-  | ActiveCursorState
-  | ActivePanState
-  | ActiveBoxState
-  | ActivePinchState;
-
-interface ActivePressState {
-  kind: 'press' | 'selection-pending' | 'long-press-ready';
-  pointerId: number;
-  pointerType: string;
-  startX: number;
-  startY: number;
-  lastX: number;
-  lastY: number;
-  startTime: number;
-  lastMoveTime: number;
-  area: AreaResult;
-}
-
-interface ActiveCursorState {
-  kind: 'cursor';
-  pointerId: number;
-  pointerType: string;
-  startX: number;
-  startY: number;
-  lastX: number;
-  lastY: number;
-}
-
-interface ActivePanState {
-  kind: 'pan';
-  pointerId: number;
-  pointerType: string;
-  lastX: number;
-  lastY: number;
-  axis?: string;
-  lastMoveTime: number;
-  velocityX: number;
-  velocityY: number;
-}
-
-interface ActiveBoxState {
-  kind: 'box';
-  pointerId: number;
-  pointerType: string;
-  startX: number;
-  startY: number;
-  lastX: number;
-  lastY: number;
-  mode: 'zoom' | 'selection';
-}
-
-interface ActivePinchState {
-  kind: 'pinch';
-  lastDist: number;
-}
 
 export class GestureManager {
   private pointers = new Map<number, PointerState>();
@@ -916,21 +847,9 @@ export class GestureManager {
     this.eventBus.emit('action:reset-zoom', undefined);
   }
 
-  // ─── Keyboard (arrow keys, +/-, 0) ─────────────────────────
+  // ─── Keyboard (the key table in keyboard.ts) ──────────────
 
-  /**
-   * Keyboard shortcuts for keyboard-only users. Active while the chart
-   * container has focus.
-   *
-   *   ArrowLeft / ArrowRight  , pan X by PAN_STEP
-   *   ArrowUp / ArrowDown     , pan Y by PAN_STEP (if pan.y enabled)
-   *   Shift + Arrow           , larger step (PAN_STEP_FAST)
-   *   `+` / `=`               , zoom in at the chart centre
-   *   `-` / `_`               , zoom out at the chart centre
-   *   `0` / `Home`            , reset zoom
-   *
-   * All shortcuts respect interaction mode: readonly suppresses them.
-   */
+  /** Keyboard shortcuts while the chart container has focus; readonly charts take none. */
   private onKeyDown(e: KeyboardEvent): void {
     const mode = this.getMode();
     if (mode === 'readonly') return;
@@ -942,82 +861,15 @@ export class GestureManager {
       return;
     }
 
-    const PAN_STEP = 40;
-    const PAN_STEP_FAST = 120;
-    const ZOOM_FACTOR = 1.2; // 20% per key press, matches wheel feel
-    const layout = this.getLayout();
-    const centreX = layout.plot.left + layout.plot.width / 2;
-    const centreY = layout.plot.top + layout.plot.height / 2;
-
     // Only preventDefault when the chart will actually act, otherwise a focused
     // chart with pan/zoom disabled would silently swallow page-scroll keys.
-    // These mirror ChartCore's own guards (pan.enabled / pan.x / pan.y and
-    // zoom.enabled) so the two never disagree.
-    const pan = this.getPanConfig();
-    const zoom = this.getZoomConfig();
-    const canPanX = !!pan.enabled && pan.x !== false;
-    const canPanY = !!pan.enabled && !!pan.y;
-
-    let handled = false;
-    switch (e.key) {
-      case 'ArrowLeft':
-        if (canPanX) {
-          this.eventBus.emit('action:pan', { dx: e.shiftKey ? PAN_STEP_FAST : PAN_STEP, dy: 0 });
-          handled = true;
-        }
-        break;
-      case 'ArrowRight':
-        if (canPanX) {
-          this.eventBus.emit('action:pan', { dx: -(e.shiftKey ? PAN_STEP_FAST : PAN_STEP), dy: 0 });
-          handled = true;
-        }
-        break;
-      case 'ArrowUp':
-        if (canPanY) {
-          this.eventBus.emit('action:pan', { dx: 0, dy: e.shiftKey ? PAN_STEP_FAST : PAN_STEP });
-          handled = true;
-        }
-        break;
-      case 'ArrowDown':
-        if (canPanY) {
-          this.eventBus.emit('action:pan', { dx: 0, dy: -(e.shiftKey ? PAN_STEP_FAST : PAN_STEP) });
-          handled = true;
-        }
-        break;
-      case '+':
-      case '=':
-        if (zoom.enabled) {
-          const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
-          this.eventBus.emit('action:zoom', {
-            factor: 1 / ZOOM_FACTOR,
-            anchorX: centreX,
-            anchorY: centreY,
-            axis,
-          });
-          handled = true;
-        }
-        break;
-      case '-':
-      case '_':
-        if (zoom.enabled) {
-          const axis = zoom.x && !zoom.y ? 'x' : !zoom.x && zoom.y ? 'y' : 'xy';
-          this.eventBus.emit('action:zoom', {
-            factor: ZOOM_FACTOR,
-            anchorX: centreX,
-            anchorY: centreY,
-            axis,
-          });
-          handled = true;
-        }
-        break;
-      case '0':
-      case 'Home':
-        // Reset always acts (ChartCore.resetZoom has no enable guard).
-        this.eventBus.emit('action:reset-zoom', undefined);
-        handled = true;
-        break;
-    }
-
+    const handled = handleChartKey({
+      event: e,
+      bus: this.eventBus,
+      layout: this.getLayout(),
+      pan: this.getPanConfig(),
+      zoom: this.getZoomConfig(),
+    });
     if (handled) e.preventDefault();
   }
 }

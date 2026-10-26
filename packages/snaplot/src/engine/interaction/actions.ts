@@ -1,8 +1,12 @@
 /**
- * What each gesture action does to the chart: the bus handlers for cursor moves and leaves, pan,
- * zoom, the box and brush drags, reset and tap.
+ * What each gesture action does to the chart, as a table (plan §3.1): one handler per bus action
+ * (cursor moves and leaves, pan, zoom, the box and brush drags, reset and tap), registered on the
+ * engine's bus by `wireEvents`. The GestureManager (gestures.ts) and the key table (keyboard.ts)
+ * turn input into these actions; M12a's one constraint function and hover model change the
+ * handlers, not the wiring.
  */
 import type { ChartCore } from '../Engine';
+import type { EventMap } from './bus';
 import { queueTouchCursor, cancelPendingTouchCursor, updateLocalCursorFromPoint } from '../cursor';
 import { clearProximityHighlight } from '../highlight';
 import { DirtyFlag } from '../spec';
@@ -25,19 +29,24 @@ import {
 import { MIN_DRAG_DISTANCE } from '../../constants';
 import { emitPointClick } from '../hit';
 
-export function wireEvents(engine: ChartCore): void {
+/** One handler per gesture action: what the action does to `engine`. */
+export type ActionTable = {
+  readonly [K in keyof EventMap]: (engine: ChartCore, payload: EventMap[K]) => void;
+};
+
+export const ACTIONS: ActionTable = {
   // ── Cursor tracking ──
-  engine.eventBus.on('action:cursor', ({ x, y, pointerType }) => {
+  'action:cursor': (engine, { x, y, pointerType }) => {
     if (pointerType === 'touch' || pointerType === 'pen') {
       queueTouchCursor(engine, x, y, pointerType);
       return;
     }
     cancelPendingTouchCursor(engine);
     updateLocalCursorFromPoint(engine, x, y, pointerType);
-  });
+  },
 
   // ── Cursor leave ──
-  engine.eventBus.on('action:cursor-leave', () => {
+  'action:cursor-leave': (engine) => {
     cancelPendingTouchCursor(engine);
     engine.cursorX = null;
     engine.cursorY = null;
@@ -54,10 +63,10 @@ export function wireEvents(engine: ChartCore): void {
     // mouse-leave skips the "cursor outside plot area" path in
     // action:cursor and the legend table never blanks its values.
     engine.emitEvent('cursor:move', null, null, 'local');
-  });
+  },
 
   // ── Pan (incremental pixel delta) ──
-  engine.eventBus.on('action:pan', ({ dx, dy, axis }) => {
+  'action:pan': (engine, { dx, dy, axis }) => {
     const pan = engine.config.pan ?? { enabled: true, x: true };
     if (!pan.enabled) return;
 
@@ -92,10 +101,10 @@ export function wireEvents(engine: ChartCore): void {
         }
       }
     }
-  });
+  },
 
   // ── Zoom (factor at anchor point) ──
-  engine.eventBus.on('action:zoom', ({ factor, anchorX, anchorY, axis }) => {
+  'action:zoom': (engine, { factor, anchorX, anchorY, axis }) => {
     const zoom = engine.config.zoom ?? { enabled: true, x: true };
     if (!zoom.enabled) return;
 
@@ -127,10 +136,10 @@ export function wireEvents(engine: ChartCore): void {
         }
       }
     }
-  });
+  },
 
   // ── Box selection (start/update/end) ──
-  engine.eventBus.on('action:box-start', ({ x, y }) => {
+  'action:box-start': (engine, { x, y }) => {
     if (isBrushMode(engine)) {
       brushStart(engine, x);
       engine.scheduler.markDirty(DirtyFlag.OVERLAY);
@@ -139,9 +148,9 @@ export function wireEvents(engine: ChartCore): void {
     engine.selectionBox = { x1: x, y1: y, x2: x, y2: y };
     updateLocalCursorFromPoint(engine, x, y, engine.lastPointerType);
     engine.scheduler.markDirty(DirtyFlag.OVERLAY);
-  });
+  },
 
-  engine.eventBus.on('action:box-update', ({ x, y }) => {
+  'action:box-update': (engine, { x, y }) => {
     if (isBrushMode(engine)) {
       brushUpdate(engine, x);
       engine.scheduler.markDirty(DirtyFlag.OVERLAY);
@@ -166,9 +175,9 @@ export function wireEvents(engine: ChartCore): void {
     }
 
     engine.scheduler.markDirty(DirtyFlag.OVERLAY);
-  });
+  },
 
-  engine.eventBus.on('action:box-end', ({ x1, y1, x2, y2 }) => {
+  'action:box-end': (engine, { x1, y1, x2, y2 }) => {
     if (isBrushMode(engine)) {
       brushEnd(engine);
       engine.scheduler.markDirty(DirtyFlag.OVERLAY);
@@ -233,15 +242,15 @@ export function wireEvents(engine: ChartCore): void {
         applyViewportChange(engine, 'y', selectionY.min, selectionY.max);
       }
     }
-  });
+  },
 
   // ── Reset zoom ──
-  engine.eventBus.on('action:reset-zoom', () => {
+  'action:reset-zoom': (engine) => {
     engine.resetZoom();
-  });
+  },
 
   // ── Tap (touch: show/persist tooltip) ──
-  engine.eventBus.on('action:tap', ({ x, y, pointerType }) => {
+  'action:tap': (engine, { x, y, pointerType }) => {
     cancelPendingTouchCursor(engine);
     const inPlot = isInPlotArea(engine, x, y);
     updateLocalCursorFromPoint(engine, x, y, pointerType);
@@ -250,5 +259,15 @@ export function wireEvents(engine: ChartCore): void {
       // Leave a short-lived ring so the user can see the tap landed.
       engine.tapFeedback = { x, y, startTime: performance.now() };
     }
-  });
+  },
+};
+
+function wire<K extends keyof EventMap>(engine: ChartCore, action: K): void {
+  const handle = ACTIONS[action];
+  engine.eventBus.on(action, (payload) => handle(engine, payload));
+}
+
+/** Register every action handler on the engine's bus. */
+export function wireEvents(engine: ChartCore): void {
+  for (const action of Object.keys(ACTIONS) as Array<keyof EventMap>) wire(engine, action);
 }
