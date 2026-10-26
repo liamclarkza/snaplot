@@ -82,6 +82,19 @@ export function contract(el: HTMLElement, samples: Sample[], losses: Loss[], acc
     return { id: `note-${at}` };
   }
   createChart(el, { data: samples, x: 'time', series: [{ y: 'cpu' }], plugins: [plugin, note(1)] });
+  // The D21 contract: install returns a cleanup; draw hooks take (context, chart, plot).
+  const marker: ChartPlugin = {
+    id: 'marker',
+    install: (chart) => chart.subscribe(() => {}),
+    drawAbove(context, chart, plot) {
+      const x = chart.scale('x')?.toPixel(new Date(2026, 0, 1)) ?? plot.left;
+      context.fillRect(x, plot.top, 1, plot.height);
+    },
+  };
+  // @ts-expect-error [gap-annotations-extensibility-08] ChartPlugin has no beforeDraw veto
+  const veto: ChartPlugin = { id: 'veto', beforeDraw: () => false };
+  void marker;
+  void veto;
 
   // A typed handle is a ChartHandle.
   const handle: ChartHandle = createChart<Loss>(el, {

@@ -53,9 +53,9 @@ function counter(): { plugin: ChartPlugin<Row>; drawn: Record<Layer, number> } {
     drawn,
     plugin: {
       id: 'mount-counter',
-      afterDrawGrid: () => drawn.grid++,
-      afterDrawData: () => drawn.data++,
-      afterDrawOverlay: () => drawn.overlay++,
+      drawBelow: () => drawn.grid++,
+      drawAbove: () => drawn.data++,
+      drawOverlay: () => drawn.overlay++,
     },
   };
 }

@@ -150,7 +150,7 @@ describe('[gap-overhaul-delta-03] isolated listeners over a snapshot (P14)', () 
 });
 
 describe('[backlog-02][dataapi-21] events are queued until the call commits', () => {
-  it.fails('[backlog-02] a selection cleared by new data is delivered after the update, with the new state', () => {
+  it('[backlog-02] a selection cleared by new data is delivered after the update, with the new state', () => {
     const chart = mount<Row>(fakes, {
       ...base,
       interaction: { drag: 'select' },
@@ -158,12 +158,7 @@ describe('[backlog-02][dataapi-21] events are queued until the call commits', ()
     });
     const seen: unknown[] = [];
     chart.on('selection:change', (selection) =>
-      // scale() lands with the plugin contract; until then the listener must not throw.
-      seen.push([
-        selection,
-        chart.getState().selection,
-        typeof chart.scale === 'function' ? chart.scale('x')?.min : undefined,
-      ]),
+      seen.push([selection, chart.getState().selection, chart.scale('x')?.min]),
     );
     chart.update({ data: Array.from({ length: 10 }, (_, i) => ({ t: 500 + i, v: 1, w: 1 })) });
     expect(seen).toEqual([[null, null, 500]]);

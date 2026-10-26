@@ -132,6 +132,21 @@ to [Semantic Versioning](https://semver.org/).
   has `setCursor` and `setHighlight` only: `options` and `destroy()` are removed, and an empty
   group is garbage.
 
+### Plugins (1.0)
+
+- A plugin is `{ id, install?(chart) → cleanup?, drawBelow?, drawAbove?, drawOverlay? }`. Draw
+  hooks receive `(context, chart, plot)` and run after the built-in reference lines and regions
+  of their layer, in array order. Plugins are reconciled by `id`: an inline plugin object
+  installs once, and its latest hooks draw. Two plugins with one id throw. A hook that throws is
+  reported once and disables its plugin.
+- `chart.scale(key)` reports `{ type, horizontal, min, max, categories?, toPixel, fromPixel }`,
+  so plugins map data (numbers, Dates, ISO-8601 strings, category labels) to pixels.
+  `chart.redraw('overlay' | 'data' | 'all')` repaints one layer; `'all'` also resolves the theme
+  again.
+- Removed: the `beforeDraw` veto, `afterDrawGrid`/`afterDrawData`/`afterDrawOverlay` (use the
+  draw hooks), `destroy` (return a cleanup from `install`), `onDataUpdate` and `onOptionsUpdate`
+  (use `chart.subscribe()` or `chart.on()`). A plugin no longer makes appends copy the data.
+
 ### Removed options (1.0)
 
 The 0.12 options below left the public types. Passing one warns once per page with its path and

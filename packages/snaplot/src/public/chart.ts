@@ -9,13 +9,13 @@ import { fail, hint, unknownSeries, warnOnce } from '../engine/errors';
 import { formatValue } from '../engine/format';
 import type {
   CursorSnapshotOptions,
-  Plugin,
   ScaleRange,
   SelectionRange,
   TooltipPoint,
 } from '../engine/spec';
 import { createReferenceLinesPlugin } from '../plugins/builtins/referenceLinesPlugin';
 import { createReferenceRegionsPlugin } from '../plugins/builtins/referenceRegionsPlugin';
+import { createScale } from '../scales/createScale';
 import { categoryLabels, commitAppend, planAppend, refreshCategoryAxis } from './append';
 import { classify, sameData, STATE_KEYS, type StateKey, type Work } from './classify';
 import {
@@ -51,8 +51,8 @@ import type {
   ChartHandle,
   ChartOptions,
   ChartPatch,
-  ChartPlugin,
   ChartPoint,
+  ChartScale,
   ChartState,
   CursorSnapshot,
   DataSource,
@@ -131,7 +131,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   private destroyed = false;
   private lines = createReferenceLinesPlugin({ lines: [] });
   private regions = createReferenceRegionsPlugin({ regions: [] });
-  private bridges = new WeakMap<ChartPlugin<Row>, Plugin>();
   /** The built-in legend: its placement and how to unmount it. */
   private legend?: { position: 'top' | 'bottom'; unmount: () => void };
 
@@ -154,7 +153,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     // so plugins are installed below, and the engine's first paint waits for them.
     this.engine = new ChartCore(
       element,
-      { ...config, plugins: [] },
+      config,
       { sources: this.columns(), seriesSources: this.ingested.seriesSources },
       /* deferFirstPaint */ true,
       /* trusted: ingest validated every source */ true,
@@ -187,7 +186,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.bindEngine();
       this.lines.setLines(this.ingested.referenceLines);
       this.regions.setRegions(this.ingested.referenceRegions);
-      for (const plugin of config.plugins ?? []) this.engine.use(plugin);
+      // Built-in annotations first, then the user's plugins, which install with the handle.
+      this.engine.use(this.regions);
+      this.engine.use(this.lines);
+      this.engine.setPlugins(normalized.plugins, this);
       this.mutating = true;
       try {
         this.applyState(this.stateChanges(normalized));
@@ -358,11 +360,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   private configFor(ingested: Ingested<Row>, normalized: NormalizedOptions<Row>) {
-    const plugins = [
-      this.regions,
-      this.lines,
-      ...normalized.plugins.map((plugin) => this.bridge(plugin)),
-    ];
     // Render functions are read through the latest options when called (plan D16): a new
     // identity is a repaint, and these wrappers stay the same.
     return {
@@ -401,39 +398,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
             : {}),
         };
       }),
-      plugins,
     };
-  }
-
-  private bridge(plugin: ChartPlugin<Row>): Plugin {
-    let bridge = this.bridges.get(plugin);
-    if (bridge) return bridge;
-    const invoke = <Result>(
-      hook: keyof ChartPlugin<Row>,
-      callback: () => Result,
-    ): Result | undefined => {
-      try {
-        return callback();
-      } catch (error) {
-        console.error(`snaplot: plugin "${plugin.id}" ${hook} hook failed.`, error);
-      }
-    };
-    bridge = {
-      id: plugin.id,
-      install: () => invoke('install', () => plugin.install?.(this)),
-      destroy: () => invoke('destroy', () => plugin.destroy?.(this)),
-      beforeDrawData: () => invoke('beforeDraw', () => plugin.beforeDraw?.(this)),
-      afterDrawGrid: (_chart, context) =>
-        invoke('afterDrawGrid', () => plugin.afterDrawGrid?.(this, context)),
-      afterDrawData: (_chart, context) =>
-        invoke('afterDrawData', () => plugin.afterDrawData?.(this, context)),
-      afterDrawOverlay: (_chart, context) =>
-        invoke('afterDrawOverlay', () => plugin.afterDrawOverlay?.(this, context)),
-      onSetData: () => invoke('onDataUpdate', () => plugin.onDataUpdate?.(this)),
-      onSetOptions: () => invoke('onOptionsUpdate', () => plugin.onOptionsUpdate?.(this)),
-    };
-    this.bridges.set(plugin, bridge);
-    return bridge;
   }
 
   update(patch: ChartPatch<Row>): void {
@@ -498,8 +463,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.normalized = normalized;
     this.optionsSnapshot = undefined;
     // A group change moves the palette slots of series without a colour (plan D17).
-    if (work.engine || work.plugins || work.group)
-      this.engine.replaceOptions(this.configFor(ingested, normalized));
+    if (work.engine || work.group) this.engine.replaceOptions(this.configFor(ingested, normalized));
+    // Plugins are reconciled by id: an inline object with a known id only repaints (D21).
+    if (work.plugins) this.engine.setPlugins(normalized.plugins, this);
     if (work.annotations) {
       this.lines.setLines(ingested.referenceLines);
       this.regions.setRegions(ingested.referenceRegions);
@@ -556,6 +522,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         /* trusted */ true,
       );
       replaced = true;
+      this.engine.setPlugins(normalized.plugins, this);
       this.lines.setLines(ingested.referenceLines);
       this.regions.setRegions(ingested.referenceRegions);
       this.engine.setHighlight(highlighted ? ingested.seriesIds.indexOf(highlighted) : null);
@@ -1120,8 +1087,44 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   resize(width: number, height: number): void {
     this.engine.resize(width, height);
   }
-  redraw(): void {
-    this.engine.redraw();
+  /** Repaint a layer on the next frame; `'all'` (the default) also resolves the theme again. */
+  redraw(layer: 'overlay' | 'data' | 'all' = 'all'): void {
+    if (this.destroyed) return;
+    if (layer !== 'overlay' && layer !== 'data' && layer !== 'all')
+      fail(`redraw() takes 'overlay', 'data' or 'all', not ${String(layer)}.`);
+    this.engine.redraw(layer);
+  }
+
+  /**
+   * An axis' kind, horizontal or not, current range and pixel mapping, as plugins draw with it
+   * (plan D21). Pixels are CSS pixels from the canvases' top-left corner; a category axis maps
+   * its labels (and slot positions), a time axis Dates and ISO-8601 strings. A snapshot: read
+   * it again after the viewport moves.
+   */
+  scale(key: string): ChartScale | undefined {
+    const axis = this.engine.getAxis(key);
+    if (!axis) return undefined;
+    const registry = this.ingested.categories.get(key);
+    const time = axis.type === 'time';
+    const { min, max } = axis;
+    const mapping = createScale(axis.type, key, min, max);
+    mapping.setPixelRange(axis.dataToPixel(min), axis.dataToPixel(max));
+    const read = (value: number | Date | string): number => {
+      if (typeof value === 'number') return value;
+      if (value instanceof Date) return value.getTime();
+      if (typeof value !== 'string') return Number.NaN;
+      if (registry) return registry.codes.get(value) ?? Number.NaN;
+      return time ? parseIso(value, this.normalized.engine.timeZone) : Number.NaN;
+    };
+    return Object.freeze({
+      type: registry ? ('category' as const) : axis.type,
+      horizontal: this.engine.isHorizontalAxis(key),
+      min,
+      max,
+      ...(registry ? { categories: Object.freeze(registry.list()) } : {}),
+      toPixel: (value: number | Date | string) => mapping.dataToPixel(read(value)),
+      fromPixel: (pixel: number) => mapping.pixelToData(pixel),
+    });
   }
   groupCategories(): ReadonlyMap<string, readonly string[]> {
     return categoryLabels(this.ingested);

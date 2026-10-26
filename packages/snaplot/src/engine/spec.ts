@@ -941,8 +941,6 @@ export interface ChartSpec<TMeta = unknown> {
    * theme object to pin colors regardless of the page.
    */
   theme?: Partial<ThemeConfig>;
-  /** Plugins installed at creation. Also addable later via `ChartCore.use()`. */
-  plugins?: Plugin[];
 }
 
 /**
@@ -997,24 +995,11 @@ export interface Plugin {
   /** After gridlines/axes paint. Draw under the data here. */
   afterDrawGrid?(chart: EngineHost, ctx: CanvasRenderingContext2D): void;
 
-  /** Before series marks paint. Return `false` to suppress the default data draw. */
-  beforeDrawData?(chart: EngineHost, ctx: CanvasRenderingContext2D): boolean | void;
   /** After series marks paint. Annotations that sit above data go here (see `createReferenceLinesPlugin`). */
   afterDrawData?(chart: EngineHost, ctx: CanvasRenderingContext2D): void;
 
   /** After the overlay paints, the topmost draw layer. */
   afterDrawOverlay?(chart: EngineHost, ctx: CanvasRenderingContext2D): void;
-
-  /** Fires after the chart's data changes: a replacement or an append. */
-  onSetData?(chart: EngineHost, data: ColumnarData): void;
-  /**
-   * Fires after the chart's options change. Use this for plugins whose DOM /
-   * visual state depends on config (series, axes, theme) rather than data,
-   * legends, toolbars, stat readouts. Avoid listening on `onSetData` for
-   * those: at high streaming rates it rebuilds the DOM underneath the user's
-   * cursor.
-   */
-  onSetOptions?(chart: EngineHost): void;
 }
 
 // ============================================================

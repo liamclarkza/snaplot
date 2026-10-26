@@ -120,7 +120,7 @@ describe('[dxtrial-19] the follow window', () => {
 });
 
 describe('[arch-01] appends with a plugin', () => {
-  it.fails('[arch-01] 100 appends with a drawing plugin copy the ring 0 times', () => {
+  it('[arch-01] 100 appends with a drawing plugin copy the ring 0 times', () => {
     const chart = mount<Sample>(fakes, {
       data: initial(),
       x: 'time',

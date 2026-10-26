@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ColumnarData, Plugin } from '../src/engine/spec';
 import { type EngineFakes, f, installEngineFakes, replaceData } from './fakes/engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2): the engine is built
@@ -14,37 +13,6 @@ beforeEach(() => {
 afterEach(() => fakes.uninstall());
 
 describe('engine appendData', () => {
-  it('emits data:update and plugin data hooks with the resulting dataset', () => {
-    const seenEvents: number[] = [];
-    const seenPluginLengths: number[] = [];
-    const plugin: Plugin = {
-      id: 'test:data-hook',
-      onSetData(_chart, data: ColumnarData) {
-        seenPluginLengths.push(data[0].length);
-      },
-    };
-
-    const chart = fakes.engine({ series: [{ label: 'value', yColumn: 1 }], plugins: [plugin] }, [
-      f([1, 2]),
-      f([10, 20]),
-    ]);
-
-    chart.on('data:update', (data) => {
-      seenEvents.push(data[0].length);
-    });
-
-    chart.appendToSource(0, [f([3]), f([30])]);
-    chart.appendToSource(0, [f([]), f([])]);
-
-    expect(seenEvents).toEqual([3]);
-    expect(seenPluginLengths).toEqual([3]);
-    expect(chart.getStats()).toMatchObject({
-      dataVersion: 1,
-      setDataCount: 0,
-      appendDataCount: 1,
-    });
-  });
-
   it('tracks setData and render counters in chart stats', () => {
     const config = {
       debug: { stats: true },
@@ -66,7 +34,6 @@ describe('engine appendData', () => {
   });
 
   it('uses config.streaming.maxLen as the append retention policy', () => {
-    const seenEvents: number[] = [];
     const chart = fakes.engine(
       {
         streaming: { maxPoints: 3 },
@@ -75,13 +42,8 @@ describe('engine appendData', () => {
       [f([1, 2]), f([10, 20])],
     );
 
-    chart.on('data:update', (data) => {
-      seenEvents.push(data[0].length);
-    });
-
     chart.appendToSource(0, [f([3, 4]), f([30, 40])]);
 
-    expect(seenEvents).toEqual([3]);
     expect(Array.from(chart.getSourceData(0)[0])).toEqual([2, 3, 4]);
     expect(Array.from(chart.getSourceData(0)[1])).toEqual([20, 30, 40]);
   });

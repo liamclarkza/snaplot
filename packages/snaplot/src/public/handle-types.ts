@@ -8,6 +8,7 @@ import type {
   AppendOptions,
   AxisPosition,
   AxisState,
+  AxisType,
   ChartOptions,
   ChartPatch,
   DataSource,
@@ -198,42 +199,7 @@ export interface SelectionResult<Row = Record<string, any>> extends SelectionRan
 
 // ─── Plugins ─────────────────────────────────────────────────────────
 
-/**
- * A plugin: drawing hooks and lifecycle callbacks. Hook errors are caught and
- * logged.
- *
- * @example
- * ```ts
- * const watermark: ChartPlugin = {
- *   id: 'watermark',
- *   afterDrawOverlay(chart, ctx) { ctx.fillText('draft', 8, 16); },
- * };
- * ```
- */
-export interface ChartPlugin<Row = Record<string, any>> {
-  /** A unique id. */
-  id: string;
-  /** Called once with the chart when the plugin is added. */
-  install?(chart: ChartHandle<Row>): void;
-  /** Called once when the plugin is removed or the chart is destroyed. */
-  destroy?(chart: ChartHandle<Row>): void;
-  /** Called before the data layer draws; return `false` to skip the built-in marks. */
-  beforeDraw?(chart: ChartHandle<Row>): boolean | void;
-  /** Draw under the data, after the grid. */
-  afterDrawGrid?(chart: ChartHandle<Row>, context: CanvasRenderingContext2D): void;
-  /** Draw over the data. */
-  afterDrawData?(chart: ChartHandle<Row>, context: CanvasRenderingContext2D): void;
-  /** Draw on the overlay, above the crosshair. */
-  afterDrawOverlay?(chart: ChartHandle<Row>, context: CanvasRenderingContext2D): void;
-  /** Called after data is replaced or appended. */
-  onDataUpdate?(chart: ChartHandle<Row>): void;
-  /** Called after options change. */
-  onOptionsUpdate?(chart: ChartHandle<Row>): void;
-}
-
-// ─── The chart handle ────────────────────────────────────────────────
-
-/** A rectangle in CSS pixels, relative to the chart container. */
+/** A rectangle in CSS pixels, from the top-left corner of the chart's canvases. */
 export interface PixelRect {
   /** The left edge. */
   left: number;
@@ -244,6 +210,64 @@ export interface PixelRect {
   /** The height. */
   height: number;
 }
+
+/**
+ * One axis as `chart.scale(key)` reports it: what plugins map data to pixels with. A snapshot:
+ * read it again after the viewport moves.
+ */
+export interface ChartScale {
+  /** The axis kind. */
+  readonly type: AxisType;
+  /** Whether the axis runs along the bottom or top of the plot. */
+  readonly horizontal: boolean;
+  /** The lower bound of the current range, in data units (slot positions on a category axis). */
+  readonly min: number;
+  /** The upper bound of the current range. */
+  readonly max: number;
+  /** The labels of a category axis, in order. */
+  readonly categories?: readonly string[];
+  /**
+   * The pixel of a value, in CSS pixels from the canvases' top-left corner: a number, a Date or
+   * an ISO-8601 string on a time axis, or a category label.
+   */
+  toPixel(value: number | Date | string): number;
+  /** The value at a pixel (a slot position on a category axis). */
+  fromPixel(pixel: number): number;
+}
+
+/**
+ * A plugin: an id, an optional install hook, and draw hooks for three slots. Plugins are
+ * reconciled by `id`, so an inline object installs once and its latest hooks draw. Each slot
+ * draws after the built-in reference lines and regions, in array order; a hook that throws is
+ * reported once and its plugin is disabled.
+ *
+ * @example
+ * ```ts
+ * const watermark: ChartPlugin = {
+ *   id: 'watermark',
+ *   drawOverlay(context, chart, plot) {
+ *     context.fillText('draft', plot.left + 8, plot.top + 16);
+ *   },
+ * };
+ * ```
+ */
+export interface ChartPlugin<Row = Record<string, any>> {
+  /** A unique id among the chart's plugins; two plugins with one id throw. */
+  id: string;
+  /**
+   * Called once with the chart when the plugin is added; return a cleanup function, called when
+   * the plugin is removed or the chart is destroyed.
+   */
+  install?(chart: ChartHandle<Row>): void | (() => void);
+  /** Draw under the data, after the grid and the reference regions. */
+  drawBelow?(context: CanvasRenderingContext2D, chart: ChartHandle<Row>, plot: PixelRect): void;
+  /** Draw over the data, after the reference lines. */
+  drawAbove?(context: CanvasRenderingContext2D, chart: ChartHandle<Row>, plot: PixelRect): void;
+  /** Draw on the overlay, above the crosshair. */
+  drawOverlay?(context: CanvasRenderingContext2D, chart: ChartHandle<Row>, plot: PixelRect): void;
+}
+
+// ─── The chart handle ────────────────────────────────────────────────
 
 /** Where an axis is drawn. */
 export interface AxisArea {
@@ -418,8 +442,13 @@ export interface ChartHandle<Row = Record<string, any>> {
   refreshTheme(): void;
   /** Resize to a fixed size in CSS pixels. */
   resize(width: number, height: number): void;
-  /** Repaint every layer. */
-  redraw(): void;
+  /**
+   * Repaint a layer on the next frame: `'overlay'`, `'data'` (the marks and what plugins draw
+   * over them) or `'all'`, which also resolves the theme from the page again.
+   */
+  redraw(layer?: 'overlay' | 'data' | 'all'): void;
+  /** An axis' kind, range and pixel mapping, or undefined for an axis the chart does not have. */
+  scale(key: string): ChartScale | undefined;
   /** Remove the chart and release its resources. */
   destroy(): void;
 }

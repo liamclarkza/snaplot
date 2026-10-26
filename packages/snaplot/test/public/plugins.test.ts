@@ -30,7 +30,7 @@ function marker(id: string, log: string[]): FinalPlugin<Row> {
 }
 
 describe('[gap-annotations-extensibility-07] reconcile by id', () => {
-  it.fails('[gap-annotations-extensibility-07] an inline plugin with the same id installs once and draws with its latest hooks', () => {
+  it('[gap-annotations-extensibility-07] an inline plugin with the same id installs once and draws with its latest hooks', () => {
     const installs = vi.fn();
     const drawn: number[] = [];
     const plugin = (n: number): FinalPlugin<Row> => ({
@@ -48,7 +48,7 @@ describe('[gap-annotations-extensibility-07] reconcile by id', () => {
     expect(drawn.at(-1)).toBe(5);
   });
 
-  it.fails('[gap-annotations-extensibility-07] install receives the handle; its cleanup runs on removal and on destroy', () => {
+  it('[gap-annotations-extensibility-07] install receives the handle; its cleanup runs on removal and on destroy', () => {
     const cleanups: string[] = [];
     const handles: unknown[] = [];
     const plugin = (id: string): FinalPlugin<Row> => ({
@@ -66,7 +66,7 @@ describe('[gap-annotations-extensibility-07] reconcile by id', () => {
     expect(cleanups).toEqual(['a', 'b']);
   });
 
-  it.fails('[backlog-27] two plugins with the same id throw, naming the id', () => {
+  it('[backlog-27] two plugins with the same id throw, naming the id', () => {
     expect(() => mount<Row>(fakes, { ...base, plugins: [{ id: 'note' }, { id: 'note' }] })).toThrow(
       /^snaplot: .*"note"/,
     );
@@ -74,7 +74,7 @@ describe('[gap-annotations-extensibility-07] reconcile by id', () => {
 });
 
 describe('[gap-annotations-extensibility-09] draw slots and order', () => {
-  it.fails('[gap-annotations-extensibility-09] plugins draw in array order, each slot on its own layer', () => {
+  it('[gap-annotations-extensibility-09] plugins draw in array order, each slot on its own layer', () => {
     const log: string[] = [];
     const chart = mount<Row>(fakes, { ...base, plugins: [marker('a', log), marker('b', log)] });
     fakes.frames.flush();
@@ -89,7 +89,7 @@ describe('[gap-annotations-extensibility-09] draw slots and order', () => {
     expect(log).toEqual(['a:above', 'b:above']);
   });
 
-  it.fails('[gap-annotations-extensibility-09] a plugin draws after the built-in reference lines of its slot', () => {
+  it('[gap-annotations-extensibility-09] a plugin draws after the built-in reference lines of its slot', () => {
     const order: string[] = [];
     const chart = mount<Row>(fakes, {
       ...base,
@@ -109,7 +109,7 @@ describe('[gap-annotations-extensibility-09] draw slots and order', () => {
     expect(order.slice(-2)).toEqual(['Limit', 'plugin']);
   });
 
-  it.fails('[gap-annotations-extensibility-09] draw hooks receive the context, the handle and the plot rectangle', () => {
+  it('[gap-annotations-extensibility-09] draw hooks receive the context, the handle and the plot rectangle', () => {
     const calls: unknown[][] = [];
     const chart = mount<Row>(fakes, {
       ...base,
@@ -122,7 +122,7 @@ describe('[gap-annotations-extensibility-09] draw slots and order', () => {
     expect(plot).toEqual(debug(chart).plot);
   });
 
-  it.fails('[gap-annotations-extensibility-08] a plugin cannot veto the data layer: a zoom repaints the data', () => {
+  it('[gap-annotations-extensibility-08] a plugin cannot veto the data layer: a zoom repaints the data', () => {
     const chart = mount<Row>(fakes, {
       ...base,
       plugins: [{ id: 'veto', beforeDraw: () => false }],
@@ -136,7 +136,7 @@ describe('[gap-annotations-extensibility-09] draw slots and order', () => {
 });
 
 describe('[gap-annotations-extensibility-11] isolation', () => {
-  it.fails('[gap-annotations-extensibility-11] a throwing hook warns once and disables only that plugin', () => {
+  it('[gap-annotations-extensibility-11] a throwing hook warns once and disables only that plugin', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const good = vi.fn();
     const bad = vi.fn(() => {
@@ -181,7 +181,7 @@ describe('[gap-annotations-extensibility-11] isolation', () => {
 });
 
 describe('[arch-17] chart.scale(key)', () => {
-  it.fails('[arch-17] maps data to pixels and back on linear axes, with the plot edges at the domain', () => {
+  it('[arch-17] maps data to pixels and back on linear axes, with the plot edges at the domain', () => {
     const chart = mount<Row>(fakes, base);
     const x = chart.scale('x')!;
     const y = chart.scale('y')!;
@@ -195,7 +195,7 @@ describe('[arch-17] chart.scale(key)', () => {
     expect(chart.scale('nope')).toBeUndefined();
   });
 
-  it.fails('[arch-17] log, time and category axes map their own values', () => {
+  it('[arch-17] log, time and category axes map their own values', () => {
     const chart = mount<Row>(fakes, {
       data: [
         { day: '2026-03-01', label: 'a', v: 1 },
@@ -227,7 +227,7 @@ describe('[arch-17] chart.scale(key)', () => {
     expect(cat.toPixel('b')).toBeGreaterThan(cat.toPixel('a'));
   });
 
-  it.fails('[arch-17] a reference line is drawn where scale() says its value is', () => {
+  it('[arch-17] a reference line is drawn where scale() says its value is', () => {
     const chart = mount<Row>(fakes, { ...base, referenceLines: [{ axis: 'y', value: 15 }] });
     fakes.frames.flush();
     const y = chart.scale('y')!.toPixel(15);
@@ -240,7 +240,7 @@ describe('[arch-17] chart.scale(key)', () => {
 });
 
 describe('[arch-10] the legacy hooks are gone', () => {
-  it.fails('[arch-10] onDataUpdate, onOptionsUpdate and the 0.12 draw hooks are not called', () => {
+  it('[arch-10] onDataUpdate, onOptionsUpdate and the 0.12 draw hooks are not called', () => {
     const legacy = vi.fn();
     const chart = mount<Row>(fakes, {
       ...base,

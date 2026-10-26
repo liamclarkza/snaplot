@@ -94,7 +94,7 @@ import { GestureManager } from '../interaction/GestureManager';
 import { HitTester } from '../interaction/HitTester';
 import { TooltipManager } from '../interaction/TooltipManager';
 
-import { PluginManager } from '../plugins/PluginManager';
+import { type HostedPlugin, PluginHost } from '../engine/plugins';
 import { isDarkColor } from '../utils/color';
 
 // Stable identity for user tickFormat functions in the layout cache key.
@@ -318,7 +318,7 @@ export class ChartCore implements EngineHost {
   private gestureManager: GestureManager;
   private hitTester: HitTester;
   private tooltipManager: TooltipManager;
-  private pluginManager: PluginManager;
+  private plugins = new PluginHost<unknown>();
 
   // Config
   private config: ChartSpec;
@@ -523,12 +523,8 @@ export class ChartCore implements EngineHost {
       this.canvasManager.container,
     );
 
-    // 9. Create plugin manager and register plugins
-    this.pluginManager = new PluginManager();
-    for (const plugin of this.config.plugins ?? []) {
-      this.pluginManager.register(plugin);
-    }
-    this.pluginManager.installAll(this);
+    // 9. Plugins are added after construction: the built-in annotations through use(), the
+    // user's through setPlugins() once the owner's handle exists (plan D21).
 
     // 10. Wire EventBus listeners
     this.wireEvents();
@@ -657,7 +653,6 @@ export class ChartCore implements EngineHost {
     this.replaceOptions(config);
     this.reconcileSelectionForDataChange();
     this.refreshCursor();
-    this.dispatchDataUpdate();
   }
 
   /**
@@ -787,7 +782,6 @@ export class ChartCore implements EngineHost {
     this.reconcileSelectionForDataChange();
     this.refreshCursor();
     this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
-    this.dispatchDataUpdate();
   }
 
   /**
@@ -974,58 +968,19 @@ export class ChartCore implements EngineHost {
 
   setOptions(partial: DeepPartial<ChartSpec>): void {
     if (this.destroyed) return;
-    // Plugins are object instances, deep-merge would corrupt them.
-    // Handle plugin updates separately: destroy old, install new.
-    const newPlugins = (partial as Partial<ChartSpec>).plugins;
-    if (newPlugins) {
-      this.pluginManager.destroyAll(this);
-      // Remove plugins from the merge input to avoid deep-merging instances
-      const { plugins: _, ...rest } = partial as Partial<ChartSpec>;
-      this.config = deepMerge(
-        this.config as unknown as Record<string, unknown>,
-        rest as unknown as Record<string, unknown>,
-      ) as unknown as ChartSpec;
-      this.config.plugins = newPlugins;
-      for (const plugin of newPlugins) {
-        this.pluginManager.register(plugin);
-      }
-      this.pluginManager.installAll(this);
-    } else {
-      this.config = deepMerge(
-        this.config as unknown as Record<string, unknown>,
-        partial as unknown as Record<string, unknown>,
-      ) as unknown as ChartSpec;
-    }
-
+    this.config = deepMerge(
+      this.config as unknown as Record<string, unknown>,
+      partial as unknown as Record<string, unknown>,
+    ) as unknown as ChartSpec;
     this.applyConfigSideEffects(partial, false);
   }
 
   replaceOptions(config: ChartSpec): void {
     if (this.destroyed) return;
-    const previousPlugins = this.config.plugins ?? [];
     this.config = deepMerge(
       DEFAULT_CONFIG as unknown as Record<string, unknown>,
       config as unknown as Record<string, unknown>,
     ) as unknown as ChartSpec;
-
-    const nextPlugins = this.config.plugins ?? [];
-    // Compare by content, not reference: a fresh declarative config passes a
-    // new array instance every call (so `!==` would rebuild every time, even
-    // with the same or zero plugins), while a caller who mutates and re-passes
-    // the same instance would never reinstall. Rebuild only when the plugin
-    // set actually changed.
-    const samePlugins =
-      nextPlugins.length === previousPlugins.length &&
-      nextPlugins.every((plugin, i) => plugin === previousPlugins[i]);
-    if (!samePlugins) {
-      this.pluginManager.destroyAll(this);
-      this.pluginManager = new PluginManager();
-      for (const plugin of nextPlugins) {
-        this.pluginManager.register(plugin);
-      }
-      this.pluginManager.installAll(this);
-    }
-
     this.applyConfigSideEffects(config, true);
   }
 
@@ -1056,7 +1011,6 @@ export class ChartCore implements EngineHost {
     this.scheduler.markDirty(DirtyFlag.ALL);
     this.emitEvent('options:update', this.config);
     if (themeChanged) this.emitEvent('theme:update', this.theme);
-    this.pluginManager.dispatch('onSetOptions', this);
   }
 
   getOptions(): ChartSpec {
@@ -1119,8 +1073,16 @@ export class ChartCore implements EngineHost {
     return this.layout;
   }
 
-  redraw(): void {
-    this.scheduler.markDirty(DirtyFlag.ALL);
+  /**
+   * Repaint a layer on the next frame: `'overlay'`, `'data'` (the marks and what plugins draw
+   * above them) or `'all'`, which also resolves the theme from the page again.
+   */
+  redraw(layer: 'overlay' | 'data' | 'all' = 'all'): void {
+    if (this.destroyed) return;
+    if (layer === 'all') this.refreshTheme();
+    this.scheduler.markDirty(
+      layer === 'overlay' ? DirtyFlag.OVERLAY : layer === 'data' ? DirtyFlag.DATA : DirtyFlag.ALL,
+    );
   }
 
   /** Reset zoom to full data extent (double-click handler) */
@@ -1336,23 +1298,26 @@ export class ChartCore implements EngineHost {
     this.gestureManager.detach();
     this.tooltipManager.destroy();
     this.eventBus.destroy();
-    this.pluginManager.destroyAll(this);
+    this.plugins.destroy(this);
     this.canvasManager.destroy();
     this.listeners.clear();
   }
 
-  use(plugin: Plugin): boolean {
-    if (this.destroyed) return false;
-    const registered = this.pluginManager.register(plugin);
-    if (!registered) return false;
-    plugin.install?.(this);
-    // Keep config.plugins in sync so the plugin lifecycle is identical no
-    // matter which entry point installed it: a later setOptions/replaceOptions
-    // rebuilds from config.plugins and would otherwise silently drop a
-    // use()-installed plugin. Reassign a new array rather than mutating the
-    // existing one, which may be the caller's array or the shared default.
-    this.config.plugins = [...(this.config.plugins ?? []), plugin];
-    return true;
+  /** Add a built-in plugin (the reference lines and regions), drawn before the user's. */
+  use(plugin: Plugin): void {
+    if (this.destroyed) return;
+    this.plugins.addBuiltin(plugin, this);
+    this.scheduler.markDirty(DirtyFlag.ALL);
+  }
+
+  /**
+   * Reconcile the user plugins by id (plan D21); their draw hooks receive `chart`, the owner's
+   * public handle. A new object for an installed id only repaints.
+   */
+  setPlugins(plugins: readonly HostedPlugin<unknown>[], chart: unknown): void {
+    if (this.destroyed) return;
+    this.plugins.reconcile(plugins, chart);
+    this.scheduler.markDirty(DirtyFlag.ALL);
   }
 
   on<K extends keyof ChartEventMap>(event: K, handler: ChartEventMap[K]): () => void {
@@ -1605,30 +1570,6 @@ export class ChartCore implements EngineHost {
     const maxLen = (this.config.streaming as StreamingSpec | undefined)?.maxPoints;
     if (maxLen !== undefined) validateMaxLen(maxLen);
     return maxLen;
-  }
-
-  private dispatchDataUpdate(): void {
-    const dataListeners = this.listeners.get('data:update');
-    const hasDataListeners = !!dataListeners && dataListeners.size > 0;
-    const hasPluginHook = this.pluginManager.hasHook('onSetData');
-    // Nothing consumes the payload: no materialization, no emit.
-    if (!hasDataListeners && !hasPluginHook) return;
-
-    // The 'data:update' handler type is `(data: ColumnarData) => void`, so
-    // every listener is entitled to the payload. The previous Function.length
-    // heuristic silently withheld it from `(...args)` and `(data = x)`
-    // listeners (both report length 0), which arity cannot distinguish from a
-    // genuine zero-arg signal. Materialize once when any listener or plugin
-    // hook exists and pass it to all of them. The cost is one getData() per
-    // data update, and only when something is actually subscribed.
-    const data = this.sourceStores[0].getData();
-
-    if (hasPluginHook) {
-      this.pluginManager.dispatch('onSetData', this, data);
-    }
-    if (hasDataListeners) {
-      this.emitEvent('data:update', data);
-    }
   }
 
   private initAxes(): void {
@@ -2956,21 +2897,17 @@ export class ChartCore implements EngineHost {
       );
       updateDOMLabels(this.canvasManager.domLayer, labels, this.theme, this.layout);
       this.lastAxisLabels = labels.labels;
-      this.pluginManager.dispatch('afterDrawGrid', this, this.canvasManager.gridCtx);
+      this.plugins.draw('below', this.canvasManager.gridCtx, this, this.layout.plot);
       this.statsEnd('grid', start);
     }
 
     // Step 4b: Data layer (series marks)
     if (flags & DirtyFlag.DATA) {
       const start = this.statsStart();
-      // Count only actual paints: a beforeDrawData plugin that returns false
-      // vetoes the clear/draw, so it must not bump renderCount.
-      if (this.pluginManager.dispatch('beforeDrawData', this, this.canvasManager.dataCtx)) {
-        this.canvasManager.clear('data');
-        this.renderAllSeries();
-        this.pluginManager.dispatch('afterDrawData', this, this.canvasManager.dataCtx);
-        this.statsEnd('data', start);
-      }
+      this.canvasManager.clear('data');
+      this.renderAllSeries();
+      this.plugins.draw('above', this.canvasManager.dataCtx, this, this.layout.plot);
+      this.statsEnd('data', start);
     }
 
     // Step 4c: Overlay layer (crosshair, tooltip)
@@ -2978,7 +2915,7 @@ export class ChartCore implements EngineHost {
       const start = this.statsStart();
       this.canvasManager.clear('overlay');
       this.renderOverlay();
-      this.pluginManager.dispatch('afterDrawOverlay', this, this.canvasManager.overlayCtx);
+      this.plugins.draw('overlay', this.canvasManager.overlayCtx, this, this.layout.plot);
       this.statsEnd('overlay', start);
     }
   }

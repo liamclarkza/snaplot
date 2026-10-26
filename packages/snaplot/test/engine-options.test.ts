@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Plugin } from '../src/engine/spec';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type EngineFakes, f, inputLayer, installEngineFakes } from './fakes/engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2).
@@ -95,18 +94,6 @@ describe('engine runtime options', () => {
     chart.replaceOptions({ series: [{ label: 'a', yColumn: 1 }] });
 
     expect(seen).toEqual([2, 1]);
-  });
-
-  it('returns false when registering a duplicate plugin id at runtime', () => {
-    const plugin: Plugin = { id: 'runtime-plugin', install: vi.fn() };
-    const chart = fakes.engine({ series: [{ label: 'value', yColumn: 1 }] }, [
-      f([1, 2]),
-      f([10, 20]),
-    ]);
-
-    expect(chart.use(plugin)).toBe(true);
-    expect(chart.use({ id: 'runtime-plugin', install: vi.fn() })).toBe(false);
-    expect(plugin.install).toHaveBeenCalledTimes(1);
   });
 
   it('limits the input layer to the plot area by default', () => {

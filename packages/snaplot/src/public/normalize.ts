@@ -49,6 +49,24 @@ import {
   TOP,
 } from './option-keys';
 
+/** The hooks of the plugin contract (plan D21). */
+const PLUGIN_HOOKS: ReadonlySet<string> = new Set([
+  'install',
+  'drawBelow',
+  'drawAbove',
+  'drawOverlay',
+]);
+/** What the 0.12 plugin hooks became. */
+const PLUGIN_HINTS: Record<string, string> = {
+  beforeDraw: 'Removed in 1.0: a plugin cannot skip the marks.',
+  afterDrawGrid: 'Use drawBelow(context, chart, plot).',
+  afterDrawData: 'Use drawAbove(context, chart, plot).',
+  afterDrawOverlay: 'Use drawOverlay(context, chart, plot).',
+  destroy: 'Return a cleanup function from install(chart).',
+  onDataUpdate: 'Removed in 1.0: listen with chart.subscribe() or chart.on().',
+  onOptionsUpdate: 'Removed in 1.0: listen with chart.subscribe() or chart.on().',
+};
+
 // ─── Normalized shape ────────────────────────────────────────────────
 
 /** A field read by a function or by name, as series and encodings give it. */
@@ -438,10 +456,23 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
     normalizeRegion(item, `referenceRegions[${i}]`),
   );
 
-  // Plugins.
+  // Plugins (plan D21): reconciled by id, so an id is unique; the 0.12 hooks are gone.
+  const pluginIds = new Set<string>();
   const plugins = listOf(raw.plugins, 'plugins').map((plugin, i) => {
     if (!plugin || typeof plugin !== 'object' || typeof (plugin as ChartPlugin).id !== 'string')
       fail(`plugins[${i}] must be a plugin object with a string id.`);
+    const { id } = plugin as ChartPlugin;
+    if (pluginIds.has(id)) fail(`plugin id "${id}" is used twice. Give each plugin a unique id.`);
+    pluginIds.add(id);
+    for (const [key, value] of Object.entries(plugin)) {
+      if (key === 'id' || value === undefined) continue;
+      if (!PLUGIN_HOOKS.has(key)) {
+        warnOnce(
+          'unknown-option',
+          `"plugins[${i}].${key}" is not a plugin hook and is ignored. ${PLUGIN_HINTS[key] ?? 'Use install, drawBelow, drawAbove or drawOverlay.'}`,
+        );
+      } else if (typeof value !== 'function') fail(`plugins[${i}].${key} must be a function.`);
+    }
     return plugin as ChartPlugin<Row>;
   });
 

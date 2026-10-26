@@ -78,10 +78,10 @@ describe('debug counters (plan D31)', () => {
 
   // Plan §3.4 guard, owned by M8: today every append copies the ring for
   // the plugin host, whose payload is then ignored.
-  it.fails('[arch-01] 100 appends with a data plugin materialize the ring 0 times', () => {
+  it('[arch-01] 100 appends with a data plugin materialize the ring 0 times', () => {
     const withPlugin = make({
       streaming: { maxPoints: 5 },
-      plugins: [{ id: 'listener', onDataUpdate() {} }],
+      plugins: [{ id: 'listener', drawAbove() {} }],
     });
     const before = debug(withPlugin).materializeCount;
     for (let x = 10; x < 110; x++) withPlugin.appendData([{ x, y: x }]);

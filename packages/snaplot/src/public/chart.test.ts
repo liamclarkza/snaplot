@@ -231,15 +231,15 @@ describe('public chart transactions', () => {
   });
 
   it('retains unchanged plugin instances and gives them the public handle', () => {
-    const install = vi.fn();
-    const destroy = vi.fn();
-    const plugin = { id: 'custom', install, destroy };
+    const cleanup = vi.fn();
+    const install = vi.fn(() => cleanup);
+    const plugin = { id: 'custom', install };
     const chart = make({ data: [{ x: 1, y: 2 }], x: 'x', series: [{ y: 'y' }], plugins: [plugin] });
     expect(install).toHaveBeenCalledExactlyOnceWith(chart);
     chart.update({ referenceLines: [{ axis: 'y', value: 4 }] });
-    expect(destroy).not.toHaveBeenCalled();
+    expect(cleanup).not.toHaveBeenCalled();
     chart.destroy();
-    expect(destroy).toHaveBeenCalledOnce();
+    expect(cleanup).toHaveBeenCalledOnce();
   });
 
   it('synchronizes identity across reordered series and disconnects a member that leaves', () => {
@@ -571,20 +571,14 @@ describe('public chart transactions', () => {
   });
 
   it('isolates and reports public plugin failures while completing validated updates', () => {
-    const report = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const report = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const plugin = {
       id: 'throwing',
-      install() {
+      install(): () => void {
         throw new Error('install');
       },
-      onOptionsUpdate() {
-        throw new Error('options');
-      },
-      onDataUpdate() {
-        throw new Error('data');
-      },
-      destroy() {
-        throw new Error('destroy');
+      drawAbove() {
+        throw new Error('draw');
       },
     };
     const chart = make({ data: [{ x: 0, y: 1 }], x: 'x', series: [{ y: 'y' }], plugins: [plugin] });
@@ -594,8 +588,7 @@ describe('public chart transactions', () => {
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(2);
     expect(() => chart.destroy()).not.toThrow();
     expect(report).toHaveBeenCalledWith(
-      expect.stringContaining('plugin "throwing"'),
-      expect.any(Error),
+      expect.stringMatching(/^snaplot: plugin "throwing" install/),
     );
   });
 
@@ -688,24 +681,6 @@ describe('public chart transactions', () => {
     });
     expect(render.mock.calls[0][0][0]).not.toHaveProperty('seriesIndex');
     expect(render.mock.calls[0][0][0]).not.toHaveProperty('dataIndex');
-  });
-
-  it('retains public beforeDraw cancellation through the plugin bridge', () => {
-    const color = vi.fn(() => '#abcdef');
-    let cancelled = true;
-    const chart = make({
-      data: [{ x: 0, y: 1 }],
-      x: 'x',
-      series: [{ type: 'bar', y: 'y', color }],
-      plugins: [{ id: 'cancel', beforeDraw: () => (cancelled ? false : undefined) }],
-    });
-    color.mockClear();
-    vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0](0);
-    expect(color).not.toHaveBeenCalled();
-    cancelled = false;
-    chart.redraw();
-    vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0](16);
-    expect(color).toHaveBeenCalled();
   });
 
   it('rejects invalid axis and viewport bounds without committing replacement data', () => {

@@ -31,5 +31,4 @@ export const DEFAULT_CONFIG: ChartSpec = {
     enabled: true,
     dimOpacity: 0.2,
   },
-  plugins: [],
 };

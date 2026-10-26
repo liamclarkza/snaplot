@@ -26,7 +26,7 @@ function texts(): string[] {
 }
 
 describe('[gap-annotations-extensibility-07][gap-annotations-extensibility-08] plugins', () => {
-  it.fails('[gap-annotations-extensibility-07] an inline plugin with the same id is neither reinstalled nor re-ingests', () => {
+  it('[gap-annotations-extensibility-07] an inline plugin with the same id is neither reinstalled nor re-ingests', () => {
     const installs = vi.fn();
     const plugin = (): ChartPlugin<Row> => ({ id: 'note', install: () => installs() });
     const chart = fakes.mount<Row>({
@@ -43,7 +43,7 @@ describe('[gap-annotations-extensibility-07][gap-annotations-extensibility-08] p
     expect(debug(chart).ingestCount).toBe(ingests);
   });
 
-  it.fails('[gap-annotations-extensibility-08] a plugin cannot veto the data layer: a zoom repaints the data', () => {
+  it('[gap-annotations-extensibility-08] a plugin cannot veto the data layer: a zoom repaints the data', () => {
     const chart = fakes.mount<Row>({
       data: rows,
       x: 't',
@@ -58,7 +58,7 @@ describe('[gap-annotations-extensibility-07][gap-annotations-extensibility-08] p
   });
 
   // Plan §5.9 and RC15: a duplicate plugin id throws (M8's plugin host). Today the second is ignored.
-  it.fails('[backlog-27] two plugins with the same id throw, naming the id', () => {
+  it('[backlog-27] two plugins with the same id throw, naming the id', () => {
     expect(() =>
       fakes.mount<Row>({
         data: rows,
@@ -90,7 +90,7 @@ describe('[gap-annotations-extensibility-07][gap-annotations-extensibility-08] p
       data: rows,
       x: 't',
       series: [{ y: 'v' }],
-      plugins: [{ id: 'overlay', afterDrawData: drawn }],
+      plugins: [{ id: 'overlay', drawAbove: drawn }],
     });
     fakes.resizeObserver.deliver();
     fakes.frames.flush();
