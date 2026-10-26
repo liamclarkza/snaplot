@@ -117,6 +117,20 @@ to [Semantic Versioning](https://semver.org/).
   `useCursorSnapshot` (use `useCursor`); in Solid the `createChart` and `createChartGroup`
   wrappers (use `<Chart ref>` and the core `createChartGroup`), `createHighlight` and
   `createCursorSnapshot` (use `createCursor`). A group is never destroyed by a component.
+- React 18.3 is supported again: the peer range is `^18.3.0 || ^19.0.0`. `<Chart>` is a
+  `forwardRef` component, and its effects run as layout effects in the browser and plain effects
+  on the server, so React 18's server renderer prints no warning.
+- A plain `useRef` works: `useChartState`, `useCursor` and `<LegendTable chart>` take the ref you
+  gave `<Chart>` (or a handle) and re-render once its chart mounts. No state-backed callback ref
+  is needed. In Solid, `ref` is typed as Solid's `Ref`, so `let chart; <Chart ref={chart} />`
+  type-checks.
+- The host element is `role="figure"`, named by `ariaLabel` or a summary of the series ("Line
+  chart, 2 series: CPU, Memory"), in the server markup too; it was `role="group"` named "Chart".
+  Every other prop that is not an option goes to the host: any `<div>` attribute, `tabIndex` and
+  DOM event handlers included. An explicit `height` is the host's `style.height`.
+- Both adapters are built on the public API: they import the core as `'snaplot'`, so an
+  application holds one engine, and the Solid server build (the `node`, `deno` and `worker`
+  conditions) no longer inlines a second one (3.5 KB, was 289 KB).
 
 ### Groups (1.0)
 
