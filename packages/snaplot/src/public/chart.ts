@@ -24,7 +24,9 @@ import {
   createChartGroup,
   type GroupCandidate,
   type GroupMember,
-  groups,
+  groupOptions,
+  membership,
+  paletteIndex,
   validateGroup,
 } from './group';
 import { companions } from './companion';
@@ -196,7 +198,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       // The mount paint: nothing repaints an unchanged box after it, so it must
       // draw the annotations, plugins and the legend's space (gap-annotations-extensibility-06:mount).
       this.engine.paint();
-      groups.get(normalized.group!)?.members.add(this);
+      membership(normalized.group, this, true);
       coordinate(normalized.group);
       this.events.reset();
     } catch (error) {
@@ -378,8 +380,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       },
       series: (ingested.spec.series ?? []).map((series, index) => {
         const id = ingested.seriesIds[index];
+        const slot = paletteIndex(normalized.group, id);
         return {
           ...series,
+          ...(slot === undefined ? {} : { paletteIndex: slot }),
           visible: !this.hidden.has(id),
           ...(normalized.series[index]?.pointColor
             ? {
@@ -493,7 +497,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.options = normalized.options;
     this.normalized = normalized;
     this.optionsSnapshot = undefined;
-    if (work.engine || work.plugins)
+    // A group change moves the palette slots of series without a colour (plan D17).
+    if (work.engine || work.plugins || work.group)
       this.engine.replaceOptions(this.configFor(ingested, normalized));
     if (work.annotations) {
       this.lines.setLines(ingested.referenceLines);
@@ -511,9 +516,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
 
   private moveGroup(from: ChartGroup | undefined, to: ChartGroup | undefined): void {
     if (from === to) return;
+    membership(from, this, false);
     if (from) this.detachGroup(from);
-    groups.get(from!)?.members.delete(this);
-    groups.get(to!)?.members.add(this);
+    membership(to, this, true);
   }
 
   /**
@@ -902,9 +907,16 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (this.destroyed) return;
     this.events.batch(() => this.engine.resetZoom());
   }
-  syncViewport(key: string, range: ScaleRange, reset: boolean): void {
-    if (reset) this.resetViewport();
-    else if (this.engine.getAxis(key)) this.setViewport({ [key]: range });
+  /** A group peer's horizontal viewport: pin the same axis, or reset with `null` (plan D17). */
+  syncViewport(key: string, range: ScaleRange | null): void {
+    if (this.destroyed) return;
+    if (range === null) this.resetViewport();
+    else if (this.engine.getAxis(key)) this.events.batch(() => this.engine.setAxis(key, range));
+  }
+  axisKind(key: string): string | undefined {
+    const axis = this.engine.getAxis(key);
+    if (!axis) return undefined;
+    return this.ingested.categories.has(key) ? 'category' : axis.type;
   }
   private isHorizontal(key: string): boolean {
     const position = inferPosition(key, this.engine.getOptions().axes?.[key]?.position);
@@ -1118,19 +1130,24 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     return this.engine.getNaturalRange(key);
   }
   coordinateRange(key: string, range: { min: number; max: number }): void {
+    const axis = this.engine.getAxis(key);
+    if (axis && axis.min === range.min && axis.max === range.max) return;
     this.engine.setCoordinatedAxis(key, range);
   }
+  naturalGutters(): { left: number; right: number } {
+    return this.engine.naturalGutters();
+  }
+  /** Apply a group's side gutters, or (undefined) this chart's own; unchanged ones cost nothing. */
+  setPlotInsets(insets: { left: number; right: number } | undefined): void {
+    this.engine.setPlotInsets(insets ?? {});
+  }
   detachGroup(group: ChartGroup): void {
-    this.coordinatePadding(undefined, undefined);
-    if (group.options.yRange) {
+    this.setPlotInsets(undefined);
+    if (groupOptions(group)?.yRange) {
       const ownRange = this.naturalRange('y');
       if (ownRange) this.engine.setCoordinatedAxis('y', ownRange);
     }
     this.publish();
-  }
-  /** Pin the plot's side gutters for alignPlots, or (undefined) return to the defaults. */
-  coordinatePadding(left: number | undefined, right: number | undefined): void {
-    this.engine.setOptions({ padding: { left: left ?? 56, right: right ?? 24 } });
   }
   private readState(): ChartState {
     return Object.freeze({
@@ -1175,7 +1192,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         // The hot channel: a snapshot only when something listens (plan §3.2).
         if (this.events.listened('cursor:change') || this.normalized.callbacks.onCursorChange)
           this.emit('cursor:change', this.getCursor());
-        if (this.options.group?.options.cursor) {
+        if (groupOptions(this.options.group)?.cursor) {
           const x = this.cursorLabel();
           broadcast(this.options.group, (member) => member.syncCursor(x), this);
         }
@@ -1183,18 +1200,19 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.engine.on('viewport:change', (key, range) => {
         this.events.mark('viewport');
         const group = this.options.group;
-        if (!group?.options.viewport || !this.isHorizontal(key)) return;
+        const linked = groupOptions(group);
+        if (!linked?.viewport || !this.isHorizontal(key)) return;
         // Plan D17: link horizontal axes only, and only axes a peer has, so a
         // peer's Y is never copied or pinned. A change that leaves this chart
         // following its data is a reset: peers return to their own range.
         const reset = this.engine.isFollowing();
-        broadcast(group, (member) => member.syncViewport(key, range, reset), this);
+        broadcast(group, (member) => member.syncViewport(key, reset ? null : range), this);
         // Keep the shared Y after the sync (a reset returns each peer to its own).
-        if (group.options.yRange) coordinate(group, 'shareY');
+        if (linked.yRange) coordinate(group, 'shareY');
       }),
       this.engine.on('highlight:change', () => {
         this.events.mark('highlight');
-        if (this.options.group?.options.highlight)
+        if (groupOptions(this.options.group)?.highlight)
           broadcast(
             this.options.group,
             (member) => member.syncHighlight(this.read('highlight') as string | null),
@@ -1240,7 +1258,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.legend?.unmount();
     this.legend = undefined;
     companions.delete(this);
-    groups.get(this.options.group!)?.members.delete(this);
+    membership(this.options.group, this, false);
     for (const off of this.off) off();
     this.engine?.destroy();
     this.destroyed = true;

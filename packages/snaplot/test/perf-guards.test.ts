@@ -409,7 +409,7 @@ describe('labels and layout', () => {
 });
 
 describe('groups, visibility and theme', () => {
-  it.fails('[perf:group-append] an alignPlots append runs no options pass on the peers', () => {
+  it('[perf:group-append] an alignPlots append runs no options pass on the peers', () => {
     const group = createChartGroup({ alignPlots: true });
     const [a, b] = [0, 1].map(() =>
       fakes.mount({ data: columns(500, (i) => i % 9), x: 'x', series: [{ y: 'y' }], group }),

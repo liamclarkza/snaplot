@@ -27,7 +27,7 @@ const rows = (length: number): Row[] =>
   }));
 
 describe('[dataapi-01][frameworks-06][interact-01] the final group model', () => {
-  it.fails('[dataapi-01] a group links the X viewport and aligns plots by default', () => {
+  it('[dataapi-01] a group links the X viewport and aligns plots by default', () => {
     const group = createChartGroup();
     const a = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group });
     const b = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'mem' }], group });
@@ -37,7 +37,7 @@ describe('[dataapi-01][frameworks-06][interact-01] the final group model', () =>
     expect(debug(a).plot.left).toBe(debug(b).plot.left);
   });
 
-  it.fails('[frameworks-06][interact-01] a peer reports only the axes it pins, never its own Y', () => {
+  it('[frameworks-06][interact-01] a peer reports only the axes it pins, never its own Y', () => {
     const group = createChartGroup();
     const onViewportChange = vi.fn();
     const a = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group });
@@ -66,7 +66,7 @@ describe('[dataapi-01][frameworks-06][interact-01] the final group model', () =>
     expect(seen.map((viewport) => Object.keys(viewport))).toEqual([['x']]);
   });
 
-  it.fails('[dataapi-01] a chart leaves with update({ group: undefined }) and keeps its own range', () => {
+  it('[dataapi-01] a chart leaves with update({ group: undefined }) and keeps its own range', () => {
     const group = createChartGroup();
     const a = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group });
     const b = mount<Row>(fakes, { data: rows(41), x: 't', series: [{ y: 'mem' }], group });
@@ -77,7 +77,7 @@ describe('[dataapi-01][frameworks-06][interact-01] the final group model', () =>
     expect(debug(a).plot.left).toBeLessThan(debug(b).plot.left);
   });
 
-  it.fails('[dataapi-01] a destroyed member stops receiving, and the others keep linking', () => {
+  it('[dataapi-01] a destroyed member stops receiving, and the others keep linking', () => {
     const group = createChartGroup();
     const charts = [0, 1, 2].map(() =>
       mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group }),
@@ -87,7 +87,7 @@ describe('[dataapi-01][frameworks-06][interact-01] the final group model', () =>
     expect(range(charts[2], 'x')).toEqual([2, 8]);
   });
 
-  it.fails('[dataapi-01] the group handle has setCursor and setHighlight only', () => {
+  it('[dataapi-01] the group handle has setCursor and setHighlight only', () => {
     const group = createChartGroup({ cursor: true });
     expect(Object.keys(group).sort()).toEqual(['setCursor', 'setHighlight']);
   });
@@ -113,7 +113,7 @@ describe('[dataapi-01][frameworks-06][interact-01] the final group model', () =>
 });
 
 describe('[frameworks-21] colours by series id', () => {
-  it.fails('[frameworks-21] the same series id gets the same colour in every member', () => {
+  it('[frameworks-21] the same series id gets the same colour in every member', () => {
     const group = createChartGroup();
     const a = mount<Row>(fakes, {
       data: rows(21),
@@ -160,7 +160,7 @@ describe('[dataapi-15][arch-13][gap-perf-gate-06] plot insets', () => {
     expect(debug(b).renderCount).toEqual(before);
   });
 
-  it.fails('[arch-13][gap-perf-gate-06] a member whose gutter grows moves every peer once', () => {
+  it('[arch-13][gap-perf-gate-06] a member whose gutter grows moves every peer once', () => {
     const group = createChartGroup();
     const a = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group });
     const b = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group });

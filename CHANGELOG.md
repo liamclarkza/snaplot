@@ -118,6 +118,20 @@ to [Semantic Versioning](https://semver.org/).
   wrappers (use `<Chart ref>` and the core `createChartGroup`), `createHighlight` and
   `createCursorSnapshot` (use `createCursor`). A group is never destroyed by a component.
 
+### Groups (1.0)
+
+- `createChartGroup({ cursor, highlight, viewport, alignPlots, yRange })` links cursor,
+  highlight, the horizontal viewport and the plot edges by default (`yRange` stays opt-in). The
+  viewport link moves only horizontal axes, and only those a member has: a member's Y is never
+  copied or pinned, and a reset returns every member to its own range. A member reports its own
+  `viewport:change` with only the axes it pins.
+- `alignPlots` gives every member the widest member's side gutters, applied only when a gutter
+  changes: appending to one member repaints no other.
+- A series id gets the same palette colour in every member; an explicit `color` still wins.
+- A chart leaves its group with `update({ group: undefined })` or `destroy()`. The group handle
+  has `setCursor` and `setHighlight` only: `options` and `destroy()` are removed, and an empty
+  group is garbage.
+
 ### Removed options (1.0)
 
 The 0.12 options below left the public types. Passing one warns once per page with its path and

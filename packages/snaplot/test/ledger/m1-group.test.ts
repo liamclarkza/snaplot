@@ -177,12 +177,15 @@ describe('[dataapi-01][dxtrial-01][frameworks-06][interact-01] group viewport sy
     const union = driver.getAxis('y');
     const left = driver.getLayout().plot.left;
     const ingests = charts.map((chart) => debug(chart).ingestCount);
+    // M8 replaced the padding options pass with plot insets: neither may run on a sync.
     const setOptions = vi.spyOn(ChartCore.prototype, 'setOptions');
+    const setPlotInsets = vi.spyOn(ChartCore.prototype, 'setPlotInsets');
 
     for (let k = 0; k < 5; k++) driver.setViewport({ x: { min: 5 + k, max: 25 + k } });
     driver.resetViewport();
 
     expect(setOptions).not.toHaveBeenCalled();
+    expect(setPlotInsets).not.toHaveBeenCalled();
     expect(charts.map((chart) => debug(chart).ingestCount)).toEqual(ingests);
     for (const peer of peers) {
       expect(peer.getAxis('x')).toEqual(driver.getAxis('x'));

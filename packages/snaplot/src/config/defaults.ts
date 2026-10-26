@@ -1,11 +1,10 @@
 import type { ChartSpec } from '../engine/spec';
-import { DEFAULT_THEME, DEFAULT_PADDING } from '../constants';
+import { DEFAULT_THEME } from '../constants';
 
 export { DEFAULT_THEME };
 
 export const DEFAULT_CONFIG: ChartSpec = {
   autoResize: true,
-  padding: { ...DEFAULT_PADDING },
   series: [],
   cursor: {
     show: true,

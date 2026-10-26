@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AXIS_LABEL_GAP, AXIS_TICK_LENGTH, EDGE_MARGIN } from '../constants';
 import type { ChartSpec, Scale } from '../engine/spec';
-import { computeLayout } from './Layout';
+import { computeLayout, type PlotInsets } from './Layout';
 
 // Without a DOM, Layout measures text at 7px per character; these tests
 // lean on that fallback so widths are deterministic.
@@ -23,8 +23,8 @@ function scale(key: string, ticks: number[]): Scale {
   };
 }
 
-function layoutFor(config: ChartSpec, scales: Map<string, Scale>) {
-  return computeLayout(640, 240, config, scales, 1, 'sans-serif', FONT_SIZE);
+function layoutFor(config: ChartSpec, scales: Map<string, Scale>, insets?: PlotInsets) {
+  return computeLayout(640, 240, config, scales, 1, 'sans-serif', FONT_SIZE, insets);
 }
 
 describe('computeLayout edge margin', () => {
@@ -35,9 +35,10 @@ describe('computeLayout edge margin', () => {
 
   it('keeps EDGE_MARGIN between the widest left tick label and the canvas edge', () => {
     const layout = layoutFor(
-      // Deliberately undersized padding: the measured gutter must win.
-      { series: [], axes: { x: {}, y: {} }, padding: { left: 8 } } as ChartSpec,
+      // Deliberately undersized insets: the measured gutter must win.
+      { series: [], axes: { x: {}, y: {} } } as ChartSpec,
       scales,
+      { left: 8 },
     );
     const maxLabelWidth = '16000'.length * CHAR_W;
     expect(layout.plot.left).toBeGreaterThanOrEqual(
@@ -46,17 +47,13 @@ describe('computeLayout edge margin', () => {
   });
 
   it('reserves a full title strip when a vertical axis has a label', () => {
-    const base = layoutFor(
-      { series: [], axes: { x: {}, y: {} }, padding: { left: 8 } } as ChartSpec,
-      scales,
-    );
+    const base = layoutFor({ series: [], axes: { x: {}, y: {} } } as ChartSpec, scales, {
+      left: 8,
+    });
     const titled = layoutFor(
-      {
-        series: [],
-        axes: { x: {}, y: { title: 'Validation loss' } },
-        padding: { left: 8 },
-      } as ChartSpec,
+      { series: [], axes: { x: {}, y: { title: 'Validation loss' } } } as ChartSpec,
       scales,
+      { left: 8 },
     );
     expect(titled.plot.left).toBeGreaterThan(base.plot.left);
     expect(titled.plot.left % 8).toBe(0);
@@ -78,9 +75,9 @@ describe('computeLayout edge margin', () => {
       {
         series: [],
         axes: { x: { format: (value: number) => `${value} ms` } },
-        padding: { left: 4, right: 4 },
       } as ChartSpec,
       edgeScales,
+      { left: 4, right: 4 },
     );
     expect(layout.plot.left).toBeGreaterThanOrEqual(('10 ms'.length * CHAR_W) / 2 + EDGE_MARGIN);
     expect(layout.width - layout.plot.left - layout.plot.width).toBeGreaterThanOrEqual(
@@ -108,9 +105,9 @@ describe('computeLayout edge margin', () => {
           },
           y: { format: (value: number) => `${value.toFixed(1)}%` },
         },
-        padding: { left: 12, right: 12 },
       } as ChartSpec,
       categoryScales,
+      { left: 12, right: 12 },
     );
 
     const rightGutter = layout.width - layout.plot.left - layout.plot.width;

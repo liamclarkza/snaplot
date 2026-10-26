@@ -106,7 +106,7 @@ describe('[dataapi-15][arch-13][gap-perf-gate-06] group appends', () => {
     );
   }
 
-  it.fails('[dataapi-15][arch-13][gap-perf-gate-06] an append to one alignPlots member repaints no other member', () => {
+  it('[dataapi-15][arch-13][gap-perf-gate-06] an append to one alignPlots member repaints no other member', () => {
     const [a, b, c] = mountGroup({ alignPlots: true, viewport: true });
     fakes.frames.flush();
     const before = [b, c].map((chart) => ({ ...debug(chart).renderCount }));

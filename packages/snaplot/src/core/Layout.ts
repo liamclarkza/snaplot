@@ -68,6 +68,16 @@ function horizontalFraction(scale: Scale, value: number): number {
   return Math.max(0, Math.min(1, (current - min) / (max - min)));
 }
 
+/**
+ * The minimum side gutters a chart group's `alignPlots` asks for (plan D17): the widest gutter of
+ * any member, so every member's plot starts and ends at the same x. Omitted sides keep the
+ * defaults (left 56, right 24); a measured gutter still grows past them.
+ */
+export interface PlotInsets {
+  left?: number;
+  right?: number;
+}
+
 export function computeLayout(
   containerWidth: number,
   containerHeight: number,
@@ -76,12 +86,13 @@ export function computeLayout(
   dpr: number,
   fontFamily: string,
   fontSize: number,
+  insets: PlotInsets = {},
 ): Layout {
-  const padding = {
-    top: config.padding?.top ?? DEFAULT_PADDING.top,
-    right: config.padding?.right ?? DEFAULT_PADDING.right,
-    bottom: config.padding?.bottom ?? DEFAULT_PADDING.bottom,
-    left: config.padding?.left ?? DEFAULT_PADDING.left,
+  const padding: { top: number; right: number; bottom: number; left: number } = {
+    top: DEFAULT_PADDING.top,
+    right: insets.right ?? DEFAULT_PADDING.right,
+    bottom: DEFAULT_PADDING.bottom,
+    left: insets.left ?? DEFAULT_PADDING.left,
   };
 
   // Accumulate space needed per side from all configured axes

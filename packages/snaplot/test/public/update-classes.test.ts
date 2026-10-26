@@ -47,8 +47,9 @@ function measure(chart: FinalHandle<Row>, act: () => void) {
   };
 }
 
+/** The axis label texts (the DOM label layer's spans). */
 function texts(chart: FinalHandle<Row>): string[] {
-  return [...chart.container.querySelectorAll('div')]
+  return [...chart.container.querySelectorAll('span')]
     .map((element) => (element.childElementCount === 0 ? (element.textContent ?? '') : ''))
     .filter(Boolean);
 }
@@ -81,7 +82,7 @@ describe('[arch-03][dataapi-10] presentation changes never ingest (P6)', () => {
     }
   });
 
-  it.fails('[arch-03] an axis title change relays out and repaints the grid', () => {
+  it('[arch-03] an axis title change relays out and repaints the grid', () => {
     const chart = mount<Row>(fakes, base);
     const work = measure(chart, () => chart.update({ axes: { y: { title: 'Load' } } }));
     expect(work).toMatchObject({ ingests: 0 });
@@ -126,10 +127,10 @@ describe('[arch-03][dataapi-10] presentation changes never ingest (P6)', () => {
     expect(measure(chart, () => chart.setOptions({ ...base, data: [] })).ingests).toBe(0);
   });
 
-  it.fails('[arch-03] a field name change re-ingests', () => {
+  it('[arch-03] a field name change re-ingests', () => {
     const chart = mount<Row>(fakes, base);
     const work = measure(chart, () =>
-      chart.update({ series: [{ y: 'mem', label: 'CPU' }, base.series[1]] }),
+      chart.update({ series: [{ id: 'cpu', y: 'mem', label: 'CPU' }, base.series[1]] }),
     );
     expect(work.ingests).toBe(1);
   });
@@ -161,7 +162,7 @@ describe('[arch-04][frameworks-02][research-01] functions are read through lates
     expect(seen).toEqual(['4:false', '4:true']);
   });
 
-  it.fails('[frameworks-02][research-01] a new axis format identity repaints without an ingest and is used', () => {
+  it('[frameworks-02][research-01] a new axis format identity repaints without an ingest and is used', () => {
     const chart = mount<Row>(fakes, base);
     const work = measure(chart, () => {
       for (let i = 0; i < 5; i++)

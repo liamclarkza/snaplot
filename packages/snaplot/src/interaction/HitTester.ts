@@ -201,7 +201,7 @@ export class HitTester {
         label: sc.label,
         x: xVal,
         y: yVal,
-        color: sc.color ?? palette[si % palette.length],
+        color: sc.color ?? palette[(sc.paletteIndex ?? si) % palette.length],
         formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
         formattedY: formatY(formatters, yScale, yVal, si),
       });
@@ -244,7 +244,7 @@ export class HitTester {
           si,
           pixelX,
           pixelY,
-          palette[si % palette.length],
+          palette[(sc.paletteIndex ?? si) % palette.length],
           proximity,
           scatterPalettes,
           dataVersion,
@@ -296,7 +296,7 @@ export class HitTester {
             label: sc.label,
             x: xVal,
             y: yVal,
-            color: sc.color ?? palette[si % palette.length],
+            color: sc.color ?? palette[(sc.paletteIndex ?? si) % palette.length],
             formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
             formattedY: formatY(formatters, yScale, yVal, si),
           };

@@ -173,6 +173,11 @@ export interface SeriesSpec<TMeta = unknown> {
    */
   color?: string;
   /**
+   * The palette slot of a series without a `color`: its index in the chart, unless a chart group
+   * assigns slots by series id across its members (plan D17).
+   */
+  paletteIndex?: number;
+  /**
    * Area / bar fill color. `null` forces no fill (useful to draw an
    * `area` series as a bare outline). Defaults to a translucent `color`
    * for areas and the series color for bars.
@@ -881,18 +886,6 @@ export interface ChartSpec<TMeta = unknown> {
    * Default: `true`. Set `false` and provide `width`/`height` for a fixed size.
    */
   autoResize?: boolean;
-
-  /**
-   * Plot-area inset in CSS pixels. Any side omitted falls back to the
-   * defaults (top 24, right 24, bottom 44, left 56); `left` is a floor and
-   * grows automatically to fit measured y-axis labels.
-   */
-  padding?: {
-    top?: number;
-    right?: number;
-    bottom?: number;
-    left?: number;
-  };
 
   /**
    * Axis definitions keyed by axis key. `'x'`/`'y'` are conventional; extra

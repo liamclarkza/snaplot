@@ -432,18 +432,23 @@ export interface ChartGroupOptions {
   cursor?: boolean;
   /** Share the highlighted series. @defaultValue `true` */
   highlight?: boolean;
-  /** Share the horizontal viewport (vertical axes stay independent). @defaultValue `false` */
+  /**
+   * Share the horizontal viewport: a zoom, pan or reset of X in one member moves every member
+   * that has that axis. Vertical axes stay each chart's own. @defaultValue `true`
+   */
   viewport?: boolean;
-  /** Align the plot edges. @defaultValue `false` */
+  /** Align the plot edges: every member takes the widest member's side gutters. @defaultValue `true` */
   alignPlots?: boolean;
-  /** Share one Y range across the group. @defaultValue `false` */
+  /** Share one Y range, the union of the members' own. @defaultValue `false` */
   yRange?: boolean;
 }
 
-/** Charts linked by `group` share their cursor, highlight and, optionally, X viewport. */
+/**
+ * Charts linked by their `group` option share their cursor, highlight, horizontal viewport and
+ * plot edges, and a series id has the same colour in every member. A chart leaves with
+ * `update({ group: undefined })` or `destroy()`.
+ */
 export interface ChartGroup {
-  /** The options the group was created with. */
-  readonly options: Readonly<ChartGroupOptions>;
   /** Move every member's cursor. A value the members' X axis cannot read throws. */
   setCursor(value: number | Date | string | null): void;
   /**
@@ -451,6 +456,4 @@ export interface ChartGroup {
    * no member has throws.
    */
   setHighlight(id: string | null): void;
-  /** Unlink every member. */
-  destroy(): void;
 }

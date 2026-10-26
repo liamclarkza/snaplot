@@ -242,14 +242,14 @@ describe('public chart transactions', () => {
     expect(destroy).toHaveBeenCalledOnce();
   });
 
-  it('synchronizes identity across reordered series and disconnects destroyed groups', () => {
+  it('synchronizes identity across reordered series and disconnects a member that leaves', () => {
     const group = createChartGroup();
     const data = [{ x: 1, a: 2, b: 3 }];
     const first = make({ data, x: 'x', group, series: [{ y: 'a' }, { y: 'b' }] });
     const second = make({ data, x: 'x', group, series: [{ y: 'b' }, { y: 'a' }] });
     first.setHighlight('b');
     expect(second.getState().highlight).toBe('b');
-    group.destroy();
+    second.update({ group: undefined });
     first.setHighlight('a');
     expect(second.getState().highlight).toBe('b');
   });
@@ -505,7 +505,8 @@ describe('public chart transactions', () => {
     expect(second.getAxis('y')).toMatchObject(secondY);
     expect(first.getLayout().plot.left).toBeLessThan(second.getLayout().plot.left);
     first.update({ group });
-    group.destroy();
+    second.update({ group: undefined });
+    first.update({ group: undefined });
     expect(first.getAxis('y')).toMatchObject(firstY);
     expect(second.getAxis('y')).toMatchObject(secondY);
     first.update({

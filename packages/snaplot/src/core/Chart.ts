@@ -27,7 +27,7 @@ import { DirtyFlag } from '../engine/spec';
 import { CanvasManager } from './CanvasManager';
 import { RenderScheduler } from './RenderScheduler';
 import { EventBus } from './EventBus';
-import { computeLayout, inferPosition } from './Layout';
+import { computeLayout, inferPosition, type PlotInsets } from './Layout';
 
 import type { ColumnarSegment, DataStore } from '../data/DataStore';
 import { validateMaxLen } from '../data/DataStore';
@@ -177,6 +177,8 @@ export interface DebugSnapshot {
   readonly inViewPoints: number;
   /** Times a ring store rebuilt its logical columns (`RingColumnarStore.materialize` cache misses). */
   readonly materializeCount: number;
+  /** The plot rectangle in CSS pixels from the canvases' top-left corner (replaces getLayout()). */
+  readonly plot: { left: number; top: number; width: number; height: number };
   /** Axis labels from the last grid paint, in paint order. */
   labelBoxes(): DebugLabelBox[];
 }
@@ -416,6 +418,10 @@ export class ChartCore implements EngineHost {
    */
   private naturalExtent = new Map<string, [number, number]>();
   private barXAxisPlans = new Map<string, BarXAxisPlan>();
+  /** A chart group's minimum side gutters (`setPlotInsets`). */
+  private plotInsets: PlotInsets = {};
+  /** naturalGutters()'s cache, keyed by the layout inputs. */
+  private natural?: { key: string; left: number; right: number };
 
   constructor(
     parent: HTMLElement,
@@ -547,6 +553,47 @@ export class ChartCore implements EngineHost {
     this.updateScalePixelRanges();
     this.scheduler.markDirty(DirtyFlag.ALL);
     if (!deferFirstPaint) this.scheduler.flush();
+  }
+
+  /**
+   * The side gutters a chart group's `alignPlots` asks for (plan D17): the widest of its
+   * members'. Applied only when they change, as a relayout: no options pass, no ingest.
+   */
+  setPlotInsets(insets: PlotInsets): void {
+    if (this.destroyed) return;
+    if (insets.left === this.plotInsets.left && insets.right === this.plotInsets.right) return;
+    this.plotInsets = { ...insets };
+    this.updateLayout();
+    this.updateScalePixelRanges();
+    this.refreshCursor();
+    this.scheduler.markDirty(DirtyFlag.ALL);
+  }
+
+  /**
+   * The side gutters this chart needs on its own, without any group's insets: what its
+   * measured axes take. Cached with the layout inputs.
+   */
+  naturalGutters(): { left: number; right: number } {
+    const width = this.canvasManager.cssWidth || 600;
+    const height = this.canvasManager.cssHeight || 400;
+    const key = `${this.createLayoutCacheKey(width, height)}|natural`;
+    if (this.natural?.key !== key) {
+      const layout = computeLayout(
+        width,
+        height,
+        this.config,
+        this.scales,
+        this.canvasManager.dpr,
+        this.theme.fontFamily,
+        this.theme.fontSize,
+      );
+      this.natural = {
+        key,
+        left: layout.plot.left,
+        right: layout.width - layout.plot.left - layout.plot.width,
+      };
+    }
+    return { left: this.natural.left, right: this.natural.right };
   }
 
   /** The element that holds the canvases and the label layer. */
@@ -1024,7 +1071,7 @@ export class ChartCore implements EngineHost {
     const palette = this.categoricalPalette();
     return this.config.series.map((series, seriesIndex) => {
       const type = series.type ?? 'line';
-      const color = series.color ?? palette[seriesIndex % palette.length];
+      const color = series.color ?? palette[(series.paletteIndex ?? seriesIndex) % palette.length];
       const configuredFill = typeof series.fill === 'string' ? series.fill : null;
       const fill =
         series.fill === null
@@ -1469,6 +1516,7 @@ export class ChartCore implements EngineHost {
         return count().inView;
       },
       materializeCount: this.debugCounters.materializeCount,
+      plot: Object.freeze({ ...this.layout.plot }),
       labelBoxes: () => debugLabelBoxes(labels),
     });
   }
@@ -2198,6 +2246,7 @@ export class ChartCore implements EngineHost {
       this.canvasManager.dpr,
       this.theme.fontFamily,
       this.theme.fontSize,
+      this.plotInsets,
     );
     this.layoutCacheKey = cacheKey;
     this.updateInteractionLayer();
@@ -2228,17 +2277,14 @@ export class ChartCore implements EngineHost {
         ac?.ticks ? ac.ticks.join(',') : '',
       ].join(':');
     }).join('|');
-    const padding = this.config.padding ?? {};
     return [
       width,
       height,
       this.canvasManager.dpr,
       this.theme.fontFamily,
       this.theme.fontSize,
-      padding.top,
-      padding.right,
-      padding.bottom,
-      padding.left,
+      this.plotInsets.left,
+      this.plotInsets.right,
       axes,
     ].join('|');
   }
@@ -2536,8 +2582,11 @@ export class ChartCore implements EngineHost {
       this.scatterPalettes(),
       this.stats.dataVersion,
       (si) =>
-        this.scatterResolvers(si, this.config.series[si], palette[si % palette.length])
-          .logicalResolver,
+        this.scatterResolvers(
+          si,
+          this.config.series[si],
+          palette[(this.config.series[si]?.paletteIndex ?? si) % palette.length],
+        ).logicalResolver,
       // The tooltip's readout, so a clicked point reads like its tooltip.
       { ...this.tooltipFormatters(), readout: this.readoutY },
       (si) => this.storeForSeries(si),
@@ -3020,7 +3069,7 @@ export class ChartCore implements EngineHost {
       const series = this.config.series[si];
       if (!series || series.visible === false) return;
 
-      const color = series.color ?? palette[si % palette.length];
+      const color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
       const xScale = this.scales.get(series.xAxis ?? 'x')!;
       const yScale = this.scales.get(series.yAxis ?? 'y')!;
       if (!xScale || !yScale) return;
@@ -3567,7 +3616,7 @@ export class ChartCore implements EngineHost {
         this.stats.dataVersion,
         (si) => {
           const series = this.config.series[si];
-          const fallback = series.color ?? palette[si % palette.length];
+          const fallback = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
           return this.scatterResolvers(si, series, fallback).logicalResolver;
         },
         { ...this.tooltipFormatters(), readout: this.readoutY },
@@ -3607,7 +3656,7 @@ export class ChartCore implements EngineHost {
       const colIdx = seriesYColumn(series);
       if (colIdx < 1 || colIdx > store.seriesCount) continue;
 
-      const color = series.color ?? palette[si % palette.length];
+      const color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
 
       // Find which bin the cursor X falls into. Edges are sorted, so
       // `upperBound` gives the largest b with edges[b] <= dataX in O(log n).
@@ -3671,7 +3720,7 @@ export class ChartCore implements EngineHost {
       const yVal = store.yAt(colIdx - 1, idx);
       if (!Number.isFinite(yVal)) continue;
 
-      const color = series.color ?? palette[si % palette.length];
+      const color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
       const fmt = this.tooltipFormatters();
 
       points.push({
@@ -3766,7 +3815,7 @@ export class ChartCore implements EngineHost {
       const formattedValue = Number.isFinite(value)
         ? this.formatReadout(s.yAxis ?? 'y', value)
         : '';
-      const color = s.color ?? palette[si % palette.length];
+      const color = s.color ?? palette[(s.paletteIndex ?? si) % palette.length];
 
       let row = points[writeIdx];
       if (!row) {
@@ -3885,7 +3934,7 @@ export class ChartCore implements EngineHost {
       point.dataIndex = dataIndex;
       point.dataX = dataX;
       point.label = series.label;
-      point.color = series.color ?? palette[si % palette.length];
+      point.color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
       point.value = value;
       point.formattedValue = formattedValue;
       point.meta = series.meta;
@@ -4004,7 +4053,7 @@ export class ChartCore implements EngineHost {
       if (!this.isValidColumn(xColumnIdx, store) || !this.isValidColumn(yColumnIdx, store))
         continue;
 
-      const fallbackColor = series.color ?? palette[si % palette.length];
+      const fallbackColor = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
       const style = this.scatterResolvers(si, series, fallbackColor).logicalResolver;
 
       for (let i = 0; i < store.length; i++) {
