@@ -22,9 +22,25 @@ const repo = join(process.cwd(), '..');
 const card = new URL(`${base}examples/social-card.jpg`, Astro.site).href;
 
 // The gzip size of each entry point, as an app that imports it pays (scripts/size.mjs, G6).
-const sizes = JSON.parse(
-  execFileSync(process.execPath, [join(repo, 'scripts/size.mjs'), '--json'], { encoding: 'utf8' }),
-) as { from: string; gzipBytes: number }[];
+// size.mjs prints the sizes, then exits 1 when an import is over its budget (its stderr says
+// which): the page still shows what was measured, and `npm run check:size` is the gate that fails.
+type Size = { from: string; gzipBytes: number };
+function measure(): Size[] {
+  let printed: string | undefined;
+  try {
+    printed = execFileSync(process.execPath, [join(repo, 'scripts/size.mjs'), '--json'], {
+      encoding: 'utf8',
+    });
+  } catch (error) {
+    printed = (error as { stdout?: string }).stdout;
+  }
+  try {
+    return JSON.parse(printed ?? '') as Size[];
+  } catch (error) {
+    throw new Error('homepage: `node scripts/size.mjs --json` printed no sizes', { cause: error });
+  }
+}
+const sizes = measure();
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 const entrySizes = ['snaplot', 'snaplot/react', 'snaplot/solid'].map((entry) => {
   const measured = sizes.filter((row) => row.from === entry);

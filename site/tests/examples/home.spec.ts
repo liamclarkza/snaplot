@@ -243,11 +243,16 @@ test.describe('the homepage', () => {
   }) => {
     await page.goto(BASE);
     const facts = await page.locator('.facts').innerText();
-    const sizes = JSON.parse(
-      execFileSync(process.execPath, [join(repo, 'scripts/size.mjs'), '--json'], {
+    let measured: string;
+    try {
+      measured = execFileSync(process.execPath, [join(repo, 'scripts/size.mjs'), '--json'], {
         encoding: 'utf8',
-      }),
-    ) as { from: string; gzipBytes: number }[];
+      });
+    } catch (error) {
+      // Over a budget, size.mjs still prints the sizes before it exits 1, as the page reads them.
+      measured = (error as { stdout?: string }).stdout ?? '';
+    }
+    const sizes = JSON.parse(measured) as { from: string; gzipBytes: number }[];
     for (const entry of ['snaplot', 'snaplot/react', 'snaplot/solid']) {
       const bytes = Math.max(...sizes.filter((s) => s.from === entry).map((s) => s.gzipBytes));
       expect(facts).toContain(`${entry} ${(bytes / 1024).toFixed(1)} KB`);
