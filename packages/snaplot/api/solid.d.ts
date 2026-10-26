@@ -1,5 +1,6 @@
 import { Accessor as Accessor_2 } from 'solid-js';
 import { JSX } from 'solid-js';
+import { Ref } from 'solid-js';
 
 /**
  * Reads a value from a row: a field name, or a function of the row and its index in the data you
@@ -455,7 +456,7 @@ export declare interface ChartProps<Row = Record<string, any>> extends ChartOpti
     /** Inline styles of the host element. @defaultValue full width and height */
     style?: string | JSX.CSSProperties;
     /** Receives the chart handle, and `undefined` on cleanup. */
-    ref?: (chart: ChartHandle<Row> | undefined) => void;
+    ref?: Ref<ChartHandle<Row> | undefined>;
 }
 
 /**
@@ -699,10 +700,10 @@ export declare interface HistogramSeriesOptions {
  * Attributes of the host element that a chart component passes through, with any `data-*`
  * attribute (JSX accepts those on components without declaring them).
  */
-export declare interface HostAttributes {
+export declare interface HostAttributes extends Omit<JSX.HTMLAttributes<HTMLDivElement>, 'ref' | 'children' | 'style' | 'innerHTML' | 'innerText' | 'textContent' | keyof ChartOptions> {
     /** The host element's id. @defaultValue none */
     id?: string;
-    /** The host's accessible name. @defaultValue `ariaLabel`, else `'Chart'` */
+    /** The host's accessible name. @defaultValue `ariaLabel`, else a summary of the series */
     'aria-label'?: string;
     /** Ids of elements that describe the chart. @defaultValue none */
     'aria-describedby'?: string;

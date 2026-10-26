@@ -1,6 +1,8 @@
 import { CSSProperties } from 'react';
+import { HTMLAttributes } from 'react';
 import { ReactElement } from 'react';
 import { Ref } from 'react';
+import { RefObject } from 'react';
 
 /**
  * Reads a value from a row: a field name, or a function of the row and its index in the data you
@@ -138,7 +140,7 @@ export declare interface CategoryAxisOptions extends AxisCommon {
  * A chart. Its props are the same options `createChart` takes, applied with `setOptions` on
  * every render, so inline objects and callbacks cost only what they change.
  */
-export declare function Chart<Row = Record<string, any>>(props: ChartProps<Row>): ReactElement;
+export declare const Chart: <Row = Record<string, any>>(props: ChartProps<Row>) => ReactElement;
 
 /**
  * Event payloads by event name, for `chart.on()`. Each `<key>:change` has a matching
@@ -684,10 +686,10 @@ export declare interface HistogramSeriesOptions {
  * Attributes of the host element that a chart component passes through, with any `data-*`
  * attribute (JSX accepts those on components without declaring them).
  */
-export declare interface HostAttributes {
+export declare interface HostAttributes extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'dangerouslySetInnerHTML' | keyof ChartOptions> {
     /** The host element's id. @defaultValue none */
     id?: string;
-    /** The host's accessible name. @defaultValue `ariaLabel`, else `'Chart'` */
+    /** The host's accessible name. @defaultValue `ariaLabel`, else a summary of the series */
     'aria-label'?: string;
     /** Ids of elements that describe the chart. @defaultValue none */
     'aria-describedby'?: string;
@@ -784,7 +786,7 @@ export declare interface LegendTableOptions<Row = Record<string, any>> {
 /** The props of {@link LegendTable}: the vanilla options, plus the host's class and style. */
 export declare interface LegendTableProps<Row = Record<string, any>> extends Omit<LegendTableOptions<Row>, 'chart'> {
     /** The chart the table reads; nothing renders until there is one. */
-    chart: ChartHandle<Row> | null | undefined;
+    chart: ChartHandle<Row> | RefObject<ChartHandle<Row> | null> | null | undefined;
     /** Class names of the host element. @defaultValue none */
     className?: string;
     /** Inline styles of the host element. @defaultValue none */
@@ -1169,7 +1171,7 @@ export declare interface TooltipOptions<Row> {
  * const following = useChartState(chart, (state) => state.following);
  * ```
  */
-export declare function useChartState<T = ChartState>(chart: ChartHandle<any> | null | undefined, selector?: (state: ChartState) => T, isEqual?: (a: T, b: T) => boolean): T | undefined;
+export declare function useChartState<T = ChartState>(chart: ChartHandle<any> | RefObject<ChartHandle<any> | null> | null | undefined, selector?: (state: ChartState) => T, isEqual?: (a: T, b: T) => boolean): T | undefined;
 
 /**
  * The values under the cursor, or at a fallback position; re-renders on cursor moves and data
@@ -1180,7 +1182,7 @@ export declare function useChartState<T = ChartState>(chart: ChartHandle<any> | 
  * const cursor = useCursor(chart, { fallback: 'latest' });
  * ```
  */
-export declare function useCursor<Row>(chart: ChartHandle<Row> | null | undefined, options?: CursorOptions): CursorSnapshot<Row> | undefined;
+export declare function useCursor<Row>(chart: ChartHandle<Row> | RefObject<ChartHandle<Row> | null> | null | undefined, options?: CursorOptions): CursorSnapshot<Row> | undefined;
 
 /** A numeric axis: linear or logarithmic. */
 export declare interface ValueAxisOptions extends AxisCommon {
