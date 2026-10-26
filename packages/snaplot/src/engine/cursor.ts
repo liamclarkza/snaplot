@@ -1,8 +1,7 @@
 /**
  * The hover model: the cursor from local pointer input (touch and pen coalesced per frame) and
- * from a group or the app (`setCursorDataX`), and the cursor snapshot that legend tables read,
- * through its two paths: one shared source (`fillSnapshot`) and independent sources
- * (`fillIndependentSnapshot`).
+ * from a group or the app (`setCursorDataX`), and the cursor snapshot that legend tables read
+ * (`fillSnapshot`, one path for a shared store and for a row per series).
  */
 import type { ChartCore } from './Engine';
 import {
@@ -10,7 +9,9 @@ import {
   DirtyFlag,
   type CursorSnapshotOptions,
   type CursorSnapshot,
+  type SeriesSpec,
 } from './spec';
+import type { DataStore } from './data/DataStore';
 import { seriesYColumn, scatterXColumn } from './marks/scatterEncoding';
 import { applyProximityHighlight, clearProximityHighlight } from './highlight';
 import {
@@ -233,193 +234,111 @@ export function getCursorSnapshot(engine: ChartCore, opts?: CursorSnapshotOption
 }
 
 /**
- * Mutate `target` to match the current snapshot. Shared implementation
- * for both allocating and zero-alloc public variants.
+ * Mutate `target` to match the current snapshot: one path for every chart. The rows reuse the
+ * objects already in `target.points`, so a caller that keeps its target stays allocation-free on
+ * the cursor hot path.
+ *
+ * When every visible series reads one store along its X column (`canUseGlobalXCursor`), the
+ * cursor's index into it (or the fallback row) is every series' row. Otherwise each series finds
+ * its own row: independent sources, or a scatter series drawn against another column. The two
+ * cases keep today's differences, which M10 (formatting) and M12a (the hover model) remove:
+ *
+ * | | one shared row | a row per series |
+ * |---|---|---|
+ * | source | the cursor index, else the fallback row | the cursor, else the fallback if any data |
+ * | value readout | `formatReadout` (no axis format) | `formatAxisReadout` (axis format first) |
+ * | header X | the row's X (tick format), or a histogram bin range | the first row's X (axis format) |
+ * | histogram rows | only when every visible series is one | per histogram series |
+ * | no rows | the source stands | the source becomes `'none'` |
  */
 export function fillSnapshot(
   engine: ChartCore,
   target: CursorSnapshot,
   opts?: CursorSnapshotOptions,
 ): CursorSnapshot {
-  if (engine.sourceStores.length > 1 || !canUseGlobalXCursor(engine))
-    return fillIndependentSnapshot(engine, target, opts);
-  const store = engine.sourceStores[0];
   const fallback = opts?.fallback ?? 'hide';
-  const length = store.length;
+  const shared = canUseGlobalXCursor(engine) ? engine.sourceStores[0] : null;
+  const onlyBins = shared !== null && hasOnlyVisibleHistograms(engine);
 
-  // Resolve the index to read from.
-  let idx: number | null = engine.cursorDataIdx;
-  let source: CursorSnapshot['source'] = idx !== null ? 'cursor' : 'none';
-
-  if (idx === null && length > 0) {
-    if (fallback === 'latest') {
-      idx = hasOnlyVisibleHistograms(engine) && length > 1 ? length - 2 : length - 1;
-      source = 'latest';
-    } else if (fallback === 'first') {
-      idx = 0;
-      source = 'first';
-    }
-  }
-
-  if (idx === null || idx < 0 || idx >= length) {
-    target.dataIndex = null;
-    target.dataX = null;
-    target.formattedX = '';
-    target.points.length = 0;
-    target.source = 'none';
-    target.activeSeriesIndex = null;
-    return target;
-  }
-
-  const histogramRange = hasOnlyVisibleHistograms(engine) ? histogramBinRange(idx, store) : null;
-  const xVal = histogramRange ? (histogramRange.min + histogramRange.max) / 2 : store.xAt(idx);
-  const xScale = engine.scales.get('x');
-
-  target.dataIndex = idx;
-  target.dataX = xVal;
-  target.formattedX = histogramRange
-    ? engine.formatHistogramBinRange(histogramRange.min, histogramRange.max)
-    : xScale
-      ? xScale.tickFormat(xVal)
-      : String(xVal);
-  target.source = source;
-
-  const palette = engine.categoricalPalette();
-  const seriesList = engine.config.series;
-  const points = target.points;
-
-  // Track the series whose Y is nearest the cursor (pixel-space).
-  // Only meaningful when the snapshot is cursor-driven; otherwise null.
-  const cursorY = source === 'cursor' ? engine.cursorY : null;
-  let nearestSi: number | null = null;
-  let nearestDist = Infinity;
-
-  // Walk visible series, mutate row objects in place; reuse rows
-  // across calls to keep the cursor hot path allocation-free.
-  let writeIdx = 0;
-  for (let si = 0; si < seriesList.length; si++) {
-    const s = seriesList[si];
-    if (s.visible === false) continue;
-
-    const colIdx = seriesYColumn(s);
-    if (colIdx < 1 || colIdx > store.seriesCount) continue;
-
-    const value = store.yAt(colIdx - 1, idx);
-    const yScale = engine.scales.get(s.yAxis ?? 'y');
-    const formattedValue = Number.isFinite(value)
-      ? engine.formatReadout(s.yAxis ?? 'y', value)
-      : '';
-    const color = s.color ?? palette[(s.paletteIndex ?? si) % palette.length];
-
-    let row = points[writeIdx];
-    if (!row) {
-      row = {
-        seriesIndex: si,
-        dataIndex: idx,
-        dataX: xVal,
-        label: s.label,
-        color,
-        value,
-        formattedValue,
-        meta: s.meta,
-      };
-      points[writeIdx] = row;
-    } else {
-      row.seriesIndex = si;
-      row.dataIndex = idx;
-      row.dataX = xVal;
-      row.label = s.label;
-      row.color = color;
-      row.value = value;
-      row.formattedValue = formattedValue;
-      row.meta = s.meta;
-    }
-    writeIdx++;
-
-    // Nearest-series in pixel space: compare the series' Y pixel to
-    // the cursor's Y pixel. Skipped for NaN values or when no cursor.
-    if (cursorY !== null && yScale && value === value) {
-      const px = yScale.dataToPixel(value);
-      const d = Math.abs(px - cursorY);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearestSi = si;
+  // The snapshot's source and, with a shared store, the row every series reads.
+  let source: CursorSnapshot['source'];
+  let row: number | null = null;
+  if (shared) {
+    row = engine.cursorDataIdx;
+    source = row !== null ? 'cursor' : 'none';
+    if (row === null && shared.length > 0) {
+      if (fallback === 'latest') {
+        row = onlyBins && shared.length > 1 ? shared.length - 2 : shared.length - 1;
+        source = 'latest';
+      } else if (fallback === 'first') {
+        row = 0;
+        source = 'first';
       }
     }
+    if (row === null || row < 0 || row >= shared.length) source = 'none';
+  } else {
+    const active = engine.cursorDataX !== null && engine.cursorX !== null;
+    source = active ? 'cursor' : engine.hasData() && fallback !== 'hide' ? fallback : 'none';
   }
-  points.length = writeIdx;
-  target.activeSeriesIndex = nearestSi;
 
-  return target;
-}
-
-export function fillIndependentSnapshot(
-  engine: ChartCore,
-  target: CursorSnapshot,
-  opts?: CursorSnapshotOptions,
-): CursorSnapshot {
-  const fallback = opts?.fallback ?? 'hide';
-  const active = engine.cursorDataX !== null && engine.cursorX !== null;
-  const source: CursorSnapshot['source'] = active
-    ? 'cursor'
-    : engine.hasData() && fallback !== 'hide'
-      ? fallback
-      : 'none';
   target.source = source;
   target.dataIndex = null;
-  target.dataX = active ? engine.cursorDataX : null;
+  target.dataX = null;
   target.formattedX = '';
   target.activeSeriesIndex = null;
   if (source === 'none') {
     target.points.length = 0;
     return target;
   }
+
+  // The header: the shared row's X, or (per-series rows) the cursor's X until the first row.
+  const sharedRange = shared && onlyBins ? histogramBinRange(row!, shared) : null;
+  if (shared) {
+    const xScale = engine.scales.get('x');
+    const x = sharedRange ? (sharedRange.min + sharedRange.max) / 2 : shared.xAt(row!);
+    target.dataIndex = row;
+    target.dataX = x;
+    target.formattedX = sharedRange
+      ? engine.formatHistogramBinRange(sharedRange.min, sharedRange.max)
+      : xScale
+        ? xScale.tickFormat(x)
+        : String(x);
+  } else if (source === 'cursor') {
+    target.dataX = engine.cursorDataX;
+  }
+
   const palette = engine.categoricalPalette();
+  const cursorY = source === 'cursor' ? engine.cursorY : null;
+  let nearestDistance = Infinity;
   let count = 0;
-  let nearestDist = Infinity;
   for (let si = 0; si < engine.config.series.length; si++) {
     const series = engine.config.series[si];
-    const store = engine.storeForSeries(si);
+    const store = shared ?? engine.storeForSeries(si);
     const column = seriesYColumn(series);
-    if (series.visible === false || !store.length || !engine.isValidColumn(column, store)) continue;
-    const seriesX = engine.scales.get(series.xAxis ?? 'x');
-    const targetX =
-      active && seriesX && engine.cursorX !== null
-        ? seriesX.pixelToData(engine.cursorX)
-        : engine.cursorDataX!;
-    let dataIndex =
-      source === 'latest'
-        ? Math.max(0, store.length - (series.type === 'histogram' ? 2 : 1))
-        : source === 'first'
-          ? 0
-          : series.type === 'histogram'
-            ? histogramBinIndexForDataX(targetX, store)
-            : store.nearestXIndex(targetX);
-    const xColumn = series.type === 'scatter' ? scatterXColumn(series) : 0;
-    if (active && xColumn !== 0) {
-      let distance = Infinity;
-      dataIndex = null;
-      for (let i = 0; i < store.length; i++) {
-        const delta = Math.abs(store.valueAt(xColumn, i) - targetX);
-        if (delta < distance) {
-          distance = delta;
-          dataIndex = i;
-        }
-      }
-    }
+    if (series.visible === false || !store.length) continue;
+    if (shared ? column < 1 || column > store.seriesCount : !engine.isValidColumn(column, store))
+      continue;
+
+    const histogram = shared ? onlyBins : series.type === 'histogram';
+    const xColumn = shared ? 0 : series.type === 'scatter' ? scatterXColumn(series) : 0;
+    const dataIndex = shared ? row : seriesRow(engine, series, store, source, xColumn);
     if (dataIndex === null) continue;
-    const range = series.type === 'histogram' ? histogramBinRange(dataIndex, store) : null;
+    const range = shared ? sharedRange : histogram ? histogramBinRange(dataIndex, store) : null;
     const dataX = range ? (range.min + range.max) / 2 : store.valueAt(xColumn, dataIndex);
     const value = store.valueAt(column, dataIndex);
-    const yScale = engine.scales.get(series.yAxis ?? 'y');
+    const yAxis = series.yAxis ?? 'y';
     const formattedValue = Number.isFinite(value)
-      ? engine.formatAxisReadout(series.yAxis ?? 'y', value)
+      ? shared
+        ? engine.formatReadout(yAxis, value)
+        : engine.formatAxisReadout(yAxis, value)
       : '';
+
     const point =
       target.points[count] ??
       (target.points[count] = {
         seriesIndex: si,
         dataIndex,
+        dataX,
         label: series.label,
         color: '',
         value,
@@ -433,25 +352,64 @@ export function fillIndependentSnapshot(
     point.value = value;
     point.formattedValue = formattedValue;
     point.meta = series.meta;
-    if (count === 0) {
+    if (!shared && count === 0) {
       target.dataIndex = dataIndex;
       target.dataX ??= dataX;
       target.formattedX = engine.formatAxisValue(series.xAxis ?? 'x', target.dataX);
     }
     count++;
-    if (active && engine.cursorY !== null && yScale && Number.isFinite(value)) {
-      const distance = Math.abs(yScale.dataToPixel(value) - engine.cursorY);
-      if (distance < nearestDist) {
-        nearestDist = distance;
+
+    // The series whose value is nearest the cursor's Y, in pixels.
+    const yScale = engine.scales.get(yAxis);
+    if (cursorY !== null && yScale && Number.isFinite(value)) {
+      const distance = Math.abs(yScale.dataToPixel(value) - cursorY);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
         target.activeSeriesIndex = si;
       }
     }
   }
   target.points.length = count;
-  if (count === 0) {
+  if (!shared && count === 0) {
     target.source = 'none';
     target.dataX = null;
     target.dataIndex = null;
   }
   return target;
+}
+
+/**
+ * The row of one series in a snapshot without a shared store: the fallback row, else the row
+ * nearest the cursor's X on the series' own X axis (the bin under it for a histogram; a scan of
+ * the X column for a scatter series drawn against another column).
+ */
+function seriesRow(
+  engine: ChartCore,
+  series: SeriesSpec,
+  store: DataStore,
+  source: CursorSnapshot['source'],
+  xColumn: number,
+): number | null {
+  const histogram = series.type === 'histogram';
+  if (source === 'latest') return Math.max(0, store.length - (histogram ? 2 : 1));
+  if (source === 'first') return 0;
+  const seriesX = engine.scales.get(series.xAxis ?? 'x');
+  const active = source === 'cursor';
+  const targetX =
+    active && seriesX && engine.cursorX !== null
+      ? seriesX.pixelToData(engine.cursorX)
+      : engine.cursorDataX!;
+  if (active && xColumn !== 0) {
+    let distance = Infinity;
+    let nearest: number | null = null;
+    for (let i = 0; i < store.length; i++) {
+      const delta = Math.abs(store.valueAt(xColumn, i) - targetX);
+      if (delta < distance) {
+        distance = delta;
+        nearest = i;
+      }
+    }
+    return nearest;
+  }
+  return histogram ? histogramBinIndexForDataX(targetX, store) : store.nearestXIndex(targetX);
 }
