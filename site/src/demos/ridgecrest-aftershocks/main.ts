@@ -170,5 +170,9 @@ export async function mount(root: HTMLElement): Promise<Ridgecrest> {
 
   show(null);
   root.dataset.ready = '';
+  // The thumbnail hook (thumbnail.json): the charts have painted two frames later.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => document.documentElement.setAttribute('data-demo-ready', '')),
+  );
   return { strip, scatter, decay: decayChart };
 }

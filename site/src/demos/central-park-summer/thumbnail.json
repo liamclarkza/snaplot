@@ -1,0 +1,7 @@
+{
+  "slug": "central-park-summer",
+  "path": "examples/central-park-summer/",
+  "ready": "html[data-demo-ready]",
+  "viewport": { "width": 1280, "height": 800 },
+  "query": ""
+}

@@ -136,6 +136,10 @@ export async function mount(root: HTMLElement): Promise<ChartHandle<SummerRow>> 
   const dots = { 'record-high': answer.recordHighs.length, 'record-low': answer.recordLows.length };
   readingKey(part(root, 'key'), chart, (id) => dots[id as keyof typeof dots] ?? 1);
   root.dataset.ready = '';
+  // The thumbnail hook (thumbnail.json): the charts have painted two frames later.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => document.documentElement.setAttribute('data-demo-ready', '')),
+  );
   return chart;
 }
 

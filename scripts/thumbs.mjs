@@ -15,7 +15,11 @@
 // server, and waits for the bench lock like every Playwright run (plan §11.1).
 //
 // A thumbnail is the demo page at 1280 × 800 CSS pixels, rendered at half density (640 × 400) as a
-// JPEG of at most 60 KB (Playwright cannot write WebP). The check fails when two demos share:
+// JPEG of at most 60 KB (Playwright cannot write WebP). Each demo says how to take it in
+// site/src/demos/<slug>/thumbnail.json: `path` and `query` to open (`?paused` holds a stream
+// still), the `viewport` (1280 × 800) and `ready`, the selector that marks the first paint
+// (`html[data-demo-ready]` on all six). Without that file the script opens the page and waits for
+// `window.demo`, `[data-ready]` or a painted canvas. The check fails when two demos share:
 // - a background colour (CIEDE2000 < 2) and the body font family;
 // - a background colour and the number of chart columns at 1280 px (distinct left edges of the
 //   chart canvases in the page's main region);
@@ -154,22 +158,48 @@ function deltaE2000([L1, a1, b1], [L2, a2, b2]) {
 }
 
 // --- in-page probes ---------------------------------------------------------------------------------
-/** Resolves once the demo has painted: `window.demo`, `[data-ready]` or a painted canvas. */
-async function settle(page) {
-  await page.waitForFunction(
-    () => {
-      if ('demo' in window || document.querySelector('[data-ready]')) return true;
-      for (const canvas of document.querySelectorAll('main canvas')) {
-        if (canvas.width === 0 || canvas.height === 0) continue;
-        const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
-        let painted = 0;
-        for (let i = 3; i < data.length; i += 4) if (data[i] > 0 && ++painted > 2000) return true;
-      }
-      return false;
-    },
-    undefined,
-    { timeout: 30_000, polling: 250 },
-  );
+/**
+ * How to take a demo's thumbnail: its site/src/demos/<slug>/thumbnail.json (M16b and M16c wrote
+ * the format), over the defaults.
+ */
+function hook(slug) {
+  const defaults = { slug, path: `examples/${slug}/`, query: '', viewport: VIEWPORT, ready: '' };
+  const file = join(site, 'src/demos', slug, 'thumbnail.json');
+  if (!existsSync(file)) return { ...defaults, problems: [] };
+  const found = { ...defaults, ...JSON.parse(readFileSync(file, 'utf8')) };
+  const problems = [];
+  if (found.slug !== slug) problems.push(`${slug}: thumbnail.json names the slug ${found.slug}`);
+  if (found.viewport.width !== VIEWPORT.width || found.viewport.height !== VIEWPORT.height) {
+    problems.push(
+      `${slug}: thumbnail.json asks for ${found.viewport.width} × ${found.viewport.height}, not 1280 × 800`,
+    );
+  }
+  if (found.query && !found.query.startsWith('?'))
+    problems.push(`${slug}: query must start with ?`);
+  return { ...found, problems };
+}
+
+/**
+ * Resolves once the demo has painted: its `ready` selector, or else `window.demo`, `[data-ready]`
+ * or a painted canvas.
+ */
+async function settle(page, ready) {
+  if (ready) await page.waitForSelector(ready, { state: 'attached', timeout: 30_000 });
+  else
+    await page.waitForFunction(
+      () => {
+        if ('demo' in window || document.querySelector('[data-ready]')) return true;
+        for (const canvas of document.querySelectorAll('main canvas')) {
+          if (canvas.width === 0 || canvas.height === 0) continue;
+          const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+          let painted = 0;
+          for (let i = 3; i < data.length; i += 4) if (data[i] > 0 && ++painted > 2000) return true;
+        }
+        return false;
+      },
+      undefined,
+      { timeout: 30_000, polling: 250 },
+    );
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(800);
 }
@@ -366,8 +396,10 @@ mkdirSync(out, { recursive: true });
 
 try {
   for (const slug of slugs) {
+    const how = hook(slug);
+    problems.push(...how.problems);
     const context = await browser.newContext({
-      viewport: VIEWPORT,
+      viewport: how.viewport,
       deviceScaleFactor: 0.5,
       colorScheme: 'light',
       reducedMotion: 'no-preference',
@@ -375,9 +407,9 @@ try {
     const page = await context.newPage();
     // A demo may open external pages or stream; nothing leaves the machine.
     await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());
-    const response = await page.goto(`${server.origin}${BASE}examples/${slug}/`);
+    const response = await page.goto(`${server.origin}${BASE}${how.path}${how.query}`);
     if (!response?.ok()) problems.push(`${slug}: HTTP ${response?.status()}`);
-    await settle(page);
+    await settle(page, how.ready);
     let quality = 80;
     let shot = await page.screenshot({ type: 'jpeg', quality });
     while (shot.length > MAX_BYTES && quality > 40) {
