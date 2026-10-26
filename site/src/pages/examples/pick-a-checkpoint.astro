@@ -25,6 +25,8 @@ const source = 'https://github.com/liamclarkza/snaplot/tree/main/site/src/demos/
       content="Two training runs of a handwritten-digit classifier compared epoch by epoch, with a decision panel that computes which checkpoint to ship."
     />
     <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <meta property="og:image" content={new URL(`${base}examples/pick-a-checkpoint.jpg`, Astro.site).href} />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body class="r1">
     <header class="r1-header">

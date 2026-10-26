@@ -43,6 +43,8 @@ const year = yearFacts(hours);
     <title>{question} · snaplot examples</title>
     <meta name="description" content={answer} />
     <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <meta property="og:image" content={new URL(`${base}examples/battery-payback.jpg`, Astro.site).href} />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body class="r2">
     <main class="r2-article">

@@ -31,6 +31,8 @@ const SOURCE_URL =
       content="A waveform editor that finds clipped samples and long silences in a NASA recording, in Solid with snaplot."
     />
     <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <meta property="og:image" content={new URL(`${base}examples/find-the-clipping.jpg`, Astro.site).href} />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <main id="main">

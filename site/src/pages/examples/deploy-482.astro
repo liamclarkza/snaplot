@@ -29,6 +29,8 @@ const SOURCE_URL = 'https://github.com/liamclarkza/snaplot/tree/main/site/src/de
       content="An incident dashboard on a simulated service: did a deploy cause a latency spike, and should it be rolled back? Solid with snaplot."
     />
     <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <meta property="og:image" content={new URL(`${base}examples/deploy-482.jpg`, Astro.site).href} />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <main id="main">
