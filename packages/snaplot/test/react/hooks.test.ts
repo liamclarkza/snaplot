@@ -79,7 +79,7 @@ function mountWithProbes(probes: { state?: (state: ChartState) => unknown; curso
 }
 
 describe('[frameworks-14][research-05] the hooks read a plain useRef', () => {
-  it('[frameworks-14] useChartState re-renders once when the chart mounts, then only on its slice', async () => {
+  it('[frameworks-14][research-05] useChartState re-renders once when the chart mounts, then only on its slice', async () => {
     const probe = mountWithProbes({ state: (state) => state.hiddenSeries.length });
     root = createRoot(host());
     await act(async () => root?.render(h(probe.App)));

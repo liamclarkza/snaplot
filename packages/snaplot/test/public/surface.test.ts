@@ -54,30 +54,39 @@ describe('[repo-19][frameworks-13] one entry and one name per concept', () => {
 });
 
 describe('[frameworks-12] the adapters use the public handle only', () => {
-  /** Every relative import of the adapter sources, resolved against src/. */
+  /** Every import of the adapter sources: relative ones resolved against src/, bare ones as is. */
   function adapterImports(): string[] {
     const src = join(pkg, 'src');
     const files = [
       join(src, 'react.ts'),
       join(src, 'solid.ts'),
-      ...['react', 'solid'].flatMap((dir) =>
+      ...['react', 'solid', 'adapters'].flatMap((dir) =>
         readdirSync(join(src, dir))
-          .filter((name) => /\.tsx?$/.test(name))
+          .filter((name) => /\.tsx?$/.test(name) && !/\.(test|typecheck)\.tsx?$/.test(name))
           .map((name) => join(src, dir, name)),
       ),
     ];
     return files.flatMap((file) =>
-      [...readFileSync(file, 'utf8').matchAll(/from '(\.[^']+)'/g)].map((match) =>
-        relative(src, resolve(dirname(file), match[1])),
+      [...readFileSync(file, 'utf8').matchAll(/^(?:import|export)[^;]*? from '([^']+)'/gm)].map(
+        ([, specifier]) =>
+          specifier.startsWith('.') ? relative(src, resolve(dirname(file), specifier)) : specifier,
       ),
     );
   }
 
-  it('[frameworks-12] React and Solid import only src/public, besides their own modules', () => {
+  it('[frameworks-12] React and Solid import the core as snaplot, besides their own modules and the binding', () => {
     const imports = adapterImports();
-    expect(imports.length).toBeGreaterThan(0);
+    expect(imports).toContain('snaplot');
     for (const target of imports)
-      expect(target).toMatch(/^(public\/|react\/|solid\/|adapters\/bind$)/);
+      expect(target).toMatch(
+        /^(snaplot|react|react-dom|solid-js(\/web)?|react\/[^/]+|solid\/[^/]+|adapters\/bind|public\/types)$/,
+      );
+    // public/types only as the entries' type-only re-export of every public type.
+    const src = join(pkg, 'src');
+    for (const entry of ['react.ts', 'solid.ts'])
+      expect(readFileSync(join(src, entry), 'utf8')).not.toMatch(
+        /^import|^export \{[^}]*\} from '\.\/public/m,
+      );
   });
 });
 

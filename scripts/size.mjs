@@ -60,6 +60,9 @@ async function measure(specifier, names) {
       outdir: 'out',
       write: false,
       logLevel: 'silent',
+      // Resolve as an application's bundler does: the package's own tsconfig `paths` (which map
+      // 'snaplot' to src/ for the library's tests) must not apply to dist/react.js's 'snaplot'.
+      tsconfigRaw: {},
     }).catch((error) => error);
     if (result.errors?.length) {
       if (result.errors.some((e) => /No matching export/.test(e.text))) continue;

@@ -11,8 +11,8 @@ const solidDir = resolve(root, 'src/solid');
 const solidEntry = resolve(root, 'src/solid.ts');
 
 /**
- * Peers and the core itself. The adapters import 'snaplot' once M13 switches them to the public
- * API (plan §11.2), so every entry shares the one published core.
+ * Peers and the core itself. The adapters import 'snaplot' (plan §11.2), so every entry shares the
+ * one published core.
  */
 export const external = ['snaplot', /^solid-js(\/|$)/, /^react(\/|$)/, /^react-dom(\/|$)/];
 
@@ -181,6 +181,13 @@ export default defineConfig({
           if (id.endsWith('/src/public/histogram.ts')) return 'histogram';
           if (/\/src\/(public\/(legend|companion)\.ts|engine\/errors\.ts|styles\/)/.test(id))
             return 'legend';
+          // The chart stays a chunk of its own, apart from dist/index.js: the adapters import it
+          // through 'snaplot' now, and inlined into the entry it would cost every import.
+          if (
+            /\/src\//.test(id) &&
+            !/\/src\/([^/]+\.tsx?|react\/.*|solid\/.*|adapters\/.*)$/.test(id)
+          )
+            return 'index';
           return undefined;
         },
       },

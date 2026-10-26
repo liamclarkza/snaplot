@@ -3,6 +3,9 @@
 // real core underneath (the jsdom fakes stand in for canvas and observers).
 // The final adapter API is used: `useChartState(chart, selector)`, a plain
 // handle for Solid companions. M8 deletes the old hooks; M13 flips these.
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Activity, act, type ComponentProps, createElement as h, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
@@ -13,6 +16,8 @@ import type { ChartHandle } from '../../src/index';
 import { Chart } from '../../src/react/Chart';
 import * as hooks from '../../src/react/hooks';
 import { LegendTable } from '../../src/solid/LegendTable';
+import * as react from '../../src/react';
+import * as solid from '../../src/solid';
 import { debug, type Fakes, installFakes } from '../fakes';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -196,5 +201,43 @@ describe('[frameworks-09] Solid', () => {
     }).not.toThrow();
     expect(host.textContent).toContain('CPU');
     dispose?.();
+  });
+});
+
+describe('[arch-18][dxtrial-22] one adapter design in two frameworks', () => {
+  const src = join(dirname(fileURLToPath(import.meta.url)), '../../src');
+  const sources = (dir: string) =>
+    readdirSync(join(src, dir))
+      .filter((name) => /\.tsx?$/.test(name) && !/\.(test|typecheck)\.tsx?$/.test(name))
+      .map((name) => readFileSync(join(src, dir, name), 'utf8'));
+
+  it('[arch-18] the shared binding lives in src/adapters, and neither adapter imports the other', () => {
+    for (const [dir, other] of [
+      ['react', 'solid'],
+      ['solid', 'react'],
+    ]) {
+      const text = sources(dir).join('\n');
+      expect(text).toContain("from '../adapters/bind'");
+      expect(text).not.toContain(`from '../${other}/`);
+    }
+    // snaplot/core is gone, and snaplot/solid has no createChart of its own.
+    expect(Object.keys(react)).not.toContain('createChart');
+    expect(Object.keys(solid)).not.toContain('createChart');
+  });
+
+  it('[dxtrial-22] React and Solid mirror each other: the same components, arguments and core names', () => {
+    const shared = ['Chart', 'LegendTable', 'createChartGroup', 'histogram'];
+    for (const entry of [react, solid] as Record<string, unknown>[])
+      for (const name of shared) expect(entry[name], name).toBeDefined();
+    // The state and cursor readers take (chart, selector, isEqual) and (chart, options) in both.
+    expect(react.useChartState.length).toBe(solid.createChartState.length);
+    expect(react.useCursor.length).toBe(solid.createCursor.length);
+    // A plain handle works for the legend table in both (Solid also takes an accessor).
+    const chart = fakes.mount<Row>({ data: rows, x: 't', series: [{ y: 'cpu', label: 'CPU' }] });
+    const host = document.createElement('div');
+    document.body.append(host);
+    const dispose = render(() => createComponent(solid.LegendTable<Row>, { chart }), host);
+    expect(host.querySelector('tbody tr')?.textContent).toContain('CPU');
+    dispose();
   });
 });

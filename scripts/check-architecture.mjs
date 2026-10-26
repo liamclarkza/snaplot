@@ -13,7 +13,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-const MODES = { P2: 'warn', P3: 'warn', size: 'warn' };
+const MODES = { P2: 'warn', P3: 'error', size: 'warn' };
 /** No source file is longer than this (plan §12 M9a: 1,200 lines; M9b brings it to 900). */
 const MAX_LINES = 1200;
 
@@ -243,5 +243,5 @@ if (errors.length > 0) {
 }
 if (!asJson)
   console.log(
-    `check-architecture: ${violations.length} violation(s), all in warn mode (P2 errors from M14, P3 from M13, size from M9b).`,
+    `check-architecture: ${violations.length} violation(s), all in warn mode (P2 errors from M14, size from M9b; P3 is in error mode since M13).`,
   );
