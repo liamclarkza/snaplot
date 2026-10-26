@@ -1,18 +1,21 @@
 // Architecture rules (plan §2): P2 "one implementation per concept" and P3 "adapters use only the
 // public API", checked over the TypeScript syntax tree of packages/snaplot/src (tests excluded),
-// so comments and type positions never count.
+// so comments and type positions never count; and the file-size cap of the engine split (plan §12
+// M9a, M9b), in physical lines as scripts/overhaul/metrics.mjs counts them.
 //
 //   node scripts/check-architecture.mjs [--strict] [--verbose] [--json]
 //
 // Each rule group has a mode. `warn` prints violations and exits 0; `error` exits 1 on any.
-// M13 switches P3 to error, M14 switches everything (plan §11.3 G3). --strict treats every rule
-// as an error, for a local preview.
+// M13 switches P3 to error, M9b the size cap (lowered to 900), M14 everything (plan §11.3 G3).
+// --strict treats every rule as an error, for a local preview.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-const MODES = { P2: 'warn', P3: 'warn' };
+const MODES = { P2: 'warn', P3: 'warn', size: 'warn' };
+/** No source file is longer than this (plan §12 M9a: 1,200 lines; M9b brings it to 900). */
+const MAX_LINES = 1200;
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = join(repo, 'packages/snaplot/src');
@@ -182,12 +185,31 @@ function p3Violations(file, source) {
   return found;
 }
 
+/** size: physical lines (newline-terminated, as `wc -l` and metrics.mjs count them). */
+function sizeViolations(file, text) {
+  const lines = text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
+  if (lines <= MAX_LINES) return [];
+  return [
+    {
+      group: 'size',
+      rule: 'lines',
+      file,
+      line: lines,
+      text: `${lines.toLocaleString('en-US')} lines`,
+    },
+  ];
+}
+
 const violations = [];
 for (const path of sourceFiles(src)) {
   const file = relative(src, path);
   const text = readFileSync(path, 'utf8');
   const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
-  violations.push(...p2Violations(file, source), ...p3Violations(file, source));
+  violations.push(
+    ...p2Violations(file, source),
+    ...p3Violations(file, source),
+    ...sizeViolations(file, text),
+  );
 }
 
 const modeOf = (group) => (strict ? 'error' : MODES[group]);
@@ -197,6 +219,7 @@ if (asJson) {
   const rules = [
     ...Object.entries(P2).map(([rule, { what }]) => ['P2', rule, what]),
     ['P3', 'imports', "adapter imports other than 'snaplot', peers and ../adapters/bind"],
+    ['size', 'lines', `source files over ${MAX_LINES.toLocaleString('en-US')} lines`],
   ];
   for (const [group, rule, what] of rules) {
     const hits = violations.filter((v) => v.group === group && v.rule === rule);
@@ -204,7 +227,9 @@ if (asJson) {
     const byFile = new Map();
     for (const hit of hits) byFile.set(hit.file, [...(byFile.get(hit.file) ?? []), hit]);
     for (const [file, list] of byFile) {
-      if (verbose) for (const hit of list) console.log(`  src/${file}:${hit.line}  ${hit.text}`);
+      if (group === 'size') console.log(`  src/${file}: ${list[0].text}`);
+      else if (verbose)
+        for (const hit of list) console.log(`  src/${file}:${hit.line}  ${hit.text}`);
       else
         console.log(`  src/${file} (${list.length}): line ${list.map((h) => h.line).join(', ')}`);
     }
@@ -218,5 +243,5 @@ if (errors.length > 0) {
 }
 if (!asJson)
   console.log(
-    `check-architecture: ${violations.length} violation(s), all in warn mode (P2 errors from M14, P3 from M13).`,
+    `check-architecture: ${violations.length} violation(s), all in warn mode (P2 errors from M14, P3 from M13, size from M9b).`,
   );
