@@ -10,6 +10,8 @@ import {
   scatterXColumn,
   type ScatterPalettes,
 } from './marks/scatterEncoding';
+import type { ChartCore } from './Engine';
+import { categoryWidthFromData, barRectForCategory } from './marks/barGeometry';
 
 /**
  * Hit-testing for finding nearest data points to cursor position.
@@ -477,4 +479,286 @@ interface ScatterGridCache {
   cells: Map<number, number[]>;
   pixelX: Float64Array;
   pixelY: Float64Array;
+}
+
+// ─── The chart's hit pipeline ─────────────────────────────────
+// The tooltip points under the cursor (the HitTester for lines, areas, bands and scatter; slot
+// and bin geometry for bars and histograms), the point a click lands on, and the histogram bin
+// under a data X.
+
+export function updateTooltipPoints(engine: ChartCore): void {
+  if (!engine.hasData() || engine.cursorX === null || engine.cursorY === null) {
+    engine.tooltipPoints = [];
+    return;
+  }
+
+  // Use chart-type-specific hit-testing for bar/histogram (they need geometry awareness),
+  // fall back to generic HitTester for line/scatter/area.
+  const hasHistogram = engine.config.series.some(
+    (s) => s.type === 'histogram' && s.visible !== false,
+  );
+  const hasBar = engine.config.series.some((s) => s.type === 'bar' && s.visible !== false);
+
+  if (hasHistogram) {
+    engine.tooltipPoints = findHistogramTooltipPoints(engine);
+  } else if (hasBar) {
+    engine.tooltipPoints = findBarTooltipPoints(engine);
+  } else {
+    const mode = engine.config.tooltip?.mode ?? 'index';
+    const hitX = mode === 'nearest' && engine.mouseX !== null ? engine.mouseX : engine.cursorX;
+    const hitY = mode === 'nearest' && engine.mouseY !== null ? engine.mouseY : engine.cursorY;
+    const palette = engine.categoricalPalette();
+    engine.tooltipPoints = engine.hitTester.findPoints(
+      engine.sourceStores[0],
+      engine.scales,
+      engine.config.series,
+      hitX,
+      hitY,
+      mode,
+      palette,
+      engine.lastPointerType,
+      engine.scatterPalettes(),
+      engine.dataVersion,
+      (si) => {
+        const series = engine.config.series[si];
+        const fallback = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
+        return engine.scatterResolvers(si, series, fallback).logicalResolver;
+      },
+      { ...tooltipFormatters(engine), readout: engine.readoutY },
+      (si) => engine.storeForSeries(si),
+    );
+  }
+}
+
+/** tooltip.xFormat / tooltip.yFormat, when configured. */
+export function tooltipFormatters(
+  engine: ChartCore,
+): { x?: (x: number) => string; y?: (y: number, seriesIndex: number) => string } | undefined {
+  const t = engine.config.tooltip;
+  if (!t?.xFormat && !t?.yFormat) return undefined;
+  return { x: t.xFormat, y: t.yFormat };
+}
+
+/**
+ * Hit-test histogram bins: find which bin the cursor X falls into
+ * and return a tooltip point showing the bin range and count.
+ */
+export function findHistogramTooltipPoints(engine: ChartCore): TooltipPoint[] {
+  const points: TooltipPoint[] = [];
+  if (engine.cursorX === null || !engine.hasData()) return points;
+  const palette = engine.categoricalPalette();
+
+  for (let si = 0; si < engine.config.series.length; si++) {
+    const series = engine.config.series[si];
+    const store = engine.storeForSeries(si);
+    if (store.length === 0) continue;
+    if (series.visible === false || series.type !== 'histogram') continue;
+
+    const xScale = engine.scales.get(series.xAxis ?? 'x');
+    if (!xScale) continue;
+    const dataX = xScale.pixelToData(engine.cursorX);
+
+    const colIdx = seriesYColumn(series);
+    if (colIdx < 1 || colIdx > store.seriesCount) continue;
+
+    const color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
+
+    // Find which bin the cursor X falls into. Edges are sorted, so
+    // `upperBound` gives the largest b with edges[b] <= dataX in O(log n).
+    // Bins are left-edge inclusive. The exact final edge maps to the
+    // final bin so a click on the right border still selects that bar.
+    const b = histogramBinIndexForDataX(dataX, store);
+    if (b === null) continue;
+
+    const binMin = store.xAt(b);
+    const binMax = store.xAt(b + 1);
+    const count = store.yAt(colIdx - 1, b);
+
+    const fmt = tooltipFormatters(engine);
+    points.push({
+      seriesIndex: si,
+      dataIndex: b,
+      label: series.label,
+      x: (binMin + binMax) / 2,
+      xRange: { min: binMin, max: binMax },
+      y: count,
+      color,
+      formattedX: engine.formatHistogramBinRange(binMin, binMax, si),
+      formattedY: fmt?.y ? fmt.y(count, si) : engine.formatAxisReadout(series.yAxis ?? 'y', count),
+    });
+  }
+
+  return points;
+}
+
+/**
+ * Hit-test bar charts: find the nearest category to the cursor X
+ * and return tooltip points for all bar series at that category.
+ */
+export function findBarTooltipPoints(engine: ChartCore): TooltipPoint[] {
+  const points: TooltipPoint[] = [];
+  if (engine.cursorX === null || !engine.hasData()) return points;
+  const palette = engine.categoricalPalette();
+
+  for (let si = 0; si < engine.config.series.length; si++) {
+    const series = engine.config.series[si];
+    const store = engine.storeForSeries(si);
+    if (store.length === 0) continue;
+    if (series.visible === false || series.type !== 'bar') continue;
+
+    const xScale = engine.scales.get(series.xAxis ?? 'x');
+    if (!xScale) continue;
+
+    const dataX = xScale.pixelToData(engine.cursorX);
+    const idx = store.nearestXIndex(dataX);
+    const xVal = store.xAt(idx);
+    const categoryWidth = categoryWidthFromData(
+      (dataIndex) => store.xAt(dataIndex),
+      idx,
+      store.length,
+    );
+    if (Math.abs(dataX - xVal) > categoryWidth * 0.6) continue;
+
+    const colIdx = seriesYColumn(series);
+    if (colIdx < 1 || colIdx > store.seriesCount) continue;
+
+    const yVal = store.yAt(colIdx - 1, idx);
+    if (!Number.isFinite(yVal)) continue;
+
+    const color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
+    const fmt = tooltipFormatters(engine);
+
+    points.push({
+      seriesIndex: si,
+      dataIndex: idx,
+      label: series.label,
+      x: xVal,
+      y: yVal,
+      color,
+      formattedX: fmt?.x ? fmt.x(xVal) : engine.formatAxisValue(series.xAxis ?? 'x', xVal),
+      formattedY: fmt?.y ? fmt.y(yVal, si) : engine.formatReadout(series.yAxis ?? 'y', yVal),
+    });
+  }
+
+  return points;
+}
+
+export function emitPointClick(engine: ChartCore, pixelX: number, pixelY: number): void {
+  const palette = engine.categoricalPalette();
+  const pointSeries = engine.config.series.map((series) =>
+    series.type === 'bar' || series.type === 'histogram' ? { ...series, visible: false } : series,
+  );
+  const points = engine.hitTester.findPoints(
+    engine.sourceStores[0],
+    engine.scales,
+    pointSeries,
+    pixelX,
+    pixelY,
+    'nearest',
+    palette,
+    engine.lastPointerType,
+    engine.scatterPalettes(),
+    engine.dataVersion,
+    (si) =>
+      engine.scatterResolvers(
+        si,
+        engine.config.series[si],
+        palette[(engine.config.series[si]?.paletteIndex ?? si) % palette.length],
+      ).logicalResolver,
+    // The tooltip's readout, so a clicked point reads like its tooltip.
+    { ...tooltipFormatters(engine), readout: engine.readoutY },
+    (si) => engine.storeForSeries(si),
+  );
+  const bars = engine.config.series.filter(
+    (series) => series.visible !== false && series.type === 'bar',
+  );
+  for (const point of [...findBarTooltipPoints(engine), ...findHistogramTooltipPoints(engine)]) {
+    const series = engine.config.series[point.seriesIndex];
+    const store = engine.storeForSeries(point.seriesIndex);
+    const xScale = engine.scales.get(series.xAxis ?? 'x');
+    const yScale = engine.scales.get(series.yAxis ?? 'y');
+    if (!xScale || !yScale || !Number.isFinite(point.y)) continue;
+    const top = yScale.dataToPixel(point.y);
+    const base = yScale.dataToPixel(yScale.type === 'log' ? yScale.min : 0);
+    if (pixelY < Math.min(top, base) || pixelY > Math.max(top, base)) continue;
+    let left: number;
+    let right: number;
+    if (series.type === 'histogram' && point.xRange) {
+      left = xScale.dataToPixel(point.xRange.min);
+      right = xScale.dataToPixel(point.xRange.max);
+    } else {
+      const rect = barRectForCategory({
+        centerX: xScale.dataToPixel(point.x),
+        categoryWidth: categoryWidthFromData(
+          (index) => xScale.dataToPixel(store.xAt(index)),
+          point.dataIndex,
+          store.length,
+          engine.layout.plot.width * 0.5,
+        ),
+        series,
+        barSeriesIndex: bars.indexOf(series),
+        totalBarSeries: bars.length,
+      });
+      left = rect.left;
+      right = rect.left + rect.width;
+    }
+    if (pixelX >= Math.min(left, right) && pixelX <= Math.max(left, right)) points.unshift(point);
+  }
+  const point = points[0];
+  if (point) engine.emitEvent('point:click', point);
+}
+
+export function hasOnlyVisibleHistograms(engine: ChartCore): boolean {
+  if (engine.sourceStores.length > 1) return false;
+  let hasVisibleSeries = false;
+  for (const series of engine.config.series) {
+    if (series.visible === false) continue;
+    hasVisibleSeries = true;
+    if (series.type !== 'histogram') return false;
+  }
+  return hasVisibleSeries;
+}
+
+/** The histogram bin under `dataX` (only-histogram charts, which have one source). */
+export function resolveHistogramCursor(
+  engine: ChartCore,
+  dataX: number,
+): { dataIndex: number; dataX: number } | null {
+  const store = engine.sourceStores[0];
+  const dataIndex = histogramBinIndexForDataX(dataX, store);
+  if (dataIndex === null) return null;
+
+  const range = histogramBinRange(dataIndex, store);
+  if (!range) return null;
+  return {
+    dataIndex,
+    dataX: (range.min + range.max) / 2,
+  };
+}
+
+export function histogramBinIndexForDataX(dataX: number, store: DataStore): number | null {
+  if (store.length < 2) return null;
+
+  const firstEdge = store.xAt(0);
+  const lastEdge = store.xAt(store.length - 1);
+  if (dataX < firstEdge || dataX > lastEdge) return null;
+
+  let binIdx = store.upperBoundX(dataX);
+  if (binIdx === store.length - 1 && dataX === lastEdge) {
+    binIdx = store.length - 2;
+  }
+
+  if (binIdx < 0 || binIdx >= store.length - 1) return null;
+  return binIdx;
+}
+
+export function histogramBinRange(
+  dataIndex: number,
+  store: DataStore,
+): { min: number; max: number } | null {
+  if (dataIndex < 0 || dataIndex >= store.length - 1) return null;
+  return {
+    min: store.xAt(dataIndex),
+    max: store.xAt(dataIndex + 1),
+  };
 }

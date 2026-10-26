@@ -13,6 +13,13 @@ import {
 } from './spec';
 import { seriesYColumn, scatterXColumn } from './marks/scatterEncoding';
 import { applyProximityHighlight, clearProximityHighlight } from './highlight';
+import {
+  updateTooltipPoints,
+  hasOnlyVisibleHistograms,
+  resolveHistogramCursor,
+  histogramBinIndexForDataX,
+  histogramBinRange,
+} from './hit';
 
 export function setCursorDataX(
   engine: ChartCore,
@@ -36,8 +43,8 @@ export function setCursorDataX(
   const xScale = engine.scales.get('x');
   if (!xScale) return;
 
-  if (engine.hasOnlyVisibleHistograms()) {
-    const hit = engine.resolveHistogramCursor(dataX);
+  if (hasOnlyVisibleHistograms(engine)) {
+    const hit = resolveHistogramCursor(engine, dataX);
     engine.cursorDataX = hit?.dataX ?? dataX;
     engine.cursorDataIdx = hit?.dataIndex ?? null;
     engine.cursorX = xScale.dataToPixel(engine.cursorDataX);
@@ -82,7 +89,7 @@ export function setCursorDataX(
   // For synced cursors: show crosshair only, hide tooltip
   // unless syncTooltip is explicitly enabled
   if (engine.config.cursor?.syncTooltip) {
-    engine.updateTooltipPoints();
+    updateTooltipPoints(engine);
   } else {
     engine.tooltipPoints = [];
     engine.tooltipManager.hide();
@@ -110,9 +117,9 @@ export function updateLocalCursorFromPoint(
   const xScale = engine.scales.get('x');
   if (xScale && engine.isInPlotArea(x, y)) {
     const pointerDataX = xScale.pixelToData(x);
-    const hasOnlyHistograms = engine.hasOnlyVisibleHistograms();
+    const hasOnlyHistograms = hasOnlyVisibleHistograms(engine);
     if (hasOnlyHistograms) {
-      const hit = engine.resolveHistogramCursor(pointerDataX);
+      const hit = resolveHistogramCursor(engine, pointerDataX);
       engine.cursorDataX = hit?.dataX ?? pointerDataX;
       engine.cursorDataIdx = hit?.dataIndex ?? null;
       engine.cursorX = xScale.dataToPixel(engine.cursorDataX);
@@ -134,7 +141,7 @@ export function updateLocalCursorFromPoint(
       engine.cursorDataX = snappedX;
     }
 
-    engine.updateTooltipPoints();
+    updateTooltipPoints(engine);
     applyNearestScatterCursor(engine);
     applyProximityHighlight(engine);
   } else {
@@ -154,7 +161,7 @@ export function updateLocalCursorFromPoint(
 /** Re-run tooltip hit-test at current cursor position (called on data change) */
 export function refreshCursor(engine: ChartCore): void {
   if (engine.mouseX === null || engine.mouseY === null || !engine.cursorIsLocal) return;
-  engine.updateTooltipPoints();
+  updateTooltipPoints(engine);
   engine.scheduler.markDirty(DirtyFlag.OVERLAY);
 }
 
@@ -245,7 +252,7 @@ export function fillSnapshot(
 
   if (idx === null && length > 0) {
     if (fallback === 'latest') {
-      idx = engine.hasOnlyVisibleHistograms() && length > 1 ? length - 2 : length - 1;
+      idx = hasOnlyVisibleHistograms(engine) && length > 1 ? length - 2 : length - 1;
       source = 'latest';
     } else if (fallback === 'first') {
       idx = 0;
@@ -263,9 +270,7 @@ export function fillSnapshot(
     return target;
   }
 
-  const histogramRange = engine.hasOnlyVisibleHistograms()
-    ? engine.histogramBinRange(idx, store)
-    : null;
+  const histogramRange = hasOnlyVisibleHistograms(engine) ? histogramBinRange(idx, store) : null;
   const xVal = histogramRange ? (histogramRange.min + histogramRange.max) / 2 : store.xAt(idx);
   const xScale = engine.scales.get('x');
 
@@ -387,7 +392,7 @@ export function fillIndependentSnapshot(
         : source === 'first'
           ? 0
           : series.type === 'histogram'
-            ? engine.histogramBinIndexForDataX(targetX, store)
+            ? histogramBinIndexForDataX(targetX, store)
             : store.nearestXIndex(targetX);
     const xColumn = series.type === 'scatter' ? scatterXColumn(series) : 0;
     if (active && xColumn !== 0) {
@@ -402,7 +407,7 @@ export function fillIndependentSnapshot(
       }
     }
     if (dataIndex === null) continue;
-    const range = series.type === 'histogram' ? engine.histogramBinRange(dataIndex, store) : null;
+    const range = series.type === 'histogram' ? histogramBinRange(dataIndex, store) : null;
     const dataX = range ? (range.min + range.max) / 2 : store.valueAt(xColumn, dataIndex);
     const value = store.valueAt(column, dataIndex);
     const yScale = engine.scales.get(series.yAxis ?? 'y');
