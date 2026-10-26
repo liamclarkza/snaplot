@@ -115,7 +115,7 @@ describe('the built-in legend (plan D6)', () => {
     expect(records.map((record) => `${record.type} ${record.attributeName ?? ''}`)).toEqual([]);
   });
 
-  it.fails('[frameworks-11] a container hidden at mount stays hidden: the legend leaves its display alone', () => {
+  it('[frameworks-11] a container hidden at mount stays hidden: the legend leaves its display alone', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const style = document.createElement('style');
     style.textContent = '.legend-test-off { display: none; }';

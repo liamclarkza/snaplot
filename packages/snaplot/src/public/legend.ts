@@ -68,8 +68,12 @@ export function mountLegend<Row>(
     flex: plot.style.flex,
     minHeight: plot.style.minHeight,
   };
-  parent.style.display = 'flex';
-  parent.style.flexDirection = 'column';
+  // An inline display would show a container its page hides (a `hidden` attribute, or a class
+  // with display: none), so a hidden one keeps its own. M12b's legend reserves its own space.
+  if (!parent.hidden && getComputedStyle(parent).display !== 'none') {
+    parent.style.display = 'flex';
+    parent.style.flexDirection = 'column';
+  }
   plot.style.flex = '1';
   plot.style.minHeight = '0';
   if (placement.position === 'top') parent.insertBefore(root, plot);
