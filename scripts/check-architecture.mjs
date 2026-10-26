@@ -6,16 +6,27 @@
 //   node scripts/check-architecture.mjs [--strict] [--verbose] [--json]
 //
 // Each rule group has a mode. `warn` prints violations and exits 0; `error` exits 1 on any.
-// M13 switches P3 to error, M9b the size cap (lowered to 900), M14 everything (plan §11.3 G3).
-// --strict treats every rule as an error, for a local preview.
+// M13 switched P3 to error and M9b the size cap (lowered to 900); M14 switches everything
+// (plan §11.3 G3). --strict treats every rule as an error, for a local preview.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-const MODES = { P2: 'warn', P3: 'error', size: 'warn' };
-/** No source file is longer than this (plan §12 M9a: 1,200 lines; M9b brings it to 900). */
-const MAX_LINES = 1200;
+const MODES = { P2: 'warn', P3: 'error', size: 'error' };
+/** No source file is longer than this (plan §12 M9b: 900 lines; M9a's step was 1,200). */
+const MAX_LINES = 900;
+/**
+ * Files over the cap that M9b could not split: the integrator owns them from ovh-api-frozen (plan
+ * §3.2), so each is frozen at its length when the cap came in. One that grows is a violation, and
+ * one that shrinks below the cap should leave this list. M14 (or the integrator) splits them;
+ * docs/handoff/m9b.md, Requests for integrator.
+ */
+const FROZEN = {
+  'public/chart.ts': 1191,
+  'engine/spec.ts': 1152,
+  'public/ingest.ts': 1073,
+};
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = join(repo, 'packages/snaplot/src');
@@ -188,14 +199,16 @@ function p3Violations(file, source) {
 /** size: physical lines (newline-terminated, as `wc -l` and metrics.mjs count them). */
 function sizeViolations(file, text) {
   const lines = text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
-  if (lines <= MAX_LINES) return [];
+  const cap = Math.max(MAX_LINES, FROZEN[file] ?? 0);
+  if (lines <= cap) return [];
+  const frozen = FROZEN[file] ? ` (frozen at ${FROZEN[file].toLocaleString('en-US')})` : '';
   return [
     {
       group: 'size',
       rule: 'lines',
       file,
       line: lines,
-      text: `${lines.toLocaleString('en-US')} lines`,
+      text: `${lines.toLocaleString('en-US')} lines${frozen}`,
     },
   ];
 }
@@ -219,7 +232,11 @@ if (asJson) {
   const rules = [
     ...Object.entries(P2).map(([rule, { what }]) => ['P2', rule, what]),
     ['P3', 'imports', "adapter imports other than 'snaplot', peers and ../adapters/bind"],
-    ['size', 'lines', `source files over ${MAX_LINES.toLocaleString('en-US')} lines`],
+    [
+      'size',
+      'lines',
+      `source files over ${MAX_LINES.toLocaleString('en-US')} lines (${Object.keys(FROZEN).length} frozen at their length)`,
+    ],
   ];
   for (const [group, rule, what] of rules) {
     const hits = violations.filter((v) => v.group === group && v.rule === rule);
@@ -243,5 +260,5 @@ if (errors.length > 0) {
 }
 if (!asJson)
   console.log(
-    `check-architecture: ${violations.length} violation(s), all in warn mode (P2 errors from M14, size from M9b; P3 is in error mode since M13).`,
+    `check-architecture: ${violations.length} violation(s), all in warn mode (P2 errors from M14; P3 is in error mode since M13, size since M9b).`,
   );
