@@ -140,7 +140,7 @@ describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] a
   });
 
   it('[gap-annotations-extensibility-06] an in-place push then update({ referenceLines }) draws the new line', () => {
-    const lines = [{ axis: 'y', value: 45, label: 'Deploy A' }];
+    const lines = [{ axis: 'y', value: 42, label: 'Deploy A' }];
     const chart = fakes.mount<Row>({
       data: rows,
       x: 't',
@@ -148,7 +148,7 @@ describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] a
       referenceLines: lines,
     });
     fakes.frames.flush();
-    lines.push({ axis: 'y', value: 47, label: 'Deploy B' });
+    lines.push({ axis: 'y', value: 44, label: 'Deploy B' });
     chart.update({ referenceLines: lines });
     fakes.frames.flush();
     const drawn = fakes.canvas.all

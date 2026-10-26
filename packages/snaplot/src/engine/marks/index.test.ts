@@ -23,7 +23,8 @@ describe('the mark registry (plan §3.1)', () => {
     };
     expect(Object.fromEntries(TYPES.map((type) => [type, trait(type)]))).toEqual({
       line: ['continuous', false, false, 'decimate', 0],
-      area: ['continuous', false, false, 'decimate', 0],
+      // Areas fill to zero, so their domain includes it (visuals-02).
+      area: ['continuous', true, false, 'decimate', 0],
       band: ['continuous', false, false, 'none', 0],
       scatter: ['continuous', false, true, 'sample', 0],
       bar: ['slot', true, false, 'none', 1],

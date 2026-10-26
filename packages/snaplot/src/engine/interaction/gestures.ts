@@ -151,7 +151,9 @@ export class GestureManager {
   private inPlotArea(x: number, y: number): boolean {
     const { plot } = this.getLayout();
     return (
-      x > plot.left && x < plot.left + plot.width && y > plot.top && y < plot.top + plot.height
+      // Inclusive, like layout's isInPlotArea: a point on the plot's edge (a data extreme now that
+      // domains are not padded) is in the plot.
+      x >= plot.left && x <= plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height
     );
   }
 

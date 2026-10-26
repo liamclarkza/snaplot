@@ -56,7 +56,9 @@ function measureTextWidth(text: string, fontFamily: string, fontSize: number): n
  */
 export function inferPosition(key: string, explicit?: AxisPosition): AxisPosition {
   if (explicit) return explicit;
-  return key === 'x' || key.startsWith('x') ? 'bottom' : 'left';
+  if (key === 'x' || key.startsWith('x')) return 'bottom';
+  // The primary value axis is on the left; any other value axis defaults to the right.
+  return key === 'y' ? 'left' : 'right';
 }
 
 function horizontalFraction(scale: Scale, value: number): number {

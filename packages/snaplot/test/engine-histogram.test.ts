@@ -83,7 +83,7 @@ describe('engine histogram cursor', () => {
     expect(tooltipText()).toMatch(/x Recall/);
   });
 
-  it('keeps baseline padding when x zoom shows only positive histogram bins', () => {
+  it('keeps the zero baseline with nice off when x zoom shows only positive histogram bins', () => {
     const chart = fakes.engine(
       {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear', nice: false } },
@@ -95,7 +95,8 @@ describe('engine histogram cursor', () => {
     chart.setAxis('x', { min: 1.2, max: 2.8 });
 
     const yScale = chart.getAxis('y')!;
-    expect(yScale.min).toBeLessThan(0);
+    // One-signed counts never get an axis below zero (plan §5.1); nice off keeps the 5% top pad.
+    expect(yScale.min).toBe(0);
     expect(yScale.max).toBeGreaterThan(120);
   });
 
@@ -115,6 +116,7 @@ describe('engine histogram cursor', () => {
 
     const yScale = chart.getAxis('y')!;
     expect(yScale.min).toBe(0);
-    expect(yScale.max).toBeGreaterThan(120);
+    // Nice rounding is the padding: 120 is already a tick.
+    expect(yScale.max).toBeGreaterThanOrEqual(120);
   });
 });

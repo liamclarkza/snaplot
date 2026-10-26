@@ -149,7 +149,7 @@ export function renderAreaSegments(
 
 export const areaDraw: MarkDraw = {
   x: 'continuous',
-  zeroBased: false,
+  zeroBased: true,
   cloud: false,
   interaction: 'decimate',
   xColumn: () => 0,

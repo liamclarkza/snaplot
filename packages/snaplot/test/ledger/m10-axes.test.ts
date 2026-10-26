@@ -213,7 +213,7 @@ describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] nu
 });
 
 describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () => {
-  it.fails('[visuals-07] a bar maximum of 100 gives a 0–100 axis', () => {
+  it('[visuals-07] a bar maximum of 100 gives a 0–100 axis', () => {
     const chart = fakes.mount({
       data: [40, 70, 100].map((v, i) => ({ q: `Q${i + 1}`, v })),
       x: 'q',
@@ -222,7 +222,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
     expect(axis(chart, 'y')).toMatchObject({ min: 0, max: 100 });
   });
 
-  it.fails('[visuals-07] data ≥ 0 never gets a negative axis minimum', () => {
+  it('[visuals-07] data ≥ 0 never gets a negative axis minimum', () => {
     const chart = fakes.mount({
       data: [0, 12, 30, 50].map((v, t) => ({ t, v })),
       x: 't',
@@ -231,7 +231,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
     expect(axis(chart, 'y')?.min).toBeGreaterThanOrEqual(0);
   });
 
-  it.fails('[visuals-02:domain] an area domain includes 0', () => {
+  it('[visuals-02:domain] an area domain includes 0', () => {
     const chart = fakes.mount({
       data: [100, 104, 110].map((v, t) => ({ t, v })),
       x: 't',
@@ -240,7 +240,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
     expect(axis(chart, 'y')?.min).toBeLessThanOrEqual(0);
   });
 
-  it.fails('[visuals-08] numeric bars span first − ½ slot to last + ½ slot', () => {
+  it('[visuals-08] numeric bars span first − ½ slot to last + ½ slot', () => {
     const chart = fakes.mount({
       data: Array.from({ length: 24 }, (_, hour) => ({ hour, kwh: 1 + (hour % 5) })),
       x: 'hour',
@@ -249,7 +249,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
     expect(axis(chart, 'x')).toMatchObject({ min: -0.5, max: 23.5 });
   });
 
-  it.fails('[render-22] all-negative bars get no positive headroom', () => {
+  it('[render-22] all-negative bars get no positive headroom', () => {
     const chart = fakes.mount({
       data: [-10, -25, -45].map((v, i) => ({ q: `Q${i + 1}`, v })),
       x: 'q',
@@ -260,7 +260,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
 });
 
 describe('[backlog-10][visuals-21:def-01] layout', () => {
-  it.fails('[backlog-10] a second value axis defaults to the right', () => {
+  it('[backlog-10] a second value axis defaults to the right', () => {
     const chart = fakes.mount({
       data: [1, 2, 3].map((t) => ({ t, a: t * 100, b: t })),
       x: 't',

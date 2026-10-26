@@ -122,8 +122,9 @@ describe('engine auto-range and log interactions', () => {
     );
 
     const xScale = chart.getAxis('x')!;
-    expect(xScale.min).toBe(5);
-    expect(xScale.max).toBe(13);
+    // Half a slot either side of the bars, no wider (visuals-08).
+    expect(xScale.min).toBe(6);
+    expect(xScale.max).toBe(12);
   });
 
   it('pads horizontal log axes symmetrically in log space by default', () => {

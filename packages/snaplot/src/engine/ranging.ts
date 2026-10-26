@@ -190,24 +190,22 @@ export function autoRangeHorizontal(engine: ChartCore): void {
       const barPlan = canPlanBarTicks
         ? planBarXAxis(Array.from(barX), xMin, xMax, ac.tickCount ?? DEFAULT_TICK_COUNT)
         : null;
-      if (barPlan) {
-        scale.min = barPlan.domainMin;
-        scale.max = barPlan.domainMax;
-        engine.barXAxisPlans.set(key, barPlan);
-      } else {
-        const firstPad = categoryWidthFromData((idx) => barX[idx], 0, barX.length) * 0.5;
-        const lastPad =
-          categoryWidthFromData((idx) => barX[idx], barX.length - 1, barX.length) * 0.5;
-        scale.min = xMin - firstPad;
-        scale.max = xMax + lastPad;
-      }
+      // Numeric bars span the first slot's left edge to the last slot's right edge: the tick plan
+      // places ticks and grid cells, but never widens the domain into phantom slots (visuals-08).
+      if (barPlan) engine.barXAxisPlans.set(key, barPlan);
+      const firstPad = categoryWidthFromData((idx) => barX[idx], 0, barX.length) * 0.5;
+      const lastPad = categoryWidthFromData((idx) => barX[idx], barX.length - 1, barX.length) * 0.5;
+      scale.min = xMin - firstPad;
+      scale.max = xMax + lastPad;
     } else if (hasBarSeries && barX.length > 1) {
       const firstPad = categoryWidthFromData((idx) => barX[idx], 0, barX.length) * 0.5;
       const lastPad = categoryWidthFromData((idx) => barX[idx], barX.length - 1, barX.length) * 0.5;
       scale.min = xMin - firstPad;
       scale.max = xMax + lastPad;
     } else if (isScatterOnly) {
-      const pad = (xMax - xMin) * (ac.padding ?? AUTO_RANGE_PADDING);
+      // Nice rounding is the padding when it applies (plan §5.1); otherwise 5%.
+      const niced = shouldNiceAutoRange(scale, ac, false);
+      const pad = (xMax - xMin) * (ac.padding ?? (niced ? 0 : AUTO_RANGE_PADDING));
       scale.min = xMin - pad;
       scale.max = xMax + pad;
     } else {
@@ -223,6 +221,12 @@ export function autoRangeHorizontal(engine: ChartCore): void {
     // `nice: false` opts out.
     if (shouldNiceAutoRange(scale, ac, hasBarSeries)) {
       niceAutoRange(scale, ac.tickCount ?? DEFAULT_TICK_COUNT);
+    }
+
+    // One-signed X never gets an axis across zero (visuals-07).
+    if (scale.type === 'linear' && !hasBarSeries) {
+      if (ac.min === undefined && xMin >= 0 && scale.min < 0) scale.min = 0;
+      if (ac.max === undefined && xMax <= 0 && scale.max > 0) scale.max = 0;
     }
 
     // Nicening may expand either side, but an explicitly pinned side must
@@ -351,9 +355,10 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
       if (ac.min === undefined) scale.min = min;
       if (ac.max === undefined) scale.max = max;
     } else {
-      // Vertical auto-range defaults to 5% padding so line/area charts
-      // don't touch the plot edges; users can override per-axis.
-      const pad = (yMax - yMin) * (ac.padding ?? AUTO_RANGE_PADDING);
+      // One domain policy (plan §5.1): nice rounding is the padding. The 5% pad applies only when
+      // nice is off (or the axis sets its own padding), so a maximum of 100 reads 0–100.
+      const niced = shouldNiceAutoRange(scale, ac, false);
+      const pad = (yMax - yMin) * (ac.padding ?? (niced ? 0 : AUTO_RANGE_PADDING));
       const equalSpan = yMin === yMax ? (yMin === 0 ? 1 : Math.abs(yMin) * 0.1) : 0;
       if (ac.min === undefined) {
         const min = yMin - (equalSpan || pad);
@@ -367,8 +372,11 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
 
     if (shouldNiceAutoRange(scale, ac, false)) {
       niceAutoRange(scale, ac.tickCount ?? DEFAULT_TICK_COUNT);
-      // nice() can push min below 0, clamp back for bar/histogram baseline
-      if (hasBarOrHist && yMin >= 0 && scale.min < 0) scale.min = 0;
+    }
+    // One-signed data never gets an axis across zero (visuals-07, render-22).
+    if (scale.type !== 'log') {
+      if (ac.min === undefined && yMin >= 0 && scale.min < 0) scale.min = 0;
+      if (ac.max === undefined && yMax <= 0 && scale.max > 0) scale.max = 0;
     }
 
     // Preserve one-sided explicit domains after automatic nicening.

@@ -538,6 +538,8 @@ describe('[gap-scale-longevity-03:ingest] appends do no work they do not need', 
         x: 'x',
         series: [{ type: 'scatter', y: 'y', colorBy: 'k', tooltipFields: ['k'] }],
         streaming: { maxPoints: n },
+        // A fixed X window: the appends stay in view, so only the data layer has work to do.
+        axes: { x: { min: 0, max: n + 100 } },
       },
       { width: 800, height: 400 },
     );

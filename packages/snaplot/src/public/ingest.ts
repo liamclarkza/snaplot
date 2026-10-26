@@ -161,9 +161,15 @@ export function describeOptions<Row>(
 function baseAxes(n: NormalizedOptions<any>): Record<string, AxisSpec> {
   const axisSpecs: Record<string, AxisSpec> = {};
   for (const [key, axis] of Object.entries(n.axes)) axisSpecs[key] = { ...axis.spec };
+  // The first value axis the series use goes on the left; a second one defaults to the right
+  // (backlog-10, plan D38). An explicit position always wins.
+  const primary = n.series.some((s) => s.yAxis === 'y') ? 'y' : n.series[0]?.yAxis;
   for (const s of n.series) {
     if (s.xAxis !== 'x') axisSpecs[s.xAxis] = { position: 'bottom', ...axisSpecs[s.xAxis] };
-    if (s.yAxis !== 'y') axisSpecs[s.yAxis] = { position: 'left', ...axisSpecs[s.yAxis] };
+    if (s.yAxis !== 'y') {
+      const side = s.yAxis === primary ? 'left' : 'right';
+      axisSpecs[s.yAxis] = { position: side, ...axisSpecs[s.yAxis] };
+    }
   }
   return axisSpecs;
 }

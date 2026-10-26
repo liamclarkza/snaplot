@@ -38,10 +38,11 @@ describe('engine bar X-axis planning', () => {
     );
 
     const xScale = chart.getAxis('x')!;
-    expect(xScale.min).toBe(5);
-    expect(xScale.max).toBe(19);
-    expect(tickValues(chart)).toEqual([6, 8, 10, 12, 14, 16, 18]);
-    expect(bottomTickMarks(fakes, chart)).toEqual(pixels(chart, [5, 7, 9, 11, 13, 15, 17, 19]));
+    // The domain is the bars' own slots (visuals-08); the plan still picks the tick centres.
+    expect(xScale.min).toBe(6.5);
+    expect(xScale.max).toBe(18.5);
+    expect(tickValues(chart)).toEqual([7, 9, 11, 13, 15, 17]);
+    expect(bottomTickMarks(fakes, chart)).toEqual(pixels(chart, [7, 9, 11, 13, 15, 17]));
   });
 
   it('keeps small integer categories at every center with half-slot edges', () => {
@@ -89,9 +90,10 @@ describe('engine bar X-axis planning', () => {
     const xScale = chart.getAxis('x')!;
     // The final category's local slot is 99 units wide; whole 20-unit
     // intervals keep its half-slot edge inside the regular grid domain.
-    expect(xScale.min).toBe(-10);
-    expect(xScale.max).toBe(150);
-    expect(tickValues(chart)).toEqual([0, 20, 40, 60, 80, 100, 120, 140]);
+    expect(xScale.min).toBe(-0.5);
+    expect(xScale.max).toBe(149.5);
+    // Three irregular bars: a tick under each bar.
+    expect(tickValues(chart)).toEqual([0, 1, 100]);
   });
 
   it('keeps legacy bar bounds for nice:false, explicit ticks, and zoomed viewports', () => {
