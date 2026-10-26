@@ -5,7 +5,7 @@ export type ChromeSide = 'top' | 'bottom';
  * Creates and manages the 3-layer canvas stack + DOM overlay, and the space chrome reserves at
  * the top and bottom of the root (`reserveChrome`, a W5 contract: plan §3.2).
  *
- * Layer 0 (grid):    Gridlines, axis lines. alpha:false for perf.
+ * Layer 0 (grid):    Gridlines, axis lines. Alpha-capable: the plot is transparent (plan D5).
  * Layer 1 (data):    Series marks (lines, fills, points, bars).
  * Layer 2 (overlay): Crosshair, selection box. pointer-events:none.
  * DOM layer:         Axis labels, tick values, tooltip, legend.
@@ -60,7 +60,7 @@ export class CanvasManager {
     this.overlayCanvas = this.createCanvas(2);
 
     // Grid canvas is opaque (no transparency compositing needed)
-    this.gridCtx = this.gridCanvas.getContext('2d', { alpha: false })!;
+    this.gridCtx = this.gridCanvas.getContext('2d')!;
     this.dataCtx = this.dataCanvas.getContext('2d')!;
     this.overlayCtx = this.overlayCanvas.getContext('2d')!;
 

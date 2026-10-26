@@ -211,7 +211,6 @@ test.describe(`[demos-03] ${SLUG}`, () => {
   test("[visuals-03] a dark system scheme leaves the light page's charts light", async ({
     browser,
   }) => {
-    test.fail(true, '[visuals-03] M11: theme auto follows the system, not the page');
     expect(await darkSchemeInk(browser, SLUG)).toBeLessThan(0.5);
   });
 

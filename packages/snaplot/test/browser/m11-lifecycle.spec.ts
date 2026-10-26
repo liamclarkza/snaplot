@@ -288,22 +288,22 @@ test.describe('lifecycle', () => {
       () => (window as unknown as { printed?: Array<{ opaque: number; inked: number }> }).printed,
     );
 
-    // In the page: the grid layer is painted, not a cleared (black) bitmap,
-    // and the data layer still holds the line.
+    // In the page: the grid layer still holds its gridlines (it is transparent by default, plan
+    // D5, so "painted" means inked, not opaque), and the data layer still holds the line.
     expect(printed, 'afterprint fired').toBeDefined();
     const [grid, marks] = printed ?? [];
-    expect(grid.opaque).toBeGreaterThan(0.9);
+    expect(grid.inked).toBeGreaterThan(0.002);
     expect(marks.inked).toBeGreaterThan(0.002);
 
     // In the PDF: the chart's layers are bitmaps of the backing-store size;
     // the opaque grid layer is not black and some layer carries the line.
     const layers = images.filter((image) => image.width === 600 && image.height === 300);
     expect(layers.length, `PDF images: ${JSON.stringify(images)}`).toBeGreaterThanOrEqual(2);
-    const opaque = layers.filter((image) => image.opaque);
-    expect(opaque.length).toBeGreaterThanOrEqual(1);
-    for (const image of opaque) expect(image.black).toBeLessThanOrEqual(0.05);
-    const translucent = layers.filter((image) => !image.opaque);
-    expect(Math.max(0, ...translucent.map((image) => image.covered))).toBeGreaterThan(0.002);
+    // No opaque layer prints as a black box (a masked layer's RGB under alpha 0 is not shown),
+    // and some layer carries the line.
+    for (const image of layers.filter((layer) => layer.opaque))
+      expect(image.black).toBeLessThanOrEqual(0.05);
+    expect(Math.max(0, ...layers.map((image) => image.covered))).toBeGreaterThan(0.002);
   });
 
   test('[gap-environments-02:print-basics] printing hides the tooltip', async ({

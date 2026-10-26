@@ -41,8 +41,15 @@ export interface Layout {
 
 /** The colours and fonts a chart resolved from its theme and page. */
 export interface ThemeConfig {
-  /** The surface colour. */
+  /** The colour painted behind the plot: `'transparent'` (the default) paints nothing. */
   backgroundColor: string;
+  /**
+   * The page surface behind the chart, resolved from `backgroundColor`, the container's ancestors
+   * or the page's text colour. It picks light or dark roles and blends gridlines; it is not painted.
+   */
+  surfaceColor?: string;
+  /** Light or dark roles, when the theme names them; otherwise derived from `surfaceColor`. */
+  mode?: 'light' | 'dark';
   /** The strong text colour. */
   textColor: string;
   /** The axis label colour. */

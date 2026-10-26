@@ -278,7 +278,6 @@ test.describe('ramps and surfaces', () => {
   test('[render-15][visuals-03] a dark CSS surface gets the dark palette', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[render-15]');
     await page.evaluate(() => {
       const card = document.createElement('div');
       card.id = 'card';
@@ -304,7 +303,6 @@ test.describe('ramps and surfaces', () => {
   test('[visuals-03] a light page under a dark OS keeps a light chart', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[visuals-03]');
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.evaluate(() => {
       window.harness.mount({
@@ -322,7 +320,6 @@ test.describe('ramps and surfaces', () => {
   test('[visuals-04] the plot surface is transparent over a cream card', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[visuals-04]');
     await page.evaluate(() => {
       const card = document.createElement('div');
       card.id = 'cream';
@@ -361,7 +358,6 @@ test.describe('ramps and surfaces', () => {
   test('[render-04] a transparent theme background shows the page', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[render-04]');
     await page.evaluate(() => {
       const card = document.createElement('div');
       card.id = 'blue';

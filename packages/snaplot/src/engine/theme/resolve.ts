@@ -331,7 +331,9 @@ function normalizeTheme(
   // Unparseable backgrounds fall back to light role palettes (the historical
   // default); a dark named/rgb/hex background now correctly selects the dark
   // sequential/diverging/heatmap ramps.
-  const dark = isDarkColor(theme.backgroundColor, false);
+  const dark = theme.mode
+    ? theme.mode === 'dark'
+    : isDarkColor(theme.surfaceColor ?? theme.backgroundColor, false);
   const defaultCategorical = dark ? PALETTE_CATEGORICAL_DARK : PALETTE_CATEGORICAL_LIGHT;
   const defaultSequential = dark ? PALETTE_SEQUENTIAL_DARK : PALETTE_SEQUENTIAL_LIGHT;
   const defaultDiverging = dark ? PALETTE_DIVERGING_DARK : PALETTE_DIVERGING_LIGHT;
@@ -396,26 +398,39 @@ export function resolveTheme(
     }
   }
 
-  // Check prefers-color-scheme
-  const baseTheme =
-    typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches
-      ? DARK_THEME
-      : DEFAULT_THEME;
-
-  const merged = deepMerge(
-    baseTheme as unknown as Record<string, unknown>,
-    cssOverrides as unknown as Record<string, unknown>,
-    (userTheme ?? {}) as unknown as Record<string, unknown>,
-  ) as unknown as ThemeConfig;
-
-  if (merged.backgroundColor === 'container') {
-    merged.backgroundColor = findContainerSurface(container, baseTheme.backgroundColor);
-  }
-
+  // The theme follows the page, not the OS (plan D4): an explicit surface (tokens or the
+  // --chart-bg variable) wins, then the first opaque ancestor background, then the luminance of
+  // the page's text colour, then white. Only an explicit surface is painted (plan D5).
   const { resolve, dispose } = createCssColorResolver(container);
   try {
+    const explicit = userTheme?.backgroundColor ?? cssOverrides.backgroundColor;
+    const page =
+      explicit === undefined || explicit === 'container' || explicit === 'transparent'
+        ? findPageSurface(container)
+        : undefined;
+    const surface =
+      explicit === undefined || explicit === 'container' || explicit === 'transparent'
+        ? page!
+        : resolve(explicit, false);
+    const mode = userTheme?.mode ?? (isDarkColor(surface, false) ? 'dark' : 'light');
+    const baseTheme = mode === 'dark' ? DARK_THEME : DEFAULT_THEME;
+
+    const merged = deepMerge(
+      baseTheme as unknown as Record<string, unknown>,
+      cssOverrides as unknown as Record<string, unknown>,
+      (userTheme ?? {}) as unknown as Record<string, unknown>,
+    ) as unknown as ThemeConfig;
+    merged.mode = mode;
+    merged.surfaceColor = surface;
+    merged.backgroundColor =
+      explicit === undefined || explicit === 'transparent'
+        ? 'transparent'
+        : explicit === 'container'
+          ? surface
+          : explicit;
+
     // Scalars resolve before normalization so the light/dark detection that
-    // picks the default role palettes sees a parseable background; palettes
+    // picks the default role palettes sees a parseable surface; palettes
     // resolve after it, because normalization chooses between the user's raw
     // arrays and the merged theme's, and the winners are what need concrete
     // values.
@@ -426,6 +441,16 @@ export function resolveTheme(
   } finally {
     dispose();
   }
+}
+
+/** The page surface behind `container`: an opaque ancestor background, else from the text colour. */
+function findPageSurface(container: HTMLElement): string {
+  const found = findContainerSurface(container, '');
+  if (found) return found;
+  if (typeof getComputedStyle === 'undefined') return '#ffffff';
+  // No opaque ancestor (a transparent page over the canvas default): light text means a dark page.
+  const text = getComputedStyle(container).color?.trim() ?? '';
+  return text && !isDarkColor(text, true) ? '#111113' : '#ffffff';
 }
 
 function findContainerSurface(container: HTMLElement, fallback: string): string {

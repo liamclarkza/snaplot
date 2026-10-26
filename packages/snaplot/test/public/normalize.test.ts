@@ -498,7 +498,10 @@ describe('§4.4 option leaves reach the engine', () => {
   it("[arch-15] theme: 'dark' resolves the dark roles on a light page", () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], theme: 'dark' });
     const light = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], theme: 'light' });
-    expect(debug(chart).theme.backgroundColor).not.toBe(debug(light).theme.backgroundColor);
+    // 'dark' picks the dark roles; neither paints a panel (plan D5).
+    expect(debug(chart).theme.mode).toBe('dark');
+    expect(debug(light).theme.mode).toBe('light');
+    expect(debug(chart).theme.backgroundColor).toBe('transparent');
     expect(debug(chart).theme.textColor).not.toBe(debug(light).theme.textColor);
   });
 

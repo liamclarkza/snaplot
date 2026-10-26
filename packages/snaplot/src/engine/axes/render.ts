@@ -55,9 +55,12 @@ export function renderAxes(
     opacity: number;
   }> = [];
 
-  // Fill background on grid canvas (opaque, alpha:false)
-  ctx.fillStyle = theme.backgroundColor;
-  ctx.fillRect(0, 0, layout.width, layout.height);
+  // The plot is transparent by default (plan D5; the engine clears the layer first); an explicit
+  // surface paints a panel.
+  if (theme.backgroundColor !== 'transparent') {
+    ctx.fillStyle = theme.backgroundColor;
+    ctx.fillRect(0, 0, layout.width, layout.height);
+  }
 
   // Square plot corners keep endpoint ticks connected to the frame.
   ctx.save();
@@ -154,7 +157,11 @@ export function renderAxes(
     const shouldDrawGrid = !gridDrawn.has(pos);
     if (shouldDrawGrid) gridDrawn.add(pos);
     if (shouldDrawGrid && grid !== null) {
-      ctx.strokeStyle = opaqueColorOnBackground(grid.color, grid.opacity, theme.backgroundColor);
+      ctx.strokeStyle = opaqueColorOnBackground(
+        grid.color,
+        grid.opacity,
+        theme.surfaceColor ?? theme.backgroundColor,
+      );
       // Solid hairlines stay stable while panning; explicit dashes remain supported.
       ctx.globalAlpha = 1;
       ctx.lineWidth = 1;
@@ -304,7 +311,11 @@ export function renderAxes(
   ctx.globalAlpha = 1;
   for (const marks of tickMarks) {
     if (marks.length <= 0 || marks.pixels.length === 0) continue;
-    ctx.strokeStyle = opaqueColorOnBackground(marks.color, marks.opacity, theme.backgroundColor);
+    ctx.strokeStyle = opaqueColorOnBackground(
+      marks.color,
+      marks.opacity,
+      theme.surfaceColor ?? theme.backgroundColor,
+    );
     ctx.globalAlpha = 1;
     ctx.beginPath();
     for (const pixel of marks.pixels) {
@@ -349,7 +360,7 @@ export function renderAxes(
   ctx.strokeStyle = opaqueColorOnBackground(
     theme.borderColor ?? theme.axisLineColor,
     theme.borderOpacity ?? theme.gridOpacity,
-    theme.backgroundColor,
+    theme.surfaceColor ?? theme.backgroundColor,
   );
   ctx.lineWidth = 1;
   ctx.globalAlpha = 1;

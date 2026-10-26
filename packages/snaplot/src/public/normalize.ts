@@ -613,8 +613,8 @@ function normalizeInteraction(
 
 function normalizeTheme(value: unknown): Partial<ThemeConfig> | undefined {
   if (value === 'auto') return undefined;
-  if (value === 'light') return { ...DEFAULT_THEME };
-  if (value === 'dark') return { ...DARK_THEME };
+  if (value === 'light') return { mode: 'light' };
+  if (value === 'dark') return { mode: 'dark' };
   if (typeof value === 'string') {
     warnValue('theme', value, ['auto', 'light', 'dark'], "'auto'");
     return undefined;
@@ -639,6 +639,9 @@ function normalizeTheme(value: unknown): Partial<ThemeConfig> | undefined {
     ...(tokens.sequential ? { sequential: [...(tokens.sequential as string[])] } : {}),
     ...(tokens.diverging ? { diverging: [...(tokens.diverging as string[])] } : {}),
   });
+  // Only an explicit surface is painted; mode picks the roles (plan D5).
+  if (tokens.surface === undefined) delete fromTokens.backgroundColor;
+  if (mode) fromTokens.mode = mode;
   return fromTokens;
 }
 

@@ -303,7 +303,7 @@ export function drawPointIndicators(engine: ChartCore, ctx: CanvasRenderingConte
   // On dark themes it reads as a subtle glow; on light themes it separates
   // the vibrant fill from the white canvas. Alpha varies by luminance so
   // the ring is visible but never harsh.
-  const bg = engine.theme.backgroundColor;
+  const bg = engine.theme.surfaceColor ?? engine.theme.backgroundColor;
   // Default unparseable backgrounds to dark, matching the previous behavior
   // of this ring's luminance check. isDarkColor correctly handles 3-digit
   // hex and named colors, which the old hand-rolled parser did not.
