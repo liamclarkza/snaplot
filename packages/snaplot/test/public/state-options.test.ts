@@ -5,7 +5,7 @@
 // option never emits; gestures, resets, group sync and data changes do.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { debug, type Fakes, installFakes } from '../fakes';
-import { doubleClick, type FinalHandle, mount, range, wheelZoom } from './contract';
+import { at, doubleClick, type FinalHandle, input, mount, range, wheelZoom } from './contract';
 
 let fakes: Fakes;
 beforeEach(() => {
@@ -282,5 +282,121 @@ describe('hiddenSeries and highlight', () => {
     expect(() => chart.update({ highlight: 'nope' })).toThrow(/"nope"/);
     expect(() => chart.update({ hiddenSeries: ['nope'] })).toThrow(/"nope"/);
     expect(chart.getState()).toMatchObject({ hiddenSeries: [] });
+  });
+});
+
+/**
+ * A state option given to createChart is applied silently, even when applying it changes
+ * nothing (`viewport: {}` on a fresh chart, the default `hiddenSeries`, `selection: null`).
+ * The first gesture after it is the user's, so it reports once, through on() and through its
+ * on<Key>Change option (plan D3, §4.1 example 5: a viewport read from a URL that holds none).
+ */
+describe('[research-14][frameworks-04] a state option given at creation does not swallow the first gesture', () => {
+  const legendButtons = (chart: FinalHandle<Row>) => [
+    ...chart.container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]'),
+  ];
+
+  /** A brush from one data point to another, through the input layer. */
+  function brush(chart: FinalHandle<Row>, from: [number, number], to: [number, number]): void {
+    const target = input(chart);
+    const point = (x: number, y: number) => ({
+      ...at(chart, x, y),
+      bubbles: true,
+      cancelable: true,
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 0,
+    });
+    target.dispatchEvent(new PointerEvent('pointerdown', point(...from)));
+    target.dispatchEvent(new PointerEvent('pointermove', point(...to)));
+    target.dispatchEvent(new PointerEvent('pointerup', point(...to)));
+  }
+
+  /** The viewport:change events and onViewportChange calls of the first zoom after mount. */
+  function firstZoom(viewport: Record<string, unknown>) {
+    const onViewportChange = vi.fn();
+    const chart = mount<Row>(fakes, { ...base, viewport, onViewportChange });
+    fakes.frames.flush();
+    const seen = events(chart);
+    wheelZoom(chart, 50, 24);
+    const reported = chart.getState().viewport;
+    expect(reported.x).toBeDefined();
+    expect(seen.filter(([event]) => event === 'viewport:change')).toEqual([
+      ['viewport:change', reported],
+    ]);
+    expect(onViewportChange.mock.calls).toEqual([[reported]]);
+  }
+
+  /** The first legend click (on the second series) after mount with a hiddenSeries option. */
+  function firstToggle(hiddenSeries: string[], expected: string[]) {
+    const onHiddenSeriesChange = vi.fn();
+    const chart = mount<Row>(fakes, { ...base, legend: true, hiddenSeries, onHiddenSeriesChange });
+    const seen = events(chart);
+    legendButtons(chart)[1].click();
+    expect(chart.getState().hiddenSeries).toEqual(expected);
+    expect(seen).toEqual([['hiddenSeries:change', expected]]);
+    expect(onHiddenSeriesChange.mock.calls).toEqual([[expected]]);
+  }
+
+  it.fails('[research-14][frameworks-04] the first zoom after viewport: {} emits viewport:change once', () => {
+    firstZoom({});
+  });
+
+  it('[research-14][frameworks-04] the first zoom after a viewport that moves the view emits viewport:change once', () => {
+    firstZoom({ x: [10, 90] });
+  });
+
+  it.fails('[research-14][frameworks-04] the first legend click after hiddenSeries: [] emits hiddenSeries:change once', () => {
+    firstToggle([], ['w']);
+  });
+
+  it.fails("[research-14][frameworks-04] the first legend click after hiddenSeries: ['w'] emits hiddenSeries:change once", () => {
+    firstToggle(['w'], []);
+  });
+
+  it('[research-14][frameworks-04] the first brush after selection: null emits selection:change once', () => {
+    const onSelectionChange = vi.fn();
+    const chart = mount<Row>(fakes, {
+      ...base,
+      interaction: { drag: 'select' },
+      selection: null,
+      onSelectionChange,
+    });
+    fakes.frames.flush();
+    const seen = events(chart);
+    brush(chart, [30, 24], [60, 24]);
+    const selection = chart.getState().selection;
+    expect(selection).not.toBeNull();
+    expect(seen.filter(([event]) => event === 'selection:change')).toEqual([
+      ['selection:change', selection],
+    ]);
+    expect(onSelectionChange.mock.calls).toEqual([[selection]]);
+  });
+
+  it.fails('[research-14][frameworks-04] the first legend hover after highlight: null emits highlight:change once', () => {
+    const onHighlightChange = vi.fn();
+    const chart = mount<Row>(fakes, {
+      ...base,
+      legend: true,
+      highlight: null,
+      onHighlightChange,
+    });
+    const seen = events(chart);
+    legendButtons(chart)[0].dispatchEvent(new MouseEvent('mouseenter'));
+    expect(chart.getState().highlight).toBe('v');
+    expect(seen).toEqual([['highlight:change', 'v']]);
+    expect(onHighlightChange.mock.calls).toEqual([['v']]);
+  });
+
+  it('[research-14] the first zoom after viewport: {} bumps the revision and wakes subscribers', () => {
+    const chart = mount<Row>(fakes, { ...base, viewport: {} });
+    fakes.frames.flush();
+    const subscriber = vi.fn();
+    chart.subscribe(subscriber);
+    const revision = chart.getState().revision;
+    wheelZoom(chart, 50, 24);
+    fakes.frames.flush();
+    expect(chart.getState().revision).toBeGreaterThan(revision);
+    expect(subscriber).toHaveBeenCalledTimes(1);
   });
 });
