@@ -40,6 +40,22 @@ function events<Row>(chart: FinalHandle<Row>) {
   return seen;
 }
 
+/** A brush from one data point to another, through the input layer. */
+function brushAcross(chart: FinalHandle<Row>, from: [number, number], to: [number, number]): void {
+  const target = input(chart);
+  const point = (x: number, y: number) => ({
+    ...at(chart, x, y),
+    bubbles: true,
+    cancelable: true,
+    pointerId: 1,
+    pointerType: 'mouse',
+    button: 0,
+  });
+  target.dispatchEvent(new PointerEvent('pointerdown', point(...from)));
+  target.dispatchEvent(new PointerEvent('pointermove', point(...to)));
+  target.dispatchEvent(new PointerEvent('pointerup', point(...to)));
+}
+
 describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
   it('[frameworks-04] update({ viewport: {} }) resets a chart created with {}', () => {
     const chart = mount<Row>(fakes, { ...base, viewport: {} });
@@ -239,6 +255,19 @@ describe('[dataapi-16][backlog-02] selection', () => {
     expect(chart.getState().selection).toBeNull();
     expect(seen).toEqual([['selection:change', null]]);
   });
+
+  // M12a's (plan §4.4: the payload is { x, y?, points }); conformance scenario #9 (M13) waits
+  // on it.
+  it.fails('[gap-annotations-extensibility-14] a brush reports the points it covers in selection:change', () => {
+    const chart = mount<Row>(fakes, brush);
+    fakes.frames.flush();
+    const seen: Array<{ points?: unknown[] } | null> = [];
+    chart.on('selection:change', (selection) => seen.push(selection as never));
+    brushAcross(chart, [30, 24], [60, 24]);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toHaveProperty('points');
+    expect(seen[0]?.points?.length ?? 0).toBeGreaterThan(0);
+  });
 });
 
 describe('hiddenSeries and highlight', () => {
@@ -296,22 +325,6 @@ describe('[research-14][frameworks-04] a state option given at creation does not
     ...chart.container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]'),
   ];
 
-  /** A brush from one data point to another, through the input layer. */
-  function brush(chart: FinalHandle<Row>, from: [number, number], to: [number, number]): void {
-    const target = input(chart);
-    const point = (x: number, y: number) => ({
-      ...at(chart, x, y),
-      bubbles: true,
-      cancelable: true,
-      pointerId: 1,
-      pointerType: 'mouse',
-      button: 0,
-    });
-    target.dispatchEvent(new PointerEvent('pointerdown', point(...from)));
-    target.dispatchEvent(new PointerEvent('pointermove', point(...to)));
-    target.dispatchEvent(new PointerEvent('pointerup', point(...to)));
-  }
-
   /** The viewport:change events and onViewportChange calls of the first zoom after mount. */
   function firstZoom(viewport: Record<string, unknown>) {
     const onViewportChange = vi.fn();
@@ -364,7 +377,7 @@ describe('[research-14][frameworks-04] a state option given at creation does not
     });
     fakes.frames.flush();
     const seen = events(chart);
-    brush(chart, [30, 24], [60, 24]);
+    brushAcross(chart, [30, 24], [60, 24]);
     const selection = chart.getState().selection;
     expect(selection).not.toBeNull();
     expect(seen.filter(([event]) => event === 'selection:change')).toEqual([

@@ -158,6 +158,30 @@ describe('the built-in legend (plan D6)', () => {
   });
 });
 
+/**
+ * Where the interim legend differs from plan §5.6, for M12b's legend to flip: it sits in space
+ * reserved through the layout, left-aligned, whatever the container's height, and it never
+ * restyles the container (which overrides a `hidden` attribute or a class's display: none).
+ */
+describe('[research-13] the final default legend (M12b, plan §5.6)', () => {
+  it.fails("[research-13] the default legend leaves the container's inline style alone", () => {
+    const chart = mount<Row>(fakes, two);
+    expect(buttons(chart)).toHaveLength(2);
+    expect(chart.container.style.display).toBe('');
+    expect(chart.container.style.flexDirection).toBe('');
+  });
+
+  it.fails('[research-13] the default legend is left-aligned', () => {
+    const chart = mount<Row>(fakes, two);
+    const legend = buttons(chart)[0].parentElement!;
+    expect(getComputedStyle(legend).justifyContent).not.toBe('center');
+  });
+
+  it.fails("[research-13] 'auto' shows the legend for two series in a container under 160 px tall", () => {
+    expect(names(mount<Row>(fakes, two, { height: 120 }))).toEqual(['CPU', 'Memory']);
+  });
+});
+
 describe('[frameworks-11][frameworks-01] createLegendTable (plan D27)', () => {
   it('[frameworks-11] the default columns are swatch, name and value, keyed by series id', () => {
     const chart = mount<Row>(fakes, { ...two, legend: false });
