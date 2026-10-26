@@ -78,7 +78,9 @@ what to use instead, and the chart keeps its default:
   frame after the gesture draws every point.
 - Rows, their original indices and row ids are retained beside the drawn data (bounded by
   `streaming.maxPoints`): appended rows survive `update()` calls that change accessors, fields or
-  styles, and every point keeps its row and index.
+  styles, and every point keeps its row and index. Data longer than `maxPoints` keeps its last
+  `maxPoints` rows (after sorting), as the drawn data does: their rows, indices and ids are the
+  chart's, and the ids and category labels of the rows before them are not.
 - `appendData()` checks before it changes anything: rows and `{ columns }` cannot be mixed in one
   source; an X before the last one, or of another kind than the axis holds (a number on a
   category axis, a Date on a numeric one), throws; row ids must stay unique, may return once their

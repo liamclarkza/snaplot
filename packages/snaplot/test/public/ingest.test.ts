@@ -648,7 +648,7 @@ describe('[dataapi-03] data longer than streaming.maxPoints keeps its last maxPo
   const v = Float64Array.from(rows, (row) => row.v);
   const ids = rows.map((row) => row.id);
 
-  it.fails("[dataapi-03] data longer than streaming.maxPoints reports each point's own row, rowIndex and rowId", () => {
+  it("[dataapi-03] data longer than streaming.maxPoints reports each point's own row, rowIndex and rowId", () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -689,7 +689,7 @@ describe('[dataapi-03] data longer than streaming.maxPoints keeps its last maxPo
     expect(latest(scatter)).toMatchObject({ x: 3, rowIndex: 4, rowId: 's3' });
   });
 
-  it.fails('[dataapi-03] data longer than streaming.maxPoints maps { columns, rowIds } and an id column to the kept rows', () => {
+  it('[dataapi-03] data longer than streaming.maxPoints maps { columns, rowIds } and an id column to the kept rows', () => {
     const chart = mount({
       data: { columns: { t, v }, rowIds: ids },
       x: 't',
@@ -718,7 +718,7 @@ describe('[dataapi-03] data longer than streaming.maxPoints keeps its last maxPo
     expect(first(keyed)).toMatchObject({ x: 7, rowIndex: 7, rowId: 107 });
   });
 
-  it.fails('[dataapi-03] data longer than streaming.maxPoints gives a bar colour function each kept row and its index', () => {
+  it('[dataapi-03] data longer than streaming.maxPoints gives a bar colour function each kept row and its index', () => {
     const seen = new Set<string>();
     const color = (value: number, row: { t: number } | undefined, index: number) => {
       seen.add(`${value}:${row?.t}:${index}`);
@@ -734,7 +734,7 @@ describe('[dataapi-03] data longer than streaming.maxPoints keeps its last maxPo
     expect([...seen].sort()).toEqual(['70:7:7', '80:8:8', '90:9:9']);
   });
 
-  it.fails('[dataapi-03] update({ data }) and update({ streaming }) keep the rows the window keeps', () => {
+  it('[dataapi-03] update({ data }) and update({ streaming }) keep the rows the window keeps', () => {
     const replaced = mount({
       data: [],
       x: 't',
@@ -765,7 +765,7 @@ describe('[dataapi-03] data longer than streaming.maxPoints keeps its last maxPo
     expect(latest(streamed)).toMatchObject({ x: 10, rowIndex: 10, rowId: 'r7' });
   });
 
-  it.fails('[dataapi-03] an id whose row is outside the initial window may be appended', () => {
+  it('[dataapi-03] an id whose row is outside the initial window may be appended', () => {
     const chart = mount({
       data: rows,
       x: 't',
@@ -802,7 +802,7 @@ describe('[dataapi-03] data longer than streaming.maxPoints keeps its last maxPo
     expect(latest(typed)).toMatchObject({ x: 10, rowIndex: 10, rowId: 'r0' });
   });
 
-  it.fails('[gap-scale-longevity-03:ingest] categories of rows outside the initial window leave the registry', () => {
+  it('[gap-scale-longevity-03:ingest] categories of rows outside the initial window leave the registry', () => {
     const labels = Array.from({ length: 10 }, (_, i) => ({ c: `L${i}`, v: i }));
     const chart = mount({
       data: labels,

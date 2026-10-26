@@ -12,7 +12,10 @@
  *   can search; otherwise column 0 is the row index.
  * - Rows, original indices and row ids are retained beside the engine's
  *   columns, bounded by `streaming.maxPoints`, so an accessor change
- *   re-reads retained rows and appended rows survive updates.
+ *   re-reads retained rows and appended rows survive updates. Data longer
+ *   than `maxPoints` keeps its last `maxPoints` rows in storage order, as
+ *   the engine's ring does: every row's X is checked, and the ids, values
+ *   and categories are the window's.
  * - String X builds a category registry per axis, and labels leave it with
  *   their last row. An axis whose streamed data is read again from what the
  *   chart retains keeps its codes; replaced data builds them from 0.
@@ -242,7 +245,7 @@ function ingestSource<Row>(
     const state = ingestColumns(plan, input, path, n, ctx, kinds, forceUnsorted);
     if (forceUnsorted && !plan.ordered) state.unsorted = true;
     if (retained) {
-      state.evicted = retained.evicted;
+      state.evicted += retained.evicted;
       state.nextIndex = retained.nextIndex;
       state.streamed = true;
     }
@@ -265,7 +268,7 @@ function ingestSource<Row>(
   );
   if (forceUnsorted && !plan.ordered) state.unsorted = true;
   if (retained) {
-    state.evicted = retained.evicted;
+    state.evicted += retained.evicted;
     state.nextIndex = retained.nextIndex;
     state.streamed = true;
   }
@@ -406,21 +409,24 @@ function ingestColumns<Row>(
     fail(`${path}: rowIds has ${input.rowIds.length} ids for ${count} rows.`);
 
   const sortedX = sorted && !forceUnsorted;
+  // The ring keeps the last maxPoints rows: views of them, so the ids and indices match.
+  const drop = windowStart(n, count);
+  const view = (column: Float64Array) => (drop ? column.subarray(drop) : column);
   const columns: Float64Array[] = [];
   const fields: ColumnField[] = [];
   if (sortedX) {
-    columns.push(x);
+    columns.push(view(x));
     fields.push({ kind: 'x' });
   } else {
-    columns.push(indexColumn(count));
+    columns.push(indexColumn(count - drop));
     fields.push({ kind: 'index' });
-    columns.push(x);
+    columns.push(view(x));
     fields.push({ kind: 'x' });
   }
   // Every named column, zero-copy and in name order, so a later series can read any of them.
   for (const key of names) {
     if (key === plan.x) continue;
-    columns.push(named[key]);
+    columns.push(view(named[key]));
     fields.push({ kind: 'field', name: key });
   }
   const state: SourceState<Row> = {
@@ -435,12 +441,12 @@ function ingestColumns<Row>(
     columns: columns as unknown as ColumnarData,
     fields,
     head: 0,
-    evicted: 0,
+    evicted: drop,
     nextIndex: count,
     streamed: false,
   };
   if (input.rowIds) {
-    state.rowIds = [...input.rowIds];
+    state.rowIds = input.rowIds.slice(drop);
     for (const id of state.rowIds)
       if (!isRowId(id))
         fail(`${path}: rowIds hold ${describe(id)}; row ids must be strings or finite numbers.`);
@@ -453,7 +459,7 @@ function ingestColumns<Row>(
       const column = named[field];
       if (!(column instanceof Float64Array))
         fail(`${path}: the data has no column "${field}" for rowId.`);
-      state.rowIds = Array.from(column);
+      state.rowIds = Array.from(view(column));
       state.rowIdColumn = field;
       finishRowIds(state, path);
     }
@@ -562,13 +568,16 @@ function ingestRows<Row>(
     order.sort((a, b) => x[a] - x[b] || a - b);
     sorted = true;
   }
-  const storedRows = order ? order.map((i) => rows[i]) : rows.slice();
-  const index = order
-    ? order.map(original)
+  // The ring keeps the last maxPoints rows in storage order, and so do the rows, indices and ids.
+  const drop = windowStart(n, count);
+  const kept = order?.slice(drop);
+  const storedRows = kept ? kept.map((i) => rows[i]) : rows.slice(drop);
+  const index = kept
+    ? kept.map(original)
     : retainedIndex
-      ? retainedIndex.slice()
-      : Array.from({ length: count }, (_, i) => i);
-  const storedX = order ? Float64Array.from(order, (i) => x[i]) : x;
+      ? retainedIndex.slice(drop)
+      : Array.from({ length: count - drop }, (_, i) => drop + i);
+  const storedX = kept ? Float64Array.from(kept, (i) => x[i]) : drop ? x.slice(drop) : x;
   const sortedX = plan.ordered || (sorted && !forceUnsorted);
   const columns: Float64Array[] = [];
   const fields: ColumnField[] = [];
@@ -576,7 +585,7 @@ function ingestRows<Row>(
     columns.push(storedX);
     fields.push({ kind: 'x' });
   } else {
-    columns.push(indexColumn(count));
+    columns.push(indexColumn(storedX.length));
     fields.push({ kind: 'index' });
     columns.push(storedX);
     fields.push({ kind: 'x' });
@@ -595,10 +604,15 @@ function ingestRows<Row>(
     rows: storedRows,
     index,
     head: 0,
-    evicted: 0,
+    evicted: drop,
     nextIndex: count,
     streamed: false,
   };
+}
+
+/** How many rows of `count` come before the last `streaming.maxPoints`, which the ring keeps. */
+function windowStart(n: NormalizedOptions<any>, count: number): number {
+  return Math.max(0, count - (n.engine.streaming?.maxPoints ?? count));
 }
 
 function rowKeys(rows: readonly unknown[]): string[] {
