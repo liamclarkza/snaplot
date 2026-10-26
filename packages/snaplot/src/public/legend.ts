@@ -4,7 +4,7 @@
  * stylesheet, injected once per document. M12b replaces the internals behind the same options.
  */
 import css from '../styles/legendTable.css?inline';
-import { fail } from '../engine/errors';
+import { fail, hint } from '../engine/errors';
 import { type Companion, companions } from './companion';
 import type { ChartHandle, ChartPoint, SeriesState } from './types';
 
@@ -211,6 +211,16 @@ function checkColumns(columns: unknown): void {
   });
 }
 
+const FALLBACKS = ['latest', 'first', 'hide'];
+
+function checkFallback(fallback: unknown): void {
+  if (fallback === undefined || FALLBACKS.includes(fallback as string)) return;
+  const given = typeof fallback === 'string' ? `"${fallback}"` : String(fallback);
+  fail(
+    `createLegendTable() fallback ${given} is not valid. Use 'latest', 'first' or 'hide'.${typeof fallback === 'string' ? hint(fallback, FALLBACKS) : ''}`,
+  );
+}
+
 const HEADERS = { swatch: '', name: 'Series', value: 'Value' } as const;
 
 function align(column: LegendTableColumn<any>): string {
@@ -236,6 +246,7 @@ export function createLegendTable<Row = Record<string, any>>(
 ): LegendTableHandle<Row> {
   if (!element || typeof element !== 'object' || element.nodeType !== 1)
     fail('createLegendTable() needs an element to render into.');
+  checkFallback(options.fallback);
   let current: Required<LegendTableOptions<Row>> = {
     chart: options.chart,
     columns: options.columns ?? DEFAULT_COLUMNS,
@@ -362,6 +373,7 @@ export function createLegendTable<Row = Record<string, any>>(
       const chart = next.chart ?? current.chart;
       const columns = next.columns ?? current.columns;
       checkColumns(columns);
+      checkFallback(next.fallback);
       companion(chart);
       const rebind = chart !== current.chart;
       const reheader = columns !== current.columns;

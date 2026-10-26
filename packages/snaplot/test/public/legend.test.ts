@@ -227,7 +227,7 @@ describe('[frameworks-11][frameworks-01] createLegendTable (plan D27)', () => {
     expect(seen).toHaveBeenCalledWith('cpu');
   });
 
-  it.fails('[backlog-27] an unknown fallback throws, naming the values it takes', () => {
+  it('[backlog-27] an unknown fallback throws, naming the values it takes', () => {
     const chart = mount<Row>(fakes, { ...two, legend: false });
     expect(() => table(chart, { fallback: 'lastest' })).toThrow(
       /^snaplot: createLegendTable\(\) fallback "lastest" is not valid\. Use 'latest', 'first' or 'hide'\. Did you mean "latest"\?/,
