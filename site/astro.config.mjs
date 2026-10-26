@@ -29,6 +29,17 @@ export default defineConfig({
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/liamclarkza/snaplot' }],
       editLink: { baseUrl: 'https://github.com/liamclarkza/snaplot/edit/main/site/' },
       lastUpdated: false,
+      // The social card (uisite-20), written by `npm run thumbs` (M16a), on every docs page.
+      head: [
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:image',
+            content: 'https://liamclarkza.github.io/snaplot/examples/social-card.jpg',
+          },
+        },
+        { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+      ],
       // Code frames follow the tokens: no shadow, radius 6px, and a copy tooltip in ink on the
       // background, which passes contrast in both themes (uisite-06).
       expressiveCode: {

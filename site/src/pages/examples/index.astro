@@ -11,6 +11,8 @@ import Site from '../../layouts/Site.astro';
 import { DEMOS, sourceUrl } from '../../lib/demos';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+/** The social card, written by `npm run thumbs` (uisite-20). */
+const card = new URL(`${base}examples/social-card.jpg`, Astro.site).href;
 const examples = DEMOS.map((demo) => ({
   ...demo,
   page: existsSync(join(process.cwd(), `src/pages/examples/${demo.slug}.astro`)),
@@ -23,6 +25,10 @@ const examples = DEMOS.map((demo) => ({
   description="Each example answers one question with real or documented data."
   current="examples"
 >
+  <Fragment slot="head">
+    <meta property="og:image" content={card} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </Fragment>
   <h1>Examples</h1>
   <p>Each example answers one question with real or documented data.</p>
   <ul class="demo-list examples">

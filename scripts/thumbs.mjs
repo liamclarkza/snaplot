@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Example thumbnails (plan §10.3).
 //
-//   npm run thumbs                         write site/public/examples/<slug>.jpg for every built demo
+//   npm run thumbs                         write site/public/examples/<slug>.jpg for every built demo,
+//                                          and the site's social card, site/public/examples/social-card.jpg
 //   options: --only <slug,…>  --url <origin of a running preview>
 //
 // Build first: `npm run build && npm run build:site`. The script serves site/dist with
@@ -24,6 +25,8 @@ const value = (name) => {
   return at >= 0 ? args[at + 1] : undefined;
 };
 const MAX_BYTES = 60 * 1024;
+/** The social card (og:image) of the homepage, the hub and the docs: 1200 × 630, at most 150 KB. */
+const CARD = { file: 'social-card.jpg', width: 1200, height: 630, maxBytes: 150 * 1024 };
 const VIEWPORT = { width: 1280, height: 800 };
 const BASE = '/snaplot/';
 
@@ -142,6 +145,26 @@ try {
     const file = join(out, `${slug}.jpg`);
     writeFileSync(file, shot);
     console.log(`thumbs: ${slug}.jpg ${(shot.length / 1024).toFixed(1)} KB (quality ${quality})`);
+    await context.close();
+  }
+
+  // The social card: the top of the homepage, with the sentence and the hero.
+  {
+    const file = join(out, CARD.file);
+    const context = await browser.newContext({
+      viewport: { width: CARD.width, height: CARD.height },
+      colorScheme: 'light',
+      reducedMotion: 'reduce',
+    });
+    const page = await context.newPage();
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());
+    await page.goto(`${server.origin}${BASE}`);
+    await page.locator('[data-example] [role="tabpanel"]:not([hidden]) canvas').first().waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(800);
+    const card = await page.screenshot({ type: 'jpeg', quality: 80 });
+    writeFileSync(file, card);
+    console.log(`thumbs: ${CARD.file} ${(card.length / 1024).toFixed(1)} KB`);
     await context.close();
   }
 } finally {

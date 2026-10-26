@@ -1,17 +1,67 @@
 ---
 /**
- * The homepage (plan §9, D34), a skeleton until M16a: the sentence, the generated install string,
- * a code and chart pair in three tabs, the fact line, the examples list and the footer. M16a
- * replaces the pair with the streaming hero (src/examples/home/hero.*) and adds the thumbnails.
+ * The homepage (plan §9, D34), in order: one sentence, the install string, a code and chart pair in
+ * three tabs (the hero, whose tabs show the files that run beside them), one fact line, the
+ * examples and the footer. There are no performance adjectives or benchmark numbers: the only
+ * facts are the version, the measured gzip size of each entry point and the peer ranges
+ * (gap-competitive-04).
  */
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import Example from '../components/Example.astro';
-import Install from '../components/Install.astro';
+import { Code } from '@astrojs/starlight/components';
 import Site from '../layouts/Site.astro';
 import { DEMOS } from '../lib/demos';
 import routes from '../lib/old-routes.json';
-import { dependencyCount, version } from '../lib/version';
+import { dependencyCount, installCommand, version } from '../lib/version';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const repo = join(process.cwd(), '..');
+/** The social card, written by `npm run thumbs` (uisite-20). */
+const card = new URL(`${base}examples/social-card.jpg`, Astro.site).href;
+
+// The gzip size of each entry point, as an app that imports it pays (scripts/size.mjs, G6).
+const sizes = JSON.parse(
+  execFileSync(process.execPath, [join(repo, 'scripts/size.mjs'), '--json'], { encoding: 'utf8' }),
+) as { from: string; gzipBytes: number }[];
+const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
+const entrySizes = ['snaplot', 'snaplot/react', 'snaplot/solid'].map((entry) => {
+  const measured = sizes.filter((row) => row.from === entry);
+  return `${entry} ${kb(Math.max(...measured.map((row) => row.gzipBytes)))}`;
+});
+
+// "React 19" from `^19.0.0`, "React 18.3/19" from `^18.3.0 || ^19.0.0`.
+const peers =
+  (
+    JSON.parse(readFileSync(join(repo, 'packages/snaplot/package.json'), 'utf8')) as {
+      peerDependencies?: Record<string, string>;
+    }
+  ).peerDependencies ?? {};
+const supported = (range = '') =>
+  range
+    .split('||')
+    .map((part) => /(\d+)\.(\d+)/.exec(part))
+    .filter((m) => m !== null)
+    .map(([, major, minor]) => (minor === '0' ? major : `${major}.${minor}`))
+    .join('/');
+
+const facts = [
+  `v${version}`,
+  `gzipped: ${entrySizes.join(', ')}`,
+  `${dependencyCount} dependencies`,
+  `React ${supported(peers.react)}`,
+  `Solid ${supported(peers['solid-js'])}`,
+];
+
+/** The hero's simulator is the deploy-482 example's; the caption links to it once it is built. */
+const incident = existsSync(join(process.cwd(), 'src/pages/examples/deploy-482.astro'));
+
+const examples = DEMOS.map((demo) => ({
+  ...demo,
+  page: existsSync(join(process.cwd(), `src/pages/examples/${demo.slug}.astro`)),
+  thumbnail: existsSync(join(process.cwd(), `public/examples/${demo.slug}.jpg`)),
+}));
 ---
 
 <Site
@@ -19,6 +69,10 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
   description="Canvas charts for live data. One options object for vanilla JS, React and Solid."
   current="home"
 >
+  <Fragment slot="head">
+    <meta property="og:image" content={card} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </Fragment>
   <script slot="head" is:inline define:vars={{ routes, base }}>
     // Old hash links, /snaplot/#/docs/<group>/<section>, land on their new pages (plan §8.2).
     const route = /^#\/([^?#]*)/.exec(location.hash);
@@ -34,21 +88,147 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
   </script>
 
   <h1 class="lede">Canvas charts for live data. One options object for vanilla JS, React and Solid.</h1>
-  <Install />
-  <Example name="start/minimal" />
-  <p class="facts num">v{version} · {dependencyCount} dependencies</p>
+  <!-- The install string (D1), as a plain code line with its copy button: no terminal frame. -->
+  <div class="install"><Code code={installCommand()} lang="sh" frame="none" /></div>
+
+  <section class="hero" aria-labelledby="hero-title">
+    <h2 id="hero-title" class="sr-only">A chart and its code</h2>
+    <Example name="home/hero" />
+    <p class="hero-caption">
+      <button type="button" class="hero-toggle" data-hero-toggle>Pause</button>
+      <span>
+        A simulated service: the latency of its /search endpoint, ten seconds of data a second.
+        Deploy #482 lands at 03:08 UTC.{' '}
+        {
+          incident ? (
+            <a href={`${base}examples/deploy-482/`}>Did it cause the spike?</a>
+          ) : (
+            'Did it cause the spike?'
+          )
+        }
+      </span>
+    </p>
+  </section>
+
+  <p class="facts num">{facts.join(' · ')}</p>
 
   <h2>Examples</h2>
-  <ul class="demo-list">
+  <p>Each example answers one question with real or documented data.</p>
+  <ul class="demo-list home-examples">
     {
-      DEMOS.map((demo) => (
-        <li>
-          <h3>{demo.question}</h3>
-          <p class="demo-meta">
-            {demo.framework} · {demo.dataset} ({demo.licence})
-          </p>
+      examples.map((demo) => (
+        <li data-demo={demo.slug}>
+          {demo.thumbnail && (
+            <img
+              class="demo-thumb"
+              src={`${base}examples/${demo.slug}.jpg`}
+              alt=""
+              width="240"
+              height="150"
+              loading="lazy"
+            />
+          )}
+          <div>
+            <h3>
+              {demo.page ? <a href={`${base}examples/${demo.slug}/`}>{demo.question}</a> : demo.question}
+            </h3>
+            <p class="demo-meta">
+              {demo.framework} · {demo.dataset}
+            </p>
+          </div>
         </li>
       ))
     }
   </ul>
 </Site>
+
+<script>
+  import { bindHeroToggle } from '../examples/data/latency-feed';
+
+  const toggle = document.querySelector<HTMLButtonElement>('[data-hero-toggle]');
+  if (toggle) bindHeroToggle(toggle);
+</script>
+
+<style>
+  .hero {
+    margin-top: 2rem;
+  }
+
+  /* The code and the chart side by side on a wide screen; the chart first on a phone. */
+  @media (min-width: 64rem) {
+    .hero :global(.example-panel:not([hidden])) {
+      display: grid;
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .hero :global(.example-output) {
+      order: 2;
+    }
+  }
+
+  /* The adapters do not size their host from `height` yet (frameworks-15, D26); the islands'
+     wrappers give the 280px the hero's code asks for. */
+  .hero :global(.example-island) {
+    height: 280px;
+  }
+
+  .hero-caption {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin: 0;
+    color: var(--snaplot-ink-secondary);
+    font-size: 0.875rem;
+    max-width: none;
+  }
+
+  .hero-toggle {
+    flex: none;
+    min-width: 4.5rem;
+    padding: 0.25rem 0.75rem;
+    font: inherit;
+    color: var(--snaplot-ink);
+    background-color: var(--snaplot-background);
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius);
+    cursor: pointer;
+  }
+
+  .hero-toggle:hover {
+    background-color: var(--snaplot-surface);
+    border-color: var(--snaplot-ink-secondary);
+  }
+
+  .hero-toggle:focus-visible {
+    outline: 2px solid var(--snaplot-accent);
+    outline-offset: 2px;
+  }
+
+  .home-examples > li {
+    grid-template-columns: 240px minmax(0, 1fr);
+    align-items: start;
+    column-gap: 1.25rem;
+  }
+
+  .home-examples h3 {
+    margin: 0;
+  }
+
+  .demo-thumb {
+    display: block;
+    width: 240px;
+    height: auto;
+    border: 1px solid var(--snaplot-rule);
+    border-radius: 2px;
+  }
+
+  @media (max-width: 40rem) {
+    .home-examples > li {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .demo-thumb {
+      width: 100%;
+    }
+  }
+</style>
