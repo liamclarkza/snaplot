@@ -1,7 +1,7 @@
 // Server rendering and hydration as frameworks do it: render on Node with the server conditions,
 // then hydrate in a DOM from a browser bundle of the same app. Also checks that the core never
-// loads a framework, and that one engine serves every entry (frameworks-19, flipped by M13 when
-// the adapters import 'snaplot').
+// loads a framework, and that one engine serves every entry under every condition: the adapters
+// import 'snaplot' (frameworks-19, repo-15:ssr-dup).
 import { build } from 'esbuild';
 import { JSDOM, VirtualConsole } from 'jsdom';
 import { describe, expect, it } from 'vitest';
@@ -153,7 +153,7 @@ describe('module graph', () => {
     }
   });
 
-  it.fails('[frameworks-19] the Solid server build shares one engine with the core', () => {
+  it('[frameworks-19][repo-15:ssr-dup] the Solid server build shares one engine with the core', () => {
     const entries = ['snaplot', 'snaplot/react', 'snaplot/solid'];
     for (const conditions of [
       ['node', 'import'],

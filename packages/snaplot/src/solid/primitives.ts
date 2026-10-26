@@ -1,5 +1,6 @@
 import { type Accessor, createEffect, createSignal, onCleanup } from 'solid-js';
-import type { ChartHandle, ChartState, CursorSnapshot, CursorOptions } from '../public/types';
+import type { ChartHandle, ChartState, CursorOptions, CursorSnapshot } from 'snaplot';
+import { watchCursor } from '../adapters/bind';
 
 /** A chart handle, an accessor of one, or nothing yet. */
 export type MaybeChart<Row> =
@@ -61,12 +62,7 @@ export function createCursor<Row>(
     }
     const read = () => setCursor(current.getCursor(options));
     read();
-    const offCursor = current.on('cursor:change', read);
-    const offState = current.subscribe(read);
-    onCleanup(() => {
-      offCursor();
-      offState();
-    });
+    onCleanup(watchCursor(current, read));
   });
   return cursor;
 }

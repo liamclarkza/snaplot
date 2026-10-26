@@ -62,6 +62,76 @@ describe('Solid Chart', () => {
   });
 });
 
+describe('[frameworks-16][frameworks-20] the Solid host', () => {
+  it('[frameworks-16] passes class, data-*, tabindex and DOM handlers through; is a named figure', () => {
+    let clicks = 0;
+    const element = host();
+    dispose = render(
+      () =>
+        createComponent(Chart<Row>, {
+          data: rows,
+          x: 't',
+          series: [{ y: 'cpu', label: 'CPU' }],
+          class: 'chart',
+          tabIndex: -1,
+          onClick: () => clicks++,
+          ...{ 'data-testid': 'cpu' },
+        }),
+      element,
+    );
+    const div = element.firstElementChild as HTMLElement;
+    expect(div.className).toBe('chart');
+    expect(div.dataset.testid).toBe('cpu');
+    expect(div.getAttribute('tabindex')).toBe('-1');
+    expect(div.getAttribute('role')).toBe('figure');
+    div.click();
+    expect(clicks).toBe(1);
+  });
+
+  it('[backlog-05] an explicit height sets the host height and follows a change', () => {
+    const [height, setHeight] = createSignal<number | undefined>(280);
+    const element = host();
+    dispose = render(
+      () =>
+        createComponent(Chart<Row>, {
+          data: rows,
+          x: 't',
+          series: [{ y: 'cpu' }],
+          get height() {
+            return height();
+          },
+          style: { 'max-width': '640px' },
+        }),
+      element,
+    );
+    const div = element.firstElementChild as HTMLElement;
+    expect(div.style.height).toBe('280px');
+    expect(div.style.maxWidth).toBe('640px');
+    setHeight(400);
+    expect(div.style.height).toBe('400px');
+    setHeight(undefined);
+    expect(div.style.height).toBe('100%');
+  });
+
+  it('[frameworks-09] a variable ref (compiled to a setter) gets the handle, then undefined', () => {
+    let chart: ChartHandle<Row> | undefined;
+    // What the Solid compiler makes of <Chart ref={chart} />.
+    const props = {
+      ref(value: ChartHandle<Row> | undefined) {
+        chart = value;
+      },
+      data: rows,
+      x: 't',
+      series: [{ y: 'cpu' }],
+    };
+    dispose = render(() => createComponent(Chart<Row>, props as never), host());
+    expect(chart?.getState().series).toHaveLength(1);
+    dispose();
+    dispose = undefined;
+    expect(chart).toBeUndefined();
+  });
+});
+
 describe('Solid primitives and LegendTable', () => {
   const mount = () =>
     createChart<Row>(host(), { data: rows, x: 't', series: [{ y: 'cpu', label: 'CPU' }] });

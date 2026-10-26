@@ -9,10 +9,7 @@ const run =
   async ({ page }: { page: Page }) =>
     body(await scenario.open(page, 'solid'));
 
-test('#1 mount: one live chart, host attributes passed through', async ({ page }) => {
-  test.fail(true, '[frameworks-16]');
-  await run(scenario.mount)({ page });
-});
+test('#1 mount: one live chart, host attributes passed through', run(scenario.mount));
 test('#1 mount: the host is a figure named by a summary of its series', async ({ page }) => {
   test.fail(true, '[interact-23]');
   await run(scenario.figure)({ page });
@@ -57,10 +54,10 @@ test('#13 a zero-height host gets 300 px and exactly one warning', async ({ page
   test.fail(true, '[frameworks-15]');
   await run(scenario.zeroHeight)({ page });
 });
-test('#13 height 280 in a stretched flex item is 280 px and resizes to 400', async ({ page }) => {
-  test.fail(true, '[backlog-05]');
-  await run(scenario.explicitHeight)({ page });
-});
+test(
+  '#13 height 280 in a stretched flex item is 280 px and resizes to 400',
+  run(scenario.explicitHeight),
+);
 test(
   '#14 unmount 20 times: no canvas, listener, group membership or heap left',
   run(scenario.unmountTwenty),

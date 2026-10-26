@@ -35,10 +35,11 @@ export function Valid() {
 
 export function VariableRef() {
   let chart!: ChartHandle<Row>;
+  const handler = (event: MouseEvent) => event.clientX;
   return (
     <>
-      {/* @ts-expect-error until M13 types ref as Solid's Ref<ChartHandle> (frameworks-09) */}
       <Chart ref={chart} data={rows} x="t" series={[{ y: 'cpu' }]} />
+      <Chart data={rows} x="t" series={[{ y: 'cpu' }]} tabIndex={-1} onClick={handler} />
     </>
   );
 }
