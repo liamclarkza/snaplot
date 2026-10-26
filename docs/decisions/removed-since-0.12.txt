@@ -7,11 +7,16 @@
 #   export <name>           an exported name no 1.0 entry exports
 #   member <Type>.<member>  a member declared on an exported v0.12.0 class or interface that the
 #                           1.0 type of that name lacks (every member, when the type is gone)
-# A name that 1.0 still exports with another meaning (the Solid createChart, createChartGroup) is
-# not listed. scripts/overhaul/check-migration.mjs (M15b) checks that the migration guide
-# mentions every name below; lines starting with # are comments.
+#   from <specifier> <name> a name that entry exported in v0.12.0 and no longer does, although
+#                           another 1.0 entry exports the same name (so `export` cannot list
+#                           it); added by hand in the M8 review, which compared each entry's
+#                           export list with its own golden
+# A name that its 1.0 entry still exports with another meaning (createChartGroup) is not listed.
+# scripts/overhaul/check-migration.mjs (M15b) checks that the migration guide mentions every name
+# below, per entry for `from` lines; lines starting with # are comments.
 entry snaplot/core
 entry snaplot/legend-table.css
+from snaplot/solid createChart
 export AppendDataOptions
 export AxisConfig
 export AxisGridConfig
