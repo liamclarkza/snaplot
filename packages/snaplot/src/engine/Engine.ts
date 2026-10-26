@@ -91,9 +91,11 @@ import { debugSnapshot, type DataPassSeries, type DebugSnapshot } from './debug'
  * ranging.ts (domains), viewport.ts (pinned axes, follow, zoom and pan, bounds), selection.ts,
  * cursor.ts (hover and the cursor snapshot), highlight.ts, hit.ts, axes/ (ticks, grid, labels),
  * layout.ts, marks/index.ts (the series pass), render/overlay.ts (the overlay pass),
- * interaction/actions.ts (what each gesture does) and debug.ts (the D31 counters). Members
- * without `private` are the state those modules read and write; the engine methods the public
- * layer calls delegate to them. The class is internal: no public declaration names it.
+ * interaction/actions.ts (what each gesture does) and debug.ts (the D31 counters). Fields
+ * without `private` are the state those modules read and write, and the helpers they call back
+ * (stores, palettes, readouts, `emitEvent`) are public for them too; the engine methods the
+ * public layer calls delegate to the modules. The class is internal: no public declaration
+ * names it.
  */
 export class ChartCore implements EngineHost {
   coordinatingAxis = false;
