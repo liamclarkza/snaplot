@@ -2,7 +2,14 @@
 // Build first (`npm run build && npm run build:site`). The expected numbers are recomputed here
 // from summer.json, without answer.ts.
 import { expect, type Page, test } from '@playwright/test';
-import { DESKTOP, dataFile, demoPageChecks, openDemo, paintedPixels } from './page-checks';
+import {
+  DESKTOP,
+  darkSchemeInk,
+  dataFile,
+  demoPageChecks,
+  openDemo,
+  paintedPixels,
+} from './page-checks';
 
 const SLUG = 'central-park-summer';
 
@@ -52,6 +59,14 @@ test.describe(`[demos-03] ${SLUG}`, () => {
     slug: SLUG,
     summaries: ['[data-part="answer"]', '[data-part="records"]', '[data-part="key"]', '.byline'],
     freshness: '.byline',
+  });
+
+  // M11 (D4): `theme: 'auto'` follows the page the chart sits on; flip this when it merges.
+  test("[visuals-03] a dark system scheme leaves the light page's charts light", async ({
+    browser,
+  }) => {
+    test.fail(true, '[visuals-03] M11: theme auto follows the system, not the page');
+    expect(await darkSchemeInk(browser, SLUG)).toBeLessThan(0.5);
   });
 
   test.describe('the task', () => {

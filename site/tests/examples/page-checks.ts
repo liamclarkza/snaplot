@@ -7,7 +7,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
-import { type BrowserContextOptions, expect, type Page, test } from '@playwright/test';
+import {
+  type Browser,
+  type BrowserContextOptions,
+  expect,
+  type Page,
+  test,
+} from '@playwright/test';
 
 export const BASE = '/snaplot/';
 const site = fileURLToPath(new URL('../..', import.meta.url));
@@ -92,25 +98,28 @@ export async function openDemo(page: Page, slug: string): Promise<void> {
   await page.waitForFunction(() => 'demo' in window, undefined, { timeout: 20_000 });
 }
 
-/** The §10.1 #9 checks, at 1280 and at 390 px. */
-export function demoPageChecks(demo: DemoPage): void {
-  // [visuals-03] M11 (D4): `theme: 'auto'` follows the page the chart sits on. Until then a dark
-  // system scheme gives these light pages dark charts.
-  test.fixme("[visuals-03] a dark system scheme leaves the light page's charts light", async ({
-    browser,
-  }) => {
-    const context = await browser.newContext({ ...DESKTOP, colorScheme: 'dark' });
+/**
+ * The luminance (0–1) of a chart label on the demo under a dark system scheme. The demos' pages
+ * are light, so with `theme: 'auto'` following the page (D4) their labels stay dark ink (< 0.5).
+ */
+export async function darkSchemeInk(browser: Browser, slug: string): Promise<number> {
+  const context = await browser.newContext({ ...DESKTOP, colorScheme: 'dark' });
+  try {
     const page = await context.newPage();
-    await openDemo(page, demo.slug);
+    await openDemo(page, slug);
     const ink = await page
       .locator('main [role="application"] span')
       .first()
       .evaluate((label) => getComputedStyle(label).color);
     const [r = 0, g = 0, b = 0] = (ink.match(/[\d.]+/g) ?? []).map(Number);
-    expect((0.2126 * r + 0.7152 * g + 0.0722 * b) / 255).toBeLessThan(0.5);
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  } finally {
     await context.close();
-  });
+  }
+}
 
+/** The §10.1 #9 checks, at 1280 and at 390 px. */
+export function demoPageChecks(demo: DemoPage): void {
   for (const [name, device] of [
     ['1280 px', DESKTOP],
     ['390 px with touch', PHONE],

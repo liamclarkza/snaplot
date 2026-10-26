@@ -215,8 +215,10 @@ test.describe('the homepage', () => {
     await expect(tooltip.first()).toBeVisible();
   });
 
-  // [uisite-03] M12a: index tooltips anywhere along X (the 12 × 8 hover sweep shows 96 of 96).
-  test.fixme('[uisite-03] the hero tooltip shows anywhere over its plot', async ({ page }) => {
+  // M12a: index tooltips anywhere along X (the 12 × 8 hover sweep shows 96 of 96); flip this when
+  // it merges.
+  test('[uisite-03:library] the hero tooltip shows anywhere over its plot', async ({ page }) => {
+    test.fail(true, '[uisite-03:library] M12a: tooltips only within 32 px of a line');
     await page.goto(BASE);
     await page.locator(HERO).scrollIntoViewIfNeeded();
     await page.locator('[data-hero-toggle]').click();

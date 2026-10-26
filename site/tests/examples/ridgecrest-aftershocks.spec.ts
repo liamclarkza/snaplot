@@ -2,7 +2,16 @@
 // Build first (`npm run build && npm run build:site`); `npm run test:smoke -w site` runs this with
 // the smoke spec. The expected numbers are recounted here from events.csv, without answer.ts.
 import { expect, type Page, test } from '@playwright/test';
-import { BASE, DESKTOP, dataFile, demoPageChecks, openDemo, PHONE, watch } from './page-checks';
+import {
+  BASE,
+  DESKTOP,
+  darkSchemeInk,
+  dataFile,
+  demoPageChecks,
+  openDemo,
+  PHONE,
+  watch,
+} from './page-checks';
 
 const SLUG = 'ridgecrest-aftershocks';
 const DAY = 86_400_000;
@@ -164,10 +173,11 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       );
     });
 
-    // [demos-07][backlog-06] M10 implements `timeZone`; until then readouts use the viewer's zone.
-    test.fixme('[demos-07] times read in UTC whatever the viewer’s zone (Asia/Tokyo)', async ({
+    // M10 implements `timeZone` and readouts with the time of day; flip this when it merges.
+    test('[demos-07] times read in UTC whatever the viewer’s zone (Asia/Tokyo)', async ({
       browser,
     }) => {
+      test.fail(true, '[demos-07][backlog-06] M10: readouts use the viewer’s zone, to the day');
       const context = await browser.newContext({ ...DESKTOP, timezoneId: 'Asia/Tokyo' });
       const page = await context.newPage();
       await openDemo(page, SLUG);
@@ -187,12 +197,23 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       await context.close();
     });
 
-    // [dxtrial-13][backlog-15] M12b: a categorical colorBy gets static legend items.
-    test.fixme('[dxtrial-13] the built-in legend names the three depth bands', async ({ page }) => {
+    // M12b gives a categorical colorBy static legend items; flip this when it merges.
+    test('[dxtrial-13:categorical] the built-in legend names the three depth bands', async ({
+      page,
+    }) => {
+      test.fail(true, '[dxtrial-13:categorical][backlog-15:categorical] M12b: no legend items');
       await openDemo(page, SLUG);
       const legend = page.locator('[data-part="scatter"]');
       for (const band of ['0–5 km', '5–10 km', '>10 km']) await expect(legend).toContainText(band);
     });
+  });
+
+  // M11 (D4): `theme: 'auto'` follows the page the chart sits on; flip this when it merges.
+  test("[visuals-03] a dark system scheme leaves the light page's charts light", async ({
+    browser,
+  }) => {
+    test.fail(true, '[visuals-03] M11: theme auto follows the system, not the page');
+    expect(await darkSchemeInk(browser, SLUG)).toBeLessThan(0.5);
   });
 
   test.describe('on a phone', () => {
