@@ -93,6 +93,9 @@ what to use instead, and the chart keeps its default:
 - An X of ISO-8601 strings (`'2026-03-01'`, `'2026-03-01T09:30:00Z'`) is a time axis, not
   categories (visual V17). A date-only or offset-free string is a wall time in the chart's
   `timeZone`; a string with `Z` or an offset is an instant.
+- An inferred X that holds both Dates and numbers is a time axis, which reads the numbers as epoch
+  milliseconds; 0.12 threw ("mixes date and number values"). ISO-8601 strings mixed with numbers
+  still throw.
 
 ### Histograms (1.0)
 
