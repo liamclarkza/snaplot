@@ -254,10 +254,10 @@ describe('[frameworks-11][frameworks-01] createLegendTable (plan D27)', () => {
   it('[backlog-27] an unknown fallback throws, naming the values it takes', () => {
     const chart = mount<Row>(fakes, { ...two, legend: false });
     expect(() => table(chart, { fallback: 'lastest' })).toThrow(
-      /^snaplot: createLegendTable\(\) fallback "lastest" is not valid\. Use 'latest', 'first' or 'hide'\. Did you mean "latest"\?/,
+      /^snaplot: createLegendTable\(\) fallback must be 'latest', 'first' or 'hide'\.$/,
     );
     const { host, handle } = table(chart, { fallback: 'hide' });
-    expect(() => handle.update({ fallback: 'never' as never })).toThrow(/fallback "never"/);
+    expect(() => handle.update({ fallback: 'never' as never })).toThrow(/fallback must be/);
     // The table keeps the fallback it had.
     expect((host.firstElementChild as HTMLElement).hidden).toBe(true);
   });

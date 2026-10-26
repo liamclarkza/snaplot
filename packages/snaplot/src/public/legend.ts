@@ -4,7 +4,7 @@
  * stylesheet, injected once per document. M12b replaces the internals behind the same options.
  */
 import css from '../styles/legendTable.css?inline';
-import { fail, hint } from '../engine/errors';
+import { fail } from '../engine/errors';
 import { type Companion, companions } from './companion';
 import type { ChartHandle, ChartPoint, SeriesState } from './types';
 
@@ -199,7 +199,10 @@ export interface LegendTableHandle<Row = Record<string, any>> {
 
 const DEFAULT_COLUMNS = ['swatch', 'name', 'value'] as const;
 
-function checkColumns(columns: unknown): void {
+/** Check the table's options as they will apply: its columns and its fallback. */
+function check({ columns, fallback }: Omit<LegendTableOptions<any>, 'chart'>): void {
+  if (!['latest', 'first', 'hide'].includes(fallback as string))
+    fail("createLegendTable() fallback must be 'latest', 'first' or 'hide'.");
   if (!Array.isArray(columns)) fail('createLegendTable() columns must be an array.');
   columns.forEach((column, i) => {
     if (column === 'swatch' || column === 'name' || column === 'value') return;
@@ -213,16 +216,6 @@ function checkColumns(columns: unknown): void {
         `createLegendTable() columns[${i}] must be 'swatch', 'name', 'value' or { header, value(point, series) }.`,
       );
   });
-}
-
-const FALLBACKS = ['latest', 'first', 'hide'];
-
-function checkFallback(fallback: unknown): void {
-  if (fallback === undefined || FALLBACKS.includes(fallback as string)) return;
-  const given = typeof fallback === 'string' ? `"${fallback}"` : String(fallback);
-  fail(
-    `createLegendTable() fallback ${given} is not valid. Use 'latest', 'first' or 'hide'.${typeof fallback === 'string' ? hint(fallback, FALLBACKS) : ''}`,
-  );
 }
 
 const HEADERS = { swatch: '', name: 'Series', value: 'Value' } as const;
@@ -250,13 +243,12 @@ export function createLegendTable<Row = Record<string, any>>(
 ): LegendTableHandle<Row> {
   if (!element || typeof element !== 'object' || element.nodeType !== 1)
     fail('createLegendTable() needs an element to render into.');
-  checkFallback(options.fallback);
   let current: Required<LegendTableOptions<Row>> = {
     chart: options.chart,
     columns: options.columns ?? DEFAULT_COLUMNS,
     fallback: options.fallback ?? 'latest',
   };
-  checkColumns(current.columns);
+  check(current);
   companion(current.chart);
   injectStyles(element);
 
@@ -376,12 +368,12 @@ export function createLegendTable<Row = Record<string, any>>(
     update(next) {
       const chart = next.chart ?? current.chart;
       const columns = next.columns ?? current.columns;
-      checkColumns(columns);
-      checkFallback(next.fallback);
+      const fallback = next.fallback ?? current.fallback;
+      check({ columns, fallback });
       companion(chart);
       const rebind = chart !== current.chart;
       const reheader = columns !== current.columns;
-      current = { chart, columns, fallback: next.fallback ?? current.fallback };
+      current = { chart, columns, fallback };
       if (rebind) bind();
       if (reheader) header();
       refresh();
