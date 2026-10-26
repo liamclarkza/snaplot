@@ -115,9 +115,11 @@ test.describe('[m16s] the theme toggle and tokens', () => {
   for (const theme of ['light', 'dark'] as const) {
     test(`${theme}: code blocks and asides sit on the surface token`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: theme });
-      await page.goto(DOCS);
+      // A page that keeps an aside and a code block (Troubleshooting).
+      await page.goto(`${BASE}troubleshooting/`);
       const aside = page.locator('.starlight-aside').first();
       await expect(aside).toHaveCSS('background-color', codeSurfaces[theme]);
+      await page.goto(DOCS);
       const pre = page.locator('.expressive-code pre').first();
       await expect(pre).toHaveCSS('background-color', codeSurfaces[theme]);
       await page.goto(BASE);
