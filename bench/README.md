@@ -63,7 +63,8 @@ Chromium switches; both show in the report's browser line.
   - `v1`: the rows-first `createChart` of `overhaul-baseline` to M7 (`setViewport`, `getAxis`,
     `getLayout`, `getStats`, legend plugins, React `onReady`);
   - `v2`: the plan §4 surface (`setOptions`, `update({ viewport })`, `scale()`, built-in legend,
-    `createLegendTable`, React `ref`). Written from the plan; **M8 finalises it**.
+    `createLegendTable`, plugins with `drawAbove`, the debug symbol's plot rectangle, React
+    `ref`), finalised by M8 against the shipped handle.
 
   The page picks the adapter from the module's shape: `'ChartCore' in mod && !('createChart' in
   mod)` is v012; otherwise it constructs a chart, and a handle with `setOptions` is v2, else v1.
@@ -211,7 +212,6 @@ profiles.
 - `heap.grossKBPerOp` is a lower bound once an operation allocates enough to trigger a scavenge
   between frames; use `--heap-profile` for the sampled allocation.
 - Fidelity needs the debug symbol (`ovh-m1-done` and later); older refs report it as n/a.
-- The v2 adapter is written from the plan and is untested until M8 lands.
 - CI runs the software profile only, advisory (plan §11.3 G12).
 
 ## History
