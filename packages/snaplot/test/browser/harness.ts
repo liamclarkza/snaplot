@@ -48,7 +48,10 @@ function chart(id = 'chart-0'): AnyChart {
 /** The plot rectangle in client (viewport) coordinates. */
 function plotRect(id = 'chart-0') {
   const handle = chart(id);
-  const host = handle.container.getBoundingClientRect();
+  // Plot coordinates start at the canvases, past a built-in legend above them.
+  const host = (
+    handle.container.querySelector('[role="application"]') ?? handle.container
+  ).getBoundingClientRect();
   const { plot } = handle.getLayout();
   return {
     left: host.left + plot.left,

@@ -3,7 +3,7 @@ import type {
   ChartOptions,
   ChartState,
   ViewportRanges,
-  LegendItem,
+  SeriesState,
   ChartPoint,
   SelectionRange,
 } from '../public/types';
@@ -96,7 +96,7 @@ export function applyDefaults<Row>(chart: ChartHandle<Row>, props: ChartControls
 /** What a legend table shows when the cursor is not over the chart. */
 export type LegendTableFallback = 'hide' | 'latest' | 'first' | 'series-only';
 export function legendPoint<Row>(
-  item: LegendItem,
+  item: SeriesState,
   state: ChartState<Row> | undefined,
   point: ChartPoint<Row> | undefined,
   fallback: LegendTableFallback,

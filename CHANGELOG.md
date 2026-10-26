@@ -72,6 +72,21 @@ to [Semantic Versioning](https://semver.org/).
 - Events: `follow:change` is `following:change` and `visibility:change` is
   `hiddenSeries:change`; an event name that does not exist throws.
 
+### Legends (1.0)
+
+- `createLegendTable(element, { chart, columns, fallback })` replaces `createLegendTablePlugin()`:
+  a table of each series' value at the cursor (or the latest data), keyed by series id and
+  refreshed on every data commit. Columns are data only: `'swatch'`, `'name'`, `'value'` or
+  `{ header, value(point, series), align }`; it returns `{ update(options), destroy() }`.
+- The built-in legend replaces `createLegendPlugin()`: `legend: true` or
+  `{ position: 'top' | 'bottom' }` shows one button per series above (or below) the plot; a click
+  shows or hides the series (`hiddenSeries:change`) and a hover highlights it
+  (`highlight:change`).
+- The legend styles are injected once per document: `import 'snaplot/legend-table.css'` is no
+  longer needed. `createLegendPlugin`, `createLegendTablePlugin` and the column helpers
+  `nameColumn`, `valueColumn`, `swatchColumn`, `metricColumn` and `column` are removed.
+  `LegendItem` is `SeriesState`.
+
 ### Removed options (1.0)
 
 The 0.12 options below left the public types. Passing one warns once per page with its path and

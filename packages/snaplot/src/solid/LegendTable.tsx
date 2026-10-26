@@ -8,7 +8,7 @@ import {
   type Accessor,
   type JSX,
 } from 'solid-js';
-import type { ChartHandle, ChartPoint, LegendItem, CursorSnapshot } from '../public/types';
+import type { ChartHandle, ChartPoint, SeriesState, CursorSnapshot } from '../public/types';
 import { applyThemeToElement } from '../config/theme';
 import { createChartState } from './createChartState';
 import { createCursorSnapshot } from './createCursorSnapshot';
@@ -28,7 +28,7 @@ export interface LegendTableColumn<Row> {
   /** Renders the cell of one series. */
   cell: (
     point: ChartPoint<Row>,
-    series: LegendItem,
+    series: SeriesState,
     api: { setHighlight: (id: string | null) => void },
   ) => JSX.Element;
 }
@@ -72,7 +72,7 @@ export function LegendTable<Row>(props: LegendTableProps<Row>): JSX.Element {
   }));
   const highlighted = createMemo(() => state()?.highlight ?? null);
   const setHighlight = (id: string | null) => props.chart()?.setHighlight(id);
-  const [items, setItems] = createSignal<LegendItem[]>([]);
+  const [items, setItems] = createSignal<SeriesState[]>([]);
   createEffect(() => {
     visibility();
     const chart = props.chart();

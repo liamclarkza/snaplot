@@ -42,7 +42,7 @@ export type {
   InterpolationMode,
   LayerCounts,
   Layout,
-  LegendItem,
+  SeriesState,
   LegendOptions,
   LineSeriesOptions,
   NumberFormat,
@@ -98,19 +98,10 @@ export {
   SNAPLOT_THEME_CSS_VARS,
 } from './config/theme';
 export type { CreateThemeTokens } from './config/theme';
-export {
-  createLegendPlugin,
-  createLegendTablePlugin,
-  nameColumn,
-  valueColumn,
-  swatchColumn,
-  metricColumn,
-  column,
-} from './public/legend';
+export { createLegendTable } from './public/legend';
 export type {
-  LegendCellContent,
-  LegendPluginOptions,
   LegendTableColumn,
+  LegendTableHandle,
   LegendTableOptions,
 } from './public/legend';
 export { histogram } from './public/histogram';

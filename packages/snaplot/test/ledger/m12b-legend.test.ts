@@ -115,7 +115,7 @@ describe('[interact-21][gap-overhaul-delta-02] legend behaviour', () => {
 });
 
 describe('[frameworks-01][frameworks-08][frameworks-20] the core legend table', () => {
-  it.fails('[frameworks-01] the latest value refreshes after a data change in a fixed viewport', () => {
+  it('[frameworks-01] the latest value refreshes after a data change in a fixed viewport', () => {
     const chart = mountTwo({ legend: false });
     const host = document.createElement('div');
     document.body.append(host);
@@ -157,7 +157,7 @@ describe('[frameworks-01][frameworks-08][frameworks-20] the core legend table', 
     expect(host.contains(button)).toBe(true);
   });
 
-  it.fails('[frameworks-20] the table header is the X axis title and value, never "Step:"', () => {
+  it('[frameworks-20] the table header is the X axis title and value, never "Step:"', () => {
     const chart = mountTwo({ legend: false, axes: { x: { title: 'Time (s)' } } });
     const host = document.createElement('div');
     document.body.append(host);

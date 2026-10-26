@@ -27,7 +27,9 @@ import {
   groups,
   validateGroup,
 } from './group';
+import { companions } from './companion';
 import { describeOptions, ingest } from './ingest';
+import { mountLegend } from './legend';
 import { type NormalizedOptions, type NormalizedState, normalize } from './normalize';
 import { equivalent, patchOptions } from './options';
 import {
@@ -136,6 +138,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   private lines = createReferenceLinesPlugin({ lines: [] });
   private regions = createReferenceRegionsPlugin({ regions: [] });
   private bridges = new WeakMap<ChartPlugin<Row>, Plugin>();
+  /** The built-in legend: its placement and how to unmount it. */
+  private legend?: { position: 'top' | 'bottom'; unmount: () => void };
 
   constructor(element: HTMLElement, options: ChartOptions<Row>) {
     this.container = element;
@@ -176,6 +180,14 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           ),
         ),
     });
+    companions.set(this, {
+      toggle: (id) => this.toggleSeries(id),
+      highlight: (id) => this.syncHighlight(id),
+      highlighted: () => this.read('highlight') as string | null,
+      series: () => this.getLegendItems(),
+      cursor: (fallback) => this.getCursorSnapshot({ fallback }),
+      xTitle: () => this.ingested.spec.axes?.x?.title,
+    });
     try {
       this.applyAccessibleName();
       this.state = this.readState();
@@ -190,8 +202,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       } finally {
         this.mutating = false;
       }
+      this.syncLegend();
       // The mount paint: nothing repaints an unchanged box after it, so it must
-      // draw the annotations and plugins (gap-annotations-extensibility-06:mount).
+      // draw the annotations, plugins and the legend's space (gap-annotations-extensibility-06:mount).
       this.engine.paint();
       groups.get(normalized.group!)?.members.add(this);
       coordinate(normalized.group);
@@ -508,6 +521,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.regions.setRegions(ingested.referenceRegions);
     }
     if (work.aria) this.applyAccessibleName();
+    if (work.engine) this.syncLegend();
     after();
     if (work.group) this.moveGroup(previous.group, normalized.options.group);
     this.publish();
@@ -562,6 +576,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.regions.setRegions(ingested.referenceRegions);
       this.engine.setHighlight(highlighted ? ingested.seriesIds.indexOf(highlighted) : null);
       this.applyAccessibleName();
+      this.syncLegend();
       after?.();
       this.moveGroup(previous.options.group, next.group);
     } catch (error) {
@@ -858,6 +873,34 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       if (axis) ranges[key] = Object.freeze({ min: axis.min, max: axis.max });
     }
     return Object.freeze(ranges);
+  }
+
+  /**
+   * Show or hide the built-in legend as the `legend` option asks (plan D6): `'auto'` shows it
+   * for two or more series. A change of the space it takes resizes the plot before the next paint.
+   */
+  private syncLegend(): void {
+    if (this.destroyed) return;
+    const option = this.normalized.engine.legend ?? 'auto';
+    const show = option === true || typeof option === 'object';
+    const position = typeof option === 'object' ? (option.position ?? 'top') : 'top';
+    if (this.legend && (!show || this.legend.position !== position)) {
+      this.legend.unmount();
+      this.legend = undefined;
+    } else if (this.legend || !show) return;
+    if (show)
+      this.legend = { position, unmount: mountLegend(this, this.engine.root, { position }) };
+    this.engine.fitToRoot();
+  }
+
+  /** A legend click: show or hide one series, reported as `hiddenSeries:change`. */
+  private toggleSeries(id: string): void {
+    if (this.destroyed || !this.ingested.seriesIds.includes(id)) return;
+    const hidden = new Set(this.hidden);
+    if (hidden.has(id)) hidden.delete(id);
+    else hidden.add(id);
+    this.events.batch(() => this.setHidden(hidden));
+    coordinate(this.options.group);
   }
 
   setViewport(viewport: ViewportRanges): void {
@@ -1188,6 +1231,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         this.emit('theme:update', theme);
       }),
       this.engine.on('resize', (width, height) => {
+        this.syncLegend();
         this.publish();
         this.emit('resize', { width, height });
         coordinate(this.options.group);
@@ -1260,6 +1304,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
   destroy(): void {
     if (this.destroyed) return;
+    this.legend?.unmount();
+    this.legend = undefined;
+    companions.delete(this);
     groups.get(this.options.group!)?.members.delete(this);
     for (const off of this.off) off();
     this.engine?.destroy();

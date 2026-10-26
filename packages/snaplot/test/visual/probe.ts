@@ -44,6 +44,11 @@ function debugOf(chart: ChartHandle<any>): DebugView {
   return ((chart as unknown as Record<symbol, DebugView | undefined>)[DEBUG] ?? {}) as DebugView;
 }
 
+/** The chart's root inside its host: the canvases and labels, past a built-in legend. */
+function rootOf(host: HTMLElement): HTMLElement {
+  return host.querySelector<HTMLElement>('[role="application"]') ?? host;
+}
+
 function layoutOf(chart: ChartHandle<any>): LayoutView {
   return chart.getLayout() as unknown as LayoutView;
 }
@@ -287,8 +292,9 @@ function collectProbes(
     slotHalf.set(d.series, Number.isFinite(gap) ? Math.max(2, gap * 0.45) : 12);
   }
 
+  // Plot coordinates start at the chart's root, which holds the canvases (past a legend).
   const offset = canvas.getBoundingClientRect();
-  const hostBox = host.getBoundingClientRect();
+  const hostBox = rootOf(host).getBoundingClientRect();
   const dx = offset.left - hostBox.left;
   const dy = offset.top - hostBox.top;
   return datums.map((d) => {
@@ -318,13 +324,14 @@ export function collectGeometry(
   host: HTMLElement,
 ): GeometryReport {
   const hostRect = rect(host.getBoundingClientRect());
+  const rootRect = rect(rootOf(host).getBoundingClientRect());
   const layout = layoutOf(chart);
   const p = layout.plot;
   const plot = rect({
-    left: hostRect.left + p.left,
-    top: hostRect.top + p.top,
-    right: hostRect.left + p.left + p.width,
-    bottom: hostRect.top + p.top + p.height,
+    left: rootRect.left + p.left,
+    top: rootRect.top + p.top,
+    right: rootRect.left + p.left + p.width,
+    bottom: rootRect.top + p.top + p.height,
     width: p.width,
     height: p.height,
   });

@@ -2,7 +2,7 @@
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ChartHandle, ChartState, LegendItem } from '../public/types';
+import type { ChartHandle, ChartState, SeriesState } from '../public/types';
 import { darkTheme } from '../config/theme';
 import { LegendTable, SeriesLegend } from './legends';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -15,7 +15,7 @@ afterEach(async () => {
 function chartFixture() {
   const handlers = new Map<string, Set<() => void>>();
   const listeners = new Set<() => void>();
-  const items: LegendItem[] = [
+  const items: SeriesState[] = [
     {
       id: 'cpu',
       label: 'CPU',

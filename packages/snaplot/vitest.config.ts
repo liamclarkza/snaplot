@@ -28,6 +28,8 @@ export default defineConfig({
   },
   test: {
     server: { deps: { inline: ['solid-js'] } },
+    // The interim legend styles are imported as text (`?inline`), as the build does.
+    css: { include: [/\.css(\?|$)/] },
     // DOM tests opt in per file with `// @vitest-environment jsdom`.
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}', 'test/**/*.test.{ts,tsx}'],

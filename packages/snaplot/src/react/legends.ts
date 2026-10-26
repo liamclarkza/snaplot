@@ -7,7 +7,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import type { ChartHandle, ChartPoint, LegendItem, CursorSnapshot } from '../public/types';
+import type { ChartHandle, ChartPoint, SeriesState, CursorSnapshot } from '../public/types';
 import { applyThemeToElement } from '../config/theme';
 import { useChartState, useCursorSnapshot } from './hooks';
 import { legendPoint, type LegendTableFallback } from './shared';
@@ -102,7 +102,7 @@ export interface LegendTableColumn<Row> {
   /** Renders the cell of one series. */
   cell: (
     point: ChartPoint<Row>,
-    series: LegendItem,
+    series: SeriesState,
     api: { setHighlight: (id: string | null) => void },
   ) => ReactNode;
 }
@@ -334,7 +334,7 @@ export function nameColumn<Row>(
           },
         },
         options.swatch !== false &&
-          swatchColumn<Row>({ size: 8 }).cell(point, {} as LegendItem, { setHighlight: () => {} }),
+          swatchColumn<Row>({ size: 8 }).cell(point, {} as SeriesState, { setHighlight: () => {} }),
         h(
           'span',
           {
@@ -371,7 +371,7 @@ export function valueColumn<Row>(
 }
 /** A column with a value computed from the point. */
 export function metricColumn<Row>(
-  resolve: (point: ChartPoint<Row>, series: LegendItem) => string,
+  resolve: (point: ChartPoint<Row>, series: SeriesState) => string,
   options: { header?: string; truncate?: number } = {},
 ): LegendTableColumn<Row> {
   return {

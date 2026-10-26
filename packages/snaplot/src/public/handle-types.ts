@@ -114,8 +114,8 @@ export interface CursorSnapshotOptions {
   fallback?: 'hide' | 'latest' | 'first';
 }
 
-/** A legend entry for one series. */
-export interface LegendItem {
+/** One series with its colour, mark and visibility: what a legend draws. */
+export interface SeriesState {
   /** The series id. */
   id: string;
   /** The series label. */
@@ -129,7 +129,7 @@ export interface LegendItem {
   /** Whether the series is shown. */
   visible: boolean;
   /** The dash pattern; empty when solid. */
-  dash: number[];
+  dash: readonly number[];
   /** The series opacity. */
   opacity: number;
 }
@@ -392,7 +392,7 @@ export interface ChartHandle<Row = Record<string, any>> {
   /** The values under the cursor, or at a fallback position. */
   getCursorSnapshot(options?: CursorSnapshotOptions): CursorSnapshot<Row>;
   /** One entry per series. */
-  getLegendItems(): LegendItem[];
+  getLegendItems(): SeriesState[];
   /** The resolved theme. */
   getTheme(): ThemeConfig;
   /** The plot and axis rectangles. */

@@ -163,7 +163,7 @@ describe('layers and update classes', () => {
     expect(notified).toBeLessThanOrEqual(1);
   });
 
-  it.fails('[perf:materialize-legend] 100 appends with the legend and a legend table materialize the ring 0 times', () => {
+  it('[perf:materialize-legend] 100 appends with the legend and a legend table materialize the ring 0 times', () => {
     const chart = fakes.mount({
       data: [{ x: 0, a: 1, b: 2 }],
       x: 'x',

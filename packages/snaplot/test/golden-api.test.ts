@@ -14,7 +14,7 @@ const manifest = JSON.parse(manifestText) as {
 
 /**
  * P4: public declarations never name these engine types (engine/spec.ts, core/Chart.ts). The
- * public LegendItem, CursorSnapshot and SelectionResult are written by hand under the same names.
+ * public SeriesState, CursorSnapshot and SelectionResult are written by hand under the same names.
  */
 const FORBIDDEN = [
   'EngineConfig',

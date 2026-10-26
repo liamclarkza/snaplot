@@ -1,4 +1,4 @@
-import type { ChartPoint, LegendItem } from '../public/types';
+import type { ChartPoint, SeriesState } from '../public/types';
 import type { LegendTableColumn } from './LegendTable';
 /** Native Solid cells; safe to render on the server. */
 export function swatchColumn<Row>(
@@ -87,7 +87,7 @@ export function valueColumn<Row>(
 }
 /** A column with a value computed from the point. */
 export function metricColumn<Row>(
-  resolve: (point: ChartPoint<Row>, series: LegendItem) => string,
+  resolve: (point: ChartPoint<Row>, series: SeriesState) => string,
   options: { header?: string; truncate?: number } = {},
 ): LegendTableColumn<Row> {
   return {

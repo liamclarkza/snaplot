@@ -113,7 +113,8 @@ export function clientPoint(
 
 /** The element that receives pointer input (falls back to the chart root). */
 export function pointerTarget(chart: ChartHandle<any>): Element {
-  const root = chart.container.firstElementChild ?? chart.container;
+  // The engine's root, past the built-in legend that may sit before it.
+  const root = chart.container.querySelector('[role="application"]') ?? chart.container;
   const candidates = [...root.querySelectorAll('div')].filter(
     (element) => element.style.pointerEvents === 'auto',
   );

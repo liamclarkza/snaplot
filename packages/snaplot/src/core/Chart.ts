@@ -559,6 +559,23 @@ export class ChartCore implements EngineHost {
     if (!deferFirstPaint) this.scheduler.flush();
   }
 
+  /** The element that holds the canvases and the label layer. */
+  get root(): HTMLElement {
+    return this.canvasManager.container;
+  }
+
+  /**
+   * Size the canvases to the root's box now, after chrome beside it (the built-in legend)
+   * changed it, instead of waiting for the ResizeObserver: the next paint has the right size.
+   */
+  fitToRoot(): void {
+    if (this.destroyed) return;
+    const width = this.canvasManager.cssWidth;
+    const height = this.canvasManager.cssHeight;
+    if (width > 0 && height > 0 && this.canvasManager.resize(width, height))
+      this.onResize(width, height);
+  }
+
   /**
    * Paint the dirty layers now instead of on the next frame: the first paint
    * of an engine constructed with `deferFirstPaint`.

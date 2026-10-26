@@ -8,7 +8,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { applyThemeToElement } from '../config/theme';
-import type { ChartHandle, LegendItem } from '../public/types';
+import type { ChartHandle, SeriesState } from '../public/types';
 import { createChartState } from './createChartState';
 /** Props of {@link SeriesLegend}. */
 export interface SeriesLegendProps<Row = Record<string, any>> {
@@ -30,7 +30,7 @@ export function SeriesLegend<Row>(props: SeriesLegendProps<Row>): JSX.Element {
   const visibility = createMemo(() => state()?.hiddenSeries ?? [], undefined, {
     equals: (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
   });
-  const [items, setItems] = createSignal<LegendItem[]>([]);
+  const [items, setItems] = createSignal<SeriesState[]>([]);
   createEffect(() => {
     visibility();
     const chart = props.chart();

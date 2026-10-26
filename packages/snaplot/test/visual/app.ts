@@ -128,7 +128,8 @@ async function renderFixture(id: string): Promise<void> {
     status: 'loading',
     plotPoint(fx, fy) {
       if (!chart || !host) throw new Error('fixture not rendered');
-      const box = host.getBoundingClientRect();
+      // Plot coordinates start at the canvases, past a built-in legend above them.
+      const box = (host.querySelector('[role="application"]') ?? host).getBoundingClientRect();
       const plot = chart.getLayout().plot;
       return {
         x: box.left + plot.left + fx * plot.width,
