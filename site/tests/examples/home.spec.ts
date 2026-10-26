@@ -194,6 +194,8 @@ test.describe('the homepage', () => {
   });
 
   test('[uisite-13] the stream pauses while the hero is offscreen', async ({ page }) => {
+    // Short enough that scrolling to the footer takes the hero out of view.
+    await page.setViewportSize({ width: 1280, height: 420 });
     await page.goto(BASE);
     await page.locator(HERO).scrollIntoViewIfNeeded();
     await expect.poll(() => rowsDuring(page, 400)).toBeGreaterThan(0);
@@ -267,7 +269,7 @@ test.describe('the homepage', () => {
     const prose = await page.evaluate(() => {
       const hide = document.createElement('style');
       hide.textContent =
-        'main pre, main code, main script, [data-example-output], .home-examples { display: none }';
+        'main pre, main code, main script, [data-example-output], .home-examples { display: none !important }';
       document.head.append(hide);
       const text = document.querySelector('main')?.innerText ?? '';
       hide.remove();
