@@ -685,7 +685,8 @@ describe('public chart transactions', () => {
       series: [{ type: 'scatter', y: 'y', colorBy: 'label' }],
       tooltip: { render },
     });
-    const replace = vi.spyOn(ChartCore.prototype, 'replaceSources');
+    // A title is a layout change (plan D16): the engine takes new options, not new sources.
+    const replace = vi.spyOn(ChartCore.prototype, 'replaceOptions');
     chart.update({ axes: { y: { title: 'Metric' } } });
     const tooltip = replace.mock.calls[0][0].tooltip!;
     tooltip.render!([

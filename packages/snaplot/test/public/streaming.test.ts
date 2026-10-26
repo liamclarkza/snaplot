@@ -91,7 +91,7 @@ describe('[dataapi-02][dataapi-04] appended rows survive updates', () => {
     ]);
   });
 
-  it.fails('[dxtrial-11:data] re-ingesting a 10,000-row source more than 10 times a second warns once', () => {
+  it('[dxtrial-11:data] re-ingesting a 10,000-row source more than 10 times a second warns once', () => {
     const big = Array.from({ length: 10_000 }, (_, t) => ({ time: t, value: t % 17 }));
     const chart = mount<Sample>(fakes, { data: big, x: 'time', series: [{ y: 'value' }] });
     for (let i = 0; i < 12; i++) chart.update({ data: big.slice() });

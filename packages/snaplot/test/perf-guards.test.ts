@@ -116,7 +116,7 @@ describe('layers and update classes', () => {
     expect(after.overlay).toBeGreaterThan(before.overlay);
   });
 
-  it.fails('[perf:paint-no-ingest] a paint-class update never ingests', () => {
+  it('[perf:paint-no-ingest] a paint-class update never ingests', () => {
     const chart = fakes.mount({ data: columns(500, (i) => i % 9), x: 'x', series: [{ y: 'y' }] });
     const before = debug(chart).ingestCount;
     chart.update({ theme: { palette: ['#ff0000'] } } as never);
@@ -124,7 +124,7 @@ describe('layers and update classes', () => {
     expect(debug(chart).ingestCount).toBe(before);
   });
 
-  it.fails('[perf:reingest-avoidance] title, theme, format identity, callbacks and plugins by id cause 0 ingests', () => {
+  it('[perf:reingest-avoidance] title, theme, format identity, callbacks and plugins by id cause 0 ingests', () => {
     const chart = fakes.mount({
       data: columns(500, (i) => i % 9),
       x: 'x',

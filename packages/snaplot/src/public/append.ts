@@ -447,6 +447,7 @@ export function commitAppend<Row>(
   }
   source.nextIndex += count - (replaced ? 1 : 0);
   source.streamed = true;
+  source.appended = (source.appended ?? 0) + count - (replaced ? 1 : 0);
   // New encoding labels (the plans of one append share their lists): every series that reads
   // the list must colour and name them.
   let encodings = false;

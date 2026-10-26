@@ -56,10 +56,115 @@ interface Plan {
   ordered: boolean;
 }
 
+/** What ingest reads from the data: everything but the description of the options. */
+export type IngestedData<Row> = Pick<
+  Ingested<Row>,
+  'sources' | 'seriesSources' | 'categories' | 'encodings' | 'kinds'
+>;
+
 /** Ingest every source of normalized options. Throws before returning anything on invalid data. */
 export function ingest<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>): Ingested<Row> {
+  const data = ingestData(n, ctx);
+  return { ...data, ...describeOptions(n, data, ctx.previousTypes) };
+}
+
+/**
+ * Describe options over data that is already ingested (plan D16): the engine spec, the series
+ * ids and the annotations. A presentation change runs only this, so it never reads the data
+ * again; the field lookups it makes find the columns ingest built.
+ */
+export function describeOptions<Row>(
+  n: NormalizedOptions<Row>,
+  data: IngestedData<Row>,
+  previousTypes?: IngestContext<Row>['previousTypes'],
+): Pick<Ingested<Row>, 'spec' | 'seriesIds' | 'referenceLines' | 'referenceRegions'> {
+  const { sources, seriesSources, categories, encodings, kinds } = data;
+  const axisSpecs = baseAxes(n);
+  // Axis types: inferred kinds, category geometry, kept types for empty inferred axes.
+  for (const [key, kind] of kinds) {
+    const axis = axisSpecs[key] ?? {};
+    if (kind === 'date') axisSpecs[key] = { ...axis, type: axis.type ?? 'time' };
+    if (kind === 'category') axisSpecs[key] = categoryAxisSpec(axis, categories.get(key)!, n, key);
+  }
+  for (const [key, type] of previousTypes ?? []) {
+    const own = sources.filter((source) => source.axis === key);
+    if (
+      n.axes[key]?.type === undefined &&
+      !categories.has(key) &&
+      own.length > 0 &&
+      own.every((source) => source.columns[0].length === 0)
+    )
+      axisSpecs[key] = { ...axisSpecs[key], type };
+  }
+
+  const seriesIds = n.series.map((s) => s.id);
+  const seriesSpecs = n.series.map((s) =>
+    seriesSpec(s, sources[seriesSources[s.index]], encodings),
+  );
+  const spec: Omit<ChartSpec, 'plugins'> = {
+    ...n.engine,
+    axes: axisSpecs,
+    series: seriesSpecs,
+    tooltip: tooltipSpec(n, seriesSpecs),
+  };
+  return {
+    spec,
+    seriesIds,
+    referenceLines: n.referenceLines.map((line, i) => ({
+      ...line,
+      axis: orientation(axisSpecs, line.axis),
+      axisKey: line.axis,
+      value: annotationValue(
+        line.axis,
+        line.value,
+        `referenceLines[${i}].value`,
+        axisSpecs,
+        kinds,
+        categories,
+        n,
+      ),
+    })),
+    referenceRegions: n.referenceRegions.map((region, i) => ({
+      ...region,
+      axis: orientation(axisSpecs, region.axis),
+      axisKey: region.axis,
+      from: annotationValue(
+        region.axis,
+        region.from,
+        `referenceRegions[${i}].from`,
+        axisSpecs,
+        kinds,
+        categories,
+        n,
+        true,
+      ),
+      to: annotationValue(
+        region.axis,
+        region.to,
+        `referenceRegions[${i}].to`,
+        axisSpecs,
+        kinds,
+        categories,
+        n,
+        true,
+      ),
+    })),
+  };
+}
+
+/** The axes the options name, with the positions series axes imply. */
+function baseAxes(n: NormalizedOptions<any>): Record<string, AxisSpec> {
   const axisSpecs: Record<string, AxisSpec> = {};
   for (const [key, axis] of Object.entries(n.axes)) axisSpecs[key] = { ...axis.spec };
+  for (const s of n.series) {
+    if (s.xAxis !== 'x') axisSpecs[s.xAxis] = { position: 'bottom', ...axisSpecs[s.xAxis] };
+    if (s.yAxis !== 'y') axisSpecs[s.yAxis] = { position: 'left', ...axisSpecs[s.yAxis] };
+  }
+  return axisSpecs;
+}
+
+/** Read every source of normalized options: sources, categories, encodings and X kinds. */
+function ingestData<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>): IngestedData<Row> {
   const kinds = new Map<string, XKind>();
   const encodings = new Map(
     Array.from(ctx.previousEncodings ?? [], ([key, labels]) => [key, [...labels]]),
@@ -75,8 +180,6 @@ export function ingest<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>):
       fail(`series "${s.id}" needs an x: set the chart's x, or the series' own x.`);
     if (isBins(input) && s.type !== 'histogram')
       fail(`series "${s.id}" has histogram() bins as data, which need type: 'histogram'.`);
-    if (s.xAxis !== 'x') axisSpecs[s.xAxis] = { position: 'bottom', ...axisSpecs[s.xAxis] };
-    if (s.yAxis !== 'y') axisSpecs[s.yAxis] = { position: 'left', ...axisSpecs[s.yAxis] };
     let pi = plans.findIndex((p) => p.input === input && p.x === x && p.axis === s.xAxis);
     if (pi < 0) {
       pi = plans.length;
@@ -122,29 +225,8 @@ export function ingest<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>):
     for (const code of source.columns[xi]) registry.count(code, 1);
   }
   for (const registry of categories.values()) registry.prune();
-
-  // Axis types: inferred kinds, category geometry, kept types for empty inferred axes.
-  for (const [key, kind] of kinds) {
-    const axis = axisSpecs[key] ?? {};
-    if (kind === 'date') axisSpecs[key] = { ...axis, type: axis.type ?? 'time' };
-    if (kind === 'category') axisSpecs[key] = categoryAxisSpec(axis, categories.get(key)!, n, key);
-  }
-  for (const [key, type] of ctx.previousTypes ?? []) {
-    const own = sources.filter((source) => source.axis === key);
-    if (
-      n.axes[key]?.type === undefined &&
-      !categories.has(key) &&
-      own.length > 0 &&
-      own.every((source) => source.columns[0].length === 0)
-    )
-      axisSpecs[key] = { ...axisSpecs[key], type };
-  }
   epochWarning(sources, kinds, n);
 
-  const seriesIds = n.series.map((s) => s.id);
-  const seriesSpecs = n.series.map((s) =>
-    seriesSpec(s, sources[seriesSources[s.index]], encodings),
-  );
   for (const s of n.series) {
     const source = sources[seriesSources[s.index]];
     if (s.type === 'bar' && source.xKind === 'category') {
@@ -155,61 +237,7 @@ export function ingest<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>):
         );
     }
   }
-
-  const spec: Omit<ChartSpec, 'plugins'> = {
-    ...n.engine,
-    axes: axisSpecs,
-    series: seriesSpecs,
-    tooltip: tooltipSpec(n, seriesSpecs),
-  };
-  return {
-    spec,
-    sources,
-    seriesSources,
-    seriesIds,
-    categories,
-    encodings,
-    kinds,
-    referenceLines: n.referenceLines.map((line, i) => ({
-      ...line,
-      axis: orientation(axisSpecs, line.axis),
-      axisKey: line.axis,
-      value: annotationValue(
-        line.axis,
-        line.value,
-        `referenceLines[${i}].value`,
-        axisSpecs,
-        kinds,
-        categories,
-        n,
-      ),
-    })),
-    referenceRegions: n.referenceRegions.map((region, i) => ({
-      ...region,
-      axis: orientation(axisSpecs, region.axis),
-      axisKey: region.axis,
-      from: annotationValue(
-        region.axis,
-        region.from,
-        `referenceRegions[${i}].from`,
-        axisSpecs,
-        kinds,
-        categories,
-        n,
-        true,
-      ),
-      to: annotationValue(
-        region.axis,
-        region.to,
-        `referenceRegions[${i}].to`,
-        axisSpecs,
-        kinds,
-        categories,
-        n,
-        true,
-      ),
-    })),
-  };
+  return { sources, seriesSources, categories, encodings, kinds };
 }
 
 function xColumnOf(source: SourceState<unknown>): number {
@@ -248,6 +276,7 @@ function ingestSource<Row>(
       state.evicted += retained.evicted;
       state.nextIndex = retained.nextIndex;
       state.streamed = true;
+      state.appended = retained.appended;
     }
     addValueColumns(state, plan, n, encodings);
     return state;
@@ -271,6 +300,7 @@ function ingestSource<Row>(
     state.evicted += retained.evicted;
     state.nextIndex = retained.nextIndex;
     state.streamed = true;
+    state.appended = retained.appended;
   }
   // Row ids, read with the current rowId in storage order (retained rows too: rowId is an
   // accessor, D16), and checked for duplicates before anything commits.

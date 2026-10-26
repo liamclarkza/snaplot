@@ -27,7 +27,8 @@ import {
   validateGroup,
 } from './group';
 import { categoryLabels, commitAppend, planAppend, refreshCategoryAxis } from './append';
-import { ingest } from './ingest';
+import { classify, sameData, STATE_KEYS, type StateKey, type Work } from './classify';
+import { describeOptions, ingest } from './ingest';
 import {
   type Ingested,
   type IngestContext,
@@ -67,67 +68,7 @@ export interface ChartControls {
   onHiddenSeriesChange?: (hiddenSeries: readonly string[]) => void;
 }
 
-/** The state options (plan D3): applied to the chart, never re-ingested. */
-const STATE_KEYS = ['viewport', 'selection', 'hiddenSeries', 'highlight'] as const;
-type StateKey = (typeof STATE_KEYS)[number];
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype;
-}
-
-/** Options without the state options, for deciding whether a change needs a re-ingest. */
-function withoutState<Row>(options: ChartOptions<Row>): Record<string, unknown> {
-  const {
-    viewport: _viewport,
-    hiddenSeries: _hidden,
-    ...rest
-  } = options as unknown as Record<string, unknown>;
-  if (rest.highlight === null || typeof rest.highlight === 'string') delete rest.highlight;
-  if (rest.selection === null || (isPlainObject(rest.selection) && 'x' in rest.selection))
-    delete rest.selection;
-  return rest;
-}
-
-/** Like `equivalent`, but any two functions count as equal. */
-function sameIgnoringFunctions(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b) || (typeof a === 'function' && typeof b === 'function')) return true;
-  if (Array.isArray(a) && Array.isArray(b))
-    return a.length === b.length && a.every((value, i) => sameIgnoringFunctions(value, b[i]));
-  if (!isPlainObject(a) || !isPlainObject(b)) return false;
-  const keys = Object.keys(a).filter((key) => a[key] !== undefined);
-  const other = Object.keys(b).filter((key) => b[key] !== undefined);
-  return (
-    keys.length === other.length &&
-    keys.every((key) =>
-      key === 'data' || key === 'group' ? a[key] === b[key] : sameIgnoringFunctions(a[key], b[key]),
-    )
-  );
-}
-
-/** The accessor fields of a series whose function identity can churn. */
-const ACCESSOR_FIELDS = ['x', 'y', 'lower', 'upper', 'rowId'] as const;
-
-/** The first series and field whose accessor is a new function while nothing else changed (D16). */
-function accessorOnlyChange<Row>(
-  previous: NormalizedOptions<Row>,
-  next: NormalizedOptions<Row>,
-): { id: string; field: string } | undefined {
-  if (!sameIgnoringFunctions(withoutState(previous.options), withoutState(next.options))) return;
-  for (const series of next.series) {
-    const old = previous.series.find((candidate) => candidate.id === series.id);
-    if (!old) continue;
-    for (const field of ACCESSOR_FIELDS) {
-      const shared = field === 'x' || field === 'rowId';
-      const a = old[field] ?? (shared ? previous[field] : undefined);
-      const b = series[field] ?? (shared ? next[field] : undefined);
-      if (typeof a === 'function' && typeof b === 'function' && a !== b)
-        return { id: series.id, field };
-    }
-  }
-  return undefined;
-}
-
-/** Sources of at least this many rows warn about accessor churn (plan D16). */
+/** Sources of at least this many rows warn about accessor churn and re-ingest churn (plan D16). */
 const CHURN_ROWS = 10_000;
 
 /** Axis ranges as the `[from, to]` viewport `onViewportChange` reports. */
@@ -147,7 +88,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   /** The state options last applied from options (plan D3). */
   private appliedState: NormalizedState = {};
   /** Identity-only accessor changes in a row, and their times (plan D16). */
-  private churn = { streak: 0, times: [] as number[] };
+  private churn = { streak: 0, times: [] as number[], ingests: [] as number[] };
   /** The one X pass per source and append batch (plan §3.4), for the debug symbol. */
   private counters = { xValidations: 0 };
   private hidden = new Set<string>();
@@ -236,11 +177,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
    */
   private context(normalized: NormalizedOptions<Row>, forceData: boolean): IngestContext<Row> {
     const previous = this.ingested as Ingested<Row> | undefined;
-    const previousTypes = new Map(
-      Object.entries(previous?.spec.axes ?? {})
-        .filter(([key]) => normalized.axes[key]?.type === undefined)
-        .map(([key, axis]) => [key, axis.type ?? 'linear'] as const),
-    );
+    const previousTypes = previous ? this.previousTypes(normalized) : new Map();
     return {
       counters: this.counters,
       previousEncodings: previous?.encodings,
@@ -249,13 +186,13 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       retained: (input, axis, x) => {
         if (!previous || (forceData && input === normalized.data)) return undefined;
         const exact = previous.sources.findIndex(
-          (s) => s.streamed && s.declared === input && s.axis === axis && s.x === x,
+          (s) => s.streamed && sameData(s.declared, input) && s.axis === axis && s.x === x,
         );
         const at =
           exact >= 0
             ? exact
             : previous.sources.findIndex(
-                (s) => s.streamed && s.declared === input && s.axis === axis,
+                (s) => s.streamed && sameData(s.declared, input) && s.axis === axis,
               );
         return at < 0 ? undefined : this.retained(previous.sources[at], at);
       },
@@ -267,6 +204,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const base = {
       evicted: source.evicted,
       nextIndex: source.nextIndex,
+      appended: source.appended,
       ...(source.unsorted ? { unsorted: true as const } : {}),
     };
     // A row source reads its ids with the current rowId again (it is an accessor, D16).
@@ -357,33 +295,33 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.lines,
       ...normalized.plugins.map((plugin) => this.bridge(plugin)),
     ];
-    const renderTooltip = normalized.tooltip.render;
+    // Render functions are read through the latest options when called (plan D16): a new
+    // identity is a repaint, and these wrappers stay the same.
     return {
       ...ingested.spec,
       tooltip: {
         ...ingested.spec.tooltip,
-        ...(renderTooltip
+        ...(normalized.tooltip.render
           ? {
               render: (points: TooltipPoint[]) =>
-                renderTooltip(
+                this.normalized.tooltip.render!(
                   points.map((point) => this.point(point.seriesIndex, point.dataIndex, point)),
                 ),
             }
           : {}),
       },
       series: (ingested.spec.series ?? []).map((series, index) => {
-        const pointColor = normalized.series[index]?.pointColor;
         const id = ingested.seriesIds[index];
         return {
           ...series,
           visible: !this.hidden.has(id),
-          ...(pointColor
+          ...(normalized.series[index]?.pointColor
             ? {
                 fill: (value: number, rowIndex: number) => {
                   const si = this.ingested.seriesIds.indexOf(id);
                   const source = this.ingested.sources[this.ingested.seriesSources[si]];
                   const at = source.head + rowIndex;
-                  return pointColor(
+                  return this.normalized.series[si]!.pointColor!(
                     value,
                     source.rows?.[at],
                     source.index ? source.index[at] : source.evicted + rowIndex,
@@ -431,27 +369,28 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   update(patch: ChartPatch<Row>): void {
     this.reconcile(
       patchOptions(this.options, patch),
-      Object.hasOwn(patch, 'data'),
+      new Set(Object.keys(patch)),
       undefined,
       STATE_KEYS.filter((key) => Object.hasOwn(patch, key)),
     );
   }
 
   /**
-   * Apply complete options. `stateKeys` are the state options an update()
-   * named, which always apply; any other state option applies when it
-   * differs from the value last applied (plan D3).
+   * Apply complete options through the diff classifier (plan D16). `named` lists the keys an
+   * update() patch names, each of which counts as changed; without it every key is compared
+   * with the last applied options (setOptions). `stateKeys` are the state options an update()
+   * named, which always apply; any other state option applies when it differs from the value
+   * last applied (plan D3).
    */
   reconcile(
     input: ChartOptions<Row>,
-    forceData = false,
+    named?: ReadonlySet<string>,
     controls?: ChartControls,
     stateKeys?: readonly StateKey[],
   ): void {
     if (this.destroyed) return;
     const normalized = normalize(input);
-    const next = normalized.options;
-    this.noteAccessorChurn(normalized);
+    const work = classify(this.normalized, normalized, named);
     const applyState = () => {
       if (stateKeys) this.applyState(normalized.state, stateKeys);
       this.applyState(
@@ -460,27 +399,84 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         false,
       );
     };
-    if (!forceData && equivalent(withoutState(this.options), withoutState(next))) {
-      // Check first and keep the new options only once they apply, so a rejected
-      // call leaves the chart and its options as they were (D23).
-      this.validateState(normalized.state, this.ingested);
-      if (controls) this.validateControls(controls);
-      applyState();
-      if (controls) this.setControls(controls);
-      this.options = next;
-      this.normalized = normalized;
-      this.optionsSnapshot = undefined;
-      this.publish();
+    if (work.data || work.accessor) {
+      this.noteChurn(normalized, work);
+      const ingested = ingest(normalized, this.context(normalized, named?.has('data') ?? false));
+      this.validateState(normalized.state, ingested);
+      if (controls) this.validateControls(controls, ingested);
+      validateGroup(normalized.group, this.candidate(ingested), this);
+      this.noteReplacedStreams(ingested);
+      this.commit(normalized, ingested, () => {
+        applyState();
+        if (controls) this.setControls(controls);
+      });
       return;
     }
-    const ingested = ingest(normalized, this.context(normalized, forceData));
+    this.churn.streak = 0;
+    // Presentation only: describe the new options over the data the chart holds, check
+    // everything, then apply; a rejected call leaves the chart and its options as they were.
+    const ingested =
+      work.engine || work.annotations
+        ? {
+            ...this.ingested,
+            ...describeOptions(normalized, this.ingested, this.previousTypes(normalized)),
+          }
+        : this.ingested;
     this.validateState(normalized.state, ingested);
-    if (controls) this.validateControls(controls, ingested);
-    validateGroup(next.group, this.candidate(ingested), this);
-    this.commit(normalized, ingested, () => {
+    if (controls) this.validateControls(controls);
+    if (work.group) validateGroup(normalized.group, this.candidate(ingested), this);
+    this.present(normalized, ingested, work, () => {
       applyState();
       if (controls) this.setControls(controls);
     });
+  }
+
+  /** Apply a change that reads no data: engine options, annotations, plugins, group and name. */
+  private present(
+    normalized: NormalizedOptions<Row>,
+    ingested: Ingested<Row>,
+    work: Work,
+    after: () => void,
+  ): void {
+    const previous = this.options;
+    this.ingested = ingested;
+    this.options = normalized.options;
+    this.normalized = normalized;
+    this.optionsSnapshot = undefined;
+    this.mutating = true;
+    try {
+      if (work.engine || work.plugins)
+        this.engine.replaceOptions(this.configFor(ingested, normalized));
+      if (work.annotations) {
+        this.lines.setLines(ingested.referenceLines);
+        this.regions.setRegions(ingested.referenceRegions);
+      }
+      if (work.aria) this.applyAccessibleName();
+      after();
+      if (work.group) this.moveGroup(previous.group, normalized.options.group);
+    } finally {
+      this.mutating = false;
+    }
+    this.publish();
+    if (work.engine || work.plugins) this.emit('options:update', this.options);
+    if (work.group) coordinate(previous.group);
+    if (work.engine || work.group) coordinate(this.options.group);
+  }
+
+  private moveGroup(from: ChartGroup | undefined, to: ChartGroup | undefined): void {
+    if (from === to) return;
+    if (from) this.detachGroup(from);
+    groups.get(from!)?.members.delete(this);
+    groups.get(to!)?.members.add(this);
+  }
+
+  /** The axis types to keep for inferred axes that hold no data (as ingest keeps them). */
+  private previousTypes(normalized: NormalizedOptions<Row>) {
+    return new Map(
+      Object.entries(this.ingested.spec.axes ?? {})
+        .filter(([key]) => normalized.axes[key]?.type === undefined)
+        .map(([key, axis]) => [key, axis.type ?? 'linear'] as const),
+    );
   }
 
   /**
@@ -524,11 +520,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.engine.setHighlight(highlighted ? ingested.seriesIds.indexOf(highlighted) : null);
       this.applyAccessibleName();
       after?.();
-      if (previous.options.group !== next.group) {
-        if (previous.options.group) this.detachGroup(previous.options.group);
-        groups.get(previous.options.group!)?.members.delete(this);
-        groups.get(next.group!)?.members.add(this);
-      }
+      this.moveGroup(previous.options.group, next.group);
     } catch (error) {
       // replaceSources() checks its candidate before it replaces a store. Once the engine holds
       // the new sources, the facade keeps the ingest that matches them: restoring the previous
@@ -553,27 +545,60 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   /**
-   * Warn once when a source of at least 10,000 rows is re-read because an
-   * accessor function got a new identity and nothing else changed, three
-   * times in a row or more than ten times a second (plan D16).
+   * Warn once when a source of at least 10,000 rows keeps being read again (plan D16, §5.9): by an
+   * accessor whose identity changes while nothing else does, three times in a row or more than
+   * ten times a second, or by data replaced more than ten times a second.
    */
-  private noteAccessorChurn(next: NormalizedOptions<Row>): void {
-    const change = accessorOnlyChange(this.normalized, next);
-    if (!change) {
-      this.churn.streak = 0;
+  private noteChurn(next: NormalizedOptions<Row>, work: Work): void {
+    const now = Date.now();
+    const rows = (si: number) => {
+      const source = si < 0 ? undefined : this.ingested.sources[this.ingested.seriesSources[si]];
+      return source?.columns[0].length ?? 0;
+    };
+    if (work.accessor && !work.data) {
+      const change = work.accessor;
+      const count = rows(this.ingested.seriesIds.indexOf(change.id));
+      if (count < CHURN_ROWS) return;
+      this.churn.streak++;
+      this.churn.times = [...this.churn.times.filter((time) => now - time < 1000), now];
+      if (this.churn.streak >= 3 || this.churn.times.length > 10)
+        warnOnce(
+          'accessor-churn',
+          `series "${change.id}" keeps getting a new ${change.field} function, and each one re-reads its ${formatValue(count)} rows. Memoise the function, or use a field name.`,
+        );
       return;
     }
-    const si = this.ingested.seriesIds.indexOf(change.id);
-    const source = si < 0 ? undefined : this.ingested.sources[this.ingested.seriesSources[si]];
-    const rows = source?.columns[0].length ?? 0;
-    if (rows < CHURN_ROWS) return;
-    const now = Date.now();
-    this.churn.streak++;
-    this.churn.times = [...this.churn.times.filter((time) => now - time < 1000), now];
-    if (this.churn.streak >= 3 || this.churn.times.length > 10)
+    this.churn.streak = 0;
+    const largest = next.series.reduce(
+      (best, s) => {
+        const count = rows(this.ingested.seriesIds.indexOf(s.id));
+        return count > best.count ? { id: s.id, count } : best;
+      },
+      { id: '', count: 0 },
+    );
+    if (largest.count < CHURN_ROWS) return;
+    this.churn.ingests = [...this.churn.ingests.filter((time) => now - time < 1000), now];
+    if (this.churn.ingests.length > 10)
       warnOnce(
-        'accessor-churn',
-        `series "${change.id}" keeps getting a new ${change.field} function, and each one re-reads its ${formatValue(rows)} rows. Memoise the function, or use a field name.`,
+        'reingest-churn',
+        `series "${largest.id}" re-read its ${formatValue(largest.count)} rows more than 10 times in a second. Use appendData() for new rows, or memoise data so it keeps its identity.`,
+      );
+  }
+
+  /** Warn once when new data replaces a source that appendData() extended (plan D16). */
+  private noteReplacedStreams(next: Ingested<Row>): void {
+    let discarded = 0;
+    for (const source of this.ingested.sources) {
+      if (!source.streamed || !source.appended) continue;
+      const kept = next.sources.some(
+        (other) => other.streamed && sameData(other.declared, source.declared),
+      );
+      if (!kept) discarded += source.appended;
+    }
+    if (discarded > 0)
+      warnOnce(
+        'streamed-replaced',
+        `data replaced on a streamed source; ${formatValue(discarded)} appended rows were discarded. Pass data once (useState/createSignal) or omit it.`,
       );
   }
 
@@ -1231,7 +1256,7 @@ export function reconcileChart<Row>(
   controls?: ChartControls,
 ): void {
   if (!(chart instanceof Controller)) fail('expected a chart created by createChart().');
-  chart.reconcile(options, false, controls);
+  chart.reconcile(options, undefined, controls);
 }
 
 /** Framework-only controlled state bridge. */

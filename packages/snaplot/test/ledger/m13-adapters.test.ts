@@ -93,7 +93,7 @@ describe('[frameworks-03][arch-04] React', () => {
     expect(renders - start).toBeLessThanOrEqual(1);
   });
 
-  it.fails('[arch-04][frameworks-02] a parent re-render with inline callbacks does not re-ingest', async () => {
+  it('[arch-04][frameworks-02] a parent re-render with inline callbacks does not re-ingest', async () => {
     let handle: ChartHandle<Row> | null = null;
     let bump: () => void = () => {};
     function App() {

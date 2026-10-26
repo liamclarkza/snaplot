@@ -172,6 +172,8 @@ export interface SourceState<Row> {
   nextIndex: number;
   /** The source received appends since its last full ingest. */
   streamed: boolean;
+  /** Rows appendData() added since the data was last given (for the replacement warning). */
+  appended?: number;
   /**
    * A scatter source stored unsorted because an append broke its X order: it stays so while
    * its data is retained, and replaced data is sorted again.
@@ -253,6 +255,8 @@ export interface Retained<Row> {
   unsorted?: true;
   evicted: number;
   nextIndex: number;
+  /** Rows appendData() added since the data was last given. */
+  appended?: number;
 }
 
 export const EMPTY: readonly unknown[] = [];

@@ -73,7 +73,7 @@ describe('[arch-03][dataapi-10] presentation changes never ingest (P6)', () => {
     ['the accessible name', { ariaLabel: 'CPU and memory' }],
     ['the locale', { locale: 'de-DE' }],
   ];
-  it.fails('[arch-03][dataapi-10] presentation changes re-render without an ingest', () => {
+  it('[arch-03][dataapi-10] presentation changes re-render without an ingest', () => {
     for (const [what, patch] of presentation) {
       const chart = mount<Row>(fakes, base);
       expect(measure(chart, () => chart.update(patch)).ingests, what).toBe(0);
@@ -136,7 +136,7 @@ describe('[arch-03][dataapi-10] presentation changes never ingest (P6)', () => {
 });
 
 describe('[arch-04][frameworks-02][research-01] functions are read through latest refs', () => {
-  it.fails('[arch-04][frameworks-02][research-01] a new onPointClick identity costs nothing and the latest one is called', () => {
+  it('[arch-04][frameworks-02][research-01] a new onPointClick identity costs nothing and the latest one is called', () => {
     const chart = mount<Row>(fakes, base);
     const calls: string[] = [];
     const work = measure(chart, () => {
@@ -171,7 +171,7 @@ describe('[arch-04][frameworks-02][research-01] functions are read through lates
     expect(texts(chart).some((text) => text.endsWith(' u4'))).toBe(true);
   });
 
-  it.fails('[dxtrial-11:callbacks] a new tooltip.render identity costs no ingest', () => {
+  it('[dxtrial-11:callbacks] a new tooltip.render identity costs no ingest', () => {
     const chart = mount<Row>(fakes, base);
     const work = measure(chart, () => {
       for (let i = 0; i < 5; i++) chart.update({ tooltip: { render: () => `t${i}` } });
@@ -203,7 +203,7 @@ describe('[arch-04][frameworks-02][research-01] functions are read through lates
 });
 
 describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] annotations', () => {
-  it.fails('[gap-annotations-extensibility-05] reference lines and regions repaint without an ingest', () => {
+  it('[gap-annotations-extensibility-05] reference lines and regions repaint without an ingest', () => {
     const chart = mount<Row>(fakes, base);
     const work = measure(chart, () => {
       chart.update({ referenceLines: [{ axis: 'y', value: 50, label: 'SLO' }] });

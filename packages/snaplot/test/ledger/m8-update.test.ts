@@ -43,12 +43,12 @@ function ingestsDuring(chart: ChartHandle<any>, act: () => void): number {
 }
 
 describe('[arch-03][dataapi-10] presentation changes do not ingest', () => {
-  it.fails('[arch-03][dataapi-10] an axis title change does not re-ingest', () => {
+  it('[arch-03][dataapi-10] an axis title change does not re-ingest', () => {
     const chart = mountCpu();
     expect(ingestsDuring(chart, () => chart.update({ axes: { y: { title: 'Load' } } }))).toBe(0);
   });
 
-  it.fails('[arch-03] cursor, tooltip and line-width changes do not re-ingest', () => {
+  it('[arch-03] cursor, tooltip and line-width changes do not re-ingest', () => {
     const chart = mountCpu();
     expect(
       ingestsDuring(chart, () => {
@@ -71,7 +71,7 @@ describe('[arch-03][dataapi-10] presentation changes do not ingest', () => {
 });
 
 describe('[arch-04][frameworks-02][research-01] callbacks are read through latest refs', () => {
-  it.fails('[arch-04][frameworks-02][research-01] a new onPointClick identity does not re-ingest', () => {
+  it('[arch-04][frameworks-02][research-01] a new onPointClick identity does not re-ingest', () => {
     const chart = mountCpu();
     expect(
       ingestsDuring(chart, () => {
@@ -80,7 +80,7 @@ describe('[arch-04][frameworks-02][research-01] callbacks are read through lates
     ).toBe(0);
   });
 
-  it.fails('[frameworks-02][research-01] a new axis format identity does not re-ingest', () => {
+  it('[frameworks-02][research-01] a new axis format identity does not re-ingest', () => {
     const chart = mountCpu();
     expect(
       ingestsDuring(chart, () => {
@@ -89,7 +89,7 @@ describe('[arch-04][frameworks-02][research-01] callbacks are read through lates
     ).toBe(0);
   });
 
-  it.fails('[dxtrial-11:callbacks] a new tooltip.render identity does not re-ingest', () => {
+  it('[dxtrial-11:callbacks] a new tooltip.render identity does not re-ingest', () => {
     const chart = mountCpu();
     expect(
       ingestsDuring(chart, () => {
@@ -98,7 +98,7 @@ describe('[arch-04][frameworks-02][research-01] callbacks are read through lates
     ).toBe(0);
   });
 
-  it.fails('[research-01] a new series.format identity does not re-ingest', () => {
+  it('[research-01] a new series.format identity does not re-ingest', () => {
     const chart = mountCpu();
     expect(
       ingestsDuring(chart, () => {
@@ -115,7 +115,7 @@ describe('[arch-04][frameworks-02][research-01] callbacks are read through lates
 });
 
 describe('[dxtrial-11:data] re-ingest churn is visible', () => {
-  it.fails('[dxtrial-11:data] re-ingesting a 10,000-row source more than 10 times a second warns once', () => {
+  it('[dxtrial-11:data] re-ingesting a 10,000-row source more than 10 times a second warns once', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const big = Array.from({ length: 10_000 }, (_, t) => ({ t, v: t % 17 }));
     const chart = fakes.mount({ data: big, x: 't', series: [{ y: 'v' }] });
@@ -126,7 +126,7 @@ describe('[dxtrial-11:data] re-ingest churn is visible', () => {
 });
 
 describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] annotations', () => {
-  it.fails('[gap-annotations-extensibility-05] updating only referenceLines does not re-ingest or emit data:update', () => {
+  it('[gap-annotations-extensibility-05] updating only referenceLines does not re-ingest or emit data:update', () => {
     const chart = mountCpu();
     let dataUpdates = 0;
     chart.on('data:update', () => {
