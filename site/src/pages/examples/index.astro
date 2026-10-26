@@ -69,9 +69,10 @@ const examples = DEMOS.map((demo) => ({
 </Site>
 
 <style>
-  .examples > li {
+  /* ul.examples outranks site.css's .demo-list > li, whose gap would otherwise win. */
+  ul.examples > li {
     grid-template-columns: 320px minmax(0, 1fr);
-    column-gap: 1.5rem;
+    gap: 0.75rem 1.5rem;
     align-items: start;
     padding-block: 1.25rem;
   }
@@ -115,7 +116,7 @@ const examples = DEMOS.map((demo) => ({
   }
 
   @media (max-width: 44rem) {
-    .examples > li {
+    ul.examples > li {
       grid-template-columns: minmax(0, 1fr);
       row-gap: 0.75rem;
     }
