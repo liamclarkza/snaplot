@@ -7,6 +7,7 @@
  * precedence, locale and time zone).
  */
 import { DEFAULT_TICK_COUNT } from '../constants';
+import type { ChartCore } from './Engine';
 import { niceStep, niceTicks } from './scales/niceNumbers';
 
 export interface ValueFormatOptions {
@@ -133,4 +134,13 @@ export function dateFormatter(
     ...(timeZone === 'UTC' ? { timeZone: 'UTC' } : {}),
   });
   return (value) => (Number.isFinite(value) ? format.format(value) : '');
+}
+
+/** `tooltip.xFormat` / `tooltip.yFormat`, when configured. */
+export function tooltipFormatters(
+  engine: ChartCore,
+): { x?: (x: number) => string; y?: (y: number, seriesIndex: number) => string } | undefined {
+  const t = engine.config.tooltip;
+  if (!t?.xFormat && !t?.yFormat) return undefined;
+  return { x: t.xFormat, y: t.yFormat };
 }

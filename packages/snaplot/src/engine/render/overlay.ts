@@ -4,9 +4,7 @@ import type { ChartCore } from '../Engine';
 import { brushPixelRange } from '../selection';
 import { DirtyFlag } from '../spec';
 import { isDarkColor } from '../../utils/color';
-import { seriesYColumn } from '../marks/scatterEncoding';
-import { categoryWidthFromData, barRectForCategory } from '../marks/barGeometry';
-import { isDensityScatterSeries } from '../marks/scatter';
+import { markOf, slotOf, visibleSlots } from '../marks/index';
 
 /**
  * Renders crosshair and selection box on the overlay canvas.
@@ -194,13 +192,12 @@ export function renderOverlay(engine: ChartCore): void {
   if (!isSelecting && cursorEnabled && engine.cursorX !== null && engine.cursorY !== null) {
     // Draw crosshair, skip for scatter-only charts
     const isScatterOnly = engine.config.series.every(
-      (s) => s.visible === false || s.type === 'scatter',
+      (s) => s.visible === false || markOf(s).draw.cloud,
     );
     if (!isScatterOnly) {
       const visibleSeries = engine.config.series.filter((s) => s.visible !== false);
       const hasOnlyDiscreteMarks =
-        visibleSeries.length > 0 &&
-        visibleSeries.every((s) => s.type === 'bar' || s.type === 'histogram');
+        visibleSeries.length > 0 && visibleSeries.every((s) => markOf(s).draw.x !== 'continuous');
       const cursorCfg = {
         ...engine.config.cursor,
         // A vertical line reads as an extra mark on grouped bars. The
@@ -316,6 +313,7 @@ export function drawPointIndicators(engine: ChartCore, ctx: CanvasRenderingConte
 
   // When a series is highlighted, only draw the indicator on that series,    // the others just get the crosshair line (matches Neptune/W&B behavior).
   const hlActive = engine.highlightedSeries !== null && engine.config.highlight?.enabled !== false;
+  const slots = visibleSlots(engine);
 
   for (const point of engine.tooltipPoints) {
     if (hlActive && point.seriesIndex !== engine.highlightedSeries) continue;
@@ -328,92 +326,18 @@ export function drawPointIndicators(engine: ChartCore, ctx: CanvasRenderingConte
     const yScale = engine.scales.get(sc.yAxis ?? 'y');
     if (!xScale || !yScale) continue;
 
-    if (sc.type === 'histogram') {
-      // Highlight hovered bin, edges from X data, counts from Y data
-      const colIdx = seriesYColumn(sc);
-      const binIdx = point.dataIndex;
-      if (colIdx >= 1 && colIdx <= store.seriesCount && binIdx < store.length - 1) {
-        const x1 = xScale.dataToPixel(store.xAt(binIdx));
-        const x2 = xScale.dataToPixel(store.xAt(binIdx + 1));
-        const yTop = yScale.dataToPixel(store.yAt(colIdx - 1, binIdx));
-        const yBase = yScale.dataToPixel(0);
-        ctx.fillStyle = `rgba(255, 255, 255, ${ringAlpha})`;
-        ctx.fillRect(x1, Math.min(yTop, yBase), x2 - x1, Math.abs(yTop - yBase));
-        ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha * 2})`;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x1, Math.min(yTop, yBase), x2 - x1, Math.abs(yTop - yBase));
-      }
-      continue;
-    }
-
-    if (sc.type === 'bar') {
-      const idx = point.dataIndex;
-      const barSeries = engine.config.series.filter((s) => s.visible !== false && s.type === 'bar');
-      const barIdx = barSeries.indexOf(sc);
-      const totalBars = barSeries.length;
-      if (barIdx >= 0 && idx < store.length) {
-        const centerX = xScale.dataToPixel(store.xAt(idx));
-        const categoryWidth = categoryWidthFromData(
-          (dataIndex) => xScale.dataToPixel(store.xAt(dataIndex)),
-          idx,
-          store.length,
-          engine.layout.plot.width * 0.5,
-        );
-        const rect = barRectForCategory({
-          centerX,
-          categoryWidth,
-          series: sc,
-          barSeriesIndex: barIdx,
-          totalBarSeries: totalBars,
-        });
-        const barTop = yScale.dataToPixel(point.y);
-        const baselineY = yScale.dataToPixel(0);
-        if (!Number.isFinite(centerX) || !Number.isFinite(barTop) || !Number.isFinite(baselineY))
-          continue;
-        const rectY = Math.min(barTop, baselineY);
-        const rectH = Math.abs(barTop - baselineY);
-        ctx.fillStyle = `rgba(255, 255, 255, ${ringAlpha})`;
-        ctx.fillRect(rect.left, rectY, rect.width, rectH);
-        ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha * 2})`;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(rect.left, rectY, rect.width, rectH);
-      }
-      continue;
-    }
-
-    // Density scatter represents aggregate bins, not a single datum. A
-    // nearest-point dot is misleading, so only point-rendered scatter gets
-    // the unified indicator style.
-    if (sc.type === 'scatter' && isDensityScatterSeries(sc, store.length)) continue;
-
-    const px = xScale.dataToPixel(point.x);
-    const py = yScale.dataToPixel(point.y);
-    const r = sc.type === 'scatter' ? (point.radius ?? sc.pointRadius ?? 3) : 4;
-
-    // On light backgrounds, a subtle drop-shadow gives the dot depth
-    // without needing a dark ring stroke.
-    if (!isDark) {
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.18)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 1;
-    }
-
-    // White ring slightly larger than the fill, acts as a clean halo.
-    ctx.beginPath();
-    ctx.arc(px, py, r + 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-
-    // Clear shadow for the inner fill so it's crisp.
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-
-    // Filled center with the series color
-    ctx.beginPath();
-    ctx.arc(px, py, r, 0, Math.PI * 2);
-    ctx.fillStyle = point.color;
-    ctx.fill();
+    markOf(sc).hit.indicator({
+      engine,
+      ctx,
+      point,
+      series: sc,
+      store,
+      xScale,
+      yScale,
+      ringAlpha,
+      isDark,
+      slot: slotOf(engine, sc, slots),
+    });
   }
 
   ctx.restore();

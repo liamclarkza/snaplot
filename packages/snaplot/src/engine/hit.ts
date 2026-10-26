@@ -1,18 +1,18 @@
 import type { Scale, SeriesSpec, TooltipPoint } from './spec';
 import type { DataStore } from './data/DataStore';
 import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
-import { formatValue, scaleStepDecimals } from './format';
+import { formatValue, scaleStepDecimals, tooltipFormatters } from './format';
+import { seriesYColumn } from './marks/columns';
+import { markOf, slotOf, TOOLTIP_RANKS, xColumnOf } from './marks/index';
+import { histogramBinIndexForDataX, histogramBinRange } from './marks/histogram/hit';
 import {
   createScatterStyleResolver,
   type ScatterStyleResolver,
-  seriesYColumn,
+  scatterResolvers,
   scatterTooltipFields,
-  scatterXColumn,
   type ScatterPalettes,
-} from './marks/scatterEncoding';
+} from './marks/scatter/encoding';
 import type { ChartCore } from './Engine';
-import { categoryWidthFromData, barRectForCategory } from './marks/barGeometry';
-import { scatterResolvers } from './marks/index';
 
 /**
  * Hit-testing for finding nearest data points to cursor position.
@@ -173,7 +173,7 @@ export class HitTester {
       if (!xScale) continue;
 
       const targetX = xScale.pixelToData(pixelX);
-      const xColumn = sc.type === 'scatter' ? scatterXColumn(sc) : 0;
+      const xColumn = xColumnOf(sc);
       let idx = store.nearestXIndex(targetX);
       if (xColumn !== 0) {
         let closest = Infinity;
@@ -239,7 +239,7 @@ export class HitTester {
       const sc = seriesConfigs[si];
       if (sc.visible === false) continue;
 
-      if (sc.type === 'scatter') {
+      if (markOf(sc).draw.cloud) {
         const scatterPoint = this.nearestScatterPoint(
           store,
           scales,
@@ -333,7 +333,7 @@ export class HitTester {
     if (!xScale || !yScale) return null;
 
     const yCol = seriesYColumn(sc);
-    const xCol = scatterXColumn(sc);
+    const xCol = xColumnOf(sc);
     if (xCol < 0 || xCol > store.seriesCount || yCol < 1 || yCol > store.seriesCount) return null;
 
     const grid = this.getScatterGrid(
@@ -411,7 +411,7 @@ export class HitTester {
     cellSize: number,
     dataVersion: number,
   ): ScatterGridCache {
-    const xCol = scatterXColumn(sc);
+    const xCol = xColumnOf(sc);
     const yCol = seriesYColumn(sc);
     const key = [
       dataVersion,
@@ -482,10 +482,81 @@ interface ScatterGridCache {
   pixelY: Float64Array;
 }
 
+// ─── The mark hit contract ────────────────────────────────────
+// What each mark's hit half (`marks/<type>/hit.ts`) answers; the registry (`marks/index.ts`)
+// pairs it with the mark's draw half.
+
+/** Where a series sits among the chart's visible slot marks (grouped bars): its index and their count. */
+export interface SlotPlace {
+  /** The series' position among them in options order, or -1 when it is not one of them. */
+  readonly index: number;
+  readonly count: number;
+}
+
+/** What the overlay pass hands a mark to draw the hover indicator of one tooltip point. */
+export interface IndicatorPass {
+  readonly engine: ChartCore;
+  readonly ctx: CanvasRenderingContext2D;
+  readonly point: TooltipPoint;
+  readonly series: SeriesSpec;
+  readonly store: DataStore;
+  readonly xScale: Scale;
+  readonly yScale: Scale;
+  /** The white halo's strength for the surface: 0.15 on dark backgrounds, else 0.08. */
+  readonly ringAlpha: number;
+  /** The chart background reads as dark. */
+  readonly isDark: boolean;
+  readonly slot: SlotPlace;
+}
+
+/** The hit half of a mark (`marks/<type>/hit.ts`; M12a). */
+export interface MarkHit {
+  /**
+   * 0: the mark's rows come from the shared hit test (the HitTester: lines, areas, bands and
+   * scatter). Above 0, a slot mark: while a visible series has a slot mark, the tooltip shows only
+   * the rows of the highest rank among them (histogram 2, bar 1), from `slotPoint`, and a click
+   * tests the slot marks' spans (ranks in ascending order) before the nearest point.
+   */
+  readonly tooltipRank: number;
+  /** The tooltip row of series `seriesIndex` at the cursor's X, or null (slot marks). */
+  slotPoint?(engine: ChartCore, seriesIndex: number): TooltipPoint | null;
+  /** The pixel span along X of a slot point's bar or bin, for a click (slot marks). */
+  slotSpan?(
+    engine: ChartCore,
+    point: TooltipPoint,
+    xScale: Scale,
+    slot: SlotPlace,
+  ): readonly [number, number];
+  /** Draws the hover indicator of one tooltip point on the overlay. */
+  indicator(pass: IndicatorPass): void;
+}
+
 // ─── The chart's hit pipeline ─────────────────────────────────
-// The tooltip points under the cursor (the HitTester for lines, areas, bands and scatter; slot
-// and bin geometry for bars and histograms), the point a click lands on, and the histogram bin
+// The tooltip points under the cursor (the HitTester for lines, areas, bands and scatter; the slot
+// marks' own rows for bars and histograms), the point a click lands on, and the histogram bin
 // under a data X.
+
+/** The highest tooltip rank among the visible series' marks (0 when none is a slot mark). */
+export function leadingTooltipRank(engine: ChartCore): number {
+  let rank = 0;
+  for (const series of engine.config.series) {
+    if (series.visible !== false) rank = Math.max(rank, markOf(series).hit.tooltipRank);
+  }
+  return rank;
+}
+
+/** The rows the slot marks of `rank` give at the cursor's X, in series order. */
+export function slotTooltipPoints(engine: ChartCore, rank: number): TooltipPoint[] {
+  const points: TooltipPoint[] = [];
+  if (engine.cursorX === null || !engine.hasData()) return points;
+  for (let si = 0; si < engine.config.series.length; si++) {
+    const hit = markOf(engine.config.series[si]).hit;
+    if (hit.tooltipRank !== rank || !hit.slotPoint) continue;
+    const point = hit.slotPoint(engine, si);
+    if (point) points.push(point);
+  }
+  return points;
+}
 
 export function updateTooltipPoints(engine: ChartCore): void {
   if (!engine.hasData() || engine.cursorX === null || engine.cursorY === null) {
@@ -493,17 +564,11 @@ export function updateTooltipPoints(engine: ChartCore): void {
     return;
   }
 
-  // Use chart-type-specific hit-testing for bar/histogram (they need geometry awareness),
-  // fall back to generic HitTester for line/scatter/area.
-  const hasHistogram = engine.config.series.some(
-    (s) => s.type === 'histogram' && s.visible !== false,
-  );
-  const hasBar = engine.config.series.some((s) => s.type === 'bar' && s.visible !== false);
-
-  if (hasHistogram) {
-    engine.tooltipPoints = findHistogramTooltipPoints(engine);
-  } else if (hasBar) {
-    engine.tooltipPoints = findBarTooltipPoints(engine);
+  // Slot marks (bars, histograms) answer from their geometry; the shared HitTester answers for
+  // lines, areas, bands and scatter.
+  const rank = leadingTooltipRank(engine);
+  if (rank > 0) {
+    engine.tooltipPoints = slotTooltipPoints(engine, rank);
   } else {
     const mode = engine.config.tooltip?.mode ?? 'index';
     const hitX = mode === 'nearest' && engine.mouseX !== null ? engine.mouseX : engine.cursorX;
@@ -531,123 +596,10 @@ export function updateTooltipPoints(engine: ChartCore): void {
   }
 }
 
-/** tooltip.xFormat / tooltip.yFormat, when configured. */
-export function tooltipFormatters(
-  engine: ChartCore,
-): { x?: (x: number) => string; y?: (y: number, seriesIndex: number) => string } | undefined {
-  const t = engine.config.tooltip;
-  if (!t?.xFormat && !t?.yFormat) return undefined;
-  return { x: t.xFormat, y: t.yFormat };
-}
-
-/**
- * Hit-test histogram bins: find which bin the cursor X falls into
- * and return a tooltip point showing the bin range and count.
- */
-export function findHistogramTooltipPoints(engine: ChartCore): TooltipPoint[] {
-  const points: TooltipPoint[] = [];
-  if (engine.cursorX === null || !engine.hasData()) return points;
-  const palette = engine.categoricalPalette();
-
-  for (let si = 0; si < engine.config.series.length; si++) {
-    const series = engine.config.series[si];
-    const store = engine.storeForSeries(si);
-    if (store.length === 0) continue;
-    if (series.visible === false || series.type !== 'histogram') continue;
-
-    const xScale = engine.scales.get(series.xAxis ?? 'x');
-    if (!xScale) continue;
-    const dataX = xScale.pixelToData(engine.cursorX);
-
-    const colIdx = seriesYColumn(series);
-    if (colIdx < 1 || colIdx > store.seriesCount) continue;
-
-    const color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
-
-    // Find which bin the cursor X falls into. Edges are sorted, so
-    // `upperBound` gives the largest b with edges[b] <= dataX in O(log n).
-    // Bins are left-edge inclusive. The exact final edge maps to the
-    // final bin so a click on the right border still selects that bar.
-    const b = histogramBinIndexForDataX(dataX, store);
-    if (b === null) continue;
-
-    const binMin = store.xAt(b);
-    const binMax = store.xAt(b + 1);
-    const count = store.yAt(colIdx - 1, b);
-
-    const fmt = tooltipFormatters(engine);
-    points.push({
-      seriesIndex: si,
-      dataIndex: b,
-      label: series.label,
-      x: (binMin + binMax) / 2,
-      xRange: { min: binMin, max: binMax },
-      y: count,
-      color,
-      formattedX: engine.formatHistogramBinRange(binMin, binMax, si),
-      formattedY: fmt?.y ? fmt.y(count, si) : engine.formatAxisReadout(series.yAxis ?? 'y', count),
-    });
-  }
-
-  return points;
-}
-
-/**
- * Hit-test bar charts: find the nearest category to the cursor X
- * and return tooltip points for all bar series at that category.
- */
-export function findBarTooltipPoints(engine: ChartCore): TooltipPoint[] {
-  const points: TooltipPoint[] = [];
-  if (engine.cursorX === null || !engine.hasData()) return points;
-  const palette = engine.categoricalPalette();
-
-  for (let si = 0; si < engine.config.series.length; si++) {
-    const series = engine.config.series[si];
-    const store = engine.storeForSeries(si);
-    if (store.length === 0) continue;
-    if (series.visible === false || series.type !== 'bar') continue;
-
-    const xScale = engine.scales.get(series.xAxis ?? 'x');
-    if (!xScale) continue;
-
-    const dataX = xScale.pixelToData(engine.cursorX);
-    const idx = store.nearestXIndex(dataX);
-    const xVal = store.xAt(idx);
-    const categoryWidth = categoryWidthFromData(
-      (dataIndex) => store.xAt(dataIndex),
-      idx,
-      store.length,
-    );
-    if (Math.abs(dataX - xVal) > categoryWidth * 0.6) continue;
-
-    const colIdx = seriesYColumn(series);
-    if (colIdx < 1 || colIdx > store.seriesCount) continue;
-
-    const yVal = store.yAt(colIdx - 1, idx);
-    if (!Number.isFinite(yVal)) continue;
-
-    const color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
-    const fmt = tooltipFormatters(engine);
-
-    points.push({
-      seriesIndex: si,
-      dataIndex: idx,
-      label: series.label,
-      x: xVal,
-      y: yVal,
-      color,
-      formattedX: fmt?.x ? fmt.x(xVal) : engine.formatAxisValue(series.xAxis ?? 'x', xVal),
-      formattedY: fmt?.y ? fmt.y(yVal, si) : engine.formatReadout(series.yAxis ?? 'y', yVal),
-    });
-  }
-
-  return points;
-}
-
 export function emitPointClick(engine: ChartCore, pixelX: number, pixelY: number): void {
   const palette = engine.categoricalPalette();
   const pointSeries = engine.config.series.map((series) =>
-    series.type === 'bar' || series.type === 'histogram' ? { ...series, visible: false } : series,
+    markOf(series).hit.tooltipRank > 0 ? { ...series, visible: false } : series,
   );
   const points = engine.hitTester.findPoints(
     engine.sourceStores[0],
@@ -671,52 +623,33 @@ export function emitPointClick(engine: ChartCore, pixelX: number, pixelY: number
     { ...tooltipFormatters(engine), readout: engine.readoutY },
     (si) => engine.storeForSeries(si),
   );
-  const bars = engine.config.series.filter(
-    (series) => series.visible !== false && series.type === 'bar',
-  );
-  for (const point of [...findBarTooltipPoints(engine), ...findHistogramTooltipPoints(engine)]) {
-    const series = engine.config.series[point.seriesIndex];
-    const store = engine.storeForSeries(point.seriesIndex);
-    const xScale = engine.scales.get(series.xAxis ?? 'x');
-    const yScale = engine.scales.get(series.yAxis ?? 'y');
-    if (!xScale || !yScale || !Number.isFinite(point.y)) continue;
-    const top = yScale.dataToPixel(point.y);
-    const base = yScale.dataToPixel(yScale.type === 'log' ? yScale.min : 0);
-    if (pixelY < Math.min(top, base) || pixelY > Math.max(top, base)) continue;
-    let left: number;
-    let right: number;
-    if (series.type === 'histogram' && point.xRange) {
-      left = xScale.dataToPixel(point.xRange.min);
-      right = xScale.dataToPixel(point.xRange.max);
-    } else {
-      const rect = barRectForCategory({
-        centerX: xScale.dataToPixel(point.x),
-        categoryWidth: categoryWidthFromData(
-          (index) => xScale.dataToPixel(store.xAt(index)),
-          point.dataIndex,
-          store.length,
-          engine.layout.plot.width * 0.5,
-        ),
-        series,
-        barSeriesIndex: bars.indexOf(series),
-        totalBarSeries: bars.length,
-      });
-      left = rect.left;
-      right = rect.left + rect.width;
+  // A click inside a bar or bin wins over the nearest point; the last slot hit wins.
+  for (const rank of TOOLTIP_RANKS) {
+    for (const point of slotTooltipPoints(engine, rank)) {
+      const series = engine.config.series[point.seriesIndex];
+      const hit = markOf(series).hit;
+      const xScale = engine.scales.get(series.xAxis ?? 'x');
+      const yScale = engine.scales.get(series.yAxis ?? 'y');
+      if (!xScale || !yScale || !hit.slotSpan || !Number.isFinite(point.y)) continue;
+      const top = yScale.dataToPixel(point.y);
+      const base = yScale.dataToPixel(yScale.type === 'log' ? yScale.min : 0);
+      if (pixelY < Math.min(top, base) || pixelY > Math.max(top, base)) continue;
+      const [left, right] = hit.slotSpan(engine, point, xScale, slotOf(engine, series));
+      if (pixelX >= Math.min(left, right) && pixelX <= Math.max(left, right)) points.unshift(point);
     }
-    if (pixelX >= Math.min(left, right) && pixelX <= Math.max(left, right)) points.unshift(point);
   }
   const point = points[0];
   if (point) engine.emitEvent('point:click', point);
 }
 
+/** Every visible series is a histogram (bins on X), in a chart with one source. */
 export function hasOnlyVisibleHistograms(engine: ChartCore): boolean {
   if (engine.sourceStores.length > 1) return false;
   let hasVisibleSeries = false;
   for (const series of engine.config.series) {
     if (series.visible === false) continue;
     hasVisibleSeries = true;
-    if (series.type !== 'histogram') return false;
+    if (markOf(series).draw.x !== 'bin') return false;
   }
   return hasVisibleSeries;
 }
@@ -735,32 +668,5 @@ export function resolveHistogramCursor(
   return {
     dataIndex,
     dataX: (range.min + range.max) / 2,
-  };
-}
-
-export function histogramBinIndexForDataX(dataX: number, store: DataStore): number | null {
-  if (store.length < 2) return null;
-
-  const firstEdge = store.xAt(0);
-  const lastEdge = store.xAt(store.length - 1);
-  if (dataX < firstEdge || dataX > lastEdge) return null;
-
-  let binIdx = store.upperBoundX(dataX);
-  if (binIdx === store.length - 1 && dataX === lastEdge) {
-    binIdx = store.length - 2;
-  }
-
-  if (binIdx < 0 || binIdx >= store.length - 1) return null;
-  return binIdx;
-}
-
-export function histogramBinRange(
-  dataIndex: number,
-  store: DataStore,
-): { min: number; max: number } | null {
-  if (dataIndex < 0 || dataIndex >= store.length - 1) return null;
-  return {
-    min: store.xAt(dataIndex),
-    max: store.xAt(dataIndex + 1),
   };
 }

@@ -75,9 +75,9 @@ import {
   updateLayout,
   updateScalePixelRanges,
 } from './layout';
-import { renderAllSeries } from './marks/index';
-import type { ScatterSeriesCache } from './marks/scatter';
-import type { ScatterStyleResolver, ScatterPalettes } from './marks/scatterEncoding';
+import { legendItems, renderAllSeries } from './marks/index';
+import type { ScatterSeriesCache } from './marks/scatter/draw';
+import type { ScatterStyleResolver, ScatterPalettes } from './marks/scatter/encoding';
 import { renderOverlay } from './render/overlay';
 import { wireEvents } from './interaction/actions';
 import { debugSnapshot, type DataPassSeries, type DebugSnapshot } from './debug';
@@ -652,28 +652,7 @@ export class ChartCore implements EngineHost {
   }
 
   getLegendItems(): LegendItem[] {
-    const palette = this.categoricalPalette();
-    return this.config.series.map((series, seriesIndex) => {
-      const type = series.type ?? 'line';
-      const color = series.color ?? palette[(series.paletteIndex ?? seriesIndex) % palette.length];
-      const configuredFill = typeof series.fill === 'string' ? series.fill : null;
-      const fill =
-        series.fill === null
-          ? null
-          : (configuredFill ?? (type === 'line' || type === 'scatter' ? null : color));
-      return {
-        seriesIndex,
-        label: series.label,
-        type,
-        visible: series.visible !== false,
-        color,
-        fill,
-        lineWidth: series.lineWidth ?? 1.5,
-        dash: series.dash ? [...series.dash] : [],
-        opacity: series.opacity ?? 1,
-        meta: series.meta,
-      };
-    });
+    return legendItems(this);
   }
 
   refreshTheme(): void {

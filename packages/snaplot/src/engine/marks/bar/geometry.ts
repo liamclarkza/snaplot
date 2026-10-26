@@ -1,4 +1,8 @@
-import type { SeriesSpec } from '../spec';
+/**
+ * Bar slot geometry (a leaf module): a slot's width from the neighbouring X values and a bar's
+ * rectangle in it. The bar draw and hit halves, the overlay and the domain policy share it.
+ */
+import type { SeriesSpec } from '../../spec';
 
 export interface BarRect {
   left: number;

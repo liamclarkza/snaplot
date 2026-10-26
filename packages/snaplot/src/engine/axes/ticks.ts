@@ -5,6 +5,7 @@
 import type { AxisSpec, Scale } from '../spec';
 import { DEFAULT_TICK_COUNT } from '../../constants';
 import type { ChartCore } from '../Engine';
+import { markOf } from '../marks/index';
 
 /**
  * Tick values for an axis: explicit `ac.ticks` (clamped to the visible
@@ -46,10 +47,11 @@ export type CustomXTicks = {
   format?: (value: number) => string;
 };
 
-export function axisMarkCoordinates(engine: ChartCore, type: 'bar' | 'histogram'): number[] {
+/** The X values of the visible slot (bar) or bin (histogram) series on the X axis, sorted. */
+export function axisMarkCoordinates(engine: ChartCore, x: 'slot' | 'bin'): number[] {
   const stores = new Set(
     engine.config.series.flatMap((series, si) =>
-      series.visible !== false && series.type === type && (series.xAxis ?? 'x') === 'x'
+      series.visible !== false && markOf(series).draw.x === x && (series.xAxis ?? 'x') === 'x'
         ? [engine.storeForSeries(si)]
         : [],
     ),
@@ -76,16 +78,16 @@ export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined
   );
 
   // Histogram: X data = bin edges, use them as tick values
-  const histSeries = visibleSeries.find((s) => s.type === 'histogram');
+  const histSeries = visibleSeries.find((s) => markOf(s).draw.x === 'bin');
   if (histSeries && engine.hasData()) {
     // X column contains bin edges directly (pre-computed by user)
-    const edgeValues = thinTicks(axisMarkCoordinates(engine, 'histogram'), maxCategoryTicks);
+    const edgeValues = thinTicks(axisMarkCoordinates(engine, 'bin'), maxCategoryTicks);
     return { values: edgeValues, format: userFormat ?? defaultFormat };
   }
 
   const xScale = engine.scales.get('x');
   const barPlan = xScale ? engine.barXAxisPlans.get('x') : undefined;
-  const hasVisibleBar = visibleSeries.some((series) => series.type === 'bar');
+  const hasVisibleBar = visibleSeries.some((series) => markOf(series).draw.x === 'slot');
   if (
     barPlan &&
     hasVisibleBar &&
@@ -107,9 +109,9 @@ export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined
   }
 
   // Bar chart: tick at each category X value
-  const barSeries = visibleSeries.find((s) => s.type === 'bar');
+  const barSeries = visibleSeries.find((s) => markOf(s).draw.x === 'slot');
   if (barSeries && engine.hasData()) {
-    const values = thinTicks(axisMarkCoordinates(engine, 'bar'), maxCategoryTicks);
+    const values = thinTicks(axisMarkCoordinates(engine, 'slot'), maxCategoryTicks);
     return { values, format: userFormat ?? defaultFormat };
   }
 

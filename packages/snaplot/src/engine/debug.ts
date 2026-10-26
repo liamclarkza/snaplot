@@ -1,7 +1,7 @@
 import type { ChartCore } from './Engine';
 import type { SeriesSpec, Layout, ThemeConfig } from './spec';
 import type { ColumnarSegment } from './data/DataStore';
-import type { LineRenderSegment } from './marks/line';
+import type { LineRenderSegment } from './marks/line/draw';
 import type { AxesRenderResult } from './axes/labels';
 
 // ─── Debug counters (plan D31) ──────────────────────────────
@@ -13,6 +13,8 @@ import type { AxesRenderResult } from './axes/labels';
 /** One visible series in the most recent data-layer pass. */
 export interface DataPassSeries {
   type: NonNullable<SeriesSpec['type']>;
+  /** A point-cloud mark (scatter): in view by X and Y. */
+  cloud: boolean;
   xData: Float64Array;
   yData: Float64Array;
   /** Physical index runs handed to the mark, before any sampling. */
@@ -69,12 +71,12 @@ function countDataPass(pass: readonly DataPassSeries[]): { drawn: number; inView
   let drawn = 0;
   let inView = 0;
   for (const series of pass) {
-    const scatter = series.type === 'scatter';
+    const cloud = series.cloud;
     const visible = (x: number, y: number) =>
       x >= series.xMin &&
       x <= series.xMax &&
       Number.isFinite(y) &&
-      (!scatter || (y >= series.yMin && y <= series.yMax));
+      (!cloud || (y >= series.yMin && y <= series.yMax));
     let seriesInView = 0;
     for (const run of series.runs) {
       for (let i = run.physicalStart; i <= run.physicalEnd; i++) {

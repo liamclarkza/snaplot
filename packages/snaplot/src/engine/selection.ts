@@ -5,8 +5,9 @@
 import type { ChartCore } from './Engine';
 import { type SelectionRange, DirtyFlag, type ScaleRange } from './spec';
 import { BRUSH_EDGE_GRAB_PX } from '../constants';
-import { scatterXColumn, seriesYColumn } from './marks/scatterEncoding';
-import { scatterResolvers } from './marks/index';
+import { seriesYColumn } from './marks/columns';
+import { markOf, xColumnOf } from './marks/index';
+import { scatterResolvers } from './marks/scatter/encoding';
 
 export function getSelection(engine: ChartCore): SelectionRange | null {
   // Return a copy so callers cannot mutate internal state.
@@ -163,8 +164,8 @@ export function scatterPointsInSelection(
     const series = engine.config.series[si];
     const store = engine.storeForSeries(si);
     if (store.length === 0) continue;
-    if (series.visible === false || series.type !== 'scatter') continue;
-    const xColumnIdx = scatterXColumn(series);
+    if (series.visible === false || !markOf(series).draw.cloud) continue;
+    const xColumnIdx = xColumnOf(series);
     const yColumnIdx = seriesYColumn(series);
     if (!engine.isValidColumn(xColumnIdx, store) || !engine.isValidColumn(yColumnIdx, store))
       continue;

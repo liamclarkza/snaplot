@@ -6,9 +6,10 @@
 import type { ChartCore } from './Engine';
 import { inferPosition } from './layout';
 import type { DataStore } from './data/DataStore';
-import { scatterXColumn, seriesYColumn } from './marks/scatterEncoding';
+import { seriesYColumn } from './marks/columns';
+import { markOf, xColumnOf } from './marks/index';
 import { AUTO_RANGE_PADDING, DEFAULT_TICK_COUNT } from '../constants';
-import { categoryWidthFromData } from './marks/barGeometry';
+import { categoryWidthFromData } from './marks/bar/geometry';
 import type { Scale, AxisSpec } from './spec';
 import { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeIndex';
 import { ColumnarStore } from './data/ColumnarStore';
@@ -51,7 +52,7 @@ export function scaleSignature(engine: ChartCore): string {
  */
 export function autoRangeTracked(engine: ChartCore): boolean {
   const hasBarLike = engine.config.series.some(
-    (s) => s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
+    (s) => s.visible !== false && markOf(s).draw.x !== 'continuous',
   );
   if (hasBarLike) {
     autoRange(engine);
@@ -131,7 +132,7 @@ export function autoRangeHorizontal(engine: ChartCore): void {
     for (const [si, s] of engine.config.series.entries()) {
       if ((s.xAxis ?? 'x') !== key || s.visible === false) continue;
       hasBoundSeries = true;
-      includeXColumn(s.type === 'scatter' ? scatterXColumn(s) : 0, engine.storeForSeries(si));
+      includeXColumn(xColumnOf(s), engine.storeForSeries(si));
     }
     if (!hasBoundSeries) includeXColumn(0, engine.sourceStores[0]);
     if (!hasXValue) continue;
@@ -140,20 +141,17 @@ export function autoRangeHorizontal(engine: ChartCore): void {
       xMin = xPositiveMin;
     }
     const hasBarSeries = engine.config.series.some(
-      (s) =>
-        s.visible !== false &&
-        (s.xAxis ?? 'x') === key &&
-        (s.type === 'bar' || s.type === 'histogram'),
+      (s) => s.visible !== false && (s.xAxis ?? 'x') === key && markOf(s).draw.x !== 'continuous',
     );
     const hasHistogramSeries = engine.config.series.some(
-      (s) => s.visible !== false && (s.xAxis ?? 'x') === key && s.type === 'histogram',
+      (s) => s.visible !== false && (s.xAxis ?? 'x') === key && markOf(s).draw.x === 'bin',
     );
     const barStores = [
       ...new Set(
         engine.config.series.flatMap((series, si) =>
           series.visible !== false &&
           (series.xAxis ?? 'x') === key &&
-          (series.type === 'bar' || series.type === 'histogram')
+          markOf(series).draw.x !== 'continuous'
             ? [engine.storeForSeries(si)]
             : [],
         ),
@@ -170,7 +168,7 @@ export function autoRangeHorizontal(engine: ChartCore): void {
     const isScatterOnly =
       !hasBarSeries &&
       engine.config.series.length > 0 &&
-      engine.config.series.every((s) => s.visible === false || s.type === 'scatter');
+      engine.config.series.every((s) => s.visible === false || markOf(s).draw.cloud);
 
     if (scale.type === 'log') {
       const [min, max] = paddedLogRange(xMin, xMax, ac.padding ?? AUTO_RANGE_PADDING);
@@ -316,7 +314,7 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
 
       const store = engine.storeForSeries(si);
       const xScale = engine.scales.get(s.xAxis ?? 'x') ?? engine.scales.get('x');
-      const xColumnIdx = s.type === 'scatter' ? scatterXColumn(s) : 0;
+      const xColumnIdx = xColumnOf(s);
       let startIdx = 0;
       let endIdx = store.length - 1;
       if (xScale && xColumnIdx === 0) {
@@ -324,23 +322,19 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
       }
 
       const yColumnIdx = seriesYColumn(s) - 1;
-      if (s.type === 'scatter' && xColumnIdx !== 0 && engine.isValidColumn(xColumnIdx, store)) {
+      if (xColumnIdx !== 0 && engine.isValidColumn(xColumnIdx, store)) {
         includeColumnForScatterViewport(yColumnIdx, xColumnIdx, xScale, store);
       } else {
         includeColumnRange(yColumnIdx, startIdx, endIdx, store);
       }
-      if (s.type === 'band') {
-        if (s.upperColumn != null) includeColumnRange(s.upperColumn - 1, startIdx, endIdx, store);
-        if (s.lowerColumn != null) includeColumnRange(s.lowerColumn - 1, startIdx, endIdx, store);
+      for (const column of markOf(s).draw.extentColumns(s)) {
+        includeColumnRange(column - 1, startIdx, endIdx, store);
       }
     }
 
-    // For bar/histogram series, always include 0 as the baseline
+    // For zero-based marks (bars, histograms), always include 0 as the baseline
     const hasBarOrHist = engine.config.series.some(
-      (s) =>
-        (s.yAxis ?? 'y') === key &&
-        s.visible !== false &&
-        (s.type === 'bar' || s.type === 'histogram'),
+      (s) => (s.yAxis ?? 'y') === key && s.visible !== false && markOf(s).draw.zeroBased,
     );
     if (!hasValue) continue;
 

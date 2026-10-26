@@ -13,10 +13,10 @@ import {
 } from './spec';
 import { scaleSignature, autoRangeVertical, autoRangeHorizontal, columnRange } from './ranging';
 import { inferPosition, isInPlotArea } from './layout';
-import { scatterXColumn, seriesYColumn } from './marks/scatterEncoding';
+import { seriesYColumn } from './marks/columns';
 import { INTERACTION_REFINE_MS } from '../constants';
 import { refreshCursor } from './cursor';
-import { interactionSamplingBudget } from './marks/index';
+import { interactionSamplingBudget, markOf, xColumnOf } from './marks/index';
 
 export function followWindow(engine: ChartCore): number | undefined {
   const follow = (engine.config.streaming as StreamingSpec | undefined)?.followWindow;
@@ -85,7 +85,7 @@ export function unpinMissedAxes(engine: ChartCore, config: ChartSpec): void {
     config.series.forEach((series, si) => {
       const store = engine.sourceStores[engine.seriesSources[si] ?? 0];
       if ((series.xAxis ?? 'x') !== key || !store?.length) return;
-      const xColumn = scatterXColumn(series);
+      const xColumn = xColumnOf(series);
       if (xColumn === 0) {
         min = Math.min(min, store.xAt(0));
         max = Math.max(max, store.xAt(store.length - 1));
@@ -439,7 +439,7 @@ export function isScatterOnlyAxis(engine: ChartCore, scaleKey: string): boolean 
   const bound = engine.config.series.filter(
     (s) => (s.yAxis ?? 'y') === scaleKey && s.visible !== false,
   );
-  return bound.length > 0 && bound.every((s) => s.type === 'scatter');
+  return bound.length > 0 && bound.every((s) => markOf(s).draw.cloud);
 }
 
 /**

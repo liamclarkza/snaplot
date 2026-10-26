@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderHistogramSegments } from './histogram';
-import type { Layout, Scale, SeriesSpec } from '../spec';
+import { renderHistogramSegments } from './draw';
+import type { Layout, Scale, SeriesSpec } from '../../spec';
 
 const f = (xs: number[]) => Float64Array.from(xs);
 

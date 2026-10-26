@@ -1,35 +1,173 @@
 /**
- * The series pass: every visible series drawn through its mark, the highlighted one last, with
- * the interaction pass while the viewport moves (M4 decimation for lines and areas, a sampling
- * stride for scatter) and the cached scatter style resolvers.
+ * The mark registry (plan §3.1): one `Mark` per series type, and the only place the engine looks
+ * at `series.type`. A mark has two halves in its folder: `<type>/draw.ts`, its traits, extent
+ * columns, legend fill and drawing (`MarkDraw`, below; M11), and `<type>/hit.ts`, its tooltip
+ * rows, click target and hover indicator (`MarkHit`, in `../hit.ts`; M12a). The engine modules
+ * ask the registry (`markOf`, `xColumnOf` and the traits) instead of naming types.
+ *
+ * Also here: the series pass (every visible series through its mark, the highlighted one last,
+ * with the interaction pass while the viewport moves: M4 decimation for `'decimate'` marks and a
+ * sampling stride for `'sample'` marks) and the legend items.
+ *
+ * Import rule: the mark folders import only types from this module and from `../hit.ts`, never
+ * values, so the registry below is built when this module loads, whichever module imports a mark
+ * first. Their shared helpers are leaf modules: `columns.ts`, `bar/geometry.ts`,
+ * `scatter/encoding.ts` and `../format.ts`.
  */
 import type { ChartCore } from '../Engine';
 import type { DataPassSeries } from '../debug';
-import {
-  seriesYColumn,
-  scatterXColumn,
-  normalizeScatterColorBy,
-  normalizeScatterSizeBy,
-  buildScatterEncodingState,
-  resolverFromEncodingState,
-} from './scatterEncoding';
-import {
-  renderLineSegments,
-  renderAreaSegments,
-  renderBandSegments,
-  type LineRenderSegment,
-} from './line';
-import { ScatterSeriesCache, renderScatterSegments } from './scatter';
-import { renderBarsSegments } from './bar';
-import { renderHistogramSegments } from './histogram';
-import type { ColumnarSegment } from '../data/DataStore';
+import type { MarkHit, SlotPlace } from '../hit';
+import type { ChartType, LegendItem, Scale, SeriesSpec } from '../spec';
+import type { ColumnarSegment, DataStore } from '../data/DataStore';
 import {
   DEFAULT_INTERACTION_SAMPLING,
   MIN_TOUCH_INTERACTION_SAMPLING,
   TOUCH_INTERACTION_POINTS_PER_PIXEL,
 } from '../../constants';
-import type { Scale, SeriesSpec } from '../spec';
 import { m4 } from '../data/m4';
+import { type RenderSegment, seriesYColumn, toRenderSegments } from './columns';
+import { normalizeScatterColorBy, normalizeScatterSizeBy } from './scatter/encoding';
+import { lineDraw } from './line/draw';
+import { lineHit } from './line/hit';
+import { areaDraw } from './area/draw';
+import { areaHit } from './area/hit';
+import { bandDraw } from './band/draw';
+import { bandHit } from './band/hit';
+import { scatterDraw } from './scatter/draw';
+import { scatterHit } from './scatter/hit';
+import { barDraw } from './bar/draw';
+import { barHit } from './bar/hit';
+import { histogramDraw } from './histogram/draw';
+import { histogramHit } from './histogram/hit';
+
+/** What the series pass hands a mark to draw one series on the data layer. */
+export interface SeriesPass {
+  readonly engine: ChartCore;
+  readonly ctx: CanvasRenderingContext2D;
+  readonly seriesIndex: number;
+  readonly series: SeriesSpec;
+  readonly store: DataStore;
+  /** The series colour: `series.color`, else its palette slot. */
+  readonly color: string;
+  readonly xScale: Scale;
+  readonly yScale: Scale;
+  /** The store's physical runs to draw: those in the X viewport, or all for a mark not culled by X. */
+  readonly runs: ColumnarSegment[];
+  /** The runs over the series' X, Y, colour and size columns; M4-decimated during a gesture. */
+  readonly segments: RenderSegment[];
+  /** The physical X and Y columns the runs index. */
+  readonly xData: Float64Array;
+  readonly yData: Float64Array;
+  /** Highlight dimming: `highlight.dimOpacity` while another series is highlighted, else 1. */
+  readonly opacity: number;
+  /** The series' place among the visible slot marks (grouped bars). */
+  readonly slot: SlotPlace;
+  /** A `'sample'` mark's stride: draw every `stride`-th point (1 draws all). */
+  readonly stride: number;
+  /** A gesture is moving the viewport (reduced-fidelity drawing is on). */
+  readonly interacting: boolean;
+}
+
+/** The draw half of a mark (`marks/<type>/draw.ts`; M11): its traits and its drawing. */
+export interface MarkDraw {
+  /**
+   * How the mark sits along X: `'continuous'` (lines, areas, bands, scatter); `'slot'`, one slot
+   * per X value that the visible slot series share side by side (bars); `'bin'`, X holds the bin
+   * edges (histograms). Slot and bin marks tick X from their data and repaint the grid with it.
+   */
+  readonly x: 'continuous' | 'slot' | 'bin';
+  /** The mark grows from 0, so a linear value axis includes 0 (bars, histograms). */
+  readonly zeroBased: boolean;
+  /**
+   * A point cloud (scatter): X may be its own column; its X domain is padded; it counts as in view
+   * by X and Y; the tooltip is its nearest point; a box selection lists its points; a chart of
+   * only clouds draws no crosshair.
+   */
+  readonly cloud: boolean;
+  /** What a gesture changes in the drawing: M4 decimation of the runs, a sampling stride, or none. */
+  readonly interaction: 'decimate' | 'sample' | 'none';
+  /** The store column holding the series' X: 0 (the source's X) unless the mark reads another. */
+  xColumn(series: SeriesSpec): number;
+  /** Store columns besides `yColumn` that the value axis spans, in order (a band's bounds). */
+  extentColumns(series: SeriesSpec): readonly number[];
+  /** The legend swatch fill of a series that sets no `fill`: its colour, or null (stroke marks). */
+  legendFill(color: string): string | null;
+  /** Draws one series. */
+  draw(pass: SeriesPass): void;
+}
+
+/** A series type's two halves. */
+export interface Mark {
+  readonly type: ChartType;
+  readonly draw: MarkDraw;
+  readonly hit: MarkHit;
+}
+
+const MARKS: Readonly<Record<ChartType, Mark>> = {
+  line: { type: 'line', draw: lineDraw, hit: lineHit },
+  area: { type: 'area', draw: areaDraw, hit: areaHit },
+  band: { type: 'band', draw: bandDraw, hit: bandHit },
+  scatter: { type: 'scatter', draw: scatterDraw, hit: scatterHit },
+  bar: { type: 'bar', draw: barDraw, hit: barHit },
+  histogram: { type: 'histogram', draw: histogramDraw, hit: histogramHit },
+};
+
+/** The mark that draws `series` (a series without a `type` is a line). */
+export function markOf(series: SeriesSpec): Mark {
+  return MARKS[series.type ?? 'line'];
+}
+
+/** The store column of the series' X: 0, the source's X, unless its mark reads another. */
+export function xColumnOf(series: SeriesSpec): number {
+  return markOf(series).draw.xColumn(series);
+}
+
+/** The slot marks' tooltip ranks, ascending: the order a click tests their spans in. */
+export const TOOLTIP_RANKS: readonly number[] = [
+  ...new Set(Object.values(MARKS).map((mark) => mark.hit.tooltipRank)),
+]
+  .filter((rank) => rank > 0)
+  .sort((a, b) => a - b);
+
+/** The chart's visible slot-mark series (grouped bars), in options order. */
+export function visibleSlots(engine: ChartCore): SeriesSpec[] {
+  return engine.config.series.filter((s) => s.visible !== false && markOf(s).draw.x === 'slot');
+}
+
+/** The series' place among the chart's visible slot marks (`slots`, by default computed here). */
+export function slotOf(
+  engine: ChartCore,
+  series: SeriesSpec,
+  slots: readonly SeriesSpec[] = visibleSlots(engine),
+): SlotPlace {
+  return { index: slots.indexOf(series), count: slots.length };
+}
+
+/** The legend's items: one per series, with its mark's swatch fill. */
+export function legendItems(engine: ChartCore): LegendItem[] {
+  const palette = engine.categoricalPalette();
+  return engine.config.series.map((series, seriesIndex) => {
+    const type = series.type ?? 'line';
+    const color = series.color ?? palette[(series.paletteIndex ?? seriesIndex) % palette.length];
+    const configuredFill = typeof series.fill === 'string' ? series.fill : null;
+    const fill =
+      series.fill === null ? null : (configuredFill ?? markOf(series).draw.legendFill(color));
+    return {
+      seriesIndex,
+      label: series.label,
+      type,
+      visible: series.visible !== false,
+      color,
+      fill,
+      lineWidth: series.lineWidth ?? 1.5,
+      dash: series.dash ? [...series.dash] : [],
+      opacity: series.opacity ?? 1,
+      meta: series.meta,
+    };
+  });
+}
+
+// ─── The series pass ──────────────────────────────────────────
 
 export function renderAllSeries(engine: ChartCore): void {
   const ctx = engine.canvasManager.dataCtx;
@@ -39,17 +177,17 @@ export function renderAllSeries(engine: ChartCore): void {
   const pass: DataPassSeries[] = [];
   engine.lastDataPass = pass;
 
-  // Count bar-type series for grouped width calculation. This mapping is
+  // Count slot-mark series for grouped width calculation. This mapping is
   // position-based (which slot a bar occupies in each group), so it must
   // be computed from config order, not affected by the highlight draw-last pass.
-  const barSeries = engine.config.series.filter((s) => s.visible !== false && s.type === 'bar');
-  const barIdxFor = new Map<number, number>();
+  const slotSeries = visibleSlots(engine);
+  const slotIdxFor = new Map<number, number>();
   {
     let i = 0;
     for (let si = 0; si < engine.config.series.length; si++) {
       const s = engine.config.series[si];
-      if (s.visible !== false && s.type === 'bar') {
-        barIdxFor.set(si, i++);
+      if (s.visible !== false && markOf(s).draw.x === 'slot') {
+        slotIdxFor.set(si, i++);
       }
     }
   }
@@ -68,6 +206,7 @@ export function renderAllSeries(engine: ChartCore): void {
     const store = engine.storeForSeries(si);
     const series = engine.config.series[si];
     if (!series || series.visible === false) return;
+    const mark = markOf(series).draw;
 
     const color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
     const xScale = engine.scales.get(series.xAxis ?? 'x')!;
@@ -78,7 +217,7 @@ export function renderAllSeries(engine: ChartCore): void {
     if (colIdx < 1 || colIdx > store.seriesCount) return;
 
     const type = series.type ?? 'line';
-    const xColumnIdx = type === 'scatter' ? scatterXColumn(series) : 0;
+    const xColumnIdx = mark.xColumn(series);
     if (!engine.isValidColumn(xColumnIdx, store)) return;
     const canCullByGlobalX = xColumnIdx === 0;
     const [startIdx, endIdx] = canCullByGlobalX
@@ -101,14 +240,11 @@ export function renderAllSeries(engine: ChartCore): void {
         ? store.getPhysicalColumn(sizeBy.column)
         : undefined,
     );
-    const renderSeries =
-      type === 'scatter' && series.heatmap && !series.heatmapGradient
-        ? { ...series, heatmapGradient: heatmapGradient(engine) }
-        : series;
 
     const opacityMul = highlightActive && si !== highlightedSi ? dimOpacity : 1;
     const record: DataPassSeries = {
       type,
+      cloud: mark.cloud,
       xData,
       yData,
       runs: segments,
@@ -120,129 +256,49 @@ export function renderAllSeries(engine: ChartCore): void {
     };
     pass.push(record);
 
-    switch (type) {
-      case 'line': {
-        const drawn = decimateLineSegments(engine, renderSegments, xScale);
-        if (drawn !== renderSegments) record.decimated = drawn;
-        renderLineSegments(
-          ctx,
-          drawn,
-          xScale,
-          yScale,
-          engine.layout,
-          renderSeries,
-          color,
-          opacityMul,
-        );
-        break;
-      }
-      case 'area': {
-        const drawn = decimateLineSegments(engine, renderSegments, xScale);
-        if (drawn !== renderSegments) record.decimated = drawn;
-        renderAreaSegments(
-          ctx,
-          drawn,
-          xScale,
-          yScale,
-          engine.layout,
-          renderSeries,
-          color,
-          opacityMul,
-        );
-        break;
-      }
-      case 'band': {
-        const upperIdx = series.upperColumn;
-        const lowerIdx = series.lowerColumn;
-        if (
-          upperIdx != null &&
-          lowerIdx != null &&
-          upperIdx >= 1 &&
-          lowerIdx >= 1 &&
-          upperIdx <= store.seriesCount &&
-          lowerIdx <= store.seriesCount
-        ) {
-          const upperYData = store.getPhysicalColumn(upperIdx);
-          const lowerYData = store.getPhysicalColumn(lowerIdx);
-          renderBandSegments(
-            ctx,
-            bandRenderSegments(segments, xData, yData, upperYData, lowerYData),
-            xScale,
-            yScale,
-            engine.layout,
-            renderSeries,
-            color,
-            opacityMul,
-          );
+    // The interaction pass: while the viewport is in motion, decimate lines and areas (M4) and
+    // cap the scatter points drawn this frame; hit-testing and the settled repaint stay
+    // full-fidelity.
+    let drawn = renderSegments;
+    let sampleStride = 1;
+    let interacting = false;
+    if (mark.interaction === 'decimate') {
+      drawn = decimateLineSegments(engine, renderSegments, xScale);
+      if (drawn !== renderSegments) record.decimated = drawn;
+    } else if (mark.interaction === 'sample') {
+      const budget = interactionSamplingBudget(engine, canCullByGlobalX);
+      if (budget !== null && interactionActive(engine)) {
+        let visible = 0;
+        for (const segment of renderSegments) {
+          visible += segment.endIdx - segment.startIdx + 1;
         }
-        break;
-      }
-      case 'scatter': {
-        let cache = engine.scatterSeriesCaches.get(si);
-        if (!cache) {
-          cache = new ScatterSeriesCache();
-          engine.scatterSeriesCaches.set(si, cache);
+        if (visible > budget) {
+          sampleStride = visible / budget;
+          engine.sampledLastDataRender = true;
         }
-        // Interaction pass: while the viewport is in motion, cap the
-        // points drawn this frame; hit-testing and the settled repaint
-        // stay full-fidelity.
-        let sampleStride = 1;
-        const budget = interactionSamplingBudget(engine, canCullByGlobalX);
-        if (budget !== null && interactionActive(engine)) {
-          let visible = 0;
-          for (const segment of renderSegments) {
-            visible += segment.endIdx - segment.startIdx + 1;
-          }
-          if (visible > budget) {
-            sampleStride = visible / budget;
-            engine.sampledLastDataRender = true;
-          }
-        }
-        record.stride = sampleStride;
-        renderScatterSegments(
-          ctx,
-          renderSegments,
-          xScale,
-          yScale,
-          engine.layout,
-          renderSeries,
-          color,
-          opacityMul,
-          engine.scatterPalettes(),
-          cache,
-          scatterResolvers(engine, si, series, color).renderResolver,
-          sampleStride,
-          interactionActive(engine),
-        );
-        break;
       }
-      case 'bar':
-        renderBarsSegments(
-          ctx,
-          renderSegments,
-          xScale,
-          yScale,
-          engine.layout,
-          renderSeries,
-          color,
-          barIdxFor.get(si) ?? 0,
-          barSeries.length,
-          opacityMul,
-        );
-        break;
-      case 'histogram':
-        renderHistogramSegments(
-          ctx,
-          renderSegments,
-          xScale,
-          yScale,
-          engine.layout,
-          renderSeries,
-          color,
-          opacityMul,
-        );
-        break;
+      record.stride = sampleStride;
+      interacting = interactionActive(engine);
     }
+
+    mark.draw({
+      engine,
+      ctx,
+      seriesIndex: si,
+      series,
+      store,
+      color,
+      xScale,
+      yScale,
+      runs: segments,
+      segments: drawn,
+      xData,
+      yData,
+      opacity: opacityMul,
+      slot: { index: slotIdxFor.get(si) ?? 0, count: slotSeries.length },
+      stride: sampleStride,
+      interacting,
+    });
   };
 
   if (highlightActive) {
@@ -255,43 +311,6 @@ export function renderAllSeries(engine: ChartCore): void {
       drawOne(si);
     }
   }
-}
-
-export function toRenderSegments(
-  segments: ColumnarSegment[],
-  xData: Float64Array,
-  yData: Float64Array,
-  colorData?: Float64Array,
-  sizeData?: Float64Array,
-) {
-  return segments.map((segment) => ({
-    xData,
-    yData,
-    colorData,
-    sizeData,
-    startIdx: segment.physicalStart,
-    endIdx: segment.physicalEnd,
-    // Ring stores wrap: per-datum callbacks (bar fill) receive logical
-    // indices, so carry the logical origin of each physical run.
-    logicalStartIdx: segment.logicalStart,
-  }));
-}
-
-export function bandRenderSegments(
-  segments: ColumnarSegment[],
-  xData: Float64Array,
-  centerYData: Float64Array,
-  upperYData: Float64Array,
-  lowerYData: Float64Array,
-) {
-  return segments.map((segment) => ({
-    xData,
-    centerYData,
-    upperYData,
-    lowerYData,
-    startIdx: segment.physicalStart,
-    endIdx: segment.physicalEnd,
-  }));
 }
 
 /**
@@ -336,9 +355,9 @@ export function interactionActive(engine: ChartCore): boolean {
  */
 export function decimateLineSegments(
   engine: ChartCore,
-  segments: LineRenderSegment[],
+  segments: RenderSegment[],
   xScale: Scale,
-): LineRenderSegment[] {
+): RenderSegment[] {
   if (!interactionActive(engine)) return segments;
   const pixelWidth = Math.max(1, Math.round(engine.layout.plot.width));
   const budget = pixelWidth * 4;
@@ -347,7 +366,7 @@ export function decimateLineSegments(
   for (const s of segments) total += s.endIdx - s.startIdx + 1;
   if (total <= budget) return segments;
 
-  const out: LineRenderSegment[] = [];
+  const out: RenderSegment[] = [];
   for (const s of segments) {
     const [dx, dy] = m4(
       s.xData.subarray(s.startIdx, s.endIdx + 1),
@@ -362,57 +381,4 @@ export function decimateLineSegments(
   if (out.length === 0) return segments;
   engine.sampledLastDataRender = true;
   return out;
-}
-
-export function scatterResolvers(
-  engine: ChartCore,
-  si: number,
-  series: SeriesSpec,
-  fallbackColor: string,
-) {
-  const store = engine.storeForSeries(si);
-  const cached = engine.scatterEncodingCache.get(si);
-  if (
-    cached &&
-    cached.series === series &&
-    cached.theme === engine.theme &&
-    cached.version === engine.dataVersion
-  ) {
-    return cached;
-  }
-
-  const logicalValueAt = (columnIdx: number, index: number) => store.valueAt(columnIdx, index);
-  const state = buildScatterEncodingState({
-    series,
-    fallbackColor,
-    fallbackRadius: series.pointRadius ?? (store.length > 10_000 ? 1.5 : 3),
-    palettes: engine.scatterPalettes(),
-    columnCount: store.seriesCount + 1,
-    ranges: [{ startIdx: 0, endIdx: store.length - 1 }],
-    valueAt: logicalValueAt,
-  });
-
-  const physicalColumns = new Map<number, Float64Array>();
-  const physicalValueAt = (columnIdx: number, index: number) => {
-    let column = physicalColumns.get(columnIdx);
-    if (!column) {
-      column = store.getPhysicalColumn(columnIdx);
-      physicalColumns.set(columnIdx, column);
-    }
-    return column[index] ?? Number.NaN;
-  };
-
-  const entry = {
-    series,
-    theme: engine.theme,
-    version: engine.dataVersion,
-    renderResolver: resolverFromEncodingState(state, physicalValueAt),
-    logicalResolver: resolverFromEncodingState(state, logicalValueAt),
-  };
-  engine.scatterEncodingCache.set(si, entry);
-  return entry;
-}
-
-export function heatmapGradient(engine: ChartCore): string[] | undefined {
-  return engine.theme.heatmapGradient ?? engine.theme.sequentialPalette;
 }

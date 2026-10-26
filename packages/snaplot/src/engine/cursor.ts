@@ -12,15 +12,11 @@ import {
   type SeriesSpec,
 } from './spec';
 import type { DataStore } from './data/DataStore';
-import { seriesYColumn, scatterXColumn } from './marks/scatterEncoding';
+import { seriesYColumn } from './marks/columns';
+import { histogramBinIndexForDataX, histogramBinRange } from './marks/histogram/hit';
+import { markOf, xColumnOf } from './marks/index';
 import { applyProximityHighlight, clearProximityHighlight } from './highlight';
-import {
-  updateTooltipPoints,
-  hasOnlyVisibleHistograms,
-  resolveHistogramCursor,
-  histogramBinIndexForDataX,
-  histogramBinRange,
-} from './hit';
+import { updateTooltipPoints, hasOnlyVisibleHistograms, resolveHistogramCursor } from './hit';
 import { isInPlotArea } from './layout';
 
 export function setCursorDataX(
@@ -170,8 +166,7 @@ export function refreshCursor(engine: ChartCore): void {
 export function canUseGlobalXCursor(engine: ChartCore): boolean {
   if (engine.sourceStores.length > 1) return false;
   return !engine.config.series.some(
-    (series) =>
-      series.visible !== false && series.type === 'scatter' && scatterXColumn(series) !== 0,
+    (series) => series.visible !== false && xColumnOf(series) !== 0,
   );
 }
 
@@ -179,7 +174,8 @@ export function applyNearestScatterCursor(engine: ChartCore): void {
   if ((engine.config.tooltip?.mode ?? 'index') !== 'nearest') return;
   const point = engine.tooltipPoints[0];
   if (!point) return;
-  if (engine.config.series[point.seriesIndex]?.type !== 'scatter') return;
+  const series = engine.config.series[point.seriesIndex];
+  if (!series || !markOf(series).draw.cloud) return;
 
   engine.cursorDataX = point.x;
   engine.cursorDataIdx = point.dataIndex;
@@ -319,8 +315,8 @@ export function fillSnapshot(
     if (shared ? column < 1 || column > store.seriesCount : !engine.isValidColumn(column, store))
       continue;
 
-    const histogram = shared ? onlyBins : series.type === 'histogram';
-    const xColumn = shared ? 0 : series.type === 'scatter' ? scatterXColumn(series) : 0;
+    const histogram = shared ? onlyBins : markOf(series).draw.x === 'bin';
+    const xColumn = shared ? 0 : xColumnOf(series);
     const dataIndex = shared ? row : seriesRow(engine, series, store, source, xColumn);
     if (dataIndex === null) continue;
     const range = shared ? sharedRange : histogram ? histogramBinRange(dataIndex, store) : null;
@@ -390,7 +386,7 @@ function seriesRow(
   source: CursorSnapshot['source'],
   xColumn: number,
 ): number | null {
-  const histogram = series.type === 'histogram';
+  const histogram = markOf(series).draw.x === 'bin';
   if (source === 'latest') return Math.max(0, store.length - (histogram ? 2 : 1));
   if (source === 'first') return 0;
   const seriesX = engine.scales.get(series.xAxis ?? 'x');

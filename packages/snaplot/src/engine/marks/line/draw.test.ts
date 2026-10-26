@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderAreaSegments, renderBandSegments, renderLineSegments } from './line';
-import type { Layout, Scale, SeriesSpec } from '../spec';
+import { renderAreaSegments } from '../area/draw';
+import { renderBandSegments } from '../band/draw';
+import type { Layout, Scale, SeriesSpec } from '../../spec';
+import { renderLineSegments } from './draw';
 
 const f = (xs: number[]) => Float64Array.from(xs);
 

@@ -1,13 +1,22 @@
-import type { Scale, Layout, SeriesSpec } from '../spec';
-import { affineParams } from '../scales/affine';
+/**
+ * The scatter mark's draw half (plan §3.1; M11): stamped points with the `colorBy` and `sizeBy`
+ * encodings, the density heatmap above 200k points, and the interaction pass's sampling stride.
+ * Scatter is the cloud mark: it may read X from its own column (`xColumn`), so it is culled by Y
+ * as well as X and hit-tested by nearest point.
+ */
+import type { ChartCore } from '../../Engine';
+import type { Scale, Layout, SeriesSpec } from '../../spec';
+import { affineParams } from '../../scales/affine';
+import { NO_COLUMNS, seriesYColumn } from '../columns';
+import type { MarkDraw } from '../index';
 import {
   createScatterStyleResolver,
   type IndexRange,
   parseHex,
   type ScatterStyleResolver,
-  seriesYColumn,
   type ScatterPalettes,
-} from './scatterEncoding';
+  scatterResolvers,
+} from './encoding';
 
 export interface ScatterRenderSegment {
   xData: Float64Array;
@@ -662,3 +671,44 @@ function viridisColor(t: number): [number, number, number] {
   const s = (t - 0.75) / 0.25;
   return [Math.round(123 + 130 * s), Math.round(220 + 33 * s), Math.round(80 - 60 * s)];
 }
+
+export function heatmapGradient(engine: ChartCore): string[] | undefined {
+  return engine.theme.heatmapGradient ?? engine.theme.sequentialPalette;
+}
+
+export const scatterDraw: MarkDraw = {
+  x: 'continuous',
+  zeroBased: false,
+  cloud: true,
+  interaction: 'sample',
+  xColumn: (series) => series.xColumn ?? 0,
+  extentColumns: () => NO_COLUMNS,
+  legendFill: () => null,
+  draw(pass) {
+    const { engine, seriesIndex: si, series } = pass;
+    const renderSeries =
+      series.heatmap && !series.heatmapGradient
+        ? { ...series, heatmapGradient: heatmapGradient(engine) }
+        : series;
+    let cache = engine.scatterSeriesCaches.get(si);
+    if (!cache) {
+      cache = new ScatterSeriesCache();
+      engine.scatterSeriesCaches.set(si, cache);
+    }
+    renderScatterSegments(
+      pass.ctx,
+      pass.segments,
+      pass.xScale,
+      pass.yScale,
+      engine.layout,
+      renderSeries,
+      pass.color,
+      pass.opacity,
+      engine.scatterPalettes(),
+      cache,
+      scatterResolvers(engine, si, series, pass.color).renderResolver,
+      pass.stride,
+      pass.interacting,
+    );
+  },
+};

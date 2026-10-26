@@ -1,10 +1,16 @@
+/**
+ * Scatter encodings (plan §3.1): `colorBy` and `sizeBy` resolved to per-point colours and radii,
+ * the tooltip fields, and the chart's cached resolvers (`scatterResolvers`), which the scatter
+ * draw and hit halves and the box selection share. A leaf module: it imports types only.
+ */
+import type { ChartCore } from '../../Engine';
 import type {
   ScatterColorEncoding,
   ScatterSizeEncoding,
   ScatterTooltipField,
   SeriesSpec,
   TooltipFieldValue,
-} from '../spec';
+} from '../../spec';
 
 export interface IndexRange {
   startIdx: number;
@@ -56,14 +62,6 @@ export interface ScatterEncodingState {
   sizeState: SizeState | null;
   fallbackColor: string;
   fallbackRadius: number;
-}
-
-export function scatterXColumn(series: SeriesSpec): number {
-  return series.type === 'scatter' ? (series.xColumn ?? 0) : 0;
-}
-
-export function seriesYColumn(series: SeriesSpec): number {
-  return series.yColumn ?? -1;
 }
 
 export function normalizeScatterColorBy(
@@ -414,4 +412,60 @@ function sampleGradientRgb(rgbStops: [number, number, number][], t: number): str
 
 function rgbToHex(rgb: [number, number, number]): string {
   return `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * The chart's style resolvers for scatter series `si`, built once per data, options or theme
+ * change (building one scans the encoded columns). Domains derive from the full column, so a
+ * point's colour and size stay put while the viewport pans. Two views share one scan: the render
+ * loop addresses points by physical index (segment ranges), hit testing and selection by logical
+ * index.
+ */
+export function scatterResolvers(
+  engine: ChartCore,
+  si: number,
+  series: SeriesSpec,
+  fallbackColor: string,
+) {
+  const store = engine.storeForSeries(si);
+  const cached = engine.scatterEncodingCache.get(si);
+  if (
+    cached &&
+    cached.series === series &&
+    cached.theme === engine.theme &&
+    cached.version === engine.dataVersion
+  ) {
+    return cached;
+  }
+
+  const logicalValueAt = (columnIdx: number, index: number) => store.valueAt(columnIdx, index);
+  const state = buildScatterEncodingState({
+    series,
+    fallbackColor,
+    fallbackRadius: series.pointRadius ?? (store.length > 10_000 ? 1.5 : 3),
+    palettes: engine.scatterPalettes(),
+    columnCount: store.seriesCount + 1,
+    ranges: [{ startIdx: 0, endIdx: store.length - 1 }],
+    valueAt: logicalValueAt,
+  });
+
+  const physicalColumns = new Map<number, Float64Array>();
+  const physicalValueAt = (columnIdx: number, index: number) => {
+    let column = physicalColumns.get(columnIdx);
+    if (!column) {
+      column = store.getPhysicalColumn(columnIdx);
+      physicalColumns.set(columnIdx, column);
+    }
+    return column[index] ?? Number.NaN;
+  };
+
+  const entry = {
+    series,
+    theme: engine.theme,
+    version: engine.dataVersion,
+    renderResolver: resolverFromEncodingState(state, physicalValueAt),
+    logicalResolver: resolverFromEncodingState(state, logicalValueAt),
+  };
+  engine.scatterEncodingCache.set(si, entry);
+  return entry;
 }

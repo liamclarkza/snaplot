@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { SeriesSpec } from '../spec';
-import { createScatterStyleResolver } from './scatterEncoding';
+import type { SeriesSpec } from '../../spec';
+import { createScatterStyleResolver } from './encoding';
 
 function resolverFor(series: SeriesSpec, columns: Float64Array[]) {
   return createScatterStyleResolver({

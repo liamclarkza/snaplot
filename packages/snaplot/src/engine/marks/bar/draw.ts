@@ -1,5 +1,11 @@
-import type { Scale, Layout, SeriesSpec } from '../spec';
-import { barRectForCategory, categoryWidthFromCenters } from './barGeometry';
+/**
+ * The bar mark's draw half (plan §3.1; M11): one slot per X value, the visible bar series side by
+ * side in it (grouped bars), growing from 0.
+ */
+import type { Scale, Layout, SeriesSpec } from '../../spec';
+import type { MarkDraw } from '../index';
+import { NO_COLUMNS } from '../columns';
+import { barRectForCategory, categoryWidthFromCenters } from './geometry';
 
 export interface BarRenderSegment {
   xData: Float64Array;
@@ -178,3 +184,26 @@ function segmentPointCount(segments: BarRenderSegment[]): number {
   }
   return count;
 }
+
+export const barDraw: MarkDraw = {
+  x: 'slot',
+  zeroBased: true,
+  cloud: false,
+  interaction: 'none',
+  xColumn: () => 0,
+  extentColumns: () => NO_COLUMNS,
+  legendFill: (color) => color,
+  draw: (pass) =>
+    renderBarsSegments(
+      pass.ctx,
+      pass.segments,
+      pass.xScale,
+      pass.yScale,
+      pass.engine.layout,
+      pass.series,
+      pass.color,
+      pass.slot.index,
+      pass.slot.count,
+      pass.opacity,
+    ),
+};

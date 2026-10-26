@@ -1,4 +1,10 @@
-import type { Scale, Layout, SeriesSpec } from '../spec';
+/**
+ * The histogram mark's draw half (plan §3.1; M11): bins between consecutive X values (the bin
+ * edges), growing from 0.
+ */
+import type { Scale, Layout, SeriesSpec } from '../../spec';
+import type { MarkDraw } from '../index';
+import { NO_COLUMNS } from '../columns';
 
 export interface HistogramRenderSegment {
   xData: Float64Array;
@@ -94,3 +100,24 @@ function segmentPointCount(segments: HistogramRenderSegment[]): number {
   }
   return count;
 }
+
+export const histogramDraw: MarkDraw = {
+  x: 'bin',
+  zeroBased: true,
+  cloud: false,
+  interaction: 'none',
+  xColumn: () => 0,
+  extentColumns: () => NO_COLUMNS,
+  legendFill: (color) => color,
+  draw: (pass) =>
+    renderHistogramSegments(
+      pass.ctx,
+      pass.segments,
+      pass.xScale,
+      pass.yScale,
+      pass.engine.layout,
+      pass.series,
+      pass.color,
+      pass.opacity,
+    ),
+};

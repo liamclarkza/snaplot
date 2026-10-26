@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderScatterSegments, ScatterSeriesCache } from './scatter';
-import type { ScatterStyleResolver } from './scatterEncoding';
-import type { Layout, Scale, SeriesSpec } from '../spec';
+import type { Layout, Scale, SeriesSpec } from '../../spec';
+import { renderScatterSegments, ScatterSeriesCache } from './draw';
+import type { ScatterStyleResolver } from './encoding';
 
 let createImageDataCalls = 0;
 
