@@ -3071,7 +3071,7 @@
       "category": "perf",
       "title": "Disputed re-ingest numbers settled with one method: 200k rows x 2 series = 54 ms desktop, about 220 ms mobile; a React inline callback at 200k = 150–165 ms per parent render on mobile",
       "required": true,
-      "owners": ["M8"],
+      "owners": ["M8", "M14"],
       "rootCauses": ["RC1"],
       "status": "tracked",
       "lock": {
