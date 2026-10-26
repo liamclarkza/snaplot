@@ -2,7 +2,6 @@ import type {
   ChartSpec,
   ChartEventMap,
   AppendDataOptions,
-  AxisSpec,
   ColumnarData,
   CursorEventOrigin,
   CursorSnapshot,
@@ -31,15 +30,12 @@ import { computeLayout, inferPosition, type PlotInsets } from './layout';
 import type { ColumnarSegment, DataStore } from './data/DataStore';
 import { validateMaxLen } from './data/DataStore';
 import { ColumnarStore } from './data/ColumnarStore';
-import { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeIndex';
+import type { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeIndex';
 import { RingColumnarStore } from './data/RingColumnarStore';
 import { createScale } from './scales/createScale';
-import { niceStep } from './scales/niceNumbers';
 import {
-  AUTO_RANGE_PADDING,
   BRUSH_EDGE_GRAB_PX,
   DEFAULT_INTERACTION_SAMPLING,
-  DEFAULT_TICK_COUNT,
   INTERACTION_REFINE_MS,
   MIN_TOUCH_INTERACTION_SAMPLING,
   MIN_DRAG_DISTANCE,
@@ -86,6 +82,16 @@ import { TooltipManager } from '../interaction/TooltipManager';
 
 import { type HostedPlugin, PluginHost } from './plugins';
 import { isDarkColor } from '../utils/color';
+import {
+  rangeForDataChange,
+  scaleSignature,
+  autoRange,
+  autoRangeHorizontal,
+  autoRangeVertical,
+  invalidateRangeCache,
+  columnRange,
+  type BarXAxisPlan,
+} from './ranging';
 
 // Stable identity for user tickFormat functions in the layout cache key.
 // Stringifying the function body per frame allocated the whole source text
@@ -97,13 +103,6 @@ type CustomXTicks = {
   values: number[];
   gridValues?: number[];
   format?: (value: number) => string;
-};
-
-type BarXAxisPlan = {
-  values: number[];
-  gridValues: number[];
-  domainMin: number;
-  domainMax: number;
 };
 
 function tickFormatId(fn: ((value: number) => string) | undefined): number {
@@ -254,9 +253,9 @@ export class ChartCore implements EngineHost {
   private canvasManager: CanvasManager;
   private scheduler: RenderScheduler;
   private eventBus: EventBus;
-  private sourceStores: DataStore[] = [];
+  sourceStores: DataStore[] = [];
   private seriesSources: readonly number[] = [];
-  private scales: Map<string, Scale> = new Map();
+  scales: Map<string, Scale> = new Map();
   private layout!: Layout;
   private layoutCacheKey = '';
   private theme!: ThemeConfig;
@@ -267,9 +266,9 @@ export class ChartCore implements EngineHost {
    * data-change auto-range path deliberately does not build these: a
    * streaming append per tick would pay an O(n) rebuild for a single query.
    */
-  private rangeIndexVersion = -1;
-  private columnRangeIndexes = new Map<string, ColumnRangeIndex>();
-  private scatterRangeIndexes = new Map<string, ScatterColumnRangeIndex>();
+  rangeIndexVersion = -1;
+  columnRangeIndexes = new Map<string, ColumnRangeIndex>();
+  scatterRangeIndexes = new Map<string, ScatterColumnRangeIndex>();
   /**
    * Per-series scatter render caches (heatmap bitmaps), keyed by series
    * index. Owned here so two charts, or two density series in one chart,
@@ -277,7 +276,7 @@ export class ChartCore implements EngineHost {
    * viewport changes; the map is dropped wholesale on store replacement so
    * stale bitmaps do not retain replaced Float64Array columns.
    */
-  private scatterSeriesCaches = new Map<number, ScatterSeriesCache>();
+  scatterSeriesCaches = new Map<number, ScatterSeriesCache>();
   /**
    * Interaction-pass state: while the viewport is actively changing,
    * scatter series above the `performance.interactionSampling` budget are
@@ -298,7 +297,7 @@ export class ChartCore implements EngineHost {
    * physical index (segment ranges), hit-testing and selection by logical
    * index.
    */
-  private scatterEncodingCache = new Map<
+  scatterEncodingCache = new Map<
     number,
     {
       series: SeriesSpec;
@@ -315,7 +314,7 @@ export class ChartCore implements EngineHost {
   private plugins = new PluginHost<unknown>();
 
   // Config
-  private config: ChartSpec;
+  config: ChartSpec;
 
   // Cursor state
   private cursorX: number | null = null;
@@ -361,14 +360,14 @@ export class ChartCore implements EngineHost {
    * axes during data updates so a zoomed Y (or X) doesn't snap back on the
    * next data replacement or append. Cleared by resetZoom().
    */
-  private userZoomedAxes = new Set<string>();
+  userZoomedAxes = new Set<string>();
 
   /**
    * Live-follow state: the X viewport tracks new data while true, and is
    * pinned by a user pan/zoom while false. Starts true; toggled by the first
    * horizontal viewport change, by `scrollToLatest()`, and by `resetZoom()`.
    */
-  private following = true;
+  following = true;
 
   // Event listeners. Handlers have per-event signatures (see ChartEventMap);
   // the storage is a contravariant-friendly callable so every event's
@@ -382,7 +381,7 @@ export class ChartCore implements EngineHost {
   private highlightedSeries: number | null = null;
 
   /** Bumped by every data change: the range index and the hit and density caches key on it. */
-  private dataVersion = 0;
+  dataVersion = 0;
   // D31 debug counters; see DebugSnapshot. Ring stores share this object.
   private debugCounters = {
     ingestCount: 0,
@@ -407,8 +406,8 @@ export class ChartCore implements EngineHost {
    * `nice: true` expansion). Used by `zoom.bounds: 'data'` so zoom-out stops
    * at the same range `resetZoom()` would produce.
    */
-  private naturalExtent = new Map<string, [number, number]>();
-  private barXAxisPlans = new Map<string, BarXAxisPlan>();
+  naturalExtent = new Map<string, [number, number]>();
+  barXAxisPlans = new Map<string, BarXAxisPlan>();
   /** A chart group's minimum side gutters (`setPlotInsets`). */
   private plotInsets: PlotInsets = {};
   /** naturalGutters()'s cache, keyed by the layout inputs. */
@@ -636,7 +635,7 @@ export class ChartCore implements EngineHost {
     const stores = trusted ? ColumnarStore.trusted(build) : build();
     this.sourceStores = stores;
     this.seriesSources = seriesSources.slice();
-    this.invalidateRangeCache();
+    invalidateRangeCache(this);
     this.unpinMissedAxes(resolved);
     this.dataVersion++;
     this.debugCounters.ingestCount++;
@@ -714,11 +713,11 @@ export class ChartCore implements EngineHost {
     }
   }
 
-  private storeForSeries(seriesIndex: number): DataStore {
+  storeForSeries(seriesIndex: number): DataStore {
     return this.sourceStores[this.seriesSources[seriesIndex] ?? 0] ?? this.sourceStores[0];
   }
 
-  private hasData(): boolean {
+  hasData(): boolean {
     return this.sourceStores.some((store) => store.length > 0);
   }
 
@@ -777,26 +776,13 @@ export class ChartCore implements EngineHost {
     if (!changed) return;
 
     this.dataVersion++;
-    const gridDirty = this.rangeForDataChange();
+    const gridDirty = rangeForDataChange(this);
     this.reconcileSelectionForDataChange();
     this.refreshCursor();
     this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
   }
 
-  /**
-   * Range the axes after a data change. When live-follow is active with a
-   * window, the X viewport is pinned to the trailing window and only Y
-   * auto-ranges; otherwise the normal auto-range runs (which itself respects
-   * user-zoomed axes). Returns whether the grid layer needs a repaint.
-   */
-  private rangeForDataChange(): boolean {
-    if (this.following && this.followWindow() !== undefined && this.hasData()) {
-      return this.applyFollowWindow();
-    }
-    return this.autoRangeTracked();
-  }
-
-  private followWindow(): number | undefined {
+  followWindow(): number | undefined {
     const follow = (this.config.streaming as StreamingSpec | undefined)?.followWindow;
     if (follow === undefined) return undefined;
     // A non-positive window is meaningless; treat it as "no window" so the
@@ -815,10 +801,10 @@ export class ChartCore implements EngineHost {
    * data or a paused viewport. Manual pan/zoom (applyViewportChange) and the
    * explicit resume actions (resetZoom/scrollToLatest) are what sync.
    */
-  private applyFollowWindow(): boolean {
+  applyFollowWindow(): boolean {
     const window = this.followWindow();
     if (window === undefined || !this.hasData()) return false;
-    const before = this.scaleSignature();
+    const before = scaleSignature(this);
     const axisConfigs = this.config.axes ?? {};
     const proposals: Array<{ key: string; scale: Scale; min: number; max: number }> = [];
     for (const [key, scale] of this.scales) {
@@ -837,36 +823,8 @@ export class ChartCore implements EngineHost {
       scale.max = max;
       this.naturalExtent.set(key, [min, max]);
     }
-    if (!this.config.zoom?.y) this.autoRangeVertical(true);
-    return this.scaleSignature() !== before;
-  }
-
-  /** Join every scale's key and bounds; used to detect any domain change. */
-  private scaleSignature(): string {
-    let sig = '';
-    for (const [key, scale] of this.scales) sig += key + ':' + scale.min + ':' + scale.max + '|';
-    return sig;
-  }
-
-  /**
-   * Run auto-range and report whether the grid layer needs a repaint.
-   * When no scale moved (zoomed or pinned axes during streaming), ticks
-   * and gridlines are unchanged and a data update can skip the grid layer
-   * entirely. Bar and histogram X ticks derive from data positions rather
-   * than the domain alone, so those charts always repaint the grid.
-   */
-  private autoRangeTracked(): boolean {
-    const hasBarLike = this.config.series.some(
-      (s) => s.visible !== false && (s.type === 'bar' || s.type === 'histogram'),
-    );
-    if (hasBarLike) {
-      this.autoRange();
-      return true;
-    }
-
-    const before = this.scaleSignature();
-    this.autoRange();
-    return this.scaleSignature() !== before;
+    if (!this.config.zoom?.y) autoRangeVertical(this, true);
+    return scaleSignature(this) !== before;
   }
 
   setAxis(key: string, range: Partial<ScaleRange>): void {
@@ -893,7 +851,7 @@ export class ChartCore implements EngineHost {
     // its own follow window back over the driver on the next data tick.
     if (isHoriz && !this.coordinatingAxis) this.setFollowing(false);
     if (isHoriz && !this.config.zoom?.y) {
-      this.autoRangeVertical(true);
+      autoRangeVertical(this, true);
     }
 
     // Group peers relay a gesture in flight on another chart, so they get
@@ -963,9 +921,9 @@ export class ChartCore implements EngineHost {
     this.setFollowing(!horizontal);
     // A pan (the same horizontal axes pinned at a new range) changes no natural extent, so it
     // skips the horizontal auto-range and its pass over every X, as a gesture does.
-    if (released || !horizontal) this.autoRangeHorizontal();
+    if (released || !horizontal) autoRangeHorizontal(this);
     if (!horizontal) this.applyFollowWindow();
-    this.autoRangeVertical(horizontal);
+    autoRangeVertical(this, horizontal);
     // A pinned axis that moved is a view in motion as far as drawing goes: an app that drives the
     // viewport from a slider or another chart gets the gesture pass, refined once it settles, as
     // a pan or a group sync does.
@@ -1017,7 +975,7 @@ export class ChartCore implements EngineHost {
     this.initAxes();
     this.updateLayout();
     this.updateScalePixelRanges();
-    this.autoRange();
+    autoRange(this);
     // Reapply the follow window that autoRange just overwrote with the full
     // extent, so a config update does not knock a following chart off its
     // trailing window (matches initAxes).
@@ -1107,10 +1065,10 @@ export class ChartCore implements EngineHost {
     );
     this.userZoomedAxes.clear();
     this.setFollowing(true);
-    this.autoRangeHorizontal();
+    autoRangeHorizontal(this);
     // Follow window (if configured) takes precedence over full-extent X.
     this.applyFollowWindow();
-    this.autoRangeVertical();
+    autoRangeVertical(this);
     this.scheduler.markDirty(DirtyFlag.ALL);
 
     this.publishResetViewport(previous);
@@ -1126,8 +1084,8 @@ export class ChartCore implements EngineHost {
     if (this.followWindow() !== undefined && this.hasData()) {
       this.applyFollowWindow();
     } else {
-      this.autoRangeHorizontal();
-      this.autoRangeVertical();
+      autoRangeHorizontal(this);
+      autoRangeVertical(this);
     }
     this.refreshCursor();
     this.scheduler.markDirty(DirtyFlag.ALL);
@@ -1562,11 +1520,11 @@ export class ChartCore implements EngineHost {
       this.sourceStores.map((store) => {
         if (maxLen !== undefined) {
           if (store instanceof RingColumnarStore && store.maxLen === maxLen) return store;
-          this.invalidateRangeCache();
+          invalidateRangeCache(this);
           return new RingColumnarStore(store.getData(), maxLen, this.debugCounters);
         }
         if (!(store instanceof RingColumnarStore)) return store;
-        this.invalidateRangeCache();
+        invalidateRangeCache(this);
         return new ColumnarStore(store.getData());
       }),
     );
@@ -1612,346 +1570,10 @@ export class ChartCore implements EngineHost {
       }
     }
 
-    this.autoRange();
+    autoRange(this);
     // A configured follow window overrides full-extent X on first paint and
     // after a config replace, as long as the user has not paused following.
     if (this.following) this.applyFollowWindow();
-  }
-
-  /**
-   * Auto-range both horizontal and vertical axes to fit data.
-   * Called on data change (replacement, append, init), NOT on zoom.
-   */
-  private autoRange(): void {
-    this.autoRangeHorizontal();
-    this.autoRangeVertical();
-  }
-
-  /** Auto-range horizontal (bottom/top) axes to full data extent. Skipped per-axis when the user has actively zoomed that axis. */
-  private autoRangeHorizontal(): void {
-    this.barXAxisPlans.clear();
-    if (!this.hasData()) return;
-
-    const axisConfigs = this.config.axes ?? {};
-    for (const [key, ac] of Object.entries(axisConfigs)) {
-      const pos = inferPosition(key, ac.position);
-      if (pos !== 'bottom' && pos !== 'top') continue;
-
-      const scale = this.scales.get(key);
-      if (!scale) continue;
-      if (ac.auto === false) continue;
-      // A user-zoomed axis keeps its viewport, but we still recompute its
-      // natural (reset-zoom / `bounds: 'data'`) extent below so streaming data
-      // beyond the pre-zoom extent stays reachable by pan/zoom-out instead of
-      // being frozen out until `resetZoom()`. We restore the live viewport
-      // after the computation.
-      const userZoomed = this.userZoomedAxes.has(key);
-      const preservedMin = scale.min;
-      const preservedMax = scale.max;
-      // Both bounds pinned → restore to those values. Skipping here would
-      // leave zoomed state intact after `resetZoom()`.
-      if (ac.min !== undefined && ac.max !== undefined) {
-        if (!userZoomed) {
-          scale.min = ac.min;
-          scale.max = ac.max;
-        }
-        this.naturalExtent.set(key, [ac.min, ac.max]);
-        continue;
-      }
-
-      let xMin = Infinity;
-      let xMax = -Infinity;
-      let xPositiveMin = Infinity;
-      let hasXValue = false;
-      const visitedColumns = new Map<DataStore, Set<number>>();
-      const includeXColumn = (columnIdx: number, store: DataStore) => {
-        if (!this.isValidColumn(columnIdx, store)) return;
-        let visited = visitedColumns.get(store);
-        if (!visited) {
-          visited = new Set();
-          visitedColumns.set(store, visited);
-        }
-        if (visited.has(columnIdx)) return;
-        visited.add(columnIdx);
-        for (let i = 0; i < store.length; i++) {
-          const value = store.valueAt(columnIdx, i);
-          if (!Number.isFinite(value)) continue;
-          hasXValue = true;
-          if (value < xMin) xMin = value;
-          if (value > xMax) xMax = value;
-          if (value > 0 && value < xPositiveMin) xPositiveMin = value;
-        }
-      };
-      let hasBoundSeries = false;
-      for (const [si, s] of this.config.series.entries()) {
-        if ((s.xAxis ?? 'x') !== key || s.visible === false) continue;
-        hasBoundSeries = true;
-        includeXColumn(s.type === 'scatter' ? scatterXColumn(s) : 0, this.storeForSeries(si));
-      }
-      if (!hasBoundSeries) includeXColumn(0, this.sourceStores[0]);
-      if (!hasXValue) continue;
-      if (scale.type === 'log') {
-        if (xMax <= 0 || xPositiveMin === Infinity) continue;
-        xMin = xPositiveMin;
-      }
-      const hasBarSeries = this.config.series.some(
-        (s) =>
-          s.visible !== false &&
-          (s.xAxis ?? 'x') === key &&
-          (s.type === 'bar' || s.type === 'histogram'),
-      );
-      const hasHistogramSeries = this.config.series.some(
-        (s) => s.visible !== false && (s.xAxis ?? 'x') === key && s.type === 'histogram',
-      );
-      const barStores = [
-        ...new Set(
-          this.config.series.flatMap((series, si) =>
-            series.visible !== false &&
-            (series.xAxis ?? 'x') === key &&
-            (series.type === 'bar' || series.type === 'histogram')
-              ? [this.storeForSeries(si)]
-              : [],
-          ),
-        ),
-      ];
-      const barX =
-        barStores.length === 1
-          ? barStores[0].x
-          : Float64Array.from(
-              [...new Set(barStores.flatMap((store) => Array.from(store.x)))].sort((a, b) => a - b),
-            );
-      // Scatter/heatmap clouds default to a 5% pad so the data fills the plot
-      // with just enough breathing room before continuous-domain nicening.
-      const isScatterOnly =
-        !hasBarSeries &&
-        this.config.series.length > 0 &&
-        this.config.series.every((s) => s.visible === false || s.type === 'scatter');
-
-      if (scale.type === 'log') {
-        const [min, max] = this.paddedLogRange(xMin, xMax, ac.padding ?? AUTO_RANGE_PADDING);
-        scale.min = ac.min ?? min;
-        scale.max = ac.max ?? max;
-      } else if (xMin === xMax) {
-        scale.min = xMin - 1;
-        scale.max = xMax + 1;
-      } else if (hasBarSeries && !hasHistogramSeries && barX.length > 1) {
-        const canPlanBarTicks =
-          scale.type === 'linear' &&
-          ac.nice !== false &&
-          ac.min === undefined &&
-          ac.max === undefined &&
-          (!ac.ticks || ac.ticks.length === 0);
-        const barPlan = canPlanBarTicks
-          ? this.planBarXAxis(Array.from(barX), xMin, xMax, ac.tickCount ?? DEFAULT_TICK_COUNT)
-          : null;
-        if (barPlan) {
-          scale.min = barPlan.domainMin;
-          scale.max = barPlan.domainMax;
-          this.barXAxisPlans.set(key, barPlan);
-        } else {
-          const firstPad = categoryWidthFromData((idx) => barX[idx], 0, barX.length) * 0.5;
-          const lastPad =
-            categoryWidthFromData((idx) => barX[idx], barX.length - 1, barX.length) * 0.5;
-          scale.min = xMin - firstPad;
-          scale.max = xMax + lastPad;
-        }
-      } else if (hasBarSeries && barX.length > 1) {
-        const firstPad = categoryWidthFromData((idx) => barX[idx], 0, barX.length) * 0.5;
-        const lastPad =
-          categoryWidthFromData((idx) => barX[idx], barX.length - 1, barX.length) * 0.5;
-        scale.min = xMin - firstPad;
-        scale.max = xMax + lastPad;
-      } else if (isScatterOnly) {
-        const pad = (xMax - xMin) * (ac.padding ?? AUTO_RANGE_PADDING);
-        scale.min = xMin - pad;
-        scale.max = xMax + pad;
-      } else {
-        // Horizontal auto-range defaults to zero padding; users can opt in
-        // via `axes.[key].padding`.
-        const pad = (xMax - xMin) * (ac.padding ?? 0);
-        scale.min = xMin - pad;
-        scale.max = xMax + pad;
-      }
-
-      // Linear continuous domains use regular 1/2/5 tick intervals by default.
-      // Bar X axes use their own slot plan above; histogram bounds stay exact.
-      // `nice: false` opts out.
-      if (this.shouldNiceAutoRange(scale, ac, hasBarSeries)) {
-        this.niceAutoRange(scale, ac.tickCount ?? DEFAULT_TICK_COUNT);
-      }
-
-      // Nicening may expand either side, but an explicitly pinned side must
-      // remain exactly where the caller put it.
-      if (ac.min !== undefined) scale.min = ac.min;
-      if (ac.max !== undefined) scale.max = ac.max;
-
-      // Remember the "full" extent so zoom.bounds: 'data' knows how far
-      // out reset-zoom would go.
-      this.naturalExtent.set(key, [scale.min, scale.max]);
-
-      // The extent is refreshed above; a user-zoomed axis keeps the viewport
-      // it had on entry so streaming appends don't snap it back.
-      if (userZoomed) {
-        scale.min = preservedMin;
-        scale.max = preservedMax;
-      }
-    }
-  }
-
-  /**
-   * Auto-range vertical (left/right) axes to fit the data visible in the current X viewport.
-   * Called on zoom/pan (viewport change) AND on data change.
-   * This is the key to "zoom X, Y follows" behavior.
-   *
-   * `fromViewport` marks the pan/zoom path, which runs once per gesture
-   * frame: it answers range queries from block-aggregate indexes instead of
-   * scanning every visible point. Data-change callers keep the direct scan
-   * because their data version bump would invalidate any index anyway.
-   */
-  private autoRangeVertical(fromViewport = false): void {
-    if (!this.hasData()) return;
-
-    const axisConfigs = this.config.axes ?? {};
-    for (const [key, scale] of this.scales) {
-      const ac = axisConfigs[key];
-      if (!ac) continue;
-      const pos = inferPosition(key, ac.position);
-      if (pos !== 'left' && pos !== 'right') continue;
-      if (ac.auto === false) continue;
-      if (this.userZoomedAxes.has(key)) continue;
-      // Both bounds pinned → restore to those values. Skipping here would
-      // leave zoomed state intact after `resetZoom()`.
-      if (ac.min !== undefined && ac.max !== undefined) {
-        scale.min = ac.min;
-        scale.max = ac.max;
-        continue;
-      }
-
-      let yMin = Infinity;
-      let yMax = -Infinity;
-      let hasValue = false;
-
-      const includeRange = (range: [number, number] | null) => {
-        if (!range) return;
-        hasValue = true;
-        if (range[0] < yMin) yMin = range[0];
-        if (range[1] > yMax) yMax = range[1];
-      };
-
-      const includeColumnRange = (
-        columnIdx: number,
-        startIdx: number,
-        endIdx: number,
-        store: DataStore,
-      ) => {
-        includeRange(
-          this.columnRange(columnIdx, startIdx, endIdx, scale.type, fromViewport, store),
-        );
-      };
-      const includeColumnForScatterViewport = (
-        yColumnIdx: number,
-        xColumnIdx: number,
-        xScale: Scale | undefined,
-        store: DataStore,
-      ) => {
-        includeRange(
-          this.scatterViewportColumnRange(
-            yColumnIdx,
-            xColumnIdx,
-            xScale,
-            scale.type,
-            fromViewport,
-            store,
-          ),
-        );
-      };
-
-      for (const [si, s] of this.config.series.entries()) {
-        if ((s.yAxis ?? 'y') !== key || s.visible === false) continue;
-
-        const store = this.storeForSeries(si);
-        const xScale = this.scales.get(s.xAxis ?? 'x') ?? this.scales.get('x');
-        const xColumnIdx = s.type === 'scatter' ? scatterXColumn(s) : 0;
-        let startIdx = 0;
-        let endIdx = store.length - 1;
-        if (xScale && xColumnIdx === 0) {
-          [startIdx, endIdx] = store.getViewportIndices(xScale.min, xScale.max);
-        }
-
-        const yColumnIdx = seriesYColumn(s) - 1;
-        if (s.type === 'scatter' && xColumnIdx !== 0 && this.isValidColumn(xColumnIdx, store)) {
-          includeColumnForScatterViewport(yColumnIdx, xColumnIdx, xScale, store);
-        } else {
-          includeColumnRange(yColumnIdx, startIdx, endIdx, store);
-        }
-        if (s.type === 'band') {
-          if (s.upperColumn != null) includeColumnRange(s.upperColumn - 1, startIdx, endIdx, store);
-          if (s.lowerColumn != null) includeColumnRange(s.lowerColumn - 1, startIdx, endIdx, store);
-        }
-      }
-
-      // For bar/histogram series, always include 0 as the baseline
-      const hasBarOrHist = this.config.series.some(
-        (s) =>
-          (s.yAxis ?? 'y') === key &&
-          s.visible !== false &&
-          (s.type === 'bar' || s.type === 'histogram'),
-      );
-      if (!hasValue) continue;
-
-      if (hasBarOrHist && scale.type !== 'log') {
-        if (yMin > 0) yMin = 0;
-        if (yMax < 0) yMax = 0;
-      }
-
-      if (scale.type === 'log') {
-        const [min, max] = this.paddedLogRange(yMin, yMax, ac.padding ?? AUTO_RANGE_PADDING);
-        if (ac.min === undefined) scale.min = min;
-        if (ac.max === undefined) scale.max = max;
-      } else {
-        // Vertical auto-range defaults to 5% padding so line/area charts
-        // don't touch the plot edges; users can override per-axis.
-        const pad = (yMax - yMin) * (ac.padding ?? AUTO_RANGE_PADDING);
-        const equalSpan = yMin === yMax ? (yMin === 0 ? 1 : Math.abs(yMin) * 0.1) : 0;
-        if (ac.min === undefined) {
-          const min = yMin - (equalSpan || pad);
-          scale.min = hasBarOrHist ? Math.min(0, min) : min;
-        }
-        if (ac.max === undefined) {
-          const max = yMax + (equalSpan || pad);
-          scale.max = hasBarOrHist ? Math.max(0, max) : max;
-        }
-      }
-
-      if (this.shouldNiceAutoRange(scale, ac, false)) {
-        this.niceAutoRange(scale, ac.tickCount ?? DEFAULT_TICK_COUNT);
-        // nice() can push min below 0, clamp back for bar/histogram baseline
-        if (hasBarOrHist && yMin >= 0 && scale.min < 0) scale.min = 0;
-      }
-
-      // Preserve one-sided explicit domains after automatic nicening.
-      if (ac.min !== undefined) scale.min = ac.min;
-      if (ac.max !== undefined) scale.max = ac.max;
-
-      // Remember the "full" extent so zoom.bounds: 'data' knows how far
-      // out reset-zoom would go.
-      this.naturalExtent.set(key, [scale.min, scale.max]);
-    }
-  }
-
-  private ensureRangeIndexesFresh(): void {
-    if (this.rangeIndexVersion === this.dataVersion) return;
-    this.rangeIndexVersion = this.dataVersion;
-    this.columnRangeIndexes.clear();
-    this.scatterRangeIndexes.clear();
-  }
-
-  private invalidateRangeCache(): void {
-    this.rangeIndexVersion = -1;
-    this.columnRangeIndexes.clear();
-    this.scatterRangeIndexes.clear();
-    this.scatterSeriesCaches.clear();
-    this.scatterEncodingCache.clear();
   }
 
   private markViewportActive(): void {
@@ -2074,99 +1696,6 @@ export class ChartCore implements EngineHost {
     };
     this.scatterEncodingCache.set(si, entry);
     return entry;
-  }
-
-  private columnRange(
-    columnIdx: number,
-    startIdx: number,
-    endIdx: number,
-    scaleType: Scale['type'],
-    useIndex: boolean,
-    store: DataStore,
-  ): [number, number] | null {
-    if (columnIdx < 0 || columnIdx >= store.seriesCount) return null;
-    const start = Math.max(0, startIdx);
-    const end = Math.min(store.length - 1, endIdx);
-    if (end < start) return null;
-    const positiveOnly = scaleType === 'log';
-
-    if (useIndex) {
-      this.ensureRangeIndexesFresh();
-      const cacheKey = this.sourceStores.indexOf(store) + ':' + columnIdx;
-      let index = this.columnRangeIndexes.get(cacheKey);
-      if (!index) {
-        // Physical column columnIdx + 1: column 0 is X, series are 1-based.
-        index = new ColumnRangeIndex(store.getPhysicalColumn(columnIdx + 1));
-        this.columnRangeIndexes.set(cacheKey, index);
-      }
-      // Segments map the logical range onto live physical ranges, so ring
-      // buffers never query dead slots between head and tail.
-      let min = Infinity;
-      let max = -Infinity;
-      for (const segment of store.getSegments(start, end)) {
-        const range = index.query(segment.physicalStart, segment.physicalEnd, positiveOnly);
-        if (!range) continue;
-        if (range[0] < min) min = range[0];
-        if (range[1] > max) max = range[1];
-      }
-      return min === Infinity ? null : [min, max];
-    }
-
-    let min = Infinity;
-    let max = -Infinity;
-    for (let i = start; i <= end; i++) {
-      const v = store.yAt(columnIdx, i);
-      if (!Number.isFinite(v) || (positiveOnly && v <= 0)) continue;
-      if (v < min) min = v;
-      if (v > max) max = v;
-    }
-    return min === Infinity ? null : [min, max];
-  }
-
-  private scatterViewportColumnRange(
-    yColumnIdx: number,
-    xColumnIdx: number,
-    xScale: Scale | undefined,
-    scaleType: Scale['type'],
-    useIndex: boolean,
-    store: DataStore,
-  ): [number, number] | null {
-    if (yColumnIdx < 0 || yColumnIdx >= store.seriesCount) return null;
-    if (!this.isValidColumn(xColumnIdx, store)) return null;
-
-    const xMin = xScale?.min ?? -Infinity;
-    const xMax = xScale?.max ?? Infinity;
-    const positiveOnly = scaleType === 'log';
-
-    // The sorted-permutation index assumes physical position == logical
-    // position, which only holds for the plain columnar store. Ring buffers
-    // fall back to the direct scan.
-    if (useIndex && store instanceof ColumnarStore) {
-      this.ensureRangeIndexesFresh();
-      const key = this.sourceStores.indexOf(store) + ':' + xColumnIdx + ':' + yColumnIdx;
-      let index = this.scatterRangeIndexes.get(key);
-      if (!index) {
-        index = new ScatterColumnRangeIndex(
-          store.getPhysicalColumn(xColumnIdx),
-          store.getPhysicalColumn(yColumnIdx + 1),
-        );
-        this.scatterRangeIndexes.set(key, index);
-      }
-      return index.query(xMin, xMax, positiveOnly);
-    }
-
-    let min = Infinity;
-    let max = -Infinity;
-    for (let i = 0; i < store.length; i++) {
-      const x = store.valueAt(xColumnIdx, i);
-      if (!Number.isFinite(x)) continue;
-      if (x < xMin || x > xMax) continue;
-      const v = store.yAt(yColumnIdx, i);
-      if (!Number.isFinite(v) || (positiveOnly && v <= 0)) continue;
-      if (v < min) min = v;
-      if (v > max) max = v;
-    }
-    return min === Infinity ? null : [min, max];
   }
 
   /** Whether the layout was computed for another box, options or scales than the current ones. */
@@ -2721,7 +2250,7 @@ export class ChartCore implements EngineHost {
     scale.max = max;
 
     if (isHoriz && !this.config.zoom?.y) {
-      this.autoRangeVertical(true);
+      autoRangeVertical(this, true);
     }
 
     this.refreshCursor();
@@ -2798,7 +2327,8 @@ export class ChartCore implements EngineHost {
     this.config.series.forEach((series, si) => {
       if ((series.yAxis ?? 'y') !== scaleKey || series.visible === false) return;
       const store = this.storeForSeries(si);
-      const range = this.columnRange(
+      const range = columnRange(
+        this,
         seriesYColumn(series) - 1,
         0,
         store.length - 1,
@@ -3908,7 +3438,7 @@ export class ChartCore implements EngineHost {
     return this.theme.heatmapGradient ?? this.theme.sequentialPalette;
   }
 
-  private isValidColumn(columnIdx: number, store: DataStore): boolean {
+  isValidColumn(columnIdx: number, store: DataStore): boolean {
     return Number.isInteger(columnIdx) && columnIdx >= 0 && columnIdx <= store.seriesCount;
   }
 
@@ -3928,44 +3458,6 @@ export class ChartCore implements EngineHost {
 
     this.cursorDataX = point.x;
     this.cursorDataIdx = point.dataIndex;
-  }
-
-  private paddedLogRange(min: number, max: number, padding: number): [number, number] {
-    const safeMin = Math.max(min, 1e-10);
-    const safeMax = Math.max(max, safeMin);
-    if (safeMin === safeMax) return [safeMin / 10, safeMax * 10];
-    const logMin = Math.log10(safeMin);
-    const logMax = Math.log10(safeMax);
-    const logPad = (logMax - logMin) * padding;
-    return [10 ** (logMin - logPad), 10 ** (logMax + logPad)];
-  }
-
-  private shouldNiceAutoRange(scale: Scale, axis: AxisSpec, hasExactGeometry: boolean): boolean {
-    if (hasExactGeometry || scale.type === 'time') return false;
-    // Linear axes get clean 1/2/5 bounds by default. Log axes retain their
-    // existing opt-in behavior because their padded powers-of-ten extent is
-    // already meaningful; `nice: true` still rounds it to full decades.
-    return scale.type === 'linear' ? axis.nice !== false : axis.nice === true;
-  }
-
-  /**
-   * Expand a linear domain until the tick step selected from that domain is
-   * stable. One pass can widen the range enough to select the next 1/2/5
-   * interval, leaving a non-tick boundary behind (for example [-100, -85]
-   * selecting a 10-unit step). A bounded loop keeps the range deterministic
-   * while avoiding any renderer-specific endpoint insertion.
-   */
-  private niceAutoRange(scale: Scale, tickCount: number): void {
-    // niceRange treats one or two requested ticks as a two-reference
-    // fallback. Reapplying that fallback can keep widening the domain, so
-    // leave those intentionally sparse ranges at their first result.
-    const maxPasses = tickCount <= 2 ? 1 : 8;
-    for (let pass = 0; pass < maxPasses; pass++) {
-      const previousMin = scale.min;
-      const previousMax = scale.max;
-      scale.nice(tickCount);
-      if (scale.min === previousMin && scale.max === previousMax) break;
-    }
   }
 
   private scatterPointsInSelection(xRange: ScaleRange, yRange: ScaleRange) {
@@ -4018,99 +3510,6 @@ export class ChartCore implements EngineHost {
     if (this.mouseX === null || this.mouseY === null || !this.cursorIsLocal) return;
     this.updateTooltipPoints();
     this.scheduler.markDirty(DirtyFlag.OVERLAY);
-  }
-
-  /**
-   * Plan automatic numeric bar centers and cell boundaries together, so
-   * category padding cannot leave partial cells after tick thinning.
-   */
-  private planBarXAxis(
-    rawValues: number[],
-    xMin: number,
-    xMax: number,
-    tickCount: number,
-  ): BarXAxisPlan | null {
-    const values = Array.from(new Set(rawValues.filter((value) => Number.isFinite(value)))).sort(
-      (a, b) => a - b,
-    );
-    if (values.length < 2 || !(xMax > xMin)) return null;
-
-    let minimumGap = Infinity;
-    for (let i = 1; i < values.length; i++) {
-      const gap = values[i] - values[i - 1];
-      if (gap > 0 && gap < minimumGap) minimumGap = gap;
-    }
-    if (!Number.isFinite(minimumGap)) return null;
-
-    // Keep the interval readable at the requested density, but never let it
-    // be narrower than the closest category spacing. The lower bound avoids
-    // introducing multiple ticks inside a single category slot.
-    const targetCount = Math.max(3, Math.floor(tickCount));
-    const suggested = niceStep(xMin, xMax, targetCount);
-    const minimumNice = this.niceIntervalAtLeast(minimumGap);
-    const interval = Math.max(suggested, minimumNice);
-    if (!(interval > 0) || !Number.isFinite(interval)) return null;
-
-    const roundingEpsilon = 1e-12;
-    let centerMin = Math.floor(xMin / interval + roundingEpsilon) * interval;
-    let centerMax = Math.ceil(xMax / interval - roundingEpsilon) * interval;
-
-    // BarRenderer sizes each category from its nearest local neighbor. For
-    // irregular spacing, the outermost bar can therefore extend beyond a
-    // simple half-interval edge. Keep expanding by whole tick intervals until
-    // every category slot fits while retaining a regular grid.
-    let geometryMin = Infinity;
-    let geometryMax = -Infinity;
-    for (let i = 0; i < rawValues.length; i++) {
-      const value = rawValues[i];
-      if (!Number.isFinite(value)) continue;
-      const width = categoryWidthFromData((index) => rawValues[index], i, rawValues.length);
-      geometryMin = Math.min(geometryMin, value - width * 0.5);
-      geometryMax = Math.max(geometryMax, value + width * 0.5);
-    }
-    if (!Number.isFinite(geometryMin) || !Number.isFinite(geometryMax)) return null;
-    const leftGap = (centerMin - interval * 0.5 - geometryMin) / interval;
-    const rightGap = (geometryMax - centerMax - interval * 0.5) / interval;
-    const leftSteps = leftGap > roundingEpsilon ? Math.ceil(leftGap - roundingEpsilon) : 0;
-    const rightSteps = rightGap > roundingEpsilon ? Math.ceil(rightGap - roundingEpsilon) : 0;
-    if (
-      !Number.isSafeInteger(leftSteps) ||
-      !Number.isSafeInteger(rightSteps) ||
-      leftSteps > 10_000 ||
-      rightSteps > 10_000
-    )
-      return null;
-    centerMin -= leftSteps * interval;
-    centerMax += rightSteps * interval;
-    if (!Number.isFinite(centerMin) || !Number.isFinite(centerMax)) return null;
-
-    const count = Math.round((centerMax - centerMin) / interval) + 1;
-    // A malformed or extremely fine input should fall back to the existing
-    // category path instead of allocating an unbounded tick list.
-    if (count < 2 || count > 10_000) return null;
-
-    const centers: number[] = [];
-    const gridValues: number[] = [];
-    const clean = (value: number) => Number(value.toPrecision(15));
-    for (let i = 0; i < count; i++) {
-      centers.push(clean(centerMin + i * interval));
-      gridValues.push(clean(centerMin - interval / 2 + i * interval));
-    }
-    gridValues.push(clean(centerMax + interval / 2));
-    return {
-      values: centers,
-      gridValues,
-      domainMin: gridValues[0],
-      domainMax: gridValues[gridValues.length - 1],
-    };
-  }
-
-  private niceIntervalAtLeast(value: number): number {
-    if (!(value > 0) || !Number.isFinite(value)) return 0;
-    const magnitude = 10 ** Math.floor(Math.log10(value));
-    const fraction = value / magnitude;
-    const niceFraction = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
-    return niceFraction * magnitude;
   }
 
   private axisMarkCoordinates(type: 'bar' | 'histogram'): number[] {
