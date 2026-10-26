@@ -1,9 +1,27 @@
+import type { RefObject } from 'react';
 import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
-import type { ChartHandle, ChartState, CursorSnapshot, CursorOptions } from '../public/types';
+import { useEffect, useLayoutEffect } from 'react';
+import type { ChartHandle, ChartState, CursorOptions, CursorSnapshot } from 'snaplot';
+import { resolveChart, watchCursor, watchRef } from '../adapters/bind';
+
+/** A layout effect in the browser, a plain effect on the server (React 18 warns otherwise). */
+export const useIsoLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
 
 const noop = () => {};
 const none = () => undefined;
-const identity = <T>(value: T) => value;
+const nothing = () => null;
+
+/**
+ * The chart a hook is given (a handle, or the ref object a `<Chart>` fills), re-rendering when
+ * that ref gets or loses its chart.
+ */
+export function useChart<Row>(
+  chart: ChartHandle<Row> | RefObject<ChartHandle<Row> | null> | null | undefined,
+): ChartHandle<Row> | null {
+  const subscribe = useCallback((notify: () => void) => watchRef(chart, notify), [chart]);
+  const read = () => resolveChart(chart);
+  return useSyncExternalStore(subscribe, read, nothing);
+}
 
 /**
  * A slice of the chart's state, re-rendering only when the slice changes (by `isEqual`).
@@ -14,27 +32,25 @@ const identity = <T>(value: T) => value;
  * ```
  */
 export function useChartState<T = ChartState>(
-  chart: ChartHandle<any> | null | undefined,
-  selector: (state: ChartState) => T = identity as (state: ChartState) => T,
+  chart: ChartHandle<any> | RefObject<ChartHandle<any> | null> | null | undefined,
+  selector: (state: ChartState) => T = (state) => state as T,
   isEqual: (a: T, b: T) => boolean = Object.is,
 ): T | undefined {
-  const cache = useRef<{ chart?: ChartHandle<any>; state?: ChartState; value?: T }>({});
-  const subscribe = useCallback(
-    (notify: () => void) => (chart ? chart.subscribe(notify) : noop),
-    [chart],
-  );
-  const snapshot = useCallback(() => {
-    if (!chart) return undefined;
-    const state = chart.getState();
-    const last = cache.current;
-    if (last.chart === chart && last.state === state) return last.value;
-    const value = selector(state);
-    const same =
-      last.chart === chart && last.state !== undefined && isEqual(last.value as T, value);
-    cache.current = { chart, state, value: same ? last.value : value };
-    return cache.current.value;
-  }, [chart, selector, isEqual]);
-  return useSyncExternalStore(subscribe, snapshot, none);
+  const handle = useChart(chart);
+  // The last state and selector read, and the value kept for them.
+  const memo = useRef<{ state?: ChartState; selector?: unknown; value?: T }>({});
+  const subscribe = useCallback((on: () => void) => handle?.subscribe(on) ?? noop, [handle]);
+  const read = () => {
+    if (!handle) return undefined;
+    const state = handle.getState();
+    const last = memo.current;
+    if (state === last.state && selector === last.selector) return last.value;
+    const next = selector(state);
+    const same = last.state !== undefined && isEqual(last.value as T, next);
+    memo.current = { state, selector, value: same ? last.value : next };
+    return memo.current.value;
+  };
+  return useSyncExternalStore(subscribe, read, none);
 }
 
 /**
@@ -47,28 +63,21 @@ export function useChartState<T = ChartState>(
  * ```
  */
 export function useCursor<Row>(
-  chart: ChartHandle<Row> | null | undefined,
+  chart: ChartHandle<Row> | RefObject<ChartHandle<Row> | null> | null | undefined,
   options?: CursorOptions,
 ): CursorSnapshot<Row> | undefined {
+  const handle = useChart(chart);
   const fallback = options?.fallback;
   const store = useMemo(() => {
     let current: CursorSnapshot<Row> | undefined;
-    return {
-      subscribe(notify: () => void) {
-        if (!chart) return noop;
-        const changed = () => {
-          current = undefined;
-          notify();
-        };
-        const offCursor = chart.on('cursor:change', changed);
-        const offState = chart.subscribe(changed);
-        return () => {
-          offCursor();
-          offState();
-        };
-      },
-      snapshot: () => (chart ? (current ??= chart.getCursor({ fallback })) : undefined),
+    const changed = (notify: () => void) => () => {
+      current = undefined;
+      notify();
     };
-  }, [chart, fallback]);
-  return useSyncExternalStore(store.subscribe, store.snapshot, none);
+    return {
+      subscribe: (notify: () => void) => (handle ? watchCursor(handle, changed(notify)) : noop),
+      read: () => (handle ? (current ??= handle.getCursor({ fallback })) : undefined),
+    };
+  }, [handle, fallback]);
+  return useSyncExternalStore(store.subscribe, store.read, none);
 }

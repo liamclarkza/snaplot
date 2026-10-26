@@ -13,17 +13,17 @@
  * @module snaplot/react
  */
 export { Chart } from './react/Chart';
-export type { ChartProps } from './react/Chart';
+export type { ChartProps, HostAttributes } from './react/Chart';
 export { LegendTable } from './react/LegendTable';
 export type { LegendTableProps } from './react/LegendTable';
 export { useChartState, useCursor } from './react/hooks';
-export type { HostAttributes } from './react/shared';
-export { createChartGroup } from './public/chart';
-export { histogram } from './public/histogram';
-export type * from './public/types';
+export { createChartGroup, histogram } from 'snaplot';
 export type {
+  HistogramOptions,
+  HistogramRule,
   LegendTableColumn,
   LegendTableHandle,
   LegendTableOptions,
-} from './public/legend';
-export type { HistogramOptions, HistogramRule } from './public/histogram';
+} from 'snaplot';
+// The public types: a type-only re-export, erased from the JavaScript, which imports 'snaplot' only.
+export type * from './public/types';

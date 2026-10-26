@@ -153,7 +153,8 @@ export function v2(): BenchApi {
         import('snaplot/react'),
       ]);
       const Chart = (adapter as Loose).Chart;
-      if (typeof Chart !== 'function') throw new Unsupported('this build has no snaplot/react');
+      // A function component, or (from M13, for React 18) a forwardRef object.
+      if (Chart == null) throw new Unsupported('this build has no snaplot/react');
       const ref: { current: Loose } = { current: null };
       let setTick: (tick: number) => void = () => {};
       const stableSeries = spec.series.map((s) => ({ id: s.id, y: s.y }));

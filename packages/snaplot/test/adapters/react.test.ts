@@ -102,7 +102,7 @@ describe('React Chart', () => {
     );
     expect(document.querySelectorAll('canvas').length).toBe(3);
     expect(renderToString(h(Chart<Row>, { data: rows, x: 't', series: [{ y: 'cpu' }] }))).toContain(
-      'role="group"',
+      'role="figure" aria-label="Line chart, 1 series: cpu"',
     );
   });
 });

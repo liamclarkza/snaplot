@@ -5,6 +5,7 @@
 // handle for Solid companions. M8 deletes the old hooks; M13 flips these.
 import { Activity, act, type ComponentProps, createElement as h, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { createComponent, render } from 'solid-js/web';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createChartGroup } from '../../src/index';
@@ -118,15 +119,14 @@ describe('[frameworks-03][arch-04] React', () => {
     expect(handle ? debug(handle).ingestCount : -2).toBe(before);
   });
 
-  it.fails('[frameworks-20] the React host is named by an automatic summary, not "Chart"', async () => {
-    const host = reactHost();
-    root = createRoot(host);
-    await act(async () =>
-      root?.render(h(Chart<Row>, { data: rows, x: 't', series: [{ y: 'cpu', label: 'CPU' }] })),
+  it('[frameworks-20] the React host is named by an automatic summary, not "Chart"', () => {
+    // The host renders its role and name itself, so server markup is a named figure (plan D20).
+    // That the core then leaves them alone is M12a's rule ([interact-23], conformance #1).
+    const html = renderToString(
+      h(Chart<Row>, { data: rows, x: 't', series: [{ y: 'cpu', label: 'CPU' }] }),
     );
-    const named = host.querySelector('[aria-label]')?.getAttribute('aria-label');
-    expect(named).not.toBe('Chart');
-    expect(named).toContain('CPU');
+    expect(html).toContain('role="figure"');
+    expect(html).toContain('aria-label="Line chart, 1 series: CPU"');
   });
 
   it('[frameworks-07] two charts grouped inside a component survive an <Activity> hide and show', async () => {

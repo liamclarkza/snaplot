@@ -157,10 +157,12 @@ export default defineConfig({
   ],
   build: {
     lib: {
+      // The core's declarations roll up last: the adapters' declarations import it ('snaplot' is
+      // src/index.ts there), so they must read it before its own rollup replaces it.
       entry: {
-        index: resolve(root, 'src/index.ts'),
         solid: solidEntry,
         react: resolve(root, 'src/react.ts'),
+        index: resolve(root, 'src/index.ts'),
       },
       formats: ['es'],
       fileName: (_format, entryName) => `${entryName}.js`,

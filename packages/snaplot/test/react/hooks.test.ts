@@ -33,6 +33,13 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+/** Run `change` and the frame that notifies state subscribers (at most once per frame). */
+const commit = (change: () => void) =>
+  act(async () => {
+    change();
+    fakes.frames.flush();
+  });
+
 function host(): HTMLElement {
   const element = document.createElement('div');
   fakes.layout.setSize(element, 400, 200);
@@ -40,7 +47,6 @@ function host(): HTMLElement {
   return element;
 }
 
-// The hooks take the ref object itself; the M8 signatures take a handle, hence the casts.
 type AnyRef = Parameters<typeof useChartState>[0];
 
 /** A chart with a plain useRef, and probes that count their renders. */
@@ -55,7 +61,7 @@ function mountWithProbes(probes: { state?: (state: ChartState) => unknown; curso
   }
   function CursorProbe({ chart }: { chart: AnyRef }) {
     counts.cursor++;
-    seen.cursor = useCursor(chart as never, { fallback: 'latest' })?.points[0]?.y;
+    seen.cursor = useCursor(chart, { fallback: 'latest' })?.points[0]?.y;
     return null;
   }
   function App() {
@@ -65,51 +71,51 @@ function mountWithProbes(probes: { state?: (state: ChartState) => unknown; curso
       'div',
       null,
       h(Chart<Row>, { ref, data: rows, x: 't', series }),
-      probes.state ? h(StateProbe, { chart: ref as unknown as AnyRef }) : null,
-      probes.cursor ? h(CursorProbe, { chart: ref as unknown as AnyRef }) : null,
+      probes.state ? h(StateProbe, { chart: ref }) : null,
+      probes.cursor ? h(CursorProbe, { chart: ref }) : null,
     );
   }
   return { App, counts, seen, chart: () => handle.current };
 }
 
 describe('[frameworks-14][research-05] the hooks read a plain useRef', () => {
-  it.fails('[frameworks-14] useChartState re-renders once when the chart mounts, then only on its slice', async () => {
+  it('[frameworks-14] useChartState re-renders once when the chart mounts, then only on its slice', async () => {
     const probe = mountWithProbes({ state: (state) => state.hiddenSeries.length });
     root = createRoot(host());
     await act(async () => root?.render(h(probe.App)));
     // The first render has no chart yet; the registry re-renders once it mounts.
     expect(probe.seen.state).toBe(0);
     expect(probe.counts.state).toBe(2);
-    await act(async () => probe.chart()?.update({ axes: { y: { title: 'Load' } } }));
+    await commit(() => probe.chart()?.update({ axes: { y: { title: 'Load' } } }));
     expect(probe.counts.state).toBe(2);
-    await act(async () => probe.chart()?.update({ hiddenSeries: ['mem'] }));
+    await commit(() => probe.chart()?.update({ hiddenSeries: ['mem'] }));
     expect(probe.seen.state).toBe(1);
     expect(probe.counts.state).toBe(3);
   });
 
-  it.fails('[frameworks-03][frameworks-14] 20 cursor moves re-render the cursor reader only', async () => {
+  it('[frameworks-03][frameworks-14] 20 cursor moves re-render the cursor reader only', async () => {
     const probe = mountWithProbes({ state: (state) => state.highlight, cursor: true });
     root = createRoot(host());
     await act(async () => root?.render(h(probe.App)));
     const before = { ...probe.counts };
-    for (let x = 0; x < 20; x++) await act(async () => probe.chart()?.setCursor(x));
+    for (let x = 0; x < 20; x++) await commit(() => probe.chart()?.setCursor(x));
     expect(probe.counts.state).toBe(before.state);
     expect(probe.counts.cursor - before.cursor).toBe(20);
     expect(probe.seen.cursor).toBe(rows[19].cpu);
   });
 
-  it.fails('[frameworks-14] useCursor reads the latest point after a data change, through the ref', async () => {
+  it('[frameworks-14] useCursor reads the latest point after a data change, through the ref', async () => {
     const probe = mountWithProbes({ cursor: true });
     root = createRoot(host());
     await act(async () => root?.render(h(probe.App)));
     expect(probe.seen.cursor).toBe(rows[19].cpu);
-    await act(async () =>
+    await commit(() =>
       probe.chart()?.update({ data: rows.map((row) => ({ ...row, cpu: row.cpu + 100 })) }),
     );
     expect(probe.seen.cursor).toBe(rows[19].cpu + 100);
   });
 
-  it.fails('[frameworks-14] the hooks return undefined again once the chart unmounts', async () => {
+  it('[frameworks-14] the hooks return undefined again once the chart unmounts', async () => {
     let seen: unknown = 'unset';
     function Probe({ chart }: { chart: AnyRef }) {
       seen = useChartState(chart, (state) => state.following);
@@ -121,7 +127,7 @@ describe('[frameworks-14][research-05] the hooks read a plain useRef', () => {
         'div',
         null,
         shown ? h(Chart<Row>, { ref, data: rows, x: 't', series }) : null,
-        h(Probe, { chart: ref as unknown as AnyRef }),
+        h(Probe, { chart: ref }),
       );
     }
     root = createRoot(host());
@@ -131,14 +137,14 @@ describe('[frameworks-14][research-05] the hooks read a plain useRef', () => {
     expect(seen).toBeUndefined();
   });
 
-  it.fails('[frameworks-14] LegendTable reads a plain useRef', async () => {
+  it('[frameworks-14] LegendTable reads a plain useRef', async () => {
     function App() {
       const ref = useRef<ChartHandle<Row>>(null);
       return h(
         'div',
         null,
         h(Chart<Row>, { ref, data: rows, x: 't', series }),
-        h(LegendTable<Row>, { chart: ref as never, columns: ['name', 'value'] }),
+        h(LegendTable<Row>, { chart: ref, columns: ['name', 'value'] }),
       );
     }
     const element = host();

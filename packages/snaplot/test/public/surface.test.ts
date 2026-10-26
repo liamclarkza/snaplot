@@ -76,7 +76,8 @@ describe('[frameworks-12] the adapters use the public handle only', () => {
   it('[frameworks-12] React and Solid import only src/public, besides their own modules', () => {
     const imports = adapterImports();
     expect(imports.length).toBeGreaterThan(0);
-    for (const target of imports) expect(target).toMatch(/^(public|react|solid)\//);
+    for (const target of imports)
+      expect(target).toMatch(/^(public\/|react\/|solid\/|adapters\/bind$)/);
   });
 });
 

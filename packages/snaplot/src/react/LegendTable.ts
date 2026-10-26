@@ -1,22 +1,14 @@
-import {
-  createElement,
-  type CSSProperties,
-  type ReactElement,
-  useLayoutEffect,
-  useRef,
-} from 'react';
-import {
-  createLegendTable,
-  type LegendTableHandle,
-  type LegendTableOptions,
-} from '../public/legend';
-import type { ChartHandle } from '../public/types';
+import type { CSSProperties, ReactElement, RefObject } from 'react';
+import { createElement, useRef } from 'react';
+import type { ChartHandle, LegendTableHandle, LegendTableOptions } from 'snaplot';
+import { createLegendTable } from 'snaplot';
+import { useChart, useIsoLayoutEffect } from './hooks';
 
 /** The props of {@link LegendTable}: the vanilla options, plus the host's class and style. */
 export interface LegendTableProps<Row = Record<string, any>>
   extends Omit<LegendTableOptions<Row>, 'chart'> {
   /** The chart the table reads; nothing renders until there is one. */
-  chart: ChartHandle<Row> | null | undefined;
+  chart: ChartHandle<Row> | RefObject<ChartHandle<Row> | null> | null | undefined;
   /** Class names of the host element. @defaultValue none */
   className?: string;
   /** Inline styles of the host element. @defaultValue none */
@@ -26,32 +18,18 @@ export interface LegendTableProps<Row = Record<string, any>>
 /** A table of each series' value at the cursor: `createLegendTable` as a component. */
 export function LegendTable<Row = Record<string, any>>(props: LegendTableProps<Row>): ReactElement {
   const host = useRef<HTMLDivElement>(null);
-  const table = useRef<{ chart: ChartHandle<Row>; handle: LegendTableHandle<Row> } | null>(null);
-  useLayoutEffect(() => {
-    const chart = props.chart;
-    const options = { columns: props.columns, fallback: props.fallback };
-    if (table.current && table.current.chart !== chart) {
-      table.current.handle.destroy();
-      table.current = null;
-    }
+  const table = useRef<LegendTableHandle<Row> | null>(null);
+  const chart = useChart(props.chart);
+  const { columns, fallback } = props;
+  // A new chart, or an option removed (back to its default), makes a new table.
+  useIsoLayoutEffect(() => {
     if (!chart || !host.current) return;
-    if (table.current) table.current.handle.update(options);
-    else
-      table.current = {
-        chart,
-        handle: createLegendTable(host.current, {
-          chart,
-          ...(options.columns ? { columns: options.columns } : {}),
-          ...(options.fallback ? { fallback: options.fallback } : {}),
-        }),
-      };
-  });
-  useLayoutEffect(
-    () => () => {
-      table.current?.handle.destroy();
+    const made = (table.current = createLegendTable(host.current, { chart, columns, fallback }));
+    return () => {
       table.current = null;
-    },
-    [],
-  );
+      made.destroy();
+    };
+  }, [chart, columns === undefined, fallback === undefined]);
+  useIsoLayoutEffect(() => table.current?.update({ columns, fallback }), [columns, fallback]);
   return createElement('div', { ref: host, className: props.className, style: props.style });
 }

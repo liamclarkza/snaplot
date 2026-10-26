@@ -128,6 +128,14 @@ export function bindChart<Row>(host: HTMLElement, options: ChartOptions<Row>): B
   };
 }
 
+/** Call `listener` on what changes a cursor readout: cursor moves and data, option and state commits. */
+export function watchCursor(chart: ChartHandle<any>, listener: () => void): () => void {
+  const offs = [chart.on('cursor:change', listener), chart.subscribe(listener)];
+  return () => {
+    for (const off of offs) off();
+  };
+}
+
 // ─── Refs ────────────────────────────────────────────────────────────
 
 /** A ref object, such as React's `useRef`: whatever holds the chart in `current`. */

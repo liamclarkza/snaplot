@@ -53,14 +53,13 @@ export function Hooks() {
   const following: boolean | undefined = useChartState(handle, (state) => state.following);
   const cursor = useCursor(handle, { fallback: 'latest' });
   const value: number | undefined = cursor?.points[0]?.row?.cpu;
-  // @ts-expect-error until M13's hooks take a ref object (frameworks-14)
   const fromRef: boolean | undefined = useChartState(chart, (state) => state.following);
+  const latest = useCursor(chart, { fallback: 'latest' })?.points[0]?.row?.cpu;
   return (
     <>
       <LegendTable chart={handle} columns={['swatch', 'name', 'value']} />
-      {/* @ts-expect-error until M13's LegendTable takes a ref object (frameworks-14) */}
       <LegendTable chart={chart} />
-      <output>{`${following} ${value} ${fromRef}`}</output>
+      <output>{`${following} ${value} ${fromRef} ${latest}`}</output>
     </>
   );
 }
