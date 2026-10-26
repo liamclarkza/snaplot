@@ -50,26 +50,14 @@ import { applyThemeToElement, resolveTheme } from './theme/resolve';
 
 import { renderAxes } from './axes/render';
 import { type AxesRenderResult, updateDOMLabels } from './axes/labels';
-import { isDensityScatterSeries, type ScatterSeriesCache } from './marks/scatter';
-import {
-  type ScatterStyleResolver,
-  seriesYColumn,
-  type ScatterPalettes,
-} from './marks/scatterEncoding';
-import { barRectForCategory, categoryWidthFromData } from './marks/barGeometry';
-import {
-  renderBrushSelection,
-  renderCrosshair,
-  renderSelectionBox,
-  renderTapRing,
-} from './render/overlay';
+import type { ScatterSeriesCache } from './marks/scatter';
+import type { ScatterStyleResolver, ScatterPalettes } from './marks/scatterEncoding';
 
 import { GestureManager } from './interaction/gestures';
 import { HitTester, emitPointClick } from './hit';
 import { TooltipManager } from '../interaction/TooltipManager';
 
 import { type HostedPlugin, PluginHost } from './plugins';
-import { isDarkColor } from '../utils/color';
 import { rangeForDataChange, autoRange, invalidateRangeCache, type BarXAxisPlan } from './ranging';
 import {
   applyFollowWindow,
@@ -93,7 +81,6 @@ import {
   setSelection,
   reconcileSelectionForDataChange,
   isBrushMode,
-  brushPixelRange,
   brushStart,
   brushUpdate,
   brushEnd,
@@ -111,6 +98,7 @@ import { setHighlight, clearProximityHighlight } from './highlight';
 import { computeCustomXTicks } from './axes/ticks';
 import { debugSnapshot, type DataPassSeries, type DebugSnapshot } from './debug';
 import { renderAllSeries } from './marks/index';
+import { renderOverlay } from './render/overlay';
 
 /**
  * Chart, the composition root.
@@ -219,7 +207,7 @@ export class ChartCore implements EngineHost {
   private themeRefreshQueued = false;
   private boundSchemeChange = () => this.queueThemeRefresh();
   /** Active selection box (shift+drag) */
-  private selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
   /** Persistent brush selection in data space (selection.mode: 'brush'). */
   selection: SelectionRange | null = null;
   /** Selection value at the last emitted selection:change, to skip no-op emits. */
@@ -231,7 +219,7 @@ export class ChartCore implements EngineHost {
     orig: ScaleRange;
   } | null = null;
   /** Transient tap-feedback ring, cleared automatically once its lifetime expires. */
-  private tapFeedback: { x: number; y: number; startTime: number } | null = null;
+  tapFeedback: { x: number; y: number; startTime: number } | null = null;
   /**
    * Axis keys the user has actively zoomed. Suppresses auto-range on those
    * axes during data updates so a zoomed Y (or X) doesn't snap back on the
@@ -1239,244 +1227,10 @@ export class ChartCore implements EngineHost {
     // Step 4c: Overlay layer (crosshair, tooltip)
     if (flags & DirtyFlag.OVERLAY) {
       this.canvasManager.clear('overlay');
-      this.renderOverlay();
+      renderOverlay(this);
       this.plugins.draw('overlay', this.canvasManager.overlayCtx, this, this.layout.plot);
       this.debugCounters.renderCount.overlay++;
     }
-  }
-
-  private renderOverlay(): void {
-    const ctx = this.canvasManager.overlayCtx;
-    const cursorEnabled = this.config.cursor?.show !== false;
-    const isSelecting = this.selectionBox !== null;
-
-    // During active selection, hide crosshair/tooltip/dots, only show the selection box
-    if (!isSelecting && cursorEnabled && this.cursorX !== null && this.cursorY !== null) {
-      // Draw crosshair, skip for scatter-only charts
-      const isScatterOnly = this.config.series.every(
-        (s) => s.visible === false || s.type === 'scatter',
-      );
-      if (!isScatterOnly) {
-        const visibleSeries = this.config.series.filter((s) => s.visible !== false);
-        const hasOnlyDiscreteMarks =
-          visibleSeries.length > 0 &&
-          visibleSeries.every((s) => s.type === 'bar' || s.type === 'histogram');
-        const cursorCfg = {
-          ...this.config.cursor,
-          // A vertical line reads as an extra mark on grouped bars. The
-          // highlighted group already supplies a stronger positional cue.
-          xLine: this.config.cursor?.xLine ?? !hasOnlyDiscreteMarks,
-        };
-        renderCrosshair(
-          ctx,
-          this.cursorX,
-          this.cursorY,
-          this.layout,
-          cursorCfg,
-          // `cursor.color` overrides the theme's crosshair colour when set,          // useful for matching a brand accent on one chart without changing
-          // the whole theme.
-          cursorCfg.color ?? this.theme.crosshairColor,
-        );
-      }
-
-      // Draw data point indicators (dot + ring per hit-tested point).
-      // Skip when the caller has opted out, typically because a legend
-      // table already shows the values and the extra glyphs would be noise.
-      if (this.config.cursor?.indicators !== false) {
-        this.drawPointIndicators(ctx);
-      }
-    }
-
-    // Show tooltip, hide during selection or when cursor is disabled
-    if (
-      !isSelecting &&
-      cursorEnabled &&
-      this.cursorIsLocal &&
-      this.config.tooltip?.show !== false &&
-      this.tooltipPoints.length > 0 &&
-      this.mouseX !== null
-    ) {
-      const rect = this.canvasManager.container.getBoundingClientRect();
-      this.tooltipManager.show(
-        this.tooltipPoints,
-        rect.left + this.mouseX,
-        rect.top + (this.mouseY ?? 0),
-        this.config.tooltip,
-        this.lastPointerType,
-      );
-    } else {
-      this.tooltipManager.hide();
-    }
-
-    // Draw the persistent brush selection band (anchored in data space, so it
-    // stays put as the viewport pans/zooms), then edge handles.
-    if (this.selection) {
-      const rect = brushPixelRange(this);
-      if (rect) {
-        renderBrushSelection(ctx, rect.min, rect.max, this.layout, this.theme.crosshairColor);
-      }
-    }
-
-    // Draw selection box
-    if (this.selectionBox) {
-      renderSelectionBox(
-        ctx,
-        this.selectionBox.x1,
-        this.selectionBox.y1,
-        this.selectionBox.x2,
-        this.selectionBox.y2,
-        this.layout,
-      );
-    }
-
-    // Tap feedback, 220ms ring animation. Schedule another overlay frame
-    // until the lifetime runs out, then clear state.
-    if (this.tapFeedback) {
-      const TAP_RING_MS = 220;
-      const elapsed = performance.now() - this.tapFeedback.startTime;
-      const progress = elapsed / TAP_RING_MS;
-      if (progress >= 1) {
-        this.tapFeedback = null;
-      } else {
-        renderTapRing(
-          ctx,
-          this.tapFeedback.x,
-          this.tapFeedback.y,
-          progress,
-          this.theme.crosshairColor,
-        );
-        this.scheduler.markDirty(DirtyFlag.OVERLAY);
-      }
-    }
-  }
-
-  private drawPointIndicators(ctx: CanvasRenderingContext2D): void {
-    // Clip all indicators to the plot area
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(
-      this.layout.plot.left,
-      this.layout.plot.top,
-      this.layout.plot.width,
-      this.layout.plot.height,
-      4,
-    );
-    ctx.clip();
-
-    // Ring around cursor dots: white works on both light and dark backgrounds.
-    // On dark themes it reads as a subtle glow; on light themes it separates
-    // the vibrant fill from the white canvas. Alpha varies by luminance so
-    // the ring is visible but never harsh.
-    const bg = this.theme.backgroundColor;
-    // Default unparseable backgrounds to dark, matching the previous behavior
-    // of this ring's luminance check. isDarkColor correctly handles 3-digit
-    // hex and named colors, which the old hand-rolled parser did not.
-    const isDark = isDarkColor(bg, true);
-    const ringAlpha = isDark ? 0.15 : 0.08;
-
-    // When a series is highlighted, only draw the indicator on that series,    // the others just get the crosshair line (matches Neptune/W&B behavior).
-    const hlActive = this.highlightedSeries !== null && this.config.highlight?.enabled !== false;
-
-    for (const point of this.tooltipPoints) {
-      if (hlActive && point.seriesIndex !== this.highlightedSeries) continue;
-
-      const store = this.storeForSeries(point.seriesIndex);
-      const sc = this.config.series[point.seriesIndex];
-      if (!sc) continue;
-
-      const xScale = this.scales.get(sc.xAxis ?? 'x');
-      const yScale = this.scales.get(sc.yAxis ?? 'y');
-      if (!xScale || !yScale) continue;
-
-      if (sc.type === 'histogram') {
-        // Highlight hovered bin, edges from X data, counts from Y data
-        const colIdx = seriesYColumn(sc);
-        const binIdx = point.dataIndex;
-        if (colIdx >= 1 && colIdx <= store.seriesCount && binIdx < store.length - 1) {
-          const x1 = xScale.dataToPixel(store.xAt(binIdx));
-          const x2 = xScale.dataToPixel(store.xAt(binIdx + 1));
-          const yTop = yScale.dataToPixel(store.yAt(colIdx - 1, binIdx));
-          const yBase = yScale.dataToPixel(0);
-          ctx.fillStyle = `rgba(255, 255, 255, ${ringAlpha})`;
-          ctx.fillRect(x1, Math.min(yTop, yBase), x2 - x1, Math.abs(yTop - yBase));
-          ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha * 2})`;
-          ctx.lineWidth = 1;
-          ctx.strokeRect(x1, Math.min(yTop, yBase), x2 - x1, Math.abs(yTop - yBase));
-        }
-        continue;
-      }
-
-      if (sc.type === 'bar') {
-        const idx = point.dataIndex;
-        const barSeries = this.config.series.filter((s) => s.visible !== false && s.type === 'bar');
-        const barIdx = barSeries.indexOf(sc);
-        const totalBars = barSeries.length;
-        if (barIdx >= 0 && idx < store.length) {
-          const centerX = xScale.dataToPixel(store.xAt(idx));
-          const categoryWidth = categoryWidthFromData(
-            (dataIndex) => xScale.dataToPixel(store.xAt(dataIndex)),
-            idx,
-            store.length,
-            this.layout.plot.width * 0.5,
-          );
-          const rect = barRectForCategory({
-            centerX,
-            categoryWidth,
-            series: sc,
-            barSeriesIndex: barIdx,
-            totalBarSeries: totalBars,
-          });
-          const barTop = yScale.dataToPixel(point.y);
-          const baselineY = yScale.dataToPixel(0);
-          if (!Number.isFinite(centerX) || !Number.isFinite(barTop) || !Number.isFinite(baselineY))
-            continue;
-          const rectY = Math.min(barTop, baselineY);
-          const rectH = Math.abs(barTop - baselineY);
-          ctx.fillStyle = `rgba(255, 255, 255, ${ringAlpha})`;
-          ctx.fillRect(rect.left, rectY, rect.width, rectH);
-          ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha * 2})`;
-          ctx.lineWidth = 1;
-          ctx.strokeRect(rect.left, rectY, rect.width, rectH);
-        }
-        continue;
-      }
-
-      // Density scatter represents aggregate bins, not a single datum. A
-      // nearest-point dot is misleading, so only point-rendered scatter gets
-      // the unified indicator style.
-      if (sc.type === 'scatter' && isDensityScatterSeries(sc, store.length)) continue;
-
-      const px = xScale.dataToPixel(point.x);
-      const py = yScale.dataToPixel(point.y);
-      const r = sc.type === 'scatter' ? (point.radius ?? sc.pointRadius ?? 3) : 4;
-
-      // On light backgrounds, a subtle drop-shadow gives the dot depth
-      // without needing a dark ring stroke.
-      if (!isDark) {
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.18)';
-        ctx.shadowBlur = 4;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 1;
-      }
-
-      // White ring slightly larger than the fill, acts as a clean halo.
-      ctx.beginPath();
-      ctx.arc(px, py, r + 1.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-
-      // Clear shadow for the inner fill so it's crisp.
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-
-      // Filled center with the series color
-      ctx.beginPath();
-      ctx.arc(px, py, r, 0, Math.PI * 2);
-      ctx.fillStyle = point.color;
-      ctx.fill();
-    }
-
-    ctx.restore();
   }
 
   // ─── Private: Helpers ───────────────────────────────────────
