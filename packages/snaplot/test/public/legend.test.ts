@@ -98,6 +98,23 @@ describe('the built-in legend (plan D6)', () => {
     expect(container.style.display).toBe('');
   });
 
+  it.fails('[frameworks-11] an append that changes no series leaves the legend DOM alone', () => {
+    const chart = mount<Row>(fakes, shown);
+    const legend = buttons(chart)[0].parentElement!;
+    const observer = new MutationObserver(() => {});
+    observer.observe(legend, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    chart.appendData([{ t: 30, cpu: 41, mem: 60 }]);
+    chart.appendData([{ t: 31, cpu: 42, mem: 60 }]);
+    const records = observer.takeRecords();
+    observer.disconnect();
+    expect(records.map((record) => `${record.type} ${record.attributeName ?? ''}`)).toEqual([]);
+  });
+
   it('[frameworks-11] the legend styles are injected once per document', () => {
     mount<Row>(fakes, shown);
     mount<Row>(fakes, shown);

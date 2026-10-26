@@ -405,4 +405,13 @@ describe('[gap-environments-03] the final handle', () => {
     ])
       expect(removed in chart).toBe(false);
   });
+
+  it.fails('[gap-environments-03] the handle has no member beyond the fourteen, and one symbol', () => {
+    const chart = mount<Row>(fakes, base);
+    const members = new Set<string>();
+    for (let o: object | null = chart; o && o !== Object.prototype; o = Object.getPrototypeOf(o))
+      for (const key of Object.getOwnPropertyNames(o)) if (key !== 'constructor') members.add(key);
+    expect([...members].sort()).toEqual([...HANDLE_MEMBERS].sort());
+    expect(Object.getOwnPropertySymbols(chart)).toEqual([Symbol.for('snaplot.debug')]);
+  });
 });

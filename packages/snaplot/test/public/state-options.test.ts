@@ -199,6 +199,25 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     chart.update({ data: rows.map((row) => ({ ...row, v: row.v + 1 })) });
     expect(range(chart, 'x')).toEqual([10, 20]);
   });
+
+  // An unsorted scatter source stores its rows in input order, with the row index in column 0.
+  const scatter = { x: 't', series: [{ type: 'scatter', y: 'v' }] };
+  const unsorted = (xs: number[]): Row[] => xs.map((t, i) => ({ t, v: i, w: 0 }));
+
+  it.fails('[dataapi-14] replacing unsorted scatter data that still reaches a pinned X range keeps it', () => {
+    const chart = mount<Row>(fakes, { ...scatter, data: unsorted([90, 10, 50, 70, 30]) });
+    chart.update({ viewport: { x: [40, 60] } });
+    chart.update({ data: unsorted([95, 15, 55, 75, 35]) });
+    expect(range(chart, 'x')).toEqual([40, 60]);
+    expect(chart.getState().viewport).toEqual({ x: [40, 60] });
+  });
+
+  it.fails('[dataapi-14] replacing unsorted scatter data that misses a pinned X range unpins it', () => {
+    const chart = mount<Row>(fakes, { ...scatter, data: unsorted([3, 1, 4, 0, 2]) });
+    chart.update({ viewport: { x: [1, 3] } });
+    chart.update({ data: unsorted([150, 110, 190, 130, 170]) });
+    expect(chart.getState().viewport).toEqual({});
+  });
 });
 
 describe('[dataapi-16][backlog-02] selection', () => {
