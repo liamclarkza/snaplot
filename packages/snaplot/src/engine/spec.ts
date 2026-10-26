@@ -1,23 +1,101 @@
 export type {
   AxisPosition,
-  ChartStats,
-  CursorSnapshotOptions,
   InterpolationMode,
-  Layout,
+  PixelRect,
   ScaleRange,
   ScatterRenderMode,
-  SelectionRange,
-  ThemeConfig,
 } from '../public/types';
 import type {
   AxisPosition,
   InterpolationMode,
-  Layout,
+  PixelRect,
   ScaleRange,
   ScatterRenderMode,
-  SelectionRange,
-  ThemeConfig,
 } from '../public/types';
+
+// ============================================================
+// ENGINE VIEWS (internal: the public handle reports scale() and the state instead)
+// ============================================================
+
+/** Where an axis is drawn. */
+export interface AxisArea {
+  /** The side of the plot. */
+  position: AxisPosition;
+  /** The rectangle of its labels and title. */
+  area: PixelRect;
+}
+
+/** The rectangle the data is drawn in, and the axis areas, in CSS pixels. */
+export interface Layout {
+  /** The chart width. */
+  width: number;
+  /** The chart height. */
+  height: number;
+  /** The plot rectangle. */
+  plot: PixelRect;
+  /** Each axis' side and area. */
+  axes: Record<string, AxisArea>;
+  /** The device pixel ratio. */
+  dpr: number;
+}
+
+/** The colours and fonts a chart resolved from its theme and page. */
+export interface ThemeConfig {
+  /** The surface colour. */
+  backgroundColor: string;
+  /** The strong text colour. */
+  textColor: string;
+  /** The axis label colour. */
+  axisLabelColor?: string;
+  /** The font family. */
+  fontFamily: string;
+  /** The axis text size in CSS pixels. */
+  fontSize: number;
+  /** The gridline colour. */
+  gridColor: string;
+  /** The gridline opacity. */
+  gridOpacity: number;
+  /** The series colours. */
+  palette: string[];
+  /** The categorical palette. */
+  categoricalPalette?: string[];
+  /** The sequential ramp. */
+  sequentialPalette?: string[];
+  /** The diverging ramp. */
+  divergingPalette?: string[];
+  /** The density ramp. */
+  heatmapGradient?: string[];
+  /** The axis line colour. */
+  axisLineColor: string;
+  /** The frame colour. */
+  borderColor: string;
+  /** The frame opacity. */
+  borderOpacity: number;
+  /** The muted text colour. */
+  tickColor: string;
+  /** The crosshair colour. */
+  crosshairColor: string;
+  /** The tooltip surface. */
+  tooltipBackground: string;
+  /** The tooltip text colour. */
+  tooltipTextColor: string;
+  /** The tooltip border colour. */
+  tooltipBorderColor: string;
+}
+
+/** A persistent selection in data space, as `getState().selection` reports it. */
+export interface SelectionRange {
+  /** The selected X range. */
+  x: ScaleRange;
+  /** The selected Y range, for a two-axis selection. */
+  y?: ScaleRange;
+}
+
+/** Options of the engine's cursor snapshot. */
+export interface CursorSnapshotOptions {
+  /** What to report when the cursor is not over the chart. */
+  fallback?: 'hide' | 'latest' | 'first';
+}
 
 // ============================================================
 // DATA TYPES
@@ -837,14 +915,6 @@ export interface PerformanceConfig {
 // DEBUG / DIAGNOSTICS
 // ============================================================
 
-export interface DebugConfig {
-  /**
-   * Enable lightweight timing diagnostics. Counters are always maintained,
-   * but per-layer duration measurement only runs when this is true.
-   */
-  stats?: boolean;
-}
-
 // ============================================================
 // STREAMING
 // ============================================================
@@ -932,8 +1002,6 @@ export interface ChartSpec<TMeta = unknown> {
   streaming?: StreamingSpec;
   /** Large-dataset interaction tuning. */
   performance?: PerformanceConfig;
-  /** Timing diagnostics. Off by default. */
-  debug?: DebugConfig;
 
   /**
    * Theme overrides. Any field omitted resolves from CSS variables on the

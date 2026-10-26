@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-// Known M8 defects in the update path (plan RC1, D16: one update path with
-// invalidation classes). Presentation and callback changes must never ingest;
-// appended rows survive updates. Public API, fakes and debug() only.
+// M8's update-path locks (plan RC1, D16: one update path with invalidation
+// classes). Presentation and callback changes never ingest; appended rows
+// survive updates. Public API, fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChartHandle } from '../../src/index';
 import { debug, type Fakes, installFakes } from '../fakes';
@@ -66,7 +66,11 @@ describe('[arch-03][dataapi-10] presentation changes do not ingest', () => {
 
   it('an equivalent no-op update does not re-ingest (control)', () => {
     const chart = mountCpu();
-    expect(ingestsDuring(chart, () => chart.update({ series: chart.getOptions().series }))).toBe(0);
+    const series = [
+      { y: 'cpu', label: 'CPU' },
+      { y: 'mem', label: 'Memory' },
+    ] as const;
+    expect(ingestsDuring(chart, () => chart.update({ series }))).toBe(0);
   });
 });
 
@@ -126,17 +130,13 @@ describe('[dxtrial-11:data] re-ingest churn is visible', () => {
 });
 
 describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] annotations', () => {
-  it('[gap-annotations-extensibility-05] updating only referenceLines does not re-ingest or emit data:update', () => {
+  it('[gap-annotations-extensibility-05] updating only referenceLines does not re-ingest', () => {
     const chart = mountCpu();
-    let dataUpdates = 0;
-    chart.on('data:update', () => {
-      dataUpdates++;
-    });
     const ingests = ingestsDuring(chart, () => {
       chart.update({ referenceLines: [{ axis: 'y', value: 50, label: 'SLO' }] });
       chart.update({ referenceRegions: [{ axis: 'x', from: 10, to: 20, label: 'Deploy' }] });
     });
-    expect({ ingests, dataUpdates }).toEqual({ ingests: 0, dataUpdates: 0 });
+    expect(ingests).toBe(0);
   });
 
   it('[gap-annotations-extensibility-06] an in-place push then update({ referenceLines }) draws the new line', () => {
@@ -160,7 +160,9 @@ describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] a
 });
 
 describe('[dataapi-04][dataapi-02] appended rows survive updates', () => {
-  it.fails('[dataapi-04] the documented rows-then-columns stream keeps appended points after an update', () => {
+  // Plan D23: a source is rows or columns. The 0.12 docs streamed columns into a rows chart and
+  // lost them on the next update; now that append throws, and a one-kind stream keeps its rows.
+  it('[dataapi-04] a rows stream keeps appended points after an update; a columns append to it throws', () => {
     type Sample = { time: number; value: number };
     const initial: Sample[] = [0, 1, 2, 3, 4].map((time) => ({ time, value: time }));
     const chart = fakes.mount<Sample>({
@@ -168,24 +170,27 @@ describe('[dataapi-04][dataapi-02] appended rows survive updates', () => {
       x: 'time',
       series: [{ y: 'value' }],
     });
+    expect(() =>
+      chart.appendData({
+        columns: { time: new Float64Array([5]), value: new Float64Array([50]) },
+      }),
+    ).toThrow(/^snaplot: .*rows/);
     for (const [time, value] of [
       [5, 50],
       [6, 51],
       [7, 52],
     ])
-      chart.appendData({
-        columns: { time: new Float64Array([time]), value: new Float64Array([value]) },
-      });
+      chart.appendData([{ time, value }]);
     chart.update({ axes: { y: { title: 'Value' } } });
-    const latest = chart.getCursorSnapshot({ fallback: 'latest' }).points[0];
+    const latest = chart.getCursor({ fallback: 'latest' }).points[0];
     expect(latest).toMatchObject({ x: 7, y: 52 });
     chart.appendData([{ time: 8, value: 53 }]);
-    expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].rowIndex).toBe(8);
+    expect(chart.getCursor({ fallback: 'latest' }).points[0].rowIndex).toBe(8);
   });
 });
 
 describe('[gap-environments-03] the final handle', () => {
-  it.fails('[gap-environments-03] the handle has no resize member', () => {
+  it('[gap-environments-03] the handle has no resize member', () => {
     const chart = mountCpu();
     expect('resize' in chart).toBe(false);
   });

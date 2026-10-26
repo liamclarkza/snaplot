@@ -105,15 +105,13 @@ describe('[gap-scale-longevity-01] resize paints synchronously', () => {
     const afterResize = resets(chart);
     fakes.resizeObserver.deliver(chart.container, { force: true });
     expect(resets(chart)).toEqual(afterResize);
-    chart.resize(500, 200);
-    expect(resets(chart)).toEqual(afterResize);
   });
 
   it('[gap-scale-longevity-01] a chart updated while hidden re-lays out when shown at the same size', () => {
     const chart = mount(2);
     fakes.resizeObserver.deliver();
     fakes.frames.flush();
-    expect(chart.getLayout()).toMatchObject({ width: 400, height: 200 });
+    expect(debug(chart).layout).toMatchObject({ width: 400, height: 200 });
 
     // display: none collapses the box; the observer reports 0 × 0 and the
     // backing stores stay allocated at 400 × 200.
@@ -126,8 +124,8 @@ describe('[gap-scale-longevity-01] resize paints synchronously', () => {
     const before = resets(chart);
     fakes.resizeObserver.resize(chart.container, 400, 200);
     expect(resets(chart)).toEqual(before);
-    expect(chart.getLayout()).toMatchObject({ width: 400, height: 200 });
-    const { plot } = chart.getLayout();
+    expect(debug(chart).layout).toMatchObject({ width: 400, height: 200 });
+    const { plot } = debug(chart);
     expect(plot.left + plot.width).toBeLessThanOrEqual(400);
     expect(plot.top + plot.height).toBeLessThanOrEqual(200);
     expectPainted(chart);

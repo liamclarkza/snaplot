@@ -19,7 +19,7 @@ afterEach(() => {
 /** Series colours, read from the final state shape when it exists. */
 function seriesColours(chart: ChartHandle<any>): string[] {
   const state = chart.getState() as unknown as { series?: Array<{ color: string }> };
-  return state.series?.map((series) => series.color) ?? chart.getLegendItems().map((i) => i.color);
+  return state.series?.map((series) => series.color) ?? chart.getState().series.map((i) => i.color);
 }
 
 function contrastOnWhite(hex: string): number {
@@ -46,7 +46,7 @@ describe("won't do in this overhaul (plan §6)", () => {
       timeZone: 'Asia/Tokyo',
     } as never);
     chart.setCursor(at);
-    expect(chart.getCursorSnapshot().formattedX).toMatch(/9:30/);
+    expect(chart.getCursor().formattedX).toMatch(/9:30/);
   });
 
   it.fails('[visuals-13:light] every light palette colour has 3:1 contrast on white', () => {
@@ -90,7 +90,7 @@ describe("won't do in this overhaul (plan §6)", () => {
       { width: 300, height: 200 },
     );
     fakes.frames.flush();
-    const { plot } = chart.getLayout();
+    const { plot } = debug(chart);
     expect(debug(chart).drawnPoints).toBeLessThanOrEqual(plot.width * plot.height);
   });
 });

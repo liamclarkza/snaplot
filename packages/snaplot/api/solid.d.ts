@@ -5,10 +5,10 @@ import { JSX } from 'solid-js';
  * Reads a value from a row: a field name, or a function of the row and its index in the data you
  * passed. Field names are cheaper: a function's identity is part of the options, so memoise it.
  */
-declare type Accessor<Row, Value> = Field<Row, Value> | RowFunction<Row, Value>;
+export declare type Accessor<Row, Value> = Field<Row, Value> | RowFunction<Row, Value>;
 
 /** Options of `appendData`. */
-declare interface AppendOptions {
+export declare interface AppendOptions {
     /**
      * Append to this series' own source instead of the chart's data.
      * @defaultValue the chart's data
@@ -16,14 +16,6 @@ declare interface AppendOptions {
     seriesId?: string;
     /** Replace the last row with the first appended row (a forming bucket). @defaultValue `false` */
     updateLast?: boolean;
-}
-
-/** Where an axis is drawn. */
-declare interface AxisArea {
-    /** The side of the plot. */
-    position: AxisPosition;
-    /** The rectangle of its labels and title. */
-    area: PixelRect;
 }
 
 /** Options every axis kind shares. */
@@ -61,7 +53,7 @@ declare interface AxisCommon {
 }
 
 /** An interval on one axis, as `[from, to]`. Dates are epoch milliseconds. */
-declare type AxisInterval = readonly [from: number | Date, to: number | Date];
+export declare type AxisInterval = readonly [from: number | Date, to: number | Date];
 
 /**
  * One axis. `axes.x` and `axes.y` exist by default; other keys (`y2`, …) add
@@ -76,28 +68,22 @@ declare type AxisInterval = readonly [from: number | Date, to: number | Date];
  * }
  * ```
  */
-declare type AxisOptions = ValueAxisOptions | TimeAxisOptions | InferredAxisOptions | CategoryAxisOptions;
+export declare type AxisOptions = ValueAxisOptions | TimeAxisOptions | InferredAxisOptions | CategoryAxisOptions;
 
 /** The side of the plot an axis sits on. */
-declare type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
-
-/** An axis' kind and current range, as `getAxis()` reports it. */
-declare interface AxisState extends ScaleRange {
-    /** The axis kind. */
-    type: AxisType;
-}
+export declare type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
 
 /** The kind of an axis. */
-declare type AxisType = 'linear' | 'log' | 'time' | 'category';
+export declare type AxisType = 'linear' | 'log' | 'time' | 'category';
 
 /**
  * A value on an axis: a number, a `Date`, an ISO-8601 date string (read as a time) or a category
  * label.
  */
-declare type AxisValue = number | Date | string;
+export declare type AxisValue = number | Date | string;
 
 /** A band between `lower` and `upper` with a centre line at `y`. */
-declare interface BandSeriesOptions<Row> extends SeriesCommon<Row>, PathOptions {
+export declare interface BandSeriesOptions<Row> extends SeriesCommon<Row>, PathOptions {
     /** The mark. */
     type: 'band';
     /** The centre value, used by the tooltip and the cursor. */
@@ -113,7 +99,7 @@ declare interface BandSeriesOptions<Row> extends SeriesCommon<Row>, PathOptions 
 }
 
 /** Bars, one per X value. */
-declare interface BarSeriesOptions<Row> extends SeriesCommon<Row> {
+export declare interface BarSeriesOptions<Row> extends SeriesCommon<Row> {
     /** The mark. */
     type: 'bar';
     /** The value. */
@@ -126,13 +112,13 @@ declare interface BarSeriesOptions<Row> extends SeriesCommon<Row> {
  * A callback option. Declared bivariantly, so a handler written for a narrower row type can be
  * stored in options typed for a wider one.
  */
-declare type Callback<Value> = {
+export declare type Callback<Value> = {
     /** Receives the new value. */
     bivarianceHack(value: Value): void;
 }['bivarianceHack'];
 
 /** A category axis: one slot per label, in order of first appearance. */
-declare interface CategoryAxisOptions extends AxisCommon {
+export declare interface CategoryAxisOptions extends AxisCommon {
     /**
      * The scale. Inferred for string values that are not ISO-8601 dates.
      * @defaultValue inferred from the data
@@ -147,76 +133,39 @@ declare interface CategoryAxisOptions extends AxisCommon {
     format?: never;
 }
 
-/** A chart. Its props are the {@link ChartOptions} plus the host's attributes. */
+/**
+ * A chart. Its props are the same options `createChart` takes, applied with `setOptions` when
+ * they change, so inline objects and callbacks cost only what they change.
+ */
 export declare function Chart<Row = Record<string, any>>(props: ChartProps<Row>): JSX.Element;
 
-/** Controlled values are authoritative; defaults are applied only at mount. */
-export declare interface ChartControls {
-    /** The host's accessible name. @defaultValue `ariaLabel`, else `'Chart'` */
-    'aria-label'?: string;
-    /** Ids of elements that describe the chart. @defaultValue none */
-    'aria-describedby'?: string;
-    /** Ids of elements that name the chart. @defaultValue none */
-    'aria-labelledby'?: string;
-    /** Controlled axis ranges: gestures propose changes through `onViewportChange`. @defaultValue uncontrolled */
-    viewport?: ViewportRanges;
-    /** Axis ranges applied once at mount. @defaultValue automatic */
-    defaultViewport?: ViewportRanges;
-    /** Called with proposed axis ranges. */
-    onViewportChange?: (viewport: ViewportRanges) => void;
-    /** The controlled selection. @defaultValue uncontrolled */
-    selectionState?: SelectionRange | null;
-    /** A selection applied once at mount. @defaultValue none */
-    defaultSelection?: SelectionRange | null;
-    /** Called with a proposed selection. */
-    onSelectionChange?: (selection: SelectionRange | null) => void;
-    /** The controlled hidden series ids. @defaultValue uncontrolled */
-    hiddenSeries?: readonly string[];
-    /** Series hidden once at mount. @defaultValue none */
-    defaultHiddenSeries?: readonly string[];
-    /** Called with proposed hidden series ids. */
-    onHiddenSeriesChange?: (ids: readonly string[]) => void;
-}
-
-/** Event payloads by event name, for `chart.on()`. */
-declare interface ChartEvents<Row = Record<string, any>> {
-    /** Any state changed. */
-    'state:change': ChartState<Row>;
-    /** The cursor moved or left. */
+/**
+ * Event payloads by event name, for `chart.on()`. Each `<key>:change` has a matching
+ * `on<Key>Change` option, called with the same value.
+ */
+export declare interface ChartEvents<Row = Record<string, any>> {
+    /** The cursor moved or left: the values under it. */
     'cursor:change': CursorSnapshot<Row>;
-    /** An axis range changed. */
-    'viewport:change': ViewportRanges;
-    /** The persistent selection changed. */
-    'selection:change': SelectionRange | null;
-    /** Series were shown or hidden. */
-    'visibility:change': readonly string[];
+    /** The pinned axes changed: the complete new viewport, `{}` on a reset. */
+    'viewport:change': Viewport;
+    /** The selection settled, or was cleared (`null`). */
+    'selection:change': SelectionChange<Row> | null;
+    /** Series were shown or hidden: the ids now hidden. */
+    'hiddenSeries:change': readonly string[];
     /** The highlighted series changed. */
     'highlight:change': string | null;
     /** Following the latest data started or stopped. */
-    'follow:change': boolean;
+    'following:change': boolean;
     /** A point was clicked. */
     'point:click': ChartPoint<Row>;
-    /** A box selection finished. */
-    select: SelectionResult<Row>;
-    /** Data was replaced or appended. */
-    'data:update': undefined;
-    /** Options changed. */
-    'options:update': ChartOptions<Row>;
-    /** The resolved theme changed. */
-    'theme:update': ThemeConfig;
-    /** The chart was resized. */
-    resize: {
-        /** The new width in CSS pixels. */
-        width: number;
-        /** The new height in CSS pixels. */
-        height: number;
-    };
 }
 
-/** Charts linked by `group` share their cursor, highlight and, optionally, X viewport. */
+/**
+ * Charts linked by their `group` option share their cursor, highlight, horizontal viewport and
+ * plot edges, and a series id has the same colour in every member. A chart leaves with
+ * `update({ group: undefined })` or `destroy()`.
+ */
 export declare interface ChartGroup {
-    /** The options the group was created with. */
-    readonly options: Readonly<ChartGroupOptions>;
     /** Move every member's cursor. A value the members' X axis cannot read throws. */
     setCursor(value: number | Date | string | null): void;
     /**
@@ -224,23 +173,6 @@ export declare interface ChartGroup {
      * no member has throws.
      */
     setHighlight(id: string | null): void;
-    /** Unlink every member. */
-    destroy(): void;
-}
-
-/** Charts linked by `group` share their cursor, highlight and, optionally, X viewport. */
-declare interface ChartGroup_2 {
-    /** The options the group was created with. */
-    readonly options: Readonly<ChartGroupOptions_2>;
-    /** Move every member's cursor. A value the members' X axis cannot read throws. */
-    setCursor(value: number | Date | string | null): void;
-    /**
-     * Highlight a series in every member. Members without that series clear their highlight; an id
-     * no member has throws.
-     */
-    setHighlight(id: string | null): void;
-    /** Unlink every member. */
-    destroy(): void;
 }
 
 /** What a chart group links. */
@@ -249,25 +181,14 @@ export declare interface ChartGroupOptions {
     cursor?: boolean;
     /** Share the highlighted series. @defaultValue `true` */
     highlight?: boolean;
-    /** Share the horizontal viewport (vertical axes stay independent). @defaultValue `false` */
+    /**
+     * Share the horizontal viewport: a zoom, pan or reset of X in one member moves every member
+     * that has that axis. Vertical axes stay each chart's own. @defaultValue `true`
+     */
     viewport?: boolean;
-    /** Align the plot edges. @defaultValue `false` */
+    /** Align the plot edges: every member takes the widest member's side gutters. @defaultValue `true` */
     alignPlots?: boolean;
-    /** Share one Y range across the group. @defaultValue `false` */
-    yRange?: boolean;
-}
-
-/** What a chart group links. */
-declare interface ChartGroupOptions_2 {
-    /** Share the cursor. @defaultValue `true` */
-    cursor?: boolean;
-    /** Share the highlighted series. @defaultValue `true` */
-    highlight?: boolean;
-    /** Share the horizontal viewport (vertical axes stay independent). @defaultValue `false` */
-    viewport?: boolean;
-    /** Align the plot edges. @defaultValue `false` */
-    alignPlots?: boolean;
-    /** Share one Y range across the group. @defaultValue `false` */
+    /** Share one Y range, the union of the members' own. @defaultValue `false` */
     yRange?: boolean;
 }
 
@@ -285,53 +206,53 @@ declare interface ChartGroupOptions_2 {
 export declare interface ChartHandle<Row = Record<string, any>> {
     /** The element the chart was created in. */
     readonly container: HTMLElement;
-    /** Apply a partial update. */
+    /**
+     * Apply a partial update. Every key the patch names counts as changed, and the state options
+     * it names always apply: `update({ viewport: {} })` resets the viewport.
+     */
     update(patch: ChartPatch<Row>): void;
+    /**
+     * Replace every option, as a framework does on each render. Each option is compared with the
+     * value last applied, so an unchanged one costs nothing, and a state option (`viewport`,
+     * `selection`, `hiddenSeries`, `highlight`) applies only when it differs from the value last
+     * given; an option left out returns to its default.
+     */
+    setOptions(options: ChartOptions<Row>): void;
     /** Append rows or columns to the chart's data, or to one series' own source. */
     appendData(data: DataSource<Row>, options?: AppendOptions): void;
-    /** The options as last applied. */
-    getOptions(): Readonly<ChartOptions<Row>>;
-    /** The current state. */
-    getState(): ChartState<Row>;
-    /** Called after any state change; returns the unsubscribe function. */
+    /** The current state: the same frozen object until the next commit. */
+    getState(): ChartState;
+    /**
+     * Called after data, options or state change, at most once per animation frame; returns the
+     * unsubscribe function. Cursor moves do not call it: listen to `cursor:change`.
+     */
     subscribe(listener: () => void): () => void;
-    /** Listen to one event; returns the unsubscribe function. */
+    /** Listen to one event; returns the unsubscribe function. An unknown event name throws. */
     on<K extends keyof ChartEvents<Row>>(event: K, listener: (value: ChartEvents<Row>[K]) => void): () => void;
-    /** Set axis ranges by key. */
-    setViewport(viewport: ViewportRanges): void;
-    /** Return every axis to its automatic range. */
+    /**
+     * The values under the cursor, or at a fallback position (`'hide'`, the default, reports
+     * none), computed when asked.
+     */
+    getCursor(options?: CursorOptions): CursorSnapshot<Row>;
+    /**
+     * Return every axis to its automatic range, as `update({ viewport: {} })` does, and report
+     * the reset as `viewport:change` with `{}`.
+     */
     resetViewport(): void;
-    /** Follow the latest data again. */
+    /** Follow the latest data again, after a pan, a zoom or a pinned viewport paused it. */
     resumeFollow(): void;
-    /** Set or clear the persistent selection. */
-    setSelection(selection: SelectionRange | null): void;
-    /** Show or hide a series. An id the chart does not have throws. */
-    setSeriesVisible(id: string, visible: boolean): void;
-    /** Highlight a series, or clear the highlight with `null`. An id the chart does not have throws. */
-    setHighlight(id: string | null): void;
     /**
      * Move the cursor to an X value, or hide it with `null`. A string is a category label, or an
      * ISO-8601 date on a time axis; a string the X axis cannot read throws.
      */
     setCursor(x: number | Date | string | null): void;
-    /** The values under the cursor, or at a fallback position. */
-    getCursorSnapshot(options?: CursorSnapshotOptions): CursorSnapshot<Row>;
-    /** One entry per series. */
-    getLegendItems(): LegendItem[];
-    /** The resolved theme. */
-    getTheme(): ThemeConfig;
-    /** The plot and axis rectangles. */
-    getLayout(): Layout;
-    /** Paint counters. */
-    getStats(): ChartStats;
-    /** An axis' kind and current range. */
-    getAxis(key: string): Readonly<AxisState> | undefined;
-    /** Resolve the theme from the page again. */
-    refreshTheme(): void;
-    /** Resize to a fixed size in CSS pixels. */
-    resize(width: number, height: number): void;
-    /** Repaint every layer. */
-    redraw(): void;
+    /** An axis' kind, range and pixel mapping, or undefined for an axis the chart does not have. */
+    scale(key: string): ChartScale | undefined;
+    /**
+     * Repaint a layer on the next frame: `'overlay'`, `'data'` (the marks and what plugins draw
+     * over them) or `'all'`, which also resolves the theme from the page again.
+     */
+    redraw(layer?: 'overlay' | 'data' | 'all'): void;
     /** Remove the chart and release its resources. */
     destroy(): void;
 }
@@ -451,41 +372,40 @@ export declare interface ChartOptions<Row = Record<string, any>> {
  * A partial update for `chart.update()`. Objects merge; arrays, `data`, `series`, `plugins` and
  * `group` replace; `undefined` resets a key.
  */
-declare type ChartPatch<Row> = {
+export declare type ChartPatch<Row> = {
     [K in keyof ChartOptions<Row>]?: K extends 'data' | 'series' | 'plugins' | 'group' ? ChartOptions<Row>[K] : OptionPatch<ChartOptions<Row>[K]>;
 };
 
 /**
- * A plugin: drawing hooks and lifecycle callbacks. Hook errors are caught and
- * logged.
+ * A plugin: an id, an optional install hook, and draw hooks for three slots. Plugins are
+ * reconciled by `id`, so an inline object installs once and its latest hooks draw. Each slot
+ * draws after the built-in reference lines and regions, in array order; a hook that throws is
+ * reported once and its plugin is disabled.
  *
  * @example
  * ```ts
  * const watermark: ChartPlugin = {
  *   id: 'watermark',
- *   afterDrawOverlay(chart, ctx) { ctx.fillText('draft', 8, 16); },
+ *   drawOverlay(context, chart, plot) {
+ *     context.fillText('draft', plot.left + 8, plot.top + 16);
+ *   },
  * };
  * ```
  */
-declare interface ChartPlugin<Row = Record<string, any>> {
-    /** A unique id. */
+export declare interface ChartPlugin<Row = Record<string, any>> {
+    /** A unique id among the chart's plugins; two plugins with one id throw. */
     id: string;
-    /** Called once with the chart when the plugin is added. */
-    install?(chart: ChartHandle<Row>): void;
-    /** Called once when the plugin is removed or the chart is destroyed. */
-    destroy?(chart: ChartHandle<Row>): void;
-    /** Called before the data layer draws; return `false` to skip the built-in marks. */
-    beforeDraw?(chart: ChartHandle<Row>): boolean | void;
-    /** Draw under the data, after the grid. */
-    afterDrawGrid?(chart: ChartHandle<Row>, context: CanvasRenderingContext2D): void;
-    /** Draw over the data. */
-    afterDrawData?(chart: ChartHandle<Row>, context: CanvasRenderingContext2D): void;
+    /**
+     * Called once with the chart when the plugin is added; return a cleanup function, called when
+     * the plugin is removed or the chart is destroyed.
+     */
+    install?(chart: ChartHandle<Row>): void | (() => void);
+    /** Draw under the data, after the grid and the reference regions. */
+    drawBelow?(context: CanvasRenderingContext2D, chart: ChartHandle<Row>, plot: PixelRect): void;
+    /** Draw over the data, after the reference lines. */
+    drawAbove?(context: CanvasRenderingContext2D, chart: ChartHandle<Row>, plot: PixelRect): void;
     /** Draw on the overlay, above the crosshair. */
-    afterDrawOverlay?(chart: ChartHandle<Row>, context: CanvasRenderingContext2D): void;
-    /** Called after data is replaced or appended. */
-    onDataUpdate?(chart: ChartHandle<Row>): void;
-    /** Called after options change. */
-    onOptionsUpdate?(chart: ChartHandle<Row>): void;
+    drawOverlay?(context: CanvasRenderingContext2D, chart: ChartHandle<Row>, plot: PixelRect): void;
 }
 
 /** One data point, as tooltips, the cursor and callbacks report it. */
@@ -518,38 +438,8 @@ export declare interface ChartPoint<Row = Record<string, any>> {
     color: string;
 }
 
-/** One data point, as tooltips, the cursor and callbacks report it. */
-declare interface ChartPoint_2<Row = Record<string, any>> {
-    /** The series id. */
-    seriesId: string;
-    /** The series label. */
-    label: string;
-    /** The original row, for row data. */
-    row?: Row;
-    /** The row's index in the data you passed (before sorting), or among appended rows. */
-    rowIndex: number;
-    /** The row id, when the data has one. */
-    rowId?: RowId_2;
-    /** The X value: a number (epoch milliseconds on time axes) or a category label. */
-    x: number | string;
-    /** The bin interval of a histogram point. */
-    xRange?: ScaleRange_2;
-    /** The value. */
-    y: number;
-    /** The marker radius of a scatter point in CSS pixels. */
-    radius?: number;
-    /** Extra scatter fields from `tooltipFields`, `colorBy` and `sizeBy`. */
-    fields?: readonly ChartPointField_2[];
-    /** The X value as written. */
-    formattedX: string;
-    /** The value as written. */
-    formattedY: string;
-    /** The point's colour. */
-    color: string;
-}
-
 /** One extra tooltip field of a scatter point. */
-declare interface ChartPointField {
+export declare interface ChartPointField {
     /** The field's label. */
     label: string;
     /** The raw value (a category label for category encodings). */
@@ -558,62 +448,66 @@ declare interface ChartPointField {
     formatted: string;
 }
 
-/** One extra tooltip field of a scatter point. */
-declare interface ChartPointField_2 {
-    /** The field's label. */
-    label: string;
-    /** The raw value (a category label for category encodings). */
-    value: number | string;
-    /** The value as written. */
-    formatted: string;
-}
-
-export declare interface ChartProps<Row = Record<string, any>> extends Omit<ChartOptions<Row>, ControlledOptionKeys>, ChartControls {
+/** The props of {@link Chart}: the chart's options, plus the host element's attributes. */
+export declare interface ChartProps<Row = Record<string, any>> extends ChartOptions<Row>, HostAttributes {
     /** Class names of the host element. @defaultValue none */
     class?: string;
     /** Inline styles of the host element. @defaultValue full width and height */
     style?: string | JSX.CSSProperties;
     /** Receives the chart handle, and `undefined` on cleanup. */
     ref?: (chart: ChartHandle<Row> | undefined) => void;
-    /** Called once with the chart handle after mount. */
-    onReady?: (chart: ChartHandle<Row>) => void;
 }
 
-/** The chart's state, as `getState()` reports it. */
-export declare interface ChartState<Row = Record<string, any>> {
-    /** The current range of every axis. */
-    viewport: ViewportRanges;
-    /** The persistent selection, or `null`. */
-    selection: SelectionRange | null;
+/**
+ * One axis as `chart.scale(key)` reports it: what plugins map data to pixels with. A snapshot:
+ * read it again after the viewport moves.
+ */
+export declare interface ChartScale {
+    /** The axis kind. */
+    readonly type: AxisType;
+    /** Whether the axis runs along the bottom or top of the plot. */
+    readonly horizontal: boolean;
+    /** The lower bound of the current range, in data units (slot positions on a category axis). */
+    readonly min: number;
+    /** The upper bound of the current range. */
+    readonly max: number;
+    /** The labels of a category axis, in order. */
+    readonly categories?: readonly string[];
+    /**
+     * The pixel of a value, in CSS pixels from the canvases' top-left corner: a number, a Date or
+     * an ISO-8601 string on a time axis, or a category label.
+     */
+    toPixel(value: number | Date | string): number;
+    /** The value at a pixel (a slot position on a category axis). */
+    fromPixel(pixel: number): number;
+}
+
+/**
+ * The chart's state, as `getState()` reports it: one frozen snapshot per revision. The cursor
+ * is not part of it; read it with `getCursor()` or listen to `cursor:change`.
+ */
+export declare interface ChartState {
+    /** Bumped by every data, option or state commit, so a subscriber can tell a change. */
+    revision: number;
+    /** The pinned axes, as `[from, to]`; `{}` when every axis is automatic. */
+    viewport: Viewport;
+    /** The selection, or `null`. */
+    selection: Selection_2 | null;
     /** The ids of hidden series. */
     hiddenSeries: readonly string[];
     /** The highlighted series id, or `null`. */
-    highlightedSeries: string | null;
+    highlight: string | null;
     /** Whether the X viewport follows the latest data. */
     following: boolean;
-    /** The values under the cursor. */
-    cursor: CursorSnapshot<Row>;
-}
-
-/** Paint counters, for diagnostics. */
-declare interface ChartStats {
-    /** Bumped on every data change. */
-    dataVersion: number;
-    /** Data replacements since creation. */
-    setDataCount: number;
-    /** Appends since creation. */
-    appendDataCount: number;
-    /** Paints per layer. */
-    renderCount: LayerCounts;
-    /** The duration of each layer's last paint in milliseconds (0 unless measured). */
-    lastRenderMs: LayerCounts;
+    /** Every series with its colour, mark and visibility, in paint order. */
+    series: readonly SeriesState[];
 }
 
 /** A colour encoding: a field, or a field with options. */
-declare type ColorEncoding<Row> = Accessor<Row, number | string | null | undefined> | ColorEncodingOptions<Row>;
+export declare type ColorEncoding<Row> = Accessor<Row, number | string | null | undefined> | ColorEncodingOptions<Row>;
 
 /** Colour scatter points by a field. */
-declare interface ColorEncodingOptions<Row> {
+export declare interface ColorEncodingOptions<Row> {
     /** The encoded field: strings are categories, numbers a ramp. */
     field: Accessor<Row, number | string | null | undefined>;
     /**
@@ -635,10 +529,7 @@ declare interface ColorEncodingOptions<Row> {
 }
 
 /** How a colour encoding reads its values. */
-declare type ColorEncodingType = 'auto' | 'category' | 'continuous' | 'diverging';
-
-/** Declares a custom column. */
-export declare function column<Row>(spec: LegendTableColumn<Row>): LegendTableColumn<Row>;
+export declare type ColorEncodingType = 'auto' | 'category' | 'continuous' | 'diverging';
 
 /**
  * Named typed columns. Every column has the same length; the X column must be
@@ -654,7 +545,7 @@ export declare function column<Row>(spec: LegendTableColumn<Row>): LegendTableCo
  * });
  * ```
  */
-declare interface ColumnData {
+export declare interface ColumnData {
     /** The columns by field name. */
     readonly columns: Readonly<Record<string, Float64Array>>;
     /**
@@ -665,25 +556,40 @@ declare interface ColumnData {
 }
 
 /**
- * Options the framework components take as controlled props instead (see
- * {@link ChartControls}).
+ * Link charts: pass the group as each chart's `group` option. Members share their cursor,
+ * highlight and horizontal viewport, and align their plot edges; Y stays each chart's own unless
+ * `yRange`.
+ *
+ * @example
+ * ```ts
+ * const group = createChartGroup();
+ * createChart(a, { ...latency, group });
+ * createChart(b, { ...errors, group });
+ * ```
  */
-declare type ControlledOptionKeys = 'viewport' | 'selection' | 'hiddenSeries' | 'onViewportChange' | 'onSelectionChange' | 'onHiddenSeriesChange';
+export declare function createChartGroup(options?: ChartGroupOptions): ChartGroup;
 
-/** Own a chart for a reactive host and a complete reactive options snapshot. */
-export declare function createChart<Row>(container: Accessor_2<HTMLElement | undefined>, options: Accessor_2<ChartOptions<Row>>): Accessor_2<ChartHandle<Row> | undefined>;
+/**
+ * A slice of the chart's state as a signal, updated only when the slice changes (by `isEqual`).
+ *
+ * @example
+ * ```tsx
+ * const following = createChartState(chart, (state) => state.following);
+ * ```
+ */
+export declare function createChartState<T = ChartState>(chart: MaybeChart<any>, selector?: (state: ChartState) => T, isEqual?: (a: T, b: T) => boolean): Accessor_2<T | undefined>;
 
-/** A chart group owned by the current reactive scope. */
-export declare function createChartGroup(options?: ChartGroupOptions): ChartGroup_2;
+/**
+ * The values under the cursor, or at a fallback position, as a signal: updated on cursor moves
+ * and data commits only.
+ */
+export declare function createCursor<Row>(chart: MaybeChart<Row>, options?: CursorOptions): Accessor_2<CursorSnapshot<Row> | undefined>;
 
-/** The chart's state as a signal. */
-export declare function createChartState<Row>(chart: Accessor_2<ChartHandle<Row> | undefined | null>): Accessor_2<ChartState<Row> | undefined>;
-
-/** The values under the cursor, or at a fallback position, as a signal. */
-export declare function createCursorSnapshot<Row>(chart: Accessor_2<ChartHandle<Row> | null | undefined>, options?: Accessor_2<CursorSnapshotOptions>): Accessor_2<CursorSnapshot_2<Row> | undefined>;
-
-/** The highlighted series id as a signal, and a setter. */
-export declare function createHighlight<Row>(chart: Accessor_2<ChartHandle<Row> | undefined | null>): readonly [Accessor_2<string | null>, (id: string | null) => void | undefined];
+/** Options of `getCursor()`. */
+export declare interface CursorOptions {
+    /** What to report when the cursor is not over the chart. @defaultValue `'hide'` */
+    fallback?: 'hide' | 'latest' | 'first';
+}
 
 /** The values under the cursor, or at a fallback position. */
 export declare interface CursorSnapshot<Row = Record<string, any>> {
@@ -699,40 +605,20 @@ export declare interface CursorSnapshot<Row = Record<string, any>> {
     activeSeriesId: string | null;
 }
 
-/** The values under the cursor, or at a fallback position. */
-declare interface CursorSnapshot_2<Row = Record<string, any>> {
-    /** The X position, or `null` when there is none. */
-    x: number | string | null;
-    /** The X position as written. */
-    formattedX: string;
-    /** One point per visible series. */
-    points: readonly ChartPoint_2<Row>[];
-    /** What produced the snapshot. */
-    source: 'cursor' | 'latest' | 'first' | 'none';
-    /** The series closest to the pointer, or `null`. */
-    activeSeriesId: string | null;
-}
-
-/** Options of `getCursorSnapshot()`. */
-declare interface CursorSnapshotOptions {
-    /** What to report when the cursor is not over the chart. @defaultValue `'hide'` */
-    fallback?: 'hide' | 'latest' | 'first';
-}
-
 /**
  * What a chart or a series draws: object rows (sorted by X for you), named typed columns (already
  * sorted, used without copying) or histogram bins.
  */
-declare type DataSource<Row> = readonly Row[] | ColumnData | HistogramBins;
+export declare type DataSource<Row> = readonly Row[] | ColumnData | HistogramBins;
 
 /** How times are written: a function of epoch milliseconds, or `Intl.DateTimeFormat` options. */
-declare type DateFormat = ((value: number) => string) | Intl.DateTimeFormatOptions;
+export declare type DateFormat = ((value: number) => string) | Intl.DateTimeFormatOptions;
 
 /**
  * A property of `Row` whose values are assignable to `Value`. For rows typed as a plain record, any
  * string is accepted.
  */
-declare type Field<Row, Value> = Extract<keyof {
+export declare type Field<Row, Value> = Extract<keyof {
     [K in keyof Row as NonNullable<Row[K]> extends Value ? K : unknown extends Row[K] ? K : never]: 0;
 }, string>;
 
@@ -740,10 +626,27 @@ declare type Field<Row, Value> = Extract<keyof {
 declare type FieldSeries<Row> = LineSeriesOptions<Row> | BarSeriesOptions<Row> | BandSeriesOptions<Row> | ScatterSeriesOptions<Row>;
 
 /**
+ * Count values into bins for a histogram series.
+ *
+ * @example
+ * ```ts
+ * const before = histogram(latencyBefore);
+ * const after = histogram(latencyAfter, { thresholds: before.edges });
+ * createChart(element, {
+ *   series: [
+ *     { id: 'before', type: 'histogram', data: before },
+ *     { id: 'after', type: 'histogram', data: after },
+ *   ],
+ * });
+ * ```
+ */
+export declare function histogram(values: Float64Array | readonly number[], options?: HistogramOptions): HistogramBins;
+
+/**
  * Histogram bins: `edges.length === counts.length + 1`, edges strictly increasing. {@link
  * histogram} computes them from raw values.
  */
-declare interface HistogramBins {
+export declare interface HistogramBins {
     /** Bin edges; bin `i` spans `[edges[i], edges[i + 1])`, and the last bin includes its upper edge. */
     edges: Float64Array;
     /** The number of values in each bin. */
@@ -752,8 +655,26 @@ declare interface HistogramBins {
     maxCount: number;
 }
 
+/** Options of {@link histogram}. */
+export declare interface HistogramOptions {
+    /**
+     * A bin count from 1 to 10,000, or the rule that picks one (capped at 1,000 bins on nice edges).
+     * @defaultValue `'freedman-diaconis'`
+     */
+    bins?: number | HistogramRule;
+    /**
+     * Explicit edges, strictly increasing: pass one histogram's `edges` to bin another dataset the
+     * same way. Values outside the first and last edge are not counted. Not combined with `bins`.
+     * @defaultValue computed from `bins`
+     */
+    thresholds?: ArrayLike<number>;
+}
+
+/** The rules that pick an automatic bin count. */
+export declare type HistogramRule = 'freedman-diaconis' | 'sturges' | 'scott';
+
 /** A histogram from {@link histogram} bins. */
-declare interface HistogramSeriesOptions {
+export declare interface HistogramSeriesOptions {
     /** The mark. */
     type: 'histogram';
     /** The series id (a histogram has no field to name it after). */
@@ -774,8 +695,23 @@ declare interface HistogramSeriesOptions {
     format?: NumberFormat;
 }
 
+/**
+ * Attributes of the host element that a chart component passes through, with any `data-*`
+ * attribute (JSX accepts those on components without declaring them).
+ */
+export declare interface HostAttributes {
+    /** The host element's id. @defaultValue none */
+    id?: string;
+    /** The host's accessible name. @defaultValue `ariaLabel`, else `'Chart'` */
+    'aria-label'?: string;
+    /** Ids of elements that describe the chart. @defaultValue none */
+    'aria-describedby'?: string;
+    /** Ids of elements that name the chart. @defaultValue none */
+    'aria-labelledby'?: string;
+}
+
 /** An axis whose type is inferred from the data. */
-declare interface InferredAxisOptions extends AxisCommon {
+export declare interface InferredAxisOptions extends AxisCommon {
     /** Inferred from the data: Dates and ISO-8601 strings give `'time'`, other strings `'category'`, numbers `'linear'`. */
     type?: undefined;
     /**
@@ -789,7 +725,7 @@ declare interface InferredAxisOptions extends AxisCommon {
 }
 
 /** Gestures. Shift+drag pans, Ctrl/⌘+wheel and pinch zoom, a double-click resets. */
-declare interface InteractionOptions {
+export declare interface InteractionOptions {
     /**
      * The axes wheel, pinch and keyboard zoom change.
      * @defaultValue `'x'`, or `'xy'` when every series is scatter
@@ -809,108 +745,69 @@ declare interface InteractionOptions {
  * Path shape between points. `monotone` never overshoots; the `step-*` variants place the riser
  * before, after or centred on each point.
  */
-declare type InterpolationMode = 'linear' | 'monotone' | 'step-before' | 'step-after' | 'step-middle';
-
-/** One number per canvas layer. */
-declare interface LayerCounts {
-    /** The grid layer: gridlines, axes and frame. */
-    grid: number;
-    /** The data layer: the marks. */
-    data: number;
-    /** The overlay: crosshair, indicators and selection. */
-    overlay: number;
-}
-
-/** The rectangle the data is drawn in, and the axis areas, in CSS pixels. */
-declare interface Layout {
-    /** The chart width. */
-    width: number;
-    /** The chart height. */
-    height: number;
-    /** The plot rectangle. */
-    plot: PixelRect;
-    /** Each axis' side and area. */
-    axes: Record<string, AxisArea>;
-    /** The device pixel ratio. */
-    dpr: number;
-}
-
-/** A legend entry for one series. */
-declare interface LegendItem {
-    /** The series id. */
-    id: string;
-    /** The series label. */
-    label: string;
-    /** The mark. */
-    type: SeriesType;
-    /** The series colour. */
-    color: string;
-    /** The fill colour, or `null`. */
-    fill: string | null;
-    /** Whether the series is shown. */
-    visible: boolean;
-    /** The dash pattern; empty when solid. */
-    dash: number[];
-    /** The series opacity. */
-    opacity: number;
-}
+export declare type InterpolationMode = 'linear' | 'monotone' | 'step-before' | 'step-after' | 'step-middle';
 
 /** The built-in legend. */
-declare interface LegendOptions {
+export declare interface LegendOptions {
     /** Where the legend sits. @defaultValue `'top'` */
     position?: 'top' | 'bottom';
 }
 
-/** A table of each series' value at the cursor. */
-export declare function LegendTable<Row>(props: LegendTableProps<Row>): JSX.Element;
+/** A table of each series' value at the cursor: `createLegendTable` as a component. */
+export declare function LegendTable<Row = Record<string, any>>(props: LegendTableProps<Row>): JSX.Element;
 
-/** One column of {@link LegendTable}. */
-export declare interface LegendTableColumn<Row> {
-    /** A stable key for the column. */
-    key: string;
+/**
+ * One column of a legend table: the series' swatch, its name, its value at the cursor, or your
+ * own text from the point and the series.
+ *
+ * @example
+ * ```ts
+ * columns: ['swatch', 'name', 'value', { header: 'LR', value: (point) => String(point?.row?.lr ?? '') }]
+ * ```
+ */
+export declare type LegendTableColumn<Row = Record<string, any>> = 'swatch' | 'name' | 'value' | {
     /** The header text. */
     header: string;
+    /** The cell text of one series: `point` is its value at the cursor (or the fallback). */
+    value(point: ChartPoint<Row> | undefined, series: SeriesState): string;
     /** Text alignment. @defaultValue `'left'` */
     align?: 'left' | 'right' | 'center';
-    /** A CSS width. @defaultValue automatic */
-    width?: string;
-    /** The header's title attribute. @defaultValue none */
-    title?: string;
-    /** Renders the cell of one series. */
-    cell: (point: ChartPoint<Row>, series: LegendItem, api: {
-        setHighlight: (id: string | null) => void;
-    }) => JSX.Element;
+};
+
+/** What {@link createLegendTable} returns. */
+export declare interface LegendTableHandle<Row = Record<string, any>> {
+    /** Change the columns, the fallback or the chart. */
+    update(options: Partial<LegendTableOptions<Row>>): void;
+    /** Remove the table. */
+    destroy(): void;
 }
 
-/** What a legend table shows when the cursor is not over the chart. */
-export declare type LegendTableFallback = 'hide' | 'latest' | 'first' | 'series-only';
-
-/** Props of {@link LegendTable}. */
-export declare interface LegendTableProps<Row = Record<string, any>> {
-    /** The chart, as an accessor. */
-    chart: Accessor_2<ChartHandle<Row> | null | undefined>;
-    /** What the rows show when the cursor is not over the chart. @defaultValue `'series-only'` */
-    fallback?: LegendTableFallback;
-    /** The columns. @defaultValue name and value */
+/** Options of {@link createLegendTable}. */
+export declare interface LegendTableOptions<Row = Record<string, any>> {
+    /** The chart the table reads. */
+    chart: ChartHandle<Row>;
+    /** The columns, in order. @defaultValue `['swatch', 'name', 'value']` */
     columns?: readonly LegendTableColumn<Row>[];
-    /** Show the X value above the rows. @defaultValue `true` */
-    showStepHeader?: boolean;
-    /** How the X value in the header is written. @defaultValue the X axis format */
-    formatStep?: (value: number | string) => string;
-    /** Highlight a series while its row is hovered. @defaultValue `true` */
-    highlightOnHover?: boolean;
-    /** A CSS max-height; the table scrolls beyond it. @defaultValue no limit */
-    maxHeight?: string;
-    /** Extra class names. @defaultValue none */
+    /**
+     * What the values show when the cursor is not over the chart: the latest or first data, or
+     * nothing (the table is then hidden).
+     * @defaultValue `'latest'`
+     */
+    fallback?: 'latest' | 'first' | 'hide';
+}
+
+/** The props of {@link LegendTable}: the vanilla options, plus the host's class and style. */
+export declare interface LegendTableProps<Row = Record<string, any>> extends Omit<LegendTableOptions<Row>, 'chart'> {
+    /** The chart the table reads: a handle, an accessor of one, or nothing yet. */
+    chart: MaybeChart<Row>;
+    /** Class names of the host element. @defaultValue none */
     class?: string;
-    /** Inline styles. @defaultValue none */
+    /** Inline styles of the host element. @defaultValue none */
     style?: string | JSX.CSSProperties;
-    /** Render the table yourself from the cursor snapshot. */
-    children?: (snapshot: Accessor_2<CursorSnapshot<Row> | undefined>, highlight: Accessor_2<string | null>, setHighlight: (id: string | null) => void) => JSX.Element;
 }
 
 /** A line, or an area filled to zero. */
-declare interface LineSeriesOptions<Row> extends SeriesCommon<Row>, PathOptions {
+export declare interface LineSeriesOptions<Row> extends SeriesCommon<Row>, PathOptions {
     /** The mark. @defaultValue `'line'` */
     type?: 'line' | 'area';
     /** The value. */
@@ -924,17 +821,8 @@ declare interface LineSeriesOptions<Row> extends SeriesCommon<Row>, PathOptions 
     fill?: string | null;
 }
 
-/** A column with a value computed from the point. */
-export declare function metricColumn<Row>(resolve: (point: ChartPoint<Row>, series: LegendItem) => string, options?: {
-    header?: string;
-    truncate?: number;
-}): LegendTableColumn<Row>;
-
-/** A column with the series swatch and name. */
-export declare function nameColumn<Row>(options?: {
-    swatch?: boolean;
-    truncate?: number;
-}): LegendTableColumn<Row>;
+/** A chart handle, an accessor of one, or nothing yet. */
+export declare type MaybeChart<Row> = ChartHandle<Row> | Accessor_2<ChartHandle<Row> | null | undefined> | null | undefined;
 
 /**
  * How numbers are written: a function, or `Intl.NumberFormat` options with an
@@ -946,10 +834,10 @@ export declare function nameColumn<Row>(options?: {
  * axes: { y: { format: (v) => `${v.toFixed(1)} ms` } }
  * ```
  */
-declare type NumberFormat = ((value: number) => string) | NumberFormatOptions;
+export declare type NumberFormat = ((value: number) => string) | NumberFormatOptions;
 
 /** `Intl.NumberFormat` options plus text placed before and after the number. */
-declare type NumberFormatOptions = Intl.NumberFormatOptions & {
+export declare type NumberFormatOptions = Intl.NumberFormatOptions & {
     /** Text before the formatted number, such as `'$'`. @defaultValue `''` */
     prefix?: string;
     /**
@@ -983,8 +871,8 @@ declare interface PathOptions {
     dash?: readonly number[];
 }
 
-/** A rectangle in CSS pixels, relative to the chart container. */
-declare interface PixelRect {
+/** A rectangle in CSS pixels, from the top-left corner of the chart's canvases. */
+export declare interface PixelRect {
     /** The left edge. */
     left: number;
     /** The top edge. */
@@ -999,13 +887,13 @@ declare interface PixelRect {
  * A colour for each bar or scatter point, from its value, its row and the row's original index.
  * Called when the layer paints.
  */
-declare type PointColor<Row> = {
+export declare type PointColor<Row> = {
     /** Returns the CSS colour of the point with this value, row and original row index. */
     bivarianceHack(value: number, row: Row | undefined, index: number): string;
 }['bivarianceHack'];
 
 /** A horizontal or vertical line at a value of one axis. */
-declare interface ReferenceLine {
+export declare interface ReferenceLine {
     /** The axis key the value is on, such as `'y'` or `'x'`. */
     axis: string;
     /** The value: a number, a Date, an ISO-8601 string or a category label. */
@@ -1021,7 +909,7 @@ declare interface ReferenceLine {
 }
 
 /** A shaded span between two values of one axis. */
-declare interface ReferenceRegion {
+export declare interface ReferenceRegion {
     /** The axis key the span is on. */
     axis: string;
     /** The start: a number, a Date, an ISO-8601 string, a category label, or `-Infinity` for an open start. */
@@ -1040,27 +928,16 @@ declare interface ReferenceRegion {
  * A function of a row and its original index in the data you passed. Declared bivariantly, so a
  * function written for a narrower row type can be stored in options typed for a wider one.
  */
-declare type RowFunction<Row, Value> = {
+export declare type RowFunction<Row, Value> = {
     /** Reads the value of `row`; `index` is its index in the data you passed. */
     bivarianceHack(row: Row, index: number): Value;
 }['bivarianceHack'];
 
 /** A stable identifier for a row, kept through sorting and streaming. */
-declare type RowId = string | number;
-
-/** A stable identifier for a row, kept through sorting and streaming. */
-declare type RowId_2 = string | number;
+export declare type RowId = string | number;
 
 /** A closed data-space interval. */
-declare interface ScaleRange {
-    /** The lower bound, in data units. */
-    min: number;
-    /** The upper bound, in data units. */
-    max: number;
-}
-
-/** A closed data-space interval. */
-declare interface ScaleRange_2 {
+export declare interface ScaleRange {
     /** The lower bound, in data units. */
     min: number;
     /** The upper bound, in data units. */
@@ -1071,10 +948,10 @@ declare interface ScaleRange_2 {
  * Scatter drawing: individual points, a density map, or points until there are more than 200,000 in
  * view.
  */
-declare type ScatterRenderMode = 'points' | 'density' | 'auto';
+export declare type ScatterRenderMode = 'points' | 'density' | 'auto';
 
 /** Points at (x, y), optionally coloured and sized by other fields. */
-declare interface ScatterSeriesOptions<Row> extends SeriesCommon<Row> {
+export declare interface ScatterSeriesOptions<Row> extends SeriesCommon<Row> {
     /** The mark. */
     type: 'scatter';
     /** The vertical position. */
@@ -1098,25 +975,12 @@ declare interface Selection_2 {
     /** The selected Y interval, for a two-axis selection. @defaultValue the whole Y range */
     readonly y?: AxisInterval;
 }
+export { Selection_2 as Selection }
 
 /** A selection as reported to `onSelectionChange`, with the points inside it. */
-declare interface SelectionChange<Row = Record<string, any>> extends Selection_2 {
+export declare interface SelectionChange<Row = Record<string, any>> extends Selection_2 {
     /** The scatter points inside a two-axis selection. */
     readonly points?: readonly ChartPoint<Row>[];
-}
-
-/** A persistent selection in data space, as `getState().selection` reports it. */
-declare interface SelectionRange {
-    /** The selected X range. */
-    x: ScaleRange;
-    /** The selected Y range, for a two-axis selection. */
-    y?: ScaleRange;
-}
-
-/** A finished box selection, with the points inside it. */
-declare interface SelectionResult<Row = Record<string, any>> extends SelectionRange {
-    /** The scatter points inside a two-axis selection. */
-    points?: readonly ChartPoint<Row>[];
 }
 
 /** Options every series shares. */
@@ -1159,24 +1023,7 @@ declare interface SeriesCommon<Row> {
 }
 
 /** Data a series brings itself, instead of the chart's `data`. */
-declare type SeriesData = readonly object[] | ColumnData;
-
-/** A list legend for a chart: one button per series. */
-export declare function SeriesLegend<Row>(props: SeriesLegendProps<Row>): JSX.Element;
-
-/** Props of {@link SeriesLegend}. */
-export declare interface SeriesLegendProps<Row = Record<string, any>> {
-    /** The chart, as an accessor. */
-    chart: Accessor_2<ChartHandle<Row> | undefined | null>;
-    /** Toggle a series on click. @defaultValue `true` */
-    toggle?: boolean;
-    /** Highlight a series on hover and focus. @defaultValue `true` */
-    highlight?: boolean;
-    /** Extra class names. @defaultValue none */
-    class?: string;
-    /** Inline styles. @defaultValue none */
-    style?: string | JSX.CSSProperties;
-}
+export declare type SeriesData = readonly object[] | ColumnData;
 
 /**
  * One series. It reads the chart's `data` unless it brings its own; a series
@@ -1192,7 +1039,7 @@ export declare interface SeriesLegendProps<Row = Record<string, any>> {
  * ]
  * ```
  */
-declare type SeriesOptions<Row = Record<string, any>> = (FieldSeries<Row> & {
+export declare type SeriesOptions<Row = Record<string, any>> = (FieldSeries<Row> & {
     /** The chart's `data` is used. */
     data?: undefined;
 }) | (FieldSeries<any> & {
@@ -1200,14 +1047,34 @@ declare type SeriesOptions<Row = Record<string, any>> = (FieldSeries<Row> & {
     data: SeriesData;
 }) | HistogramSeriesOptions;
 
+/** One series with its colour, mark and visibility: what a legend draws. */
+export declare interface SeriesState {
+    /** The series id. */
+    id: string;
+    /** The series label. */
+    label: string;
+    /** The mark. */
+    type: SeriesType;
+    /** The series colour. */
+    color: string;
+    /** The fill colour, or `null`. */
+    fill: string | null;
+    /** Whether the series is shown. */
+    visible: boolean;
+    /** The dash pattern; empty when solid. */
+    dash: readonly number[];
+    /** The series opacity. */
+    opacity: number;
+}
+
 /** A mark type. */
-declare type SeriesType = 'line' | 'area' | 'band' | 'bar' | 'scatter' | 'histogram';
+export declare type SeriesType = 'line' | 'area' | 'band' | 'bar' | 'scatter' | 'histogram';
 
 /** A size encoding: a field, or a field with options. */
-declare type SizeEncoding<Row> = Numeric<Row> | SizeEncodingOptions<Row>;
+export declare type SizeEncoding<Row> = Numeric<Row> | SizeEncodingOptions<Row>;
 
 /** Size scatter points by a numeric field. */
-declare interface SizeEncodingOptions<Row> {
+export declare interface SizeEncodingOptions<Row> {
     /** The encoded field. */
     field: Numeric<Row>;
     /** The radius range in CSS pixels. @defaultValue `[2, 7]` */
@@ -1219,7 +1086,7 @@ declare interface SizeEncodingOptions<Row> {
 }
 
 /** Streaming with `appendData`. */
-declare interface StreamingOptions {
+export declare interface StreamingOptions {
     /** Keep at most this many rows per source; older rows are dropped. @defaultValue unbounded */
     maxPoints?: number;
     /**
@@ -1228,56 +1095,6 @@ declare interface StreamingOptions {
      * @defaultValue the whole data extent
      */
     followWindow?: number;
-}
-
-/** Native Solid cells; safe to render on the server. */
-export declare function swatchColumn<Row>(options?: {
-    size?: number;
-    shape?: 'dot' | 'bar';
-}): LegendTableColumn<Row>;
-
-/** The colours and fonts a chart resolved from its theme and page. */
-declare interface ThemeConfig {
-    /** The surface colour. */
-    backgroundColor: string;
-    /** The strong text colour. */
-    textColor: string;
-    /** The axis label colour. */
-    axisLabelColor?: string;
-    /** The font family. */
-    fontFamily: string;
-    /** The axis text size in CSS pixels. */
-    fontSize: number;
-    /** The gridline colour. */
-    gridColor: string;
-    /** The gridline opacity. */
-    gridOpacity: number;
-    /** The series colours. */
-    palette: string[];
-    /** The categorical palette. */
-    categoricalPalette?: string[];
-    /** The sequential ramp. */
-    sequentialPalette?: string[];
-    /** The diverging ramp. */
-    divergingPalette?: string[];
-    /** The density ramp. */
-    heatmapGradient?: string[];
-    /** The axis line colour. */
-    axisLineColor: string;
-    /** The frame colour. */
-    borderColor: string;
-    /** The frame opacity. */
-    borderOpacity: number;
-    /** The muted text colour. */
-    tickColor: string;
-    /** The crosshair colour. */
-    crosshairColor: string;
-    /** The tooltip surface. */
-    tooltipBackground: string;
-    /** The tooltip text colour. */
-    tooltipTextColor: string;
-    /** The tooltip border colour. */
-    tooltipBorderColor: string;
 }
 
 /**
@@ -1289,7 +1106,7 @@ declare interface ThemeConfig {
  * theme: { surface: '#fffdf7', categorical: ['#0072b2', '#d55e00'] }
  * ```
  */
-declare interface ThemeTokens {
+export declare interface ThemeTokens {
     /** Light or dark roles. @defaultValue derived from `surface` */
     mode?: 'light' | 'dark';
     /**
@@ -1322,7 +1139,7 @@ declare interface ThemeTokens {
 }
 
 /** A time axis: epoch milliseconds, Dates or ISO-8601 strings. */
-declare interface TimeAxisOptions extends AxisCommon {
+export declare interface TimeAxisOptions extends AxisCommon {
     /** The scale. */
     type: 'time';
     /**
@@ -1335,10 +1152,10 @@ declare interface TimeAxisOptions extends AxisCommon {
 }
 
 /** A tooltip field: a field, or a field with options. */
-declare type TooltipField<Row> = Accessor<Row, number | string | null | undefined> | TooltipFieldOptions<Row>;
+export declare type TooltipField<Row> = Accessor<Row, number | string | null | undefined> | TooltipFieldOptions<Row>;
 
 /** An extra field shown in a scatter point's tooltip. */
-declare interface TooltipFieldOptions<Row> {
+export declare interface TooltipFieldOptions<Row> {
     /** The field. */
     field: Accessor<Row, number | string | null | undefined>;
     /** The name shown before the value. @defaultValue the field name */
@@ -1348,7 +1165,7 @@ declare interface TooltipFieldOptions<Row> {
 }
 
 /** The tooltip. */
-declare interface TooltipOptions<Row> {
+export declare interface TooltipOptions<Row> {
     /**
      * `index` lists every series at the nearest X; `nearest` shows the closest point.
      * @defaultValue `'index'`, or `'nearest'` when every series is scatter
@@ -1363,7 +1180,7 @@ declare interface TooltipOptions<Row> {
 }
 
 /** A numeric axis: linear or logarithmic. */
-declare interface ValueAxisOptions extends AxisCommon {
+export declare interface ValueAxisOptions extends AxisCommon {
     /** The scale. `log` needs positive values. */
     type: 'linear' | 'log';
     /**
@@ -1376,21 +1193,10 @@ declare interface ValueAxisOptions extends AxisCommon {
     categories?: undefined;
 }
 
-/** A column with the series value. */
-export declare function valueColumn<Row>(options?: {
-    format?: (value: number, point: ChartPoint<Row>) => string;
-    placeholder?: string;
-    align?: 'left' | 'right' | 'center';
-    header?: string;
-}): LegendTableColumn<Row>;
-
 /**
  * The pinned axes of the viewport. An axis that is not named stays automatic; `{}` means every axis
  * is automatic.
  */
-declare type Viewport = Readonly<Partial<Record<string, AxisInterval>>>;
-
-/** The current axis ranges by axis key, as `getState().viewport` reports them. */
-declare type ViewportRanges = Readonly<Record<string, Readonly<ScaleRange>>>;
+export declare type Viewport = Readonly<Partial<Record<string, AxisInterval>>>;
 
 export { }

@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-// Known M8 defects in state and events (plan D3 declarative state options,
-// RC2 viewport = pinned axes, RC3 one isolated dispatcher, P14). Public API,
-// fakes and debug() only. Final names (`setOptions`, `viewport` as an
-// option) are used where M8 introduces them.
+// M8's state and events locks (plan D3 declarative state options, RC2
+// viewport = pinned axes, RC3 one isolated dispatcher, P14), on the 1.0
+// handle. Public API, fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createChartGroup } from '../../src/index';
 import type { ChartHandle } from '../../src/index';
-import { clientPoint, debug, type Fakes, installFakes, pointerTarget } from '../fakes';
+import { axis, clientPoint, debug, type Fakes, installFakes, pointerTarget } from '../fakes';
 
 let fakes: Fakes;
 beforeEach(() => {
@@ -56,24 +56,18 @@ describe('[dxtrial-04][frameworks-04][frameworks-05] the viewport names only pin
   it('[frameworks-04] update({ viewport: {} }) resets a zoomed chart', () => {
     const chart = mountLine();
     fakes.frames.flush();
-    const full = { ...chart.getAxis('x') };
+    const full = { ...axis(chart, 'x') };
     wheelZoom(chart, 50, 24);
-    expect(chart.getAxis('x')?.max).toBeLessThan(full.max ?? 0);
+    expect(axis(chart, 'x')?.max).toBeLessThan(full.max ?? 0);
     chart.update({ viewport: {} } as never);
     fakes.frames.flush();
-    expect(chart.getAxis('x')).toMatchObject({ min: full.min, max: full.max });
+    expect(axis(chart, 'x')).toMatchObject({ min: full.min, max: full.max });
   });
 
-  it.fails('[dxtrial-04] echoing the reported viewport keeps Y automatic', () => {
+  it('[dxtrial-04] echoing the reported viewport keeps Y automatic', () => {
     const chart = mountLine();
-    // The owner echoes what the chart reports: today through setViewport,
-    // after M8 through update({ viewport }) (D3).
-    const handle = chart as unknown as {
-      setViewport?: (viewport: never) => void;
-      update(patch: object): void;
-    };
-    const echo = (viewport: object) =>
-      handle.setViewport ? handle.setViewport(viewport as never) : handle.update({ viewport });
+    // The owner echoes what the chart reports through update({ viewport }) (D3).
+    const echo = (viewport: object) => chart.update({ viewport });
     let reported: object | null = null;
     chart.on('viewport:change', (viewport) => {
       reported = viewport;
@@ -83,7 +77,7 @@ describe('[dxtrial-04][frameworks-04][frameworks-05] the viewport names only pin
     if (reported) echo(reported);
     chart.update({ data: rows.map((row) => ({ ...row, v: row.v * 10 })) });
     fakes.frames.flush();
-    expect(chart.getAxis('y')?.max ?? 0).toBeGreaterThanOrEqual(280);
+    expect(axis(chart, 'y')?.max ?? 0).toBeGreaterThanOrEqual(280);
   });
 
   it('[frameworks-05] setOptions with an equal viewport neither repaints nor pins', () => {
@@ -96,32 +90,31 @@ describe('[dxtrial-04][frameworks-04][frameworks-05] the viewport names only pin
     const chart = fakes.mount<Row>(options as never);
     fakes.frames.flush();
     const before = debug(chart).renderCount.data;
-    const setOptions = (chart as unknown as { setOptions(o: object): void }).setOptions;
-    setOptions.call(chart, { ...options, viewport: { x: [10, 40] } });
+    chart.setOptions({ ...options, viewport: { x: [10, 40] } } as never);
     fakes.frames.flush();
     expect(debug(chart).renderCount.data).toBe(before);
-    expect(chart.getAxis('x')).toMatchObject({ min: 10, max: 40 });
+    expect(axis(chart, 'x')).toMatchObject({ min: 10, max: 40 });
   });
 });
 
 describe('[dataapi-14][dataapi-16][backlog-02] state survives data changes correctly', () => {
   it('[dataapi-14] replacing data outside a pinned X range unpins that axis', () => {
     const chart = mountLine();
-    chart.setViewport({ x: { min: 10, max: 20 } });
+    chart.update({ viewport: { x: [10, 20] } });
     chart.update({ data: Array.from({ length: 101 }, (_, i) => ({ t: 1000 + i, v: 5 })) });
     fakes.frames.flush();
-    expect(chart.getAxis('x')).toMatchObject({ min: 1000, max: 1100 });
+    expect(axis(chart, 'x')).toMatchObject({ min: 1000, max: 1100 });
   });
 
   it('[dataapi-16] a non-finite selection is rejected', () => {
     const chart = mountLine({ selection: { mode: 'brush' } });
-    expect(() => chart.setSelection({ x: { min: Number.NaN, max: 10 } })).toThrow(/selection/i);
+    expect(() => chart.update({ selection: { x: [Number.NaN, 10] } })).toThrow(/selection/i);
     expect(chart.getState().selection).toBeNull();
   });
 
   it('[backlog-02] a selection cleared by a data change emits selection:change(null)', () => {
     const chart = mountLine({ selection: { mode: 'brush' } });
-    chart.setSelection({ x: { min: 40, max: 60 } });
+    chart.update({ selection: { x: [40, 60] } });
     const events: unknown[] = [];
     chart.on('selection:change', (selection) => events.push(selection));
     chart.update({ data: Array.from({ length: 10 }, (_, i) => ({ t: 500 + i, v: 1 })) });
@@ -142,23 +135,26 @@ describe('[gap-overhaul-delta-03] one bad listener never blocks the others', () 
   it('[gap-overhaul-delta-03] a throwing on() listener does not stop later listeners', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const queued = captureRethrows();
-    const chart = mountLine({ highlight: { enabled: true } });
+    const chart = mountLine();
+    // A group's highlight is not the chart's own option, so the chart reports it (D3).
+    const group = createChartGroup();
+    chart.update({ group });
     const seen: Array<string | null> = [];
     chart.on('highlight:change', () => {
       throw new Error('first listener fails');
     });
     chart.on('highlight:change', (id) => seen.push(id));
-    chart.setHighlight('v');
-    chart.setHighlight(null);
+    group.setHighlight('v');
+    group.setHighlight(null);
     vi.unstubAllGlobals();
     expect(seen).toEqual(['v', null]);
     expect(queued.length).toBeGreaterThan(0);
   });
 
-  it.fails('[gap-overhaul-delta-03] a throwing subscriber does not stop later subscribers', () => {
+  it('[gap-overhaul-delta-03] a throwing subscriber does not stop later subscribers', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     captureRethrows();
-    const chart = mountLine({ highlight: { enabled: true } });
+    const chart = mountLine();
     let later = 0;
     chart.subscribe(() => {
       throw new Error('first subscriber fails');
@@ -166,7 +162,9 @@ describe('[gap-overhaul-delta-03] one bad listener never blocks the others', () 
     chart.subscribe(() => {
       later++;
     });
-    chart.setHighlight('v');
+    chart.update({ highlight: 'v' });
+    // Subscribers hear about commits once per frame (plan §3.2).
+    fakes.frames.flush();
     vi.unstubAllGlobals();
     expect(later).toBeGreaterThan(0);
   });

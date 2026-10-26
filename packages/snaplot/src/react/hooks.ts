@@ -1,10 +1,5 @@
 import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
-import type {
-  ChartHandle,
-  ChartState,
-  CursorSnapshot,
-  CursorSnapshotOptions,
-} from '../public/types';
+import type { ChartHandle, ChartState, CursorSnapshot, CursorOptions } from '../public/types';
 
 const noop = () => {};
 const none = () => undefined;
@@ -53,7 +48,7 @@ export function useChartState<T = ChartState>(
  */
 export function useCursor<Row>(
   chart: ChartHandle<Row> | null | undefined,
-  options?: CursorSnapshotOptions,
+  options?: CursorOptions,
 ): CursorSnapshot<Row> | undefined {
   const fallback = options?.fallback;
   const store = useMemo(() => {

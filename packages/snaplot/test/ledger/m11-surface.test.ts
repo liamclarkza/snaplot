@@ -57,7 +57,7 @@ describe('[backlog-05][research-02][repo-04] sizing and environments', () => {
     const chart = fakes.mount<Row>(options, { width: 600, height: 0 });
     fakes.resizeObserver.deliver();
     fakes.frames.flush();
-    expect(chart.getLayout().height).toBe(300);
+    expect(debug(chart).layout.height).toBe(300);
     expect(warn.mock.calls.filter((call) => /snaplot:/.test(String(call[0])))).toHaveLength(1);
   });
 
@@ -65,11 +65,11 @@ describe('[backlog-05][research-02][repo-04] sizing and environments', () => {
     const chart = fakes.mount<Row>({ ...options, height: 280 }, { width: 600, height: 500 });
     fakes.resizeObserver.deliver();
     fakes.frames.flush();
-    expect(chart.getLayout().height).toBe(280);
+    expect(debug(chart).layout.height).toBe(280);
     chart.update({ height: 400 });
     fakes.resizeObserver.deliver();
     fakes.frames.flush();
-    expect(chart.getLayout().height).toBe(400);
+    expect(debug(chart).layout.height).toBe(400);
   });
 
   it.fails('[repo-04] without ResizeObserver the chart renders nothing, warns once and never throws', () => {

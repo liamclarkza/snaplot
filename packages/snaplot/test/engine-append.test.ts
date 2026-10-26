@@ -13,24 +13,18 @@ beforeEach(() => {
 afterEach(() => fakes.uninstall());
 
 describe('engine appendData', () => {
-  it('tracks setData and render counters in chart stats', () => {
-    const config = {
-      debug: { stats: true },
-      series: [{ label: 'value', yColumn: 1 }],
-    };
+  it('counts ingests and paints in the debug counters', () => {
+    const config = { series: [{ label: 'value', yColumn: 1 }] };
     const chart = fakes.engine(config, [f([1, 2]), f([10, 20])]);
 
-    const initialStats = chart.getStats();
-    expect(initialStats.renderCount.grid).toBe(1);
-    expect(initialStats.renderCount.data).toBe(1);
-    expect(initialStats.renderCount.overlay).toBe(1);
+    const initial = chart.debugSnapshot();
+    expect(initial.renderCount).toEqual({ grid: 1, data: 1, overlay: 1 });
+    expect(initial.ingestCount).toBe(1);
 
     replaceData(chart, config, [f([1, 2, 3]), f([10, 20, 30])]);
-    expect(chart.getStats()).toMatchObject({
-      dataVersion: 1,
-      setDataCount: 1,
-      appendDataCount: 0,
-    });
+    expect(chart.debugSnapshot().ingestCount).toBe(2);
+    chart.appendToSource(0, [f([4]), f([40])]);
+    expect(chart.debugSnapshot().ingestCount).toBe(2);
   });
 
   it('uses config.streaming.maxLen as the append retention policy', () => {

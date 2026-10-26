@@ -4,7 +4,7 @@
 // M7 fix commit flips it to `it`. Public API, fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { histogram } from '../../src/index';
-import { type Fakes, installFakes } from '../fakes';
+import { axis, type Fakes, installFakes } from '../fakes';
 
 let fakes: Fakes;
 beforeEach(() => {
@@ -18,8 +18,8 @@ afterEach(() => {
 type Row = { id?: string; x: number; y: number };
 
 /** The newest point of the first series, read without a cursor. */
-function latest(chart: { getCursorSnapshot(o: { fallback: 'latest' }): any }) {
-  return chart.getCursorSnapshot({ fallback: 'latest' }).points[0];
+function latest(chart: { getCursor(o: { fallback: 'latest' }): any }) {
+  return chart.getCursor({ fallback: 'latest' }).points[0];
 }
 
 describe('[dataapi-03] appendData validates row ids', () => {
@@ -76,14 +76,14 @@ describe('[dataapi-05] inferred categories follow the data', () => {
         { m: 'Apr', v: 4 },
       ],
     });
-    expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 1.5 });
+    expect(axis(chart, 'x')).toMatchObject({ min: -0.5, max: 1.5 });
     chart.update({
       data: [
         { m: 'Jan', v: 1 },
         { m: 'Feb', v: 2 },
       ],
     });
-    expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 1.5 });
+    expect(axis(chart, 'x')).toMatchObject({ min: -0.5, max: 1.5 });
   });
 
   it('[gap-scale-longevity-03:ingest] categories stay bounded after 10 × maxPoints string-X appends', () => {
@@ -94,7 +94,7 @@ describe('[dataapi-05] inferred categories follow the data', () => {
       streaming: { maxPoints: 3 },
     });
     for (let i = 1; i <= 30; i++) chart.appendData([{ k: `item-${i}`, v: i }]);
-    const x = chart.getAxis('x');
+    const x = axis(chart, 'x');
     expect((x?.max ?? 0) - (x?.min ?? 0)).toBeLessThanOrEqual(3);
   });
 });
@@ -107,8 +107,8 @@ describe('[dataapi-07][dxtrial-08] ISO date strings', () => {
 
   it('[dataapi-07][dxtrial-08] ISO-8601 strings infer a time axis', () => {
     const chart = fakes.mount({ data: rows, x: 'time', series: [{ y: 'visits' }] });
-    expect(chart.getAxis('x')?.type).toBe('time');
-    expect(chart.getAxis('x')?.min).toBe(Date.UTC(2026, 0, 1));
+    expect(axis(chart, 'x')?.type).toBe('time');
+    expect(axis(chart, 'x')?.min).toBe(Date.UTC(2026, 0, 1));
   });
 
   it("[dataapi-07] axes.x.type 'time' accepts ISO strings", () => {
@@ -134,7 +134,7 @@ describe('[dataapi-12] appends keep the axis kind', () => {
       series: [{ y: 'y' }],
     });
     expect(() => chart.appendData([{ x: 5, y: 3 }])).toThrow(/categor/i);
-    expect(chart.getAxis('x')?.type).toBe('category');
+    expect(axis(chart, 'x')?.type).toBe('category');
   });
 
   it('[dataapi-12] a Date appended to a numeric axis throws', () => {

@@ -39,11 +39,8 @@ describe('engine lifecycle + config integrity', () => {
     chart.appendToSource(0, [f([3]), f([30])]);
     replaceData(chart, config, [f([1, 2, 3, 4]), f([1, 2, 3, 4])]);
 
-    expect(chart.getStats()).toMatchObject({
-      dataVersion: 0,
-      setDataCount: 0,
-      appendDataCount: 0,
-    });
+    expect(chart.debugSnapshot().ingestCount).toBe(1);
+    expect(chart.getSourceLength(0)).toBe(2);
   });
 
   it('does not snap a synced cursor to column 0 for an off-axis scatter', () => {

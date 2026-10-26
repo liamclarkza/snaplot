@@ -155,8 +155,8 @@ describe('[arch-15] removed options name their replacement', () => {
           `"series\\[0\\]\\.fill" is not an option of ${type} series and is ignored\\. Use color\\.`,
         ),
       );
-    expect(JSON.stringify(bar.getLegendItems())).not.toMatch(/#ff0001/);
-    expect(JSON.stringify(bins.getLegendItems())).not.toMatch(/#ff0003/);
+    expect(JSON.stringify(bar.getState().series)).not.toMatch(/#ff0001/);
+    expect(JSON.stringify(bins.getState().series)).not.toMatch(/#ff0003/);
   });
 
   it('fill on line, area and band series prints nothing (control)', () => {

@@ -143,12 +143,6 @@ export type AxisType = 'linear' | 'log' | 'time' | 'category';
 /** The side of the plot an axis sits on. */
 export type AxisPosition = 'top' | 'bottom' | 'left' | 'right';
 
-/** An axis' kind and current range, as `getAxis()` reports it. */
-export interface AxisState extends ScaleRange {
-  /** The axis kind. */
-  type: AxisType;
-}
-
 /** A closed data-space interval. */
 export interface ScaleRange {
   /** The lower bound, in data units. */

@@ -6,7 +6,7 @@
 // Public API, the shared fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ChartHandle, createChartGroup } from '../../src/index';
-import { debug, type Fakes, installFakes } from '../fakes';
+import { axis, debug, type Fakes, installFakes, wheelGesture } from '../fakes';
 
 let fakes: Fakes;
 beforeEach(() => {
@@ -25,9 +25,8 @@ function mount(options: Loose, size?: { width?: number; height?: number }): Char
 /** Counters the debug symbol gains in M7 (plan D31: the owner adds the counter with the path). */
 const counters = (chart: ChartHandle<any>) => debug(chart) as unknown as { xValidations?: number };
 
-const latest = (chart: ChartHandle<any>) =>
-  chart.getCursorSnapshot({ fallback: 'latest' }).points[0];
-const first = (chart: ChartHandle<any>) => chart.getCursorSnapshot({ fallback: 'first' }).points[0];
+const latest = (chart: ChartHandle<any>) => chart.getCursor({ fallback: 'latest' }).points[0];
+const first = (chart: ChartHandle<any>) => chart.getCursor({ fallback: 'first' }).points[0];
 
 function columns(n: number, x: (i: number) => number = (i) => i) {
   return {
@@ -102,14 +101,18 @@ describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X orde
   const n = 20_000;
   /**
    * Points drawn during a gesture over 10 % of X, over min(in view, max(400, 1.5 × plot width)):
-   * exactly 1 for a source culled by X, whose stride runs over the points in view.
+   * about 1 for a source culled by X, whose stride runs over the points in view, and another
+   * ratio for one sampled over its whole length. (The wheel step that starts the gesture moves
+   * the range off whole numbers, so the stride's rounding leaves a sorted source just under 1.)
    */
   function gestureFidelity(chart: ChartHandle<any>): number {
     fakes.frames.flush();
-    chart.setViewport({ x: { min: 0, max: n / 10 } });
+    chart.update({ viewport: { x: [0, n / 10] } });
+    fakes.frames.flush();
+    wheelGesture(chart);
     fakes.frames.flush();
     const { drawnPoints, inViewPoints } = debug(chart);
-    const budget = Math.max(400, 1.5 * chart.getLayout().plot.width);
+    const budget = Math.max(400, 1.5 * debug(chart).plot.width);
     chart.resetViewport();
     fakes.frames.flush();
     return drawnPoints / Math.min(inViewPoints, budget);
@@ -119,20 +122,20 @@ describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X orde
   const fidelity = (x: (i: number) => number) => gestureFidelity(scatter(x));
 
   it('[arch-06:ingest][gap-perf-gate-01:storage] a sorted scatter source is culled by X during a gesture', () => {
-    expect(fidelity((i) => i)).toBe(1);
+    expect(fidelity((i) => i)).toBeGreaterThanOrEqual(0.99);
   });
 
   it('[arch-06:ingest] a scatter stored unsorted by an append is culled again once its data is replaced', () => {
     const chart = scatter((i) => i);
     // An append before the last X stores the source unsorted.
     chart.appendData({ columns: { x: Float64Array.of(-1), y: Float64Array.of(0) } });
-    expect(gestureFidelity(chart)).not.toBe(1);
+    expect(gestureFidelity(chart)).not.toBeCloseTo(1, 1);
     chart.update({ data: { columns: columns(n) } });
-    expect(gestureFidelity(chart)).toBe(1);
+    expect(gestureFidelity(chart)).toBeGreaterThanOrEqual(0.99);
     // Appended in order and read again from what it retains, it stays sorted.
     chart.appendData({ columns: { x: Float64Array.of(n), y: Float64Array.of(0) } });
     chart.update({ axes: { y: { title: 'Load' } } });
-    expect(gestureFidelity(chart)).toBe(1);
+    expect(gestureFidelity(chart)).toBeGreaterThanOrEqual(0.99);
   });
 
   it('an unsorted scatter source is accepted and keeps its row order (control)', () => {
@@ -238,7 +241,7 @@ describe('appends are validated before anything changes', () => {
       expect(thrown(() => chart.appendData(batch, options))).toMatch(
         /^snaplot: appendData\(\) to series "v": bar series "v" has the same category twice/,
       );
-      expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 1.5 });
+      expect(axis(chart, 'x')).toMatchObject({ min: -0.5, max: 1.5 });
       expect(latest(chart)).toMatchObject({ x: 'B', y: 2 });
       expect(() => chart.update({ axes: { y: { title: 'Load' } } })).not.toThrow();
       chart.appendData([{ m: 'E', v: 5 }]);
@@ -304,9 +307,8 @@ describe('appends are validated before anything changes', () => {
     };
     const chart = mount(options);
     mount(options);
-    const events: string[] = [];
-    chart.on('options:update', () => events.push('options:update'));
-    chart.on('data:update', () => events.push('data:update'));
+    // A rejected append commits nothing: the state revision stays.
+    const revision = chart.getState().revision;
     const ingests = debug(chart).ingestCount;
     // A comes before B, so the scatter would be stored unsorted, and the other chart lacks C.
     expect(
@@ -317,7 +319,7 @@ describe('appends are validated before anything changes', () => {
         ]),
       ),
     ).toMatch(/^snaplot: charts in one group need the same category order/);
-    expect(events).toEqual([]);
+    expect(chart.getState().revision).toBe(revision);
     expect(debug(chart).ingestCount).toBe(ingests);
     expect(latest(chart)).toMatchObject({ x: 'B', y: 2 });
   });
@@ -386,7 +388,7 @@ describe('appends are validated before anything changes', () => {
     ]);
     expect(latest(chart)).toMatchObject({ x: 4, y: 4, rowIndex: 1 });
     chart.setCursor(2);
-    expect(chart.getCursorSnapshot().points[0]).toMatchObject({ x: 2, y: 2, rowIndex: 2 });
+    expect(chart.getCursor().points[0]).toMatchObject({ x: 2, y: 2, rowIndex: 2 });
   });
 
   // A batch is taken whole whatever its size: the engine and the retained rows and ids grow
@@ -482,7 +484,7 @@ describe('appends are validated before anything changes', () => {
   ];
   const at = (chart: ChartHandle<any>, x: number) => {
     chart.setCursor(x);
-    return chart.getCursorSnapshot().points[0];
+    return chart.getCursor().points[0];
   };
   const formed = [
     { x: 0, y: 3, rowIndex: 0, rowId: 'b0' },
@@ -557,7 +559,7 @@ describe('[dataapi-05] category codes stay with their labels', () => {
   /** The points the cursor finds at a category label, as [series, label, y]. */
   const pointsAt = (chart: ChartHandle<any>, label: string) => {
     chart.setCursor(label);
-    return chart.getCursorSnapshot().points.map((point) => [point.seriesId, point.x, point.y]);
+    return chart.getCursor().points.map((point) => [point.seriesId, point.x, point.y]);
   };
 
   it('[dataapi-05] sources on one axis that append different new labels in one call keep them apart', () => {
@@ -571,11 +573,11 @@ describe('[dataapi-05] category codes stay with their labels', () => {
     });
     chart.appendData([{ a: 'C', b: 'D', y1: 3, y2: 4 }]);
     // Four labels, four slots: P and Q from the data, then C and D.
-    expect(chart.getAxis('x')).toMatchObject({ type: 'category', min: 0, max: 3 });
+    expect(axis(chart, 'x')).toMatchObject({ type: 'category', min: 0, max: 3 });
     expect(pointsAt(chart, 'C')).toContainEqual(['s1', 'C', 3]);
     expect(pointsAt(chart, 'D')).toContainEqual(['s2', 'D', 4]);
     chart.update({ axes: { y: { title: 'Load' } } });
-    expect(chart.getAxis('x')).toMatchObject({ type: 'category', min: 0, max: 3 });
+    expect(axis(chart, 'x')).toMatchObject({ type: 'category', min: 0, max: 3 });
     expect(pointsAt(chart, 'C')).toContainEqual(['s1', 'C', 3]);
     expect(pointsAt(chart, 'D')).toContainEqual(['s2', 'D', 4]);
   });
@@ -590,21 +592,21 @@ describe('[dataapi-05] category codes stay with their labels', () => {
     });
     for (const [i, m] of months.entries()) if (i > 0) chart.appendData([{ m, y: i + 1 }]);
     // Apr to Aug are retained, at the codes they were appended with.
-    const full = chart.getAxis('x');
+    const full = axis(chart, 'x');
     expect(full).toMatchObject({ type: 'category', min: 3, max: 7 });
     // Zoom to Jun and Jul, as a gesture or a controlled viewport pins them.
     const zoom = { min: 4.75, max: 6.25 };
-    chart.setViewport({ x: zoom });
+    chart.update({ viewport: { x: [zoom.min, zoom.max] } });
     fakes.frames.flush();
     expect(debug(chart).inViewPoints).toBe(2);
     chart.update({ axes: { y: { title: 'Load' } } });
     fakes.frames.flush();
-    expect(chart.getAxis('x')).toMatchObject(zoom);
+    expect(axis(chart, 'x')).toMatchObject(zoom);
     expect(debug(chart).inViewPoints).toBe(2);
     expect(pointsAt(chart, 'Jun')).toEqual([['y', 'Jun', 6]]);
     chart.appendData([{ m: 'Sep', y: 9 }]);
     chart.resetViewport();
-    expect(chart.getAxis('x')).toMatchObject({ min: 4, max: 8 });
+    expect(axis(chart, 'x')).toMatchObject({ min: 4, max: 8 });
     // Replacing the data rebuilds the categories from the new rows.
     chart.update({
       data: [
@@ -613,7 +615,7 @@ describe('[dataapi-05] category codes stay with their labels', () => {
       ],
     });
     chart.resetViewport();
-    expect(chart.getAxis('x')).toMatchObject({ min: 0, max: 1 });
+    expect(axis(chart, 'x')).toMatchObject({ min: 0, max: 1 });
   });
 
   it('[dataapi-05] sources on one axis keep their slot order through an update', () => {
@@ -630,7 +632,7 @@ describe('[dataapi-05] category codes stay with their labels', () => {
     const slots = () =>
       [0, 1, 2, 3].map((code) => {
         chart.setCursor(code);
-        return chart.getCursorSnapshot().x;
+        return chart.getCursor().x;
       });
     expect(slots()).toEqual(['P', 'Q', 'C', 'D']);
     chart.update({ axes: { y: { title: 'Load' } } });
@@ -811,7 +813,7 @@ describe('[dataapi-03] data longer than streaming.maxPoints keeps its last maxPo
       streaming: { maxPoints: 3 },
     });
     const span = () => {
-      const x = chart.getAxis('x');
+      const x = axis(chart, 'x');
       return (x?.max ?? 0) - (x?.min ?? 0);
     };
     expect(span()).toBeLessThanOrEqual(2);

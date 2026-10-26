@@ -47,7 +47,7 @@ test.describe('hover model', () => {
     await mountLines(page);
     await hoverData(page, 'chart-0', 13, 50);
     await page.evaluate(() =>
-      window.harness.chart('chart-0').setViewport({ x: { min: 15, max: 44 } }),
+      window.harness.chart('chart-0').update({ viewport: { x: [15, 44] } }),
     );
     await settle(page);
     const cursor = await page.evaluate(() => window.harness.chart('chart-0').getCursor().x);
@@ -61,8 +61,7 @@ test.describe('hover model', () => {
     await hoverData(page, 'chart-0', 30, 50);
     expect(await tooltipText(page)).toContain('A');
     await page.evaluate(() => {
-      const chart = window.harness.chart('chart-0');
-      for (const id of ['a', 'b', 'c']) chart.setSeriesVisible(id, false);
+      window.harness.chart('chart-0').update({ hiddenSeries: ['a', 'b', 'c'] });
     });
     await settle(page);
     expect(await tooltipText(page)).toBeNull();
@@ -387,8 +386,7 @@ test.describe('containers', () => {
     // The visible plot is the canvas' on-screen rectangle (already scaled).
     const visible = await page.evaluate(() => {
       const canvas = window.harness.canvases('chart-0')[1];
-      const chart = window.harness.chart('chart-0');
-      const { plot, width } = chart.getLayout();
+      const { plot, width } = window.harness.layout('chart-0');
       const rect = canvas.getBoundingClientRect();
       const scale = rect.width / width;
       return {

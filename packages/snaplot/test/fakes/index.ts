@@ -11,6 +11,7 @@
 import { createChart } from '../../src/index';
 import type { ChartHandle, ChartOptions } from '../../src/index';
 import { type CanvasFake, installCanvas } from './canvas';
+import { debug } from './debug';
 import { type FramesFake, installFrames } from './frames';
 import { installLayout, type LayoutFake } from './layout';
 import { installMedia, type MediaFake } from './media';
@@ -94,21 +95,26 @@ export function installFakes(options: FakeOptions = {}): Fakes {
   };
 }
 
-/** Client coordinates of a data point on linear axes (boxes sit at the origin). */
+/** An axis' kind and current range, from `chart.scale(key)`, without its pixel mapping. */
+export function axis(
+  chart: ChartHandle<any>,
+  key: string,
+): { type: string; min: number; max: number } | undefined {
+  const scale = chart.scale(key);
+  return scale ? { type: scale.type, min: scale.min, max: scale.max } : undefined;
+}
+
+/** Client coordinates of a data point (boxes sit at the origin). */
 export function clientPoint(
   chart: ChartHandle<never> | ChartHandle<any>,
   x: number,
   y: number,
   axes: { x?: string; y?: string } = {},
 ): { clientX: number; clientY: number } {
-  const { plot } = chart.getLayout();
-  const xAxis = chart.getAxis(axes.x ?? 'x');
-  const yAxis = chart.getAxis(axes.y ?? 'y');
-  if (!xAxis || !yAxis) throw new Error('clientPoint(): unknown axis');
-  return {
-    clientX: plot.left + ((x - xAxis.min) / (xAxis.max - xAxis.min)) * plot.width,
-    clientY: plot.top + (1 - (y - yAxis.min) / (yAxis.max - yAxis.min)) * plot.height,
-  };
+  const xScale = chart.scale(axes.x ?? 'x');
+  const yScale = chart.scale(axes.y ?? 'y');
+  if (!xScale || !yScale) throw new Error('clientPoint(): unknown axis');
+  return { clientX: xScale.toPixel(x), clientY: yScale.toPixel(y) };
 }
 
 /** The element that receives pointer input (falls back to the chart root). */
@@ -119,6 +125,26 @@ export function pointerTarget(chart: ChartHandle<any>): Element {
     (element) => element.style.pointerEvents === 'auto',
   );
   return candidates.at(-1) ?? root;
+}
+
+/**
+ * A gesture at the current view: a small Ctrl+wheel zoom at the plot centre. It marks the
+ * viewport as moving, so the next paint is the reduced-fidelity gesture pass. An applied
+ * `viewport` option is a settled view, not a gesture (plan D3), so tests that measure the
+ * gesture pass set the range first and then call this. Run `fakes.frames.flush()` after it.
+ */
+export function wheelGesture(chart: ChartHandle<any>, deltaY = -1): void {
+  const { plot } = debug(chart);
+  pointerTarget(chart).dispatchEvent(
+    new WheelEvent('wheel', {
+      clientX: plot.left + plot.width / 2,
+      clientY: plot.top + plot.height / 2,
+      deltaY,
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
 }
 
 /** Move a mouse over a data point. Run `fakes.frames.flush()` to paint the result. */

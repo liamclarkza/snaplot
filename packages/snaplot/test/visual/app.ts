@@ -130,7 +130,13 @@ async function renderFixture(id: string): Promise<void> {
       if (!chart || !host) throw new Error('fixture not rendered');
       // Plot coordinates start at the canvases, past a built-in legend above them.
       const box = (host.querySelector('[role="application"]') ?? host).getBoundingClientRect();
-      const plot = chart.getLayout().plot;
+      const debug = (
+        chart as unknown as Record<
+          symbol,
+          { plot: { left: number; top: number; width: number; height: number } }
+        >
+      )[Symbol.for('snaplot.debug')];
+      const plot = debug.plot;
       return {
         x: box.left + plot.left + fx * plot.width,
         y: box.top + plot.top + fy * plot.height,

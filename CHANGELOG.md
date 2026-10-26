@@ -9,7 +9,7 @@ to [Semantic Versioning](https://semver.org/).
 ### API overhaul
 
 - A framework-independent `createChart(element, options)` accepts rows or named typed columns, shared or independent series datasets, stable series/row IDs, categories, named encodings and direct histogram results.
-- Atomic `update`, exact `setViewport`, `resetViewport`, `resumeFollow`, declarative reference lines/regions, typed interaction events and core chart groups replace the previous public authoring surface.
+- Atomic `update`, the `viewport` state option, `resetViewport`, `resumeFollow`, declarative reference lines/regions, typed interaction events and core chart groups replace the previous public authoring surface.
 - Native React 19 and Solid 1.9 integrations provide equivalent direct props, controlled state, state subscriptions, groups and JSX legend/table companions with isolated optional peers and SSR-safe imports.
 - Axis options use `title`, `roundBounds`, `rangePadding` and `format`; streaming uses `maxPoints` and `followWindow`. Repository examples, documentation, benchmarks and comparison adapters use the new API. No compatibility aliases are retained.
 - Existing visual defaults are preserved by the API overhaul.
@@ -36,8 +36,8 @@ to [Semantic Versioning](https://semver.org/).
   with other series throws. Re-reading a source of 10,000 rows or more because an accessor
   function keeps getting a new identity warns once.
 - A series id the chart does not have throws, with the closest id, wherever one is named:
-  `hiddenSeries`, `highlight`, `setSeriesVisible()` and `setHighlight()` (a group's
-  `setHighlight()` throws only when no member has that series). `setCursor()` throws on a label
+  `hiddenSeries` and `highlight` (a group's `setHighlight()` throws only when no member has that
+  series). `setCursor()` throws on a label
   that is not a category and on a string a numeric axis cannot read, and reads an ISO-8601 date
   on a time axis.
 
@@ -146,6 +146,37 @@ to [Semantic Versioning](https://semver.org/).
 - Removed: the `beforeDraw` veto, `afterDrawGrid`/`afterDrawData`/`afterDrawOverlay` (use the
   draw hooks), `destroy` (return a cleanup from `install`), `onDataUpdate` and `onOptionsUpdate`
   (use `chart.subscribe()` or `chart.on()`). A plugin no longer makes appends copy the data.
+
+### Handle and exports (1.0)
+
+- The handle has fourteen members: `container`, `update`, `setOptions`, `appendData`,
+  `getState`, `subscribe`, `on`, `getCursor`, `resetViewport`, `resumeFollow`, `setCursor`,
+  `scale`, `redraw` and `destroy`. `getCursor({ fallback })` replaces `getCursorSnapshot()`, and
+  `scale(key)` replaces `getAxis()` and `getLayout()`.
+- Seven events: `cursor:change`, `viewport:change`, `selection:change`, `hiddenSeries:change`,
+  `highlight:change`, `following:change` and `point:click`.
+- `snaplot` exports `createChart`, `createChartGroup`, `createLegendTable`, `histogram` and the
+  types; `snaplot/react` and `snaplot/solid` add `Chart`, `LegendTable` and their state hooks or
+  primitives.
+- Removed members: `getOptions` (keep the options you pass), `setViewport`, `setSelection`,
+  `setSeriesVisible` and `setHighlight` (use `update({ viewport | selection | hiddenSeries |
+  highlight })`), `getLegendItems` (use `getState().series`), `getTheme`, `refreshTheme` (use
+  `redraw('all')`), `getStats` (debug counters are internal now), `getAxis`, `getLayout` and
+  `resize` (the chart follows its container).
+- Removed events: `state:change` (use `subscribe()`), `select` (use `selection:change`),
+  `data:update`, `options:update`, `theme:update` and `resize`.
+- Removed exports: the `snaplot/core` entry, the 14 theme objects (`lightTheme`, `darkTheme`,
+  `oceanTheme`, `forestTheme`, `sunsetTheme`, `violetTheme`, `fogTheme`, `ivoryTheme`,
+  `mintTheme`, `studioTheme`, `tokyoTheme`, `midnightTheme`, `marsTheme`, `refinedDarkTheme`) and
+  the helpers `createTheme`, `resolveTheme` and `applyThemeToElement` (use `theme: 'light' |
+  'dark'` or `ThemeTokens`), `CHART_CSS_VARS` and `SNAPLOT_THEME_CSS_VARS`, `lttb`, `m4`,
+  `lowerBound`, `upperBound`, `nearestIndex` and `viewportIndices`, and the types `ChartStats`,
+  `LayerCounts`, `Layout`, `AxisArea`, `AxisState`, `ThemeConfig`, `CreateThemeTokens`,
+  `SelectionRange`, `SelectionResult`, `ViewportRanges`, `CursorSnapshotOptions` (now
+  `CursorOptions`), `LegendItem` (now `SeriesState`), `LegendCellContent` and
+  `LegendPluginOptions`.
+- The package marks itself free of side effects (`sideEffects: false`), so a bundler drops the
+  modules an app does not import: `histogram` and `createLegendTable` cost only themselves.
 
 ### Removed options (1.0)
 

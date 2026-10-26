@@ -75,7 +75,7 @@ describe('[research-14] seven events, one name per concept', () => {
     expect(events.viewport.mock.calls.map(([v]) => Object.keys(v))).toEqual([['x'], []]);
   });
 
-  it.fails('[research-14] the 0.12 event names are gone', () => {
+  it('[research-14] the 0.12 event names are gone', () => {
     const chart = mount<Row>(fakes, base);
     for (const name of [
       'state:change',

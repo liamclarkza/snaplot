@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ChartOptions } from '../src/index';
-import { type Fakes, hover, installFakes } from './fakes';
+import { axis, type Fakes, hover, installFakes } from './fakes';
 
 // arch-10: the public types dropped the engine's key-based sync (`syncKey` on
 // cursor, highlight and zoom), but untyped options still pass through to the
@@ -36,7 +36,7 @@ describe('[arch-10] the removed engine sync is unreachable through untyped optio
   it('[arch-10] an untyped highlight.syncKey does not link two charts', () => {
     const [a, b] = pair({ highlight: { syncKey: 'k' } });
 
-    a.setHighlight('v');
+    a.update({ highlight: 'v' });
 
     expect(a.getState().highlight).toBe('v');
     expect(b.getState().highlight).toBeNull();
@@ -44,14 +44,14 @@ describe('[arch-10] the removed engine sync is unreachable through untyped optio
 
   it('[arch-10] an untyped zoom.syncKey does not link two charts', () => {
     const [a, b] = pair({ zoom: { syncKey: 'k' } });
-    const before = b.getAxis('x');
+    const before = axis(b, 'x');
 
     // A keyboard zoom (`+` on the focused chart) is a local gesture.
     a.container.firstElementChild!.dispatchEvent(
       new KeyboardEvent('keydown', { bubbles: true, key: '+' }),
     );
 
-    expect(a.getAxis('x')!.max - a.getAxis('x')!.min).toBeLessThan(before!.max - before!.min);
-    expect(b.getAxis('x')).toEqual(before);
+    expect(axis(a, 'x')!.max - axis(a, 'x')!.min).toBeLessThan(before!.max - before!.min);
+    expect(axis(b, 'x')).toEqual(before);
   });
 });

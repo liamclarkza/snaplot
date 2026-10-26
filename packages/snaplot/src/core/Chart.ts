@@ -1,7 +1,6 @@
 import type {
   ChartSpec,
   ChartEventMap,
-  ChartStats,
   AppendDataOptions,
   AxisSpec,
   ColumnarData,
@@ -179,6 +178,10 @@ export interface DebugSnapshot {
   readonly materializeCount: number;
   /** The plot rectangle in CSS pixels from the canvases' top-left corner (replaces getLayout()). */
   readonly plot: { left: number; top: number; width: number; height: number };
+  /** The last layout: the canvas size, the plot and each axis' side and area (replaces getLayout()). */
+  readonly layout: Layout;
+  /** The resolved theme roles (replaces getTheme()). */
+  readonly theme: Readonly<ThemeConfig>;
   /** Axis labels from the last grid paint, in paint order. */
   labelBoxes(): DebugLabelBox[];
 }
@@ -387,17 +390,14 @@ export class ChartCore implements EngineHost {
   // Highlight state
   private highlightedSeries: number | null = null;
 
-  // Diagnostics. Counters are cheap and always maintained; render duration
-  // measurement is gated by config.debug.stats in the render path.
-  private stats: ChartStats = {
-    dataVersion: 0,
-    setDataCount: 0,
-    appendDataCount: 0,
-    renderCount: { grid: 0, data: 0, overlay: 0 },
-    lastRenderMs: { grid: 0, data: 0, overlay: 0 },
-  };
+  /** Bumped by every data change: the range index and the hit and density caches key on it. */
+  private dataVersion = 0;
   // D31 debug counters; see DebugSnapshot. Ring stores share this object.
-  private debugCounters = { ingestCount: 0, materializeCount: 0 };
+  private debugCounters = {
+    ingestCount: 0,
+    materializeCount: 0,
+    renderCount: { grid: 0, data: 0, overlay: 0 },
+  };
   private lastDataPass: DataPassSeries[] = [];
   private lastAxisLabels: AxesRenderResult['labels'] | null = null;
 
@@ -647,8 +647,7 @@ export class ChartCore implements EngineHost {
     this.seriesSources = seriesSources.slice();
     this.invalidateRangeCache();
     this.unpinMissedAxes(resolved);
-    this.stats.dataVersion++;
-    this.stats.setDataCount++;
+    this.dataVersion++;
     this.debugCounters.ingestCount++;
     this.replaceOptions(config);
     this.reconcileSelectionForDataChange();
@@ -776,8 +775,7 @@ export class ChartCore implements EngineHost {
     const changed = trusted ? ColumnarStore.trusted(write) : write();
     if (!changed) return;
 
-    this.stats.dataVersion++;
-    this.stats.appendDataCount++;
+    this.dataVersion++;
     const gridDirty = this.rangeForDataChange();
     this.reconcileSelectionForDataChange();
     this.refreshCursor();
@@ -1445,16 +1443,6 @@ export class ChartCore implements EngineHost {
     return this.cursorDataX;
   }
 
-  getStats(): ChartStats {
-    return {
-      dataVersion: this.stats.dataVersion,
-      setDataCount: this.stats.setDataCount,
-      appendDataCount: this.stats.appendDataCount,
-      renderCount: { ...this.stats.renderCount },
-      lastRenderMs: { ...this.stats.lastRenderMs },
-    };
-  }
-
   /**
    * Internal: the D31 debug counters, exposed on the public handle as
    * `chart[Symbol.for('snaplot.debug')]`. Point counts are computed lazily
@@ -1468,7 +1456,7 @@ export class ChartCore implements EngineHost {
     const count = () => (counts ??= countDataPass(pass));
     return Object.freeze({
       ingestCount: this.debugCounters.ingestCount,
-      renderCount: { ...this.stats.renderCount },
+      renderCount: { ...this.debugCounters.renderCount },
       layers: {
         grid: canvases.gridCanvas,
         data: canvases.dataCanvas,
@@ -1482,6 +1470,8 @@ export class ChartCore implements EngineHost {
       },
       materializeCount: this.debugCounters.materializeCount,
       plot: Object.freeze({ ...this.layout.plot }),
+      layout: this.layout,
+      theme: Object.freeze({ ...this.theme }),
       labelBoxes: () => debugLabelBoxes(labels),
     });
   }
@@ -1934,8 +1924,8 @@ export class ChartCore implements EngineHost {
   }
 
   private ensureRangeIndexesFresh(): void {
-    if (this.rangeIndexVersion === this.stats.dataVersion) return;
-    this.rangeIndexVersion = this.stats.dataVersion;
+    if (this.rangeIndexVersion === this.dataVersion) return;
+    this.rangeIndexVersion = this.dataVersion;
     this.columnRangeIndexes.clear();
     this.scatterRangeIndexes.clear();
   }
@@ -2033,7 +2023,7 @@ export class ChartCore implements EngineHost {
       cached &&
       cached.series === series &&
       cached.theme === this.theme &&
-      cached.version === this.stats.dataVersion
+      cached.version === this.dataVersion
     ) {
       return cached;
     }
@@ -2062,7 +2052,7 @@ export class ChartCore implements EngineHost {
     const entry = {
       series,
       theme: this.theme,
-      version: this.stats.dataVersion,
+      version: this.dataVersion,
       renderResolver: resolverFromEncodingState(state, physicalValueAt),
       logicalResolver: resolverFromEncodingState(state, logicalValueAt),
     };
@@ -2521,7 +2511,7 @@ export class ChartCore implements EngineHost {
       palette,
       this.lastPointerType,
       this.scatterPalettes(),
-      this.stats.dataVersion,
+      this.dataVersion,
       (si) =>
         this.scatterResolvers(
           si,
@@ -2881,7 +2871,6 @@ export class ChartCore implements EngineHost {
 
     // Step 4a: Grid layer (axes, gridlines)
     if (flags & DirtyFlag.GRID) {
-      const start = this.statsStart();
       this.canvasManager.clear('grid');
 
       // Compute custom X ticks for bar/histogram charts
@@ -2898,36 +2887,23 @@ export class ChartCore implements EngineHost {
       updateDOMLabels(this.canvasManager.domLayer, labels, this.theme, this.layout);
       this.lastAxisLabels = labels.labels;
       this.plugins.draw('below', this.canvasManager.gridCtx, this, this.layout.plot);
-      this.statsEnd('grid', start);
+      this.debugCounters.renderCount.grid++;
     }
 
     // Step 4b: Data layer (series marks)
     if (flags & DirtyFlag.DATA) {
-      const start = this.statsStart();
       this.canvasManager.clear('data');
       this.renderAllSeries();
       this.plugins.draw('above', this.canvasManager.dataCtx, this, this.layout.plot);
-      this.statsEnd('data', start);
+      this.debugCounters.renderCount.data++;
     }
 
     // Step 4c: Overlay layer (crosshair, tooltip)
     if (flags & DirtyFlag.OVERLAY) {
-      const start = this.statsStart();
       this.canvasManager.clear('overlay');
       this.renderOverlay();
       this.plugins.draw('overlay', this.canvasManager.overlayCtx, this, this.layout.plot);
-      this.statsEnd('overlay', start);
-    }
-  }
-
-  private statsStart(): number {
-    return this.config.debug?.stats ? performance.now() : 0;
-  }
-
-  private statsEnd(layer: keyof ChartStats['renderCount'], start: number): void {
-    this.stats.renderCount[layer]++;
-    if (this.config.debug?.stats) {
-      this.stats.lastRenderMs[layer] = performance.now() - start;
+      this.debugCounters.renderCount.overlay++;
     }
   }
 
@@ -3550,7 +3526,7 @@ export class ChartCore implements EngineHost {
         palette,
         this.lastPointerType,
         this.scatterPalettes(),
-        this.stats.dataVersion,
+        this.dataVersion,
         (si) => {
           const series = this.config.series[si];
           const fallback = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];

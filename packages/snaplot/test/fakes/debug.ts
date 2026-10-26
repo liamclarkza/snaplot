@@ -27,8 +27,21 @@ export interface DebugSnapshot {
   readonly inViewPoints: number;
   /** Ring-store logical materializations. */
   readonly materializeCount: number;
-  /** The plot rectangle in CSS pixels, relative to the chart container (M8). */
+  /** The plot rectangle in CSS pixels from the canvases' top-left corner (M8). */
   readonly plot: { left: number; top: number; width: number; height: number };
+  /** The last layout: canvas size, plot and each axis' side (M8; replaces getLayout()). */
+  readonly layout: {
+    width: number;
+    height: number;
+    plot: { left: number; top: number; width: number; height: number };
+    axes: Record<string, { position: 'top' | 'bottom' | 'left' | 'right' }>;
+    dpr: number;
+  };
+  /** The resolved theme roles (M8; replaces getTheme()). */
+  readonly theme: Readonly<Record<string, unknown>> & {
+    backgroundColor: string;
+    textColor: string;
+  };
   /** Axis labels of the last grid paint, in paint order. */
   labelBoxes(): DebugLabelBox[];
 }

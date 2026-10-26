@@ -51,7 +51,7 @@ describe('debug counters (plan D31)', () => {
     const chart = make();
     expect(debug(chart).inViewPoints).toBe(10);
     expect(debug(chart).drawnPoints).toBe(10);
-    chart.setViewport({ x: { min: 2, max: 5 } });
+    chart.update({ viewport: { x: [2, 5] } });
     fakes.frames.flush();
     // x = 2, 3, 4, 5 are in view; the neighbours drawn for continuity are not.
     expect(debug(chart).inViewPoints).toBe(4);

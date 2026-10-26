@@ -1,10 +1,5 @@
 import { type Accessor, createEffect, createSignal, onCleanup } from 'solid-js';
-import type {
-  ChartHandle,
-  ChartState,
-  CursorSnapshot,
-  CursorSnapshotOptions,
-} from '../public/types';
+import type { ChartHandle, ChartState, CursorSnapshot, CursorOptions } from '../public/types';
 
 /** A chart handle, an accessor of one, or nothing yet. */
 export type MaybeChart<Row> =
@@ -53,7 +48,7 @@ export function createChartState<T = ChartState>(
  */
 export function createCursor<Row>(
   chart: MaybeChart<Row>,
-  options?: CursorSnapshotOptions,
+  options?: CursorOptions,
 ): Accessor<CursorSnapshot<Row> | undefined> {
   const [cursor, setCursor] = createSignal<CursorSnapshot<Row> | undefined>(undefined, {
     equals: false,

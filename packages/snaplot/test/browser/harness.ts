@@ -3,8 +3,8 @@
  *
  * Specs build charts inside `page.evaluate(() => harness.mount(...))` through
  * the public API only. Every helper that reads chart geometry lives here, in
- * one place, so the API renames of M7 and M8 (`getLayout`/`getAxis` →
- * `scale()`) touch this file and not every spec.
+ * one place: `scale()` for axes and the debug symbol for the plot rectangle
+ * (M8 removed `getLayout()` and `getAxis()`).
  */
 import { createChart, createChartGroup, histogram } from '../../src/index';
 import type { ChartHandle, ChartOptions } from '../../src/index';
@@ -45,14 +45,41 @@ function chart(id = 'chart-0'): AnyChart {
   return found;
 }
 
+const DEBUG = Symbol.for('snaplot.debug');
+
+/** The untyped debug symbol (plan D31): test-only, never public API. */
+function debugOf(handle: AnyChart): {
+  plot: { left: number; top: number; width: number; height: number };
+  layout: { axes: Record<string, { position: string }> };
+  [key: string]: any;
+} {
+  const snapshot = (handle as unknown as Record<symbol, any>)[DEBUG];
+  if (!snapshot) throw new Error('harness: no debug symbol');
+  return snapshot;
+}
+
+/** The client position of the canvases' top-left corner, past a built-in legend above them. */
+function canvasOrigin(handle: AnyChart): DOMRect {
+  return (
+    handle.container.querySelector('[role="application"]') ?? handle.container
+  ).getBoundingClientRect();
+}
+
+/** The last layout from the debug symbol: the canvas width and the plot rectangle in CSS px. */
+function layout(id = 'chart-0'): {
+  width: number;
+  height: number;
+  plot: { left: number; top: number; width: number; height: number };
+} {
+  const { width, height, plot } = debugOf(chart(id)).layout as any;
+  return { width, height, plot: { ...plot } };
+}
+
 /** The plot rectangle in client (viewport) coordinates. */
 function plotRect(id = 'chart-0') {
   const handle = chart(id);
-  // Plot coordinates start at the canvases, past a built-in legend above them.
-  const host = (
-    handle.container.querySelector('[role="application"]') ?? handle.container
-  ).getBoundingClientRect();
-  const { plot } = handle.getLayout();
+  const host = canvasOrigin(handle);
+  const { plot } = debugOf(handle);
   return {
     left: host.left + plot.left,
     top: host.top + plot.top,
@@ -66,20 +93,17 @@ function plotRect(id = 'chart-0') {
 /** Client coordinates of a data point on linear axes. */
 function toClient(id: string, x: number, y: number, axes: { x?: string; y?: string } = {}) {
   const handle = chart(id);
-  const rect = plotRect(id);
-  const xAxis = handle.getAxis(axes.x ?? 'x');
-  const yAxis = handle.getAxis(axes.y ?? 'y');
-  if (!xAxis || !yAxis) throw new Error('harness.toClient(): unknown axis');
-  return {
-    x: rect.left + ((x - xAxis.min) / (xAxis.max - xAxis.min)) * rect.width,
-    y: rect.top + (1 - (y - yAxis.min) / (yAxis.max - yAxis.min)) * rect.height,
-  };
+  const origin = canvasOrigin(handle);
+  const xScale = handle.scale(axes.x ?? 'x');
+  const yScale = handle.scale(axes.y ?? 'y');
+  if (!xScale || !yScale) throw new Error('harness.toClient(): unknown axis');
+  return { x: origin.left + xScale.toPixel(x), y: origin.top + yScale.toPixel(y) };
 }
 
 /** Current axis domain, `{ min, max }`. */
 function domain(id: string, axis: string) {
-  const range = chart(id).getAxis(axis);
-  return range ? { min: range.min, max: range.max } : null;
+  const scale = chart(id).scale(axis);
+  return scale ? { min: scale.min, max: scale.max } : null;
 }
 
 /**
@@ -107,12 +131,9 @@ function tooltip(): string | null {
   return shown.length ? shown.join('\n') : null;
 }
 
-const DEBUG = Symbol.for('snaplot.debug');
-
 /** Point-in-time debug counters (plan D31), without the canvas references. */
 function counters(id = 'chart-0') {
-  const snapshot = (chart(id) as unknown as Record<symbol, any>)[DEBUG];
-  if (!snapshot) throw new Error('harness.counters(): no debug symbol');
+  const snapshot = debugOf(chart(id));
   return {
     ingestCount: snapshot.ingestCount as number,
     renderCount: { ...snapshot.renderCount } as { grid: number; data: number; overlay: number },
@@ -183,6 +204,7 @@ export const harness = {
   histogram,
   mount,
   chart,
+  layout,
   plotRect,
   toClient,
   domain,

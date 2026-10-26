@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { histogram } from '../../src/index';
 import type { ChartHandle } from '../../src/index';
-import { debug, type Fakes, installFakes } from '../fakes';
+import { axis, debug, type Fakes, installFakes } from '../fakes';
 
 let fakes: Fakes;
 beforeEach(() => {
@@ -219,7 +219,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
       x: 'q',
       series: [{ type: 'bar', y: 'v' }],
     });
-    expect(chart.getAxis('y')).toMatchObject({ min: 0, max: 100 });
+    expect(axis(chart, 'y')).toMatchObject({ min: 0, max: 100 });
   });
 
   it.fails('[visuals-07] data ≥ 0 never gets a negative axis minimum', () => {
@@ -228,7 +228,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
       x: 't',
       series: [{ type: 'area', y: 'v' }],
     });
-    expect(chart.getAxis('y')?.min).toBeGreaterThanOrEqual(0);
+    expect(axis(chart, 'y')?.min).toBeGreaterThanOrEqual(0);
   });
 
   it.fails('[visuals-02:domain] an area domain includes 0', () => {
@@ -237,7 +237,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
       x: 't',
       series: [{ type: 'area', y: 'v' }],
     });
-    expect(chart.getAxis('y')?.min).toBeLessThanOrEqual(0);
+    expect(axis(chart, 'y')?.min).toBeLessThanOrEqual(0);
   });
 
   it.fails('[visuals-08] numeric bars span first − ½ slot to last + ½ slot', () => {
@@ -246,7 +246,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
       x: 'hour',
       series: [{ type: 'bar', y: 'kwh' }],
     });
-    expect(chart.getAxis('x')).toMatchObject({ min: -0.5, max: 23.5 });
+    expect(axis(chart, 'x')).toMatchObject({ min: -0.5, max: 23.5 });
   });
 
   it.fails('[render-22] all-negative bars get no positive headroom', () => {
@@ -255,7 +255,7 @@ describe('[visuals-02:domain][visuals-07][visuals-08][render-22] domains', () =>
       x: 'q',
       series: [{ type: 'bar', y: 'v' }],
     });
-    expect(chart.getAxis('y')?.max).toBe(0);
+    expect(axis(chart, 'y')?.max).toBe(0);
   });
 });
 
@@ -266,7 +266,7 @@ describe('[backlog-10][visuals-21:def-01] layout', () => {
       x: 't',
       series: [{ y: 'a' }, { y: 'b', yAxis: 'y2' }],
     });
-    expect(chart.getLayout().axes.y2?.position).toBe('right');
+    expect(debug(chart).layout.axes.y2?.position).toBe('right');
   });
 
   it.fails('[visuals-21:def-01] long axis titles stay inside a 320 × 220 container', () => {

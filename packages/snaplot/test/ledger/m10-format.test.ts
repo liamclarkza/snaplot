@@ -5,7 +5,7 @@
 // fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChartHandle } from '../../src/index';
-import { debug, type Fakes, hover, installFakes, tooltipText } from '../fakes';
+import { axis, debug, type Fakes, hover, installFakes, tooltipText } from '../fakes';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -44,7 +44,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
       series: [{ type: 'scatter', y: 'y' }],
     });
     chart.setCursor(2.74);
-    expect(chart.getCursorSnapshot().points[0]?.formattedX).toBe('2.74');
+    expect(chart.getCursor().points[0]?.formattedX).toBe('2.74');
   });
 
   it.fails('[dxtrial-03][backlog-01] the Y axis format drives the cursor snapshot', () => {
@@ -59,7 +59,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
       axes: { y: { format: (v) => `${v}%` } },
     });
     chart.setCursor(1);
-    expect(chart.getCursorSnapshot().points[0]?.formattedY).toBe('20.4%');
+    expect(chart.getCursor().points[0]?.formattedY).toBe('20.4%');
   });
 
   it.fails('[backlog-01] the X axis format drives formattedX', () => {
@@ -70,7 +70,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
       axes: { x: { format: (v) => `T+${v}s` } },
     });
     chart.setCursor(9);
-    expect(chart.getCursorSnapshot().formattedX).toBe('T+9s');
+    expect(chart.getCursor().formattedX).toBe('T+9s');
   });
 
   it.fails('[backlog-01] a category cursor snapshot reads the category label', () => {
@@ -80,7 +80,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
       series: [{ y: 'v' }],
     });
     chart.setCursor('Gamma');
-    expect(chart.getCursorSnapshot().formattedX).toBe('Gamma');
+    expect(chart.getCursor().formattedX).toBe('Gamma');
   });
 
   it.fails('[dataapi-09] a format on one series leaves the other series at value precision', () => {
@@ -98,7 +98,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
       ],
     });
     chart.setCursor(1);
-    const rate = chart.getCursorSnapshot().points.find((point) => point.seriesId === 'rate');
+    const rate = chart.getCursor().points.find((point) => point.seriesId === 'rate');
     hover(chart, 1, 13.8);
     fakes.frames.flush();
     const text = tooltipText();
@@ -121,7 +121,7 @@ describe('[dxtrial-10][render-11] sub-second and single-point time axes', () => 
       },
       { width: 640, height: 240 },
     );
-    chart.setViewport({ x: { min: start + 5000, max: start + 8000 } });
+    chart.update({ viewport: { x: [start + 5000, start + 8000] } });
     fakes.frames.flush();
     const labels = xLabels(chart);
     expect(labels.length).toBeGreaterThanOrEqual(2);
@@ -149,7 +149,7 @@ describe('[dxtrial-10][render-11] sub-second and single-point time axes', () => 
       x: 't',
       series: [{ y: 'v' }],
     });
-    const x = chart.getAxis('x');
+    const x = axis(chart, 'x');
     expect((x?.max ?? 0) - (x?.min ?? 0)).toBeGreaterThanOrEqual(3_600_000);
   });
 });
@@ -204,7 +204,7 @@ describe('[render-12][gap-environments-09][backlog-06:utc][demos-07:utc] time zo
         timeZone: 'UTC',
       } as never);
       chart.setCursor(at);
-      expect(chart.getCursorSnapshot().formattedX).toMatch(/9:30/);
+      expect(chart.getCursor().formattedX).toMatch(/9:30/);
     });
   });
 });
@@ -223,7 +223,7 @@ describe('[gap-environments-06][gap-scale-longevity-03:ticks] locale and streami
       .map((box) => box.text);
     expect(yLabels.some((label) => /\d,\d/.test(label))).toBe(true);
     chart.setCursor(1);
-    expect(chart.getCursorSnapshot().points[0]?.formattedY).toBe('0,55');
+    expect(chart.getCursor().points[0]?.formattedY).toBe('0,55');
   });
 
   it('[gap-scale-longevity-03:ticks] streaming string X keeps the tick work bounded by the window', () => {

@@ -52,7 +52,7 @@ describe('[gap-annotations-extensibility-07][gap-annotations-extensibility-08] p
     });
     fakes.frames.flush();
     const before = debug(chart).renderCount.data;
-    chart.setViewport({ x: { min: 30, max: 70 } });
+    chart.update({ viewport: { x: [30, 70] } });
     fakes.frames.flush();
     expect(debug(chart).renderCount.data).toBeGreaterThan(before);
   });

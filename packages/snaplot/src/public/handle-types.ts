@@ -6,8 +6,6 @@
  */
 import type {
   AppendOptions,
-  AxisPosition,
-  AxisState,
   AxisType,
   ChartOptions,
   ChartPatch,
@@ -41,17 +39,6 @@ export interface SelectionChange<Row = Record<string, any>> extends Selection {
   /** The scatter points inside a two-axis selection. */
   readonly points?: readonly ChartPoint<Row>[];
 }
-
-/** A persistent selection in data space, as `getState().selection` reports it. */
-export interface SelectionRange {
-  /** The selected X range. */
-  x: ScaleRange;
-  /** The selected Y range, for a two-axis selection. */
-  y?: ScaleRange;
-}
-
-/** The current axis ranges by axis key, as `getState().viewport` reports them. */
-export type ViewportRanges = Readonly<Record<string, Readonly<ScaleRange>>>;
 
 // ─── Points and readouts ─────────────────────────────────────────────
 
@@ -109,8 +96,8 @@ export interface CursorSnapshot<Row = Record<string, any>> {
   activeSeriesId: string | null;
 }
 
-/** Options of `getCursorSnapshot()`. */
-export interface CursorSnapshotOptions {
+/** Options of `getCursor()`. */
+export interface CursorOptions {
   /** What to report when the cursor is not over the chart. @defaultValue `'hide'` */
   fallback?: 'hide' | 'latest' | 'first';
 }
@@ -156,9 +143,12 @@ export interface ChartState {
   series: readonly SeriesState[];
 }
 
-/** Event payloads by event name, for `chart.on()`. */
+/**
+ * Event payloads by event name, for `chart.on()`. Each `<key>:change` has a matching
+ * `on<Key>Change` option, called with the same value.
+ */
 export interface ChartEvents<Row = Record<string, any>> {
-  /** The cursor moved or left. */
+  /** The cursor moved or left: the values under it. */
   'cursor:change': CursorSnapshot<Row>;
   /** The pinned axes changed: the complete new viewport, `{}` on a reset. */
   'viewport:change': Viewport;
@@ -172,29 +162,6 @@ export interface ChartEvents<Row = Record<string, any>> {
   'following:change': boolean;
   /** A point was clicked. */
   'point:click': ChartPoint<Row>;
-  /** Any state changed. */
-  'state:change': ChartState;
-  /** A box selection finished. */
-  select: SelectionResult<Row>;
-  /** Data was replaced or appended. */
-  'data:update': undefined;
-  /** Options changed. */
-  'options:update': ChartOptions<Row>;
-  /** The resolved theme changed. */
-  'theme:update': ThemeConfig;
-  /** The chart was resized. */
-  resize: {
-    /** The new width in CSS pixels. */
-    width: number;
-    /** The new height in CSS pixels. */
-    height: number;
-  };
-}
-
-/** A finished box selection, with the points inside it. */
-export interface SelectionResult<Row = Record<string, any>> extends SelectionRange {
-  /** The scatter points inside a two-axis selection. */
-  points?: readonly ChartPoint<Row>[];
 }
 
 // ─── Plugins ─────────────────────────────────────────────────────────
@@ -269,96 +236,6 @@ export interface ChartPlugin<Row = Record<string, any>> {
 
 // ─── The chart handle ────────────────────────────────────────────────
 
-/** Where an axis is drawn. */
-export interface AxisArea {
-  /** The side of the plot. */
-  position: AxisPosition;
-  /** The rectangle of its labels and title. */
-  area: PixelRect;
-}
-
-/** The rectangle the data is drawn in, and the axis areas, in CSS pixels. */
-export interface Layout {
-  /** The chart width. */
-  width: number;
-  /** The chart height. */
-  height: number;
-  /** The plot rectangle. */
-  plot: PixelRect;
-  /** Each axis' side and area. */
-  axes: Record<string, AxisArea>;
-  /** The device pixel ratio. */
-  dpr: number;
-}
-
-/** One number per canvas layer. */
-export interface LayerCounts {
-  /** The grid layer: gridlines, axes and frame. */
-  grid: number;
-  /** The data layer: the marks. */
-  data: number;
-  /** The overlay: crosshair, indicators and selection. */
-  overlay: number;
-}
-
-/** Paint counters, for diagnostics. */
-export interface ChartStats {
-  /** Bumped on every data change. */
-  dataVersion: number;
-  /** Data replacements since creation. */
-  setDataCount: number;
-  /** Appends since creation. */
-  appendDataCount: number;
-  /** Paints per layer. */
-  renderCount: LayerCounts;
-  /** The duration of each layer's last paint in milliseconds (0 unless measured). */
-  lastRenderMs: LayerCounts;
-}
-
-/** The colours and fonts a chart resolved from its theme and page. */
-export interface ThemeConfig {
-  /** The surface colour. */
-  backgroundColor: string;
-  /** The strong text colour. */
-  textColor: string;
-  /** The axis label colour. */
-  axisLabelColor?: string;
-  /** The font family. */
-  fontFamily: string;
-  /** The axis text size in CSS pixels. */
-  fontSize: number;
-  /** The gridline colour. */
-  gridColor: string;
-  /** The gridline opacity. */
-  gridOpacity: number;
-  /** The series colours. */
-  palette: string[];
-  /** The categorical palette. */
-  categoricalPalette?: string[];
-  /** The sequential ramp. */
-  sequentialPalette?: string[];
-  /** The diverging ramp. */
-  divergingPalette?: string[];
-  /** The density ramp. */
-  heatmapGradient?: string[];
-  /** The axis line colour. */
-  axisLineColor: string;
-  /** The frame colour. */
-  borderColor: string;
-  /** The frame opacity. */
-  borderOpacity: number;
-  /** The muted text colour. */
-  tickColor: string;
-  /** The crosshair colour. */
-  crosshairColor: string;
-  /** The tooltip surface. */
-  tooltipBackground: string;
-  /** The tooltip text colour. */
-  tooltipTextColor: string;
-  /** The tooltip border colour. */
-  tooltipBorderColor: string;
-}
-
 /**
  * The handle `createChart` returns.
  *
@@ -387,8 +264,6 @@ export interface ChartHandle<Row = Record<string, any>> {
   setOptions(options: ChartOptions<Row>): void;
   /** Append rows or columns to the chart's data, or to one series' own source. */
   appendData(data: DataSource<Row>, options?: AppendOptions): void;
-  /** The options as last applied. */
-  getOptions(): Readonly<ChartOptions<Row>>;
   /** The current state: the same frozen object until the next commit. */
   getState(): ChartState;
   /**
@@ -396,59 +271,35 @@ export interface ChartHandle<Row = Record<string, any>> {
    * unsubscribe function. Cursor moves do not call it: listen to `cursor:change`.
    */
   subscribe(listener: () => void): () => void;
-  /** Listen to one event; returns the unsubscribe function. */
+  /** Listen to one event; returns the unsubscribe function. An unknown event name throws. */
   on<K extends keyof ChartEvents<Row>>(
     event: K,
     listener: (value: ChartEvents<Row>[K]) => void,
   ): () => void;
-  /** Set axis ranges by key. */
-  setViewport(viewport: ViewportRanges): void;
+  /**
+   * The values under the cursor, or at a fallback position (`'hide'`, the default, reports
+   * none), computed when asked.
+   */
+  getCursor(options?: CursorOptions): CursorSnapshot<Row>;
   /**
    * Return every axis to its automatic range, as `update({ viewport: {} })` does, and report
    * the reset as `viewport:change` with `{}`.
    */
   resetViewport(): void;
-  /** Follow the latest data again. */
+  /** Follow the latest data again, after a pan, a zoom or a pinned viewport paused it. */
   resumeFollow(): void;
-  /** Set or clear the persistent selection. */
-  setSelection(selection: SelectionRange | null): void;
-  /** Show or hide a series. An id the chart does not have throws. */
-  setSeriesVisible(id: string, visible: boolean): void;
-  /** Highlight a series, or clear the highlight with `null`. An id the chart does not have throws. */
-  setHighlight(id: string | null): void;
   /**
    * Move the cursor to an X value, or hide it with `null`. A string is a category label, or an
    * ISO-8601 date on a time axis; a string the X axis cannot read throws.
    */
   setCursor(x: number | Date | string | null): void;
-  /** The values under the cursor, or at a fallback position. */
-  getCursorSnapshot(options?: CursorSnapshotOptions): CursorSnapshot<Row>;
-  /**
-   * The values under the cursor, or at a fallback position (`'hide'`, the default, reports
-   * none), computed when asked.
-   */
-  getCursor(options?: CursorSnapshotOptions): CursorSnapshot<Row>;
-  /** One entry per series. */
-  getLegendItems(): SeriesState[];
-  /** The resolved theme. */
-  getTheme(): ThemeConfig;
-  /** The plot and axis rectangles. */
-  getLayout(): Layout;
-  /** Paint counters. */
-  getStats(): ChartStats;
-  /** An axis' kind and current range. */
-  getAxis(key: string): Readonly<AxisState> | undefined;
-  /** Resolve the theme from the page again. */
-  refreshTheme(): void;
-  /** Resize to a fixed size in CSS pixels. */
-  resize(width: number, height: number): void;
+  /** An axis' kind, range and pixel mapping, or undefined for an axis the chart does not have. */
+  scale(key: string): ChartScale | undefined;
   /**
    * Repaint a layer on the next frame: `'overlay'`, `'data'` (the marks and what plugins draw
    * over them) or `'all'`, which also resolves the theme from the page again.
    */
   redraw(layer?: 'overlay' | 'data' | 'all'): void;
-  /** An axis' kind, range and pixel mapping, or undefined for an axis the chart does not have. */
-  scale(key: string): ChartScale | undefined;
   /** Remove the chart and release its resources. */
   destroy(): void;
 }

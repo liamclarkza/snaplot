@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { build as esbuild, type Plugin as EsbuildPlugin } from 'esbuild';
 import ts from 'typescript';
@@ -154,23 +154,11 @@ export default defineConfig({
     }),
     adapterCore(),
     solidSource(),
-    {
-      // Copy stylesheets to dist so consumers can `import 'snaplot/legend-table.css'`.
-      name: 'snaplot:copy-css',
-      closeBundle() {
-        mkdirSync(resolve(root, 'dist'), { recursive: true });
-        copyFileSync(
-          resolve(root, 'src/styles/legendTable.css'),
-          resolve(root, 'dist/legend-table.css'),
-        );
-      },
-    },
   ],
   build: {
     lib: {
       entry: {
         index: resolve(root, 'src/index.ts'),
-        core: resolve(root, 'src/core.ts'),
         solid: solidEntry,
         react: resolve(root, 'src/react.ts'),
       },

@@ -3,7 +3,7 @@
 // come from the recorder.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChartHandle } from '../../src/index';
-import { debug, type Fakes, installFakes } from '../fakes';
+import { debug, type Fakes, installFakes, wheelGesture } from '../fakes';
 
 let fakes: Fakes;
 beforeEach(() => {
@@ -67,10 +67,12 @@ describe('[dataapi-17] decimation budget', () => {
       { width: 400, height: 200 },
     );
     fakes.frames.flush();
-    // A viewport change marks a gesture in flight, which turns M4 on.
-    chart.setViewport({ x: { min: 0, max: n - 1 } });
+    // A gesture in flight turns M4 on: set the view, then start a small wheel zoom.
+    chart.update({ viewport: { x: [0, n - 1] } });
     fakes.frames.flush();
-    const { plot } = chart.getLayout();
+    wheelGesture(chart);
+    fakes.frames.flush();
+    const { plot } = debug(chart);
     expect(debug(chart).drawnPoints).toBeLessThanOrEqual(4 * Math.ceil(plot.width) + 8);
   });
 });

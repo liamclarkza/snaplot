@@ -5,14 +5,9 @@
 import { ChartCore } from '../core/Chart';
 import { inferPosition } from '../core/Layout';
 import { ColumnarStore } from '../data/ColumnarStore';
-import { fail, hint, unknownSeries, warnOnce } from '../engine/errors';
+import { fail, hint, warnOnce } from '../engine/errors';
 import { formatValue } from '../engine/format';
-import type {
-  CursorSnapshotOptions,
-  ScaleRange,
-  SelectionRange,
-  TooltipPoint,
-} from '../engine/spec';
+import type { ScaleRange, SelectionRange, TooltipPoint } from '../engine/spec';
 import { createReferenceLinesPlugin } from '../plugins/builtins/referenceLinesPlugin';
 import { createReferenceRegionsPlugin } from '../plugins/builtins/referenceRegionsPlugin';
 import { createScale } from '../scales/createScale';
@@ -45,7 +40,6 @@ import {
 import { Dispatcher, type ReportedKey } from './state';
 import type {
   AppendOptions,
-  AxisState,
   ChartEvents,
   ChartGroup,
   ChartHandle,
@@ -58,8 +52,8 @@ import type {
   DataSource,
   Selection,
   SeriesState,
+  CursorOptions,
   Viewport,
-  ViewportRanges,
 } from './types';
 
 export { createChartGroup };
@@ -70,7 +64,7 @@ const CHURN_ROWS = 10_000;
 /** The container height from which `legend: 'auto'` shows the legend (CSS pixels). */
 const LEGEND_MIN_HEIGHT = 160;
 
-/** The events, in plan §4.4's order, then the 0.12 events the final handle removes. */
+/** The seven events, in plan §4.4's order. */
 const EVENTS: readonly (keyof ChartEvents)[] = [
   'cursor:change',
   'viewport:change',
@@ -79,12 +73,6 @@ const EVENTS: readonly (keyof ChartEvents)[] = [
   'highlight:change',
   'following:change',
   'point:click',
-  'state:change',
-  'select',
-  'data:update',
-  'options:update',
-  'theme:update',
-  'resize',
 ];
 
 /** The on<Key>Change option of each event (plan §4.5: a 1:1 alias). */
@@ -113,7 +101,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   readonly container: HTMLElement;
   private engine: ChartCore;
   private options: ChartOptions<Row>;
-  private optionsSnapshot?: ChartOptions<Row>;
   private normalized: NormalizedOptions<Row>;
   private ingested: Ingested<Row>;
   /** The state options last applied from options (plan D3). */
@@ -177,7 +164,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       highlight: (id) => this.syncHighlight(id),
       highlighted: () => this.read('highlight') as string | null,
       series: () => this.getState().series,
-      cursor: (fallback) => this.getCursorSnapshot({ fallback }),
+      cursor: (fallback) => this.getCursor({ fallback }),
       xTitle: () => this.ingested.spec.axes?.x?.title,
       observe: (listener) => this.events.observe(listener),
     });
@@ -461,7 +448,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.ingested = ingested;
     this.options = normalized.options;
     this.normalized = normalized;
-    this.optionsSnapshot = undefined;
     // A group change moves the palette slots of series without a colour (plan D17).
     if (work.engine || work.group) this.engine.replaceOptions(this.configFor(ingested, normalized));
     // Plugins are reconciled by id: an inline object with a known id only repaints (D21).
@@ -475,7 +461,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     after();
     if (work.group) this.moveGroup(previous.group, normalized.options.group);
     this.publish();
-    if (work.engine || work.plugins) this.emit('options:update', this.options);
     if (work.group) coordinate(previous.group);
     if (work.engine || work.group) coordinate(this.options.group);
   }
@@ -504,7 +489,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       options: this.options,
       normalized: this.normalized,
       hidden: this.hidden,
-      optionsSnapshot: this.optionsSnapshot,
     };
     const next = normalized.options;
     const highlighted = this.read('highlight') as string | null;
@@ -514,7 +498,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.ingested = ingested;
       this.options = next;
       this.normalized = normalized;
-      this.optionsSnapshot = undefined;
       this.engine.replaceSources(
         this.configFor(ingested, normalized),
         this.columns(),
@@ -538,7 +521,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         this.ingested = previous.ingested;
         this.options = previous.options;
         this.normalized = previous.normalized;
-        this.optionsSnapshot = previous.optionsSnapshot;
         this.hidden = previous.hidden;
       }
       throw error;
@@ -546,8 +528,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (quiet) return;
     this.events.mark('hiddenSeries');
     this.publish();
-    this.emit('options:update', this.options);
-    this.emit('data:update', undefined);
     if (previous.options.group !== next.group) coordinate(previous.options.group);
     coordinate(this.options.group);
   }
@@ -608,33 +588,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         'streamed-replaced',
         `data replaced on a streamed source; ${formatValue(discarded)} appended rows were discarded. Pass data once (useState/createSignal) or omit it.`,
       );
-  }
-
-  /** The options with streamed sources' retained data in place of their declared inputs. */
-  private liveOptions(): ChartOptions<Row> {
-    const streamed = this.ingested.sources.filter((source) => source.streamed);
-    if (!streamed.length) return this.options;
-    const replacement = new Map<unknown, DataSource<Row>>();
-    for (const source of streamed) {
-      const index = this.ingested.sources.indexOf(source);
-      const retained = this.retained(source, index);
-      replacement.set(
-        source.declared,
-        retained.rows ?? {
-          columns: retained.columns!,
-          ...(retained.rowIds ? { rowIds: retained.rowIds } : {}),
-        },
-      );
-    }
-    return {
-      ...this.options,
-      data: (this.options.data && replacement.get(this.options.data)) ?? this.options.data,
-      series: this.options.series.map((series) =>
-        series.data && replacement.has(series.data)
-          ? ({ ...series, data: replacement.get(series.data) } as typeof series)
-          : series,
-      ),
-    };
   }
 
   appendData(data: DataSource<Row>, options: AppendOptions = {}): void {
@@ -711,7 +664,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const newEncodingLabels = plans.some((plan) => plan.encodings?.size);
     const maxPoints = this.normalized.engine.streaming?.maxPoints;
     const changedAxes = new Set<string>();
-    this.optionsSnapshot = undefined;
     for (const plan of plans) {
       const source = this.ingested.sources[plan.source];
       const count = plan.columns[0].length;
@@ -749,14 +701,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.engine.setOptions({ axes });
     }
     this.publish();
-    this.emit('data:update', undefined);
     coordinate(this.options.group);
   }
 
-  getOptions(): Readonly<ChartOptions<Row>> {
-    if (this.mutating) return this.liveOptions();
-    return (this.optionsSnapshot ??= this.liveOptions());
-  }
   /** The cold state: one frozen snapshot per revision (plan §3.2). */
   getState(): ChartState {
     if (this.cold?.revision !== this.events.revision) this.cold = this.readState();
@@ -852,23 +799,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     coordinate(this.options.group);
   }
 
-  setViewport(viewport: ViewportRanges): void {
-    for (const [key, range] of Object.entries(viewport)) {
-      const axis = this.engine.getAxis(key);
-      if (
-        !axis ||
-        (axis.type === 'log' && range.min <= 0) ||
-        !Number.isFinite(range.min) ||
-        !Number.isFinite(range.max) ||
-        range.max <= range.min
-      ) {
-        fail(`the viewport of axis "${key}" needs an axis the chart has and finite min < max.`);
-      }
-    }
-    this.events.batch(() => {
-      for (const [key, range] of Object.entries(viewport)) this.engine.setAxis(key, range);
-    });
-  }
   /** Return every axis to its automatic range; reports `{}` once if anything was pinned. */
   resetViewport(): void {
     if (this.destroyed) return;
@@ -892,26 +822,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   resumeFollow(): void {
     if (this.destroyed) return;
     this.events.batch(() => this.engine.scrollToLatest());
-  }
-  setSelection(selection: SelectionRange | null): void {
-    if (selection && (!Number.isFinite(selection.x.min) || !Number.isFinite(selection.x.max)))
-      fail('a selection needs finite bounds.');
-    this.events.batch(() => this.engine.setSelection(selection));
-  }
-  setSeriesVisible(id: string, visible: boolean): void {
-    const ids = this.ingested.seriesIds;
-    if (!ids.includes(id)) unknownSeries('setSeriesVisible()', id, ids);
-    const hidden = new Set(this.hidden);
-    if (visible) hidden.delete(id);
-    else hidden.add(id);
-    if (equivalent([...hidden], [...this.hidden])) return;
-    this.events.batch(() => this.setHidden(hidden));
-    coordinate(this.options.group);
-  }
-  setHighlight(id: string | null): void {
-    const ids = this.ingested.seriesIds;
-    if (id !== null && !ids.includes(id)) unknownSeries('setHighlight()', id, ids);
-    this.syncHighlight(id);
   }
   /** A group's highlight: a series this chart lacks clears its highlight. */
   syncHighlight(id: string | null): void {
@@ -1022,11 +932,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       ? formatter(value)
       : (this.engine.getAxis(axis)?.tickFormat(value) ?? String(value));
   }
-  getCursorSnapshot(options?: CursorSnapshotOptions): CursorSnapshot<Row> {
-    return this.getCursor(options);
-  }
   /** The values under the cursor, or at a fallback position, computed when asked. */
-  getCursor(options?: CursorSnapshotOptions): CursorSnapshot<Row> {
+  getCursor(options?: CursorOptions): CursorSnapshot<Row> {
     const snapshot = this.engine.getCursorSnapshot(options);
     return Object.freeze({
       x:
@@ -1053,39 +960,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           ? null
           : this.ingested.seriesIds[snapshot.activeSeriesIndex],
     });
-  }
-  getLegendItems() {
-    return this.engine
-      .getLegendItems()
-      .map(({ seriesIndex: _index, meta: _meta, ...item }, index) => ({
-        ...item,
-        id: this.ingested.seriesIds[index],
-      }));
-  }
-  getTheme() {
-    return this.engine.getTheme();
-  }
-  getLayout() {
-    return this.engine.getLayout();
-  }
-  getStats() {
-    return this.engine.getStats();
-  }
-  getAxis(key: string): Readonly<AxisState> | undefined {
-    const axis = this.engine.getAxis(key);
-    return axis
-      ? Object.freeze({
-          type: this.ingested.categories.has(key) ? ('category' as const) : axis.type,
-          min: axis.min,
-          max: axis.max,
-        })
-      : undefined;
-  }
-  refreshTheme(): void {
-    this.engine.refreshTheme();
-  }
-  resize(width: number, height: number): void {
-    this.engine.resize(width, height);
   }
   /** Repaint a layer on the next frame; `'all'` (the default) also resolves the theme again. */
   redraw(layer: 'overlay' | 'data' | 'all' = 'all'): void {
@@ -1179,7 +1053,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   private publish(): void {
     if (this.mutating || this.destroyed) return;
     this.events.commit();
-    if (this.events.listened('state:change')) this.emit('state:change', this.getState());
   }
   /** The cursor's X as the axis reads it: a category label, else the data value. */
   private cursorLabel(): number | string | null {
@@ -1223,23 +1096,11 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           );
       }),
       this.engine.on('selection:change', () => this.events.mark('selection')),
-      this.engine.on('select', (selection) => {
-        const result = {
-          ...selection,
-          points: selection.points?.map((point) =>
-            this.point(point.seriesIndex, point.dataIndex, point),
-          ),
-        };
-        this.emit('select', result);
-      }),
       this.engine.on('follow:change', () => this.events.mark('following')),
-      this.engine.on('theme:update', (theme) => {
-        this.publish();
-        this.emit('theme:update', theme);
-      }),
-      this.engine.on('resize', (width, height) => {
+      // Series colours come from the theme.
+      this.engine.on('theme:update', () => this.publish()),
+      this.engine.on('resize', () => {
         this.syncLegend();
-        this.emit('resize', { width, height });
         coordinate(this.options.group);
       }),
     );

@@ -197,7 +197,7 @@ export function contract(el: HTMLElement, samples: Sample[], losses: Loss[], acc
     format: (value: number) => String(value),
   };
   // @ts-expect-error the axis type is a union, not a string
-  if (chart.getAxis('x')?.type === 'categroy') void chart;
+  if (chart.scale('x')?.type === 'categroy') void chart;
 
   void handle;
   void invalid;

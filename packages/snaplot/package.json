@@ -11,10 +11,6 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./core": {
-      "types": "./dist/core.d.ts",
-      "default": "./dist/core.js"
-    },
     "./react": {
       "types": "./dist/react.d.ts",
       "default": "./dist/react.js"
@@ -28,7 +24,6 @@
       "node": "./dist/solid.server.js",
       "default": "./dist/solid.js"
     },
-    "./legend-table.css": "./dist/legend-table.css",
     "./package.json": "./package.json"
   },
   "files": [
@@ -39,9 +34,7 @@
   "engines": {
     "node": ">=22.12"
   },
-  "sideEffects": [
-    "*.css"
-  ],
+  "sideEffects": false,
   "scripts": {
     "build": "vite build && vite build --config vite.ssr.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
@@ -53,7 +46,7 @@
     "trace-check": "node ../../scripts/overhaul/trace-check.mjs",
     "prepack": "node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').copyFileSync('../../' + f, f)\"",
     "postpack": "node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').rmSync(f, { force: true })\"",
-    "check:package": "publint --strict && attw --pack . --profile esm-only --exclude-entrypoints ./legend-table.css && node scripts/check-consumers.mjs",
+    "check:package": "publint --strict && attw --pack . --profile esm-only && node scripts/check-consumers.mjs",
     "check:api": "node scripts/check-api.mjs",
     "api:update": "node scripts/check-api.mjs --update",
     "test:tz": "TZ=America/Los_Angeles vitest run time Time .tz. && TZ=Asia/Kathmandu vitest run time Time .tz. && TZ=UTC vitest run time Time .tz.",

@@ -11,14 +11,13 @@ import { DARK_THEME, DEFAULT_THEME } from '../constants';
 import { createTheme } from '../config/theme';
 import { fail, hint, unknownSeries, warnOnce } from '../engine/errors';
 import { dateFormatter, type NumberFormatSpec, numberFormatter } from '../engine/format';
-import type { AxisSpec, ChartSpec, SeriesSpec, ThemeConfig } from '../engine/spec';
+import type { AxisSpec, ChartSpec, SelectionRange, SeriesSpec, ThemeConfig } from '../engine/spec';
 import type {
   ChartGroup,
   ChartOptions,
   ChartPlugin,
   ChartPoint,
   DataSource,
-  SelectionRange,
   SeriesType,
 } from './types';
 import {

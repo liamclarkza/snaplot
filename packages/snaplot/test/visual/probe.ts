@@ -1,7 +1,7 @@
 /**
  * In-page geometry collection for `geometry.spec.ts`: DOM label boxes, the axes and the ink under
- * every finite datum. It reads only the public handle plus the untyped debug symbol (plan D31),
- * and prefers the final API (`scale(key).toPixel`, M8) when it exists.
+ * every finite datum. It reads only the public handle (`scale(key)`, M8) plus the untyped debug
+ * symbol (plan D31) for the layout.
  */
 import type { ChartHandle, ChartOptions } from '../../src/index';
 import type { GeometryReport, PageAxis, PageLabel, PageProbe, PageRect } from './page-api';
@@ -10,6 +10,7 @@ const DEBUG = Symbol.for('snaplot.debug');
 
 interface DebugView {
   layers?: { data?: HTMLCanvasElement };
+  layout?: LayoutView;
   labelBoxes?: () => Array<{ axis: string; kind: 'tick' | 'title'; text: string }>;
 }
 
@@ -24,10 +25,6 @@ interface LayoutView {
   axes: Record<string, { position: PageAxis['position'] }>;
   dpr: number;
 }
-
-type AnyHandle = ChartHandle<any> & {
-  scale?: (key: string) => { toPixel(value: number): number } | undefined;
-};
 
 function rect(r: DOMRect | PageRect): PageRect {
   return {
@@ -50,32 +47,19 @@ function rootOf(host: HTMLElement): HTMLElement {
 }
 
 function layoutOf(chart: ChartHandle<any>): LayoutView {
-  return chart.getLayout() as unknown as LayoutView;
+  const layout = debugOf(chart).layout;
+  if (!layout) throw new Error('probe: the debug symbol has no layout');
+  return layout;
 }
 
 function axisOf(chart: ChartHandle<any>, key: string): AxisView | undefined {
-  return chart.getAxis(key) as AxisView | undefined;
+  const scale = chart.scale(key);
+  return scale ? { type: scale.type, min: scale.min, max: scale.max } : undefined;
 }
 
-function isHorizontal(layout: LayoutView, key: string): boolean {
-  const position = layout.axes[key]?.position;
-  return position ? position === 'top' || position === 'bottom' : key.startsWith('x');
-}
-
-/** CSS px relative to the chart host. */
+/** CSS px relative to the chart's canvases. */
 function toPixel(chart: ChartHandle<any>, key: string, value: number): number {
-  const final = (chart as AnyHandle).scale?.(key);
-  if (final && typeof final.toPixel === 'function') return final.toPixel(value);
-  const axis = axisOf(chart, key);
-  const layout = layoutOf(chart);
-  if (!axis) return Number.NaN;
-  const { min, max } = axis;
-  const t =
-    axis.type === 'log'
-      ? (Math.log10(value) - Math.log10(min)) / (Math.log10(max) - Math.log10(min))
-      : (value - min) / (max - min);
-  const plot = layout.plot;
-  return isHorizontal(layout, key) ? plot.left + t * plot.width : plot.top + (1 - t) * plot.height;
+  return chart.scale(key)?.toPixel(value) ?? Number.NaN;
 }
 
 function inDomain(chart: ChartHandle<any>, key: string, value: number): boolean {

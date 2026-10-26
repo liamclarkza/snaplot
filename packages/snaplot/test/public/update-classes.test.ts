@@ -230,7 +230,7 @@ describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] a
 });
 
 describe('[gap-environments-03] the final handle', () => {
-  it.fails('[gap-environments-03] the handle has exactly the fourteen 1.0 members and no resize', () => {
+  it('[gap-environments-03] the handle has exactly the fourteen 1.0 members and no resize', () => {
     const chart = mount<Row>(fakes, base);
     const members = new Set<string>();
     for (let o: object | null = chart; o && o !== Object.prototype; o = Object.getPrototypeOf(o))

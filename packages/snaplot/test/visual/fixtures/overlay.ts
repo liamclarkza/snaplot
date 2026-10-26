@@ -54,7 +54,7 @@ export const fixtures: Fixture[] = [
       axes: { x: { type: 'linear' }, y: { type: 'linear' } },
       series: lineSeries,
     }),
-    after: (chart) => chart.setHighlight('value2'),
+    after: (chart) => chart.update({ highlight: 'value2' }),
   },
   {
     id: 'overlay/hover-bar-line',

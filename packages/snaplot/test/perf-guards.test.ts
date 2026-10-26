@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as snaplot from '../src/index';
 import { createChartGroup } from '../src/index';
 import type { ChartHandle } from '../src/index';
-import { clientPoint, debug, type Fakes, installFakes, pointerTarget } from './fakes';
+import { clientPoint, debug, type Fakes, installFakes, pointerTarget, wheelGesture } from './fakes';
 
 let fakes: Fakes;
 beforeEach(() => {
@@ -55,7 +55,7 @@ describe('data and culling', () => {
       series: [{ y: 'y' }],
     });
     fakes.frames.flush();
-    chart.setViewport({ x: { min: 1000, max: 1100 } });
+    chart.update({ viewport: { x: [1000, 1100] } });
     // Let the gesture window expire so the at-rest path draws.
     fakes.frames.flush();
     const record = fakes.canvas.of(debug(chart).layers.data);
@@ -95,7 +95,7 @@ describe('data and culling', () => {
       series: [{ y: 'y' }],
     });
     fakes.frames.flush();
-    chart.setViewport({ x: { min: 1000, max: 3000 } });
+    chart.update({ viewport: { x: [1000, 3000] } });
     fakes.frames.flush();
     expect(future(chart).rangeScanPoints ?? Number.POSITIVE_INFINITY).toBeLessThan(n / 10);
   });
@@ -193,7 +193,7 @@ describe('marks', () => {
       { width: 400, height: 200 },
     );
     fakes.frames.flush();
-    const { plot } = chart.getLayout();
+    const { plot } = debug(chart);
     expect(calls(chart, 'data', ['lineTo', 'moveTo'])).toBeLessThanOrEqual(
       4 * Math.ceil(plot.width) + 8,
     );
@@ -216,11 +216,13 @@ describe('marks', () => {
       { width: 400, height: 200 },
     );
     fakes.frames.flush();
-    // setViewport marks a gesture in flight, so the interaction pass samples.
-    chart.setViewport({ x: { min: 0, max: n / 100 } });
+    // The view is set, then a small wheel zoom puts a gesture in flight, so the pass samples.
+    chart.update({ viewport: { x: [0, n / 100] } });
+    fakes.frames.flush();
+    wheelGesture(chart);
     fakes.frames.flush();
     const { drawnPoints, inViewPoints } = debug(chart);
-    const budget = Math.max(400, 1.5 * chart.getLayout().plot.width);
+    const budget = Math.max(400, 1.5 * debug(chart).plot.width);
     return drawnPoints / Math.min(inViewPoints, budget);
   }
 
@@ -260,10 +262,10 @@ describe('marks', () => {
       series: [{ type: 'scatter', y: 'y', renderMode: 'density' }],
     });
     fakes.frames.flush();
-    chart.setViewport({ x: { min: 100, max: 900 } });
+    chart.update({ viewport: { x: [100, 900] } });
     fakes.frames.flush();
     const before = future(chart).densityRebins;
-    chart.setViewport({ x: { min: 101, max: 901 } });
+    chart.update({ viewport: { x: [101, 901] } });
     fakes.frames.flush();
     expect(before).toBeDefined();
     expect(future(chart).densityRebins).toBe(before);
@@ -395,7 +397,7 @@ describe('labels and layout', () => {
     let labels = 0;
     for (let frame = 0; frame < 100; frame++) {
       const min = start + frame * 600_000;
-      chart.setViewport({ x: { min, max: min + 6 * 3_600_000 } });
+      chart.update({ viewport: { x: [min, min + 6 * 3_600_000] } });
       fakes.frames.flush();
       labels += debug(chart)
         .labelBoxes()

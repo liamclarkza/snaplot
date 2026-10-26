@@ -6,7 +6,7 @@
 // the first paint today (recorded separately as an M8 entry).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChartHandle } from '../../src/index';
-import { type Fakes, installFakes } from '../fakes';
+import { debug, type Fakes, installFakes } from '../fakes';
 
 let fakes: Fakes;
 beforeEach(() => {
@@ -26,7 +26,7 @@ const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /** Region fills: fillRect calls that span the plot height but not its width. */
 function regionRects(chart: ChartHandle<any>) {
-  const { plot } = chart.getLayout();
+  const { plot } = debug(chart);
   return fakes.canvas.all
     .flatMap((record) => record.calls)
     .filter((call) => call.name === 'fillRect')
@@ -55,7 +55,7 @@ describe('[gap-annotations-extensibility-01] category regions span slot edges', 
   it.fails('[gap-annotations-extensibility-01] a Sat–Sun region covers both whole slots', () => {
     const chart = mountWeek([{ from: 'Sat', to: 'Sun' }]);
     repaint(chart);
-    const { plot } = chart.getLayout();
+    const { plot } = debug(chart);
     const slot = plot.width / 7;
     const [rect] = regionRects(chart);
     expect(rect).toBeDefined();
@@ -66,7 +66,7 @@ describe('[gap-annotations-extensibility-01] category regions span slot edges', 
   it.fails('[gap-annotations-extensibility-01] a single-category region draws its slot', () => {
     const chart = mountWeek([{ from: 'Wed', to: 'Wed' }]);
     repaint(chart);
-    const { plot } = chart.getLayout();
+    const { plot } = debug(chart);
     const slot = plot.width / 7;
     const [rect] = regionRects(chart);
     expect(rect).toBeDefined();
@@ -111,7 +111,7 @@ describe('[gap-annotations-extensibility-02] annotation labels stay readable', (
       { width: 390, height: 220 },
     );
     repaint(chart);
-    const { plot } = chart.getLayout();
+    const { plot } = debug(chart);
     const [label] = labelCalls('Deploy #482');
     expect(label).toBeDefined();
     expect(label.x + 'Deploy #482'.length * 7).toBeLessThanOrEqual(plot.left + plot.width);

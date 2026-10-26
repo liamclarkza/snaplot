@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ChartHandle, createChart, createChartGroup } from '../../src/index';
 import {
+  axis,
   clientPoint,
   debug,
   type Fakes,
@@ -79,7 +80,7 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
   it('a field present on some rows only is a gap, not an error', () => {
     const sparse = [{ t: 0, cpu: 1 }, { t: 1 }, { t: 2, cpu: 3 }];
     const chart = mount({ data: sparse, x: 't', series: [{ y: 'cpu' }] });
-    expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0]).toMatchObject({ y: 3 });
+    expect(chart.getCursor({ fallback: 'latest' }).points[0]).toMatchObject({ y: 3 });
   });
 
   it('[dataapi-20] unsorted typed columns throw and point at rows', () => {
@@ -135,7 +136,7 @@ describe('§5.9 invalid input throws at the call that caused it', () => {
     );
     expect(message).toMatch(/^snaplot: /);
     expect(message).toMatch(/shar/);
-    expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].x).toBe(20);
+    expect(chart.getCursor({ fallback: 'latest' }).points[0].x).toBe(20);
   });
 
   it('[dataapi-20] a series with no id or y field is named by its path', () => {
@@ -188,18 +189,18 @@ describe('[dataapi-22] one policy for unknown series ids and cursor labels: thro
     expect(chart.getState()).toMatchObject({ highlight: 'mem', hiddenSeries: [] });
   });
 
-  it('[dataapi-22] setHighlight() throws on an unknown id, as setSeriesVisible() does', () => {
+  it('[dataapi-22] highlight and hiddenSeries suggest the nearest series id', () => {
     const chart = mount(two);
     for (const run of [
-      () => chart.setHighlight('cpus'),
-      () => chart.setSeriesVisible('cpus', false),
+      () => chart.update({ highlight: 'cpus' }),
+      () => chart.update({ hiddenSeries: ['cpus'] }),
     ]) {
       expect(thrown(run)).toMatch(
-        /^snaplot: set\w+\(\) names "cpus", which is not a series id\. Did you mean "cpu"\?/,
+        /^snaplot: \w+ names "cpus", which is not a series id\. Did you mean "cpu"\?/,
       );
     }
     expect(chart.getState()).toMatchObject({ highlight: null, hiddenSeries: [] });
-    chart.setHighlight('mem');
+    chart.update({ highlight: 'mem' });
     expect(chart.getState().highlight).toBe('mem');
   });
 
@@ -213,7 +214,7 @@ describe('[dataapi-22] one policy for unknown series ids and cursor labels: thro
       );
     }
     chart.setCursor(12);
-    expect(chart.getCursorSnapshot().x).toBe(12);
+    expect(chart.getCursor().x).toBe(12);
   });
 
   it('[dataapi-22] setCursor() throws on a label that is not a category, and reads ISO dates on a time axis', () => {
@@ -229,7 +230,7 @@ describe('[dataapi-22] one policy for unknown series ids and cursor labels: thro
       /^snaplot: setCursor\(\) got "Fev", which is not a category of axis "x"\. Did you mean "Feb"\?/,
     );
     bars.setCursor('Feb');
-    expect(bars.getCursorSnapshot().points[0]?.y).toBe(2);
+    expect(bars.getCursor().points[0]?.y).toBe(2);
 
     const days = mount({
       data: [
@@ -243,9 +244,9 @@ describe('[dataapi-22] one policy for unknown series ids and cursor labels: thro
       /^snaplot: setCursor\(\) got "2 March", which is not an ISO-8601 date for time axis "x"/,
     );
     days.setCursor('2026-03-02');
-    expect(days.getCursorSnapshot().points[0]?.y).toBe(2);
+    expect(days.getCursor().points[0]?.y).toBe(2);
     days.setCursor(new Date(2026, 2, 1));
-    expect(days.getCursorSnapshot().points[0]?.y).toBe(1);
+    expect(days.getCursor().points[0]?.y).toBe(1);
   });
 
   it('[dataapi-22] a group highlights a series some members lack, and throws on one none has', () => {
@@ -254,14 +255,14 @@ describe('[dataapi-22] one policy for unknown series ids and cursor labels: thro
     const b = mount({ data: rows, x: 't', group, series: [{ y: 'mem' }] });
     group.setHighlight('cpu');
     expect([a.getState().highlight, b.getState().highlight]).toEqual(['cpu', null]);
-    b.setHighlight('mem');
+    b.update({ highlight: 'mem' });
     expect([a.getState().highlight, b.getState().highlight]).toEqual([null, 'mem']);
     expect(thrown(() => group.setHighlight('mems'))).toMatch(
       /^snaplot: setHighlight\(\) names "mems", which is not a series id\. Did you mean "mem"\?/,
     );
     expect(thrown(() => group.setCursor('nope'))).toMatch(/^snaplot: setCursor\(\) got "nope"/);
     group.setCursor(4);
-    expect([a.getCursorSnapshot().x, b.getCursorSnapshot().x]).toEqual([4, 4]);
+    expect([a.getCursor().x, b.getCursor().x]).toEqual([4, 4]);
   });
 });
 
@@ -275,7 +276,7 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
       x: 'day',
       series: [{ y: 'v' }],
     });
-    expect(chart.getAxis('x')).toMatchObject({ type: 'time', min: new Date(2026, 2, 1).getTime() });
+    expect(axis(chart, 'x')).toMatchObject({ type: 'time', min: new Date(2026, 2, 1).getTime() });
   });
 
   it('[dataapi-07] an impossible calendar date throws at its row instead of rolling over', () => {
@@ -301,7 +302,7 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
       x: 'day',
       series: [{ y: 'v' }],
     });
-    expect(leap.getAxis('x')).toMatchObject({ type: 'time', max: new Date(2028, 1, 29).getTime() });
+    expect(axis(leap, 'x')).toMatchObject({ type: 'time', max: new Date(2028, 1, 29).getTime() });
   });
 
   it("[dataapi-07] date-only strings are UTC dates with timeZone: 'UTC'", () => {
@@ -314,7 +315,7 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
       timeZone: 'UTC',
       series: [{ y: 'v' }],
     });
-    expect(chart.getAxis('x')).toMatchObject({ type: 'time', min: Date.UTC(2026, 2, 1) });
+    expect(axis(chart, 'x')).toMatchObject({ type: 'time', min: Date.UTC(2026, 2, 1) });
   });
 
   it('[dataapi-07] strings with an offset are absolute instants', () => {
@@ -326,7 +327,7 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
       x: 'at',
       series: [{ y: 'v' }],
     });
-    expect(chart.getAxis('x')).toMatchObject({
+    expect(axis(chart, 'x')).toMatchObject({
       type: 'time',
       min: Date.UTC(2025, 11, 31, 22),
       max: Date.UTC(2026, 0, 1, 6, 30, 15, 250),
@@ -342,7 +343,7 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
       x: 'k',
       series: [{ type: 'bar', y: 'v' }],
     });
-    expect(chart.getAxis('x')?.type).toBe('category');
+    expect(axis(chart, 'x')?.type).toBe('category');
   });
 
   it("[dataapi-07] axes.x.type 'time' rejects a string that is not ISO-8601", () => {
@@ -367,7 +368,7 @@ describe('[dataapi-07][dxtrial-08] ISO-8601 inference (D18)', () => {
       x: 'd',
       series: [{ y: 'v' }],
     });
-    expect(chart.getAxis('x')?.type).toBe('time');
+    expect(axis(chart, 'x')?.type).toBe('time');
   });
 });
 
@@ -377,7 +378,7 @@ describe('intake copies (D16)', () => {
     const chart = mount({ data: rows, x: 't', series });
     series.push({ y: 'mem' });
     chart.update({ axes: { y: { title: 'Load' } } });
-    expect(chart.getLegendItems().map((item) => item.id)).toEqual(['cpu']);
+    expect(chart.getState().series.map((item) => item.id)).toEqual(['cpu']);
   });
 
   it('pushing into the caller’s referenceLines array after creation draws nothing new', () => {
@@ -400,16 +401,16 @@ describe('intake copies (D16)', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], axes });
     axes.y.max = 50;
     chart.update({ series: [{ y: 'cpu', label: 'CPU' }] });
-    expect(chart.getAxis('y')).toMatchObject({ min: 0, max: 100 });
+    expect(axis(chart, 'y')).toMatchObject({ min: 0, max: 100 });
   });
 });
 
 describe('§4.4 option leaves reach the engine', () => {
   it("interaction: 'readonly' keeps the viewport on a zoom key (control)", () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], interaction: 'readonly' });
-    const before = chart.getAxis('x');
+    const before = axis(chart, 'x');
     keyZoom(chart);
-    expect(chart.getAxis('x')).toEqual(before);
+    expect(axis(chart, 'x')).toEqual(before);
   });
 
   it("[arch-15] interaction: { zoom: 'xy' } zooms both axes", () => {
@@ -419,25 +420,25 @@ describe('§4.4 option leaves reach the engine', () => {
       series: [{ y: 'cpu' }],
       interaction: { zoom: 'xy' },
     });
-    const x = chart.getAxis('x')!;
-    const y = chart.getAxis('y')!;
+    const x = axis(chart, 'x')!;
+    const y = axis(chart, 'y')!;
     keyZoom(chart);
-    expect(chart.getAxis('x')!.max - chart.getAxis('x')!.min).toBeLessThan(x.max - x.min);
-    expect(chart.getAxis('y')!.max - chart.getAxis('y')!.min).toBeLessThan(y.max - y.min);
+    expect(axis(chart, 'x')!.max - axis(chart, 'x')!.min).toBeLessThan(x.max - x.min);
+    expect(axis(chart, 'y')!.max - axis(chart, 'y')!.min).toBeLessThan(y.max - y.min);
   });
 
   it("the default zoom is 'x' for lines", () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
-    const y = chart.getAxis('y');
+    const y = axis(chart, 'y');
     keyZoom(chart);
-    expect(chart.getAxis('y')).toEqual(y);
+    expect(axis(chart, 'y')).toEqual(y);
   });
 
   it("[arch-15] the default zoom is 'xy' when every series is scatter", () => {
     const chart = mount({ data: rows, x: 't', series: [{ type: 'scatter', y: 'cpu' }] });
-    const y = chart.getAxis('y')!;
+    const y = axis(chart, 'y')!;
     keyZoom(chart);
-    expect(chart.getAxis('y')!.max - chart.getAxis('y')!.min).toBeLessThan(y.max - y.min);
+    expect(axis(chart, 'y')!.max - axis(chart, 'y')!.min).toBeLessThan(y.max - y.min);
   });
 
   it("[arch-15] interaction: { zoom: 'none' } keeps the viewport on a zoom key", () => {
@@ -447,9 +448,9 @@ describe('§4.4 option leaves reach the engine', () => {
       series: [{ y: 'cpu' }],
       interaction: { zoom: 'none' },
     });
-    const before = chart.getAxis('x');
+    const before = axis(chart, 'x');
     keyZoom(chart);
-    expect(chart.getAxis('x')).toEqual(before);
+    expect(axis(chart, 'x')).toEqual(before);
   });
 
   it("[arch-15] interaction: { bounds: 'none' } lets a zoom-out leave the data", () => {
@@ -460,7 +461,7 @@ describe('§4.4 option leaves reach the engine', () => {
       interaction: { bounds: 'none' },
     });
     keyZoom(chart, '-');
-    expect(chart.getAxis('x')!.min).toBeLessThan(0);
+    expect(axis(chart, 'x')!.min).toBeLessThan(0);
   });
 
   it('[arch-15] cursor: false draws no crosshair', () => {
@@ -497,8 +498,8 @@ describe('§4.4 option leaves reach the engine', () => {
   it("[arch-15] theme: 'dark' resolves the dark roles on a light page", () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], theme: 'dark' });
     const light = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], theme: 'light' });
-    expect(chart.getTheme().backgroundColor).not.toBe(light.getTheme().backgroundColor);
-    expect(chart.getTheme().textColor).not.toBe(light.getTheme().textColor);
+    expect(debug(chart).theme.backgroundColor).not.toBe(debug(light).theme.backgroundColor);
+    expect(debug(chart).theme.textColor).not.toBe(debug(light).theme.textColor);
   });
 
   it('[arch-15] theme tokens set the surface, text and categorical palette', () => {
@@ -508,8 +509,8 @@ describe('§4.4 option leaves reach the engine', () => {
       series: [{ y: 'cpu' }, { y: 'mem' }],
       theme: { surface: '#fafaf7', text: '#202020', categorical: ['#d55e00', '#0072b2'] },
     });
-    expect(chart.getTheme()).toMatchObject({ backgroundColor: '#fafaf7', textColor: '#202020' });
-    expect(chart.getLegendItems().map((item) => item.color)).toEqual(['#d55e00', '#0072b2']);
+    expect(debug(chart).theme).toMatchObject({ backgroundColor: '#fafaf7', textColor: '#202020' });
+    expect(chart.getState().series.map((item) => item.color)).toEqual(['#d55e00', '#0072b2']);
   });
 
   it('[arch-15] series color and dash style the series', () => {
@@ -518,7 +519,7 @@ describe('§4.4 option leaves reach the engine', () => {
       x: 't',
       series: [{ y: 'cpu', color: '#cc79a7', dash: [4, 2] }],
     });
-    expect(chart.getLegendItems()[0]).toMatchObject({ color: '#cc79a7', dash: [4, 2] });
+    expect(chart.getState().series[0]).toMatchObject({ color: '#cc79a7', dash: [4, 2] });
   });
 
   it('[arch-15] a bar color function receives the value, the row and the row index', () => {
@@ -542,7 +543,7 @@ describe('§4.4 option leaves reach the engine', () => {
       series: [{ y: 'v' }],
       axes: { y: { nice: false } },
     });
-    const y = chart.getAxis('y')!;
+    const y = axis(chart, 'y')!;
     expect(y.max).toBeLessThan(10.1);
     expect(y.min).toBeGreaterThan(2.9);
   });
@@ -559,7 +560,7 @@ describe('§4.4 option leaves reach the engine', () => {
       series: [{ y: 'v' }],
       axes: { x: { min: start, max: end } },
     });
-    expect(chart.getAxis('x')).toMatchObject({ min: start.getTime(), max: end.getTime() });
+    expect(axis(chart, 'x')).toMatchObject({ min: start.getTime(), max: end.getTime() });
   });
 
   it('[arch-15] explicit ticks accept Dates', () => {
@@ -649,8 +650,8 @@ describe('state options at creation (D3)', () => {
   it('[arch-15] viewport pins only the axes it names', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }], viewport: { x: [2, 8] } });
     const auto = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
-    expect(chart.getAxis('x')).toMatchObject({ min: 2, max: 8 });
-    expect(chart.getAxis('y')).toEqual(auto.getAxis('y'));
+    expect(axis(chart, 'x')).toMatchObject({ min: 2, max: 8 });
+    expect(axis(chart, 'y')).toEqual(axis(auto, 'y'));
   });
 
   it('[arch-15] viewport accepts Dates on a time axis', () => {
@@ -665,7 +666,7 @@ describe('state options at creation (D3)', () => {
       series: [{ y: 'v' }],
       viewport: { x: [from, to] },
     });
-    expect(chart.getAxis('x')).toMatchObject({ min: from.getTime(), max: to.getTime() });
+    expect(axis(chart, 'x')).toMatchObject({ min: from.getTime(), max: to.getTime() });
   });
 
   it('[arch-15] hiddenSeries hides the series it names', () => {
@@ -702,15 +703,14 @@ describe('state options at creation (D3)', () => {
   it('[arch-15] update({ viewport }) applies the viewport', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
     chart.update({ viewport: { x: [4, 12] } } as never);
-    expect(chart.getAxis('x')).toMatchObject({ min: 4, max: 12 });
+    expect(axis(chart, 'x')).toMatchObject({ min: 4, max: 12 });
   });
 });
 
 // A state option is checked against the chart's axes before anything changes, like the data
 // it may arrive with: a rejected call leaves the chart, its options and later calls as they were.
 describe('state options are checked before anything changes (D3, D23)', () => {
-  const latest = (chart: ChartHandle<any>) =>
-    chart.getCursorSnapshot({ fallback: 'latest' }).points[0];
+  const latest = (chart: ChartHandle<any>) => chart.getCursor({ fallback: 'latest' }).points[0];
 
   it('[arch-15] a viewport naming an unknown axis throws at createChart and leaves the container empty', () => {
     const host = document.createElement('div');
@@ -731,28 +731,28 @@ describe('state options are checked before anything changes (D3, D23)', () => {
 
   it('[arch-15] a rejected update({ viewport }) changes nothing, and later updates work', () => {
     const chart = mount({ data: rows, x: 't', series: [{ y: 'cpu' }] });
-    const x = chart.getAxis('x');
+    const x = axis(chart, 'x');
     expect(thrown(() => chart.update({ viewport: { x: [2, 8], z: [0, 1] } } as never))).toMatch(
       /^snaplot: viewport names axis "z"/,
     );
-    expect(chart.getAxis('x')).toEqual(x);
-    expect(chart.getOptions().viewport).toBeUndefined();
+    expect(axis(chart, 'x')).toEqual(x);
+    expect(chart.getState().following).toBe(true);
     expect(() => chart.update({ axes: { y: { title: 'Load' } } } as never)).not.toThrow();
     expect(() => chart.update({ data: rows.slice(0, 10) } as never)).not.toThrow();
     expect(latest(chart)).toMatchObject({ x: 9 });
     chart.update({ viewport: { x: [2, 8] } } as never);
-    expect(chart.getAxis('x')).toMatchObject({ min: 2, max: 8 });
+    expect(axis(chart, 'x')).toMatchObject({ min: 2, max: 8 });
   });
 
   it('[dataapi-03][arch-15] a rejected update({ data, viewport }) keeps the old data and row ids', () => {
     const data = Array.from({ length: 5 }, (_, i) => ({ x: i, y: i * 2, id: `r${i}` }));
     const chart = mount({ data, x: 'x', rowId: 'id', series: [{ y: 'y' }] });
-    const x = chart.getAxis('x');
+    const x = axis(chart, 'x');
     const next = Array.from({ length: 3 }, (_, i) => ({ x: 100 + i, y: i, id: `n${i}` }));
     expect(thrown(() => chart.update({ data: next, viewport: { z: [0, 1] } } as never))).toMatch(
       /^snaplot: viewport names axis "z"/,
     );
-    expect(chart.getAxis('x')).toEqual(x);
+    expect(axis(chart, 'x')).toEqual(x);
     expect(latest(chart)).toMatchObject({ x: 4, y: 8, rowIndex: 4, rowId: 'r4' });
     expect(latest(chart).row).toBe(data[4]);
     chart.update({ data: next } as never);
@@ -766,13 +766,13 @@ describe('state options are checked before anything changes (D3, D23)', () => {
       /^snaplot: viewport\.y is \[0, 10\], but axis "y" is a log axis/,
     );
     const chart = mount(options);
-    const y = chart.getAxis('y');
+    const y = axis(chart, 'y');
     expect(thrown(() => chart.update({ viewport: { y: [-1, 10] } } as never))).toMatch(
       /^snaplot: viewport\.y is \[-1, 10\], but axis "y" is a log axis/,
     );
-    expect(chart.getAxis('y')).toEqual(y);
+    expect(axis(chart, 'y')).toEqual(y);
     chart.update({ viewport: { y: [1, 100] } } as never);
-    expect(chart.getAxis('y')).toMatchObject({ min: 1, max: 100 });
+    expect(axis(chart, 'y')).toMatchObject({ min: 1, max: 100 });
   });
 });
 
@@ -783,7 +783,7 @@ describe('on<Key>Change callback options (D16)', () => {
     keyZoom(chart);
     expect(onViewportChange).toHaveBeenCalled();
     const viewport = onViewportChange.mock.calls.at(-1)![0] as Record<string, unknown>;
-    const x = chart.getAxis('x')!;
+    const x = axis(chart, 'x')!;
     expect(viewport.x).toEqual([x.min, x.max]);
   });
 
@@ -795,12 +795,15 @@ describe('on<Key>Change callback options (D16)', () => {
       data: rows,
       x: 't',
       series: [{ y: 'cpu' }, { y: 'mem' }],
+      legend: true,
       onHiddenSeriesChange,
       onHighlightChange,
       onCursorChange,
     });
-    chart.setSeriesVisible('mem', false);
-    chart.setHighlight('cpu');
+    // Options apply silently (plan D3); the legend's gestures report.
+    const [cpu, mem] = chart.container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]');
+    mem.click();
+    cpu.dispatchEvent(new MouseEvent('mouseenter'));
     chart.setCursor(5);
     fakes.frames.flush();
     expect(onHiddenSeriesChange).toHaveBeenLastCalledWith(['mem']);

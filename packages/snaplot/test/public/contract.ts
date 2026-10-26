@@ -1,104 +1,24 @@
 /**
- * The 1.0 handle of plan §4.4, for the contract tests that M8's first commit writes before the
- * later commits land it on `ChartHandle`. Once they have, these names are the exported types.
+ * Helpers for the 1.0 contract tests (plan §4.4). M8's first commit wrote these tests against
+ * local copies of the final types; now that `ChartHandle` is the final handle, the names below
+ * are aliases of the exported types.
  */
-import type {
-  ChartHandle,
-  ChartOptions,
-  ChartPatch,
-  ChartPoint,
-  CursorSnapshot,
-  SelectionChange,
-  SeriesType,
-  Viewport,
-} from '../../src/index';
+import type { ChartHandle, ChartOptions, ChartPlugin } from '../../src/index';
 import type { Fakes } from '../fakes';
 
-/** One series as `getState().series` reports it. */
-export interface FinalSeries {
-  id: string;
-  label: string;
-  type: SeriesType;
-  color: string;
-  fill: string | null;
-  visible: boolean;
-  dash: readonly number[];
-  opacity: number;
-}
-
-/** `getState()`: the cold state, without the cursor. */
-export interface FinalState {
-  readonly revision: number;
-  readonly viewport: Viewport;
-  readonly selection: {
-    readonly x: readonly [number, number];
-    readonly y?: readonly [number, number];
-  } | null;
-  readonly hiddenSeries: readonly string[];
-  readonly highlight: string | null;
-  readonly following: boolean;
-  readonly series: readonly FinalSeries[];
-}
-
-/** The seven events. */
-export interface FinalEvents<Row> {
-  'cursor:change': CursorSnapshot<Row>;
-  'viewport:change': Viewport;
-  'selection:change': SelectionChange<Row> | null;
-  'hiddenSeries:change': readonly string[];
-  'highlight:change': string | null;
-  'following:change': boolean;
-  'point:click': ChartPoint<Row>;
-}
-
-/** `chart.scale(key)`. */
-export interface FinalScale {
-  readonly type: 'linear' | 'log' | 'time' | 'category';
-  readonly horizontal: boolean;
-  readonly min: number;
-  readonly max: number;
-  readonly categories?: readonly string[];
-  toPixel(value: number | Date | string): number;
-  fromPixel(pixel: number): number;
-}
-
-/** The plot rectangle a plugin draw hook receives. */
-export interface FinalPlot {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
-
-/** The D21 plugin contract. */
-export interface FinalPlugin<Row = Record<string, any>> {
-  id: string;
-  install?(chart: FinalHandle<Row>): void | (() => void);
-  drawBelow?(context: CanvasRenderingContext2D, chart: FinalHandle<Row>, plot: FinalPlot): void;
-  drawAbove?(context: CanvasRenderingContext2D, chart: FinalHandle<Row>, plot: FinalPlot): void;
-  drawOverlay?(context: CanvasRenderingContext2D, chart: FinalHandle<Row>, plot: FinalPlot): void;
-}
-
-/** The fourteen members. */
-export interface FinalHandle<Row = Record<string, any>> {
-  readonly container: HTMLElement;
-  update(patch: ChartPatch<Row> | Record<string, unknown>): void;
-  setOptions(options: ChartOptions<Row> | Record<string, unknown>): void;
-  appendData(data: unknown, options?: { seriesId?: string; updateLast?: boolean }): void;
-  getState(): FinalState;
-  subscribe(listener: () => void): () => void;
-  on<K extends keyof FinalEvents<Row>>(
-    event: K,
-    listener: (value: FinalEvents<Row>[K]) => void,
-  ): () => void;
-  getCursor(options?: { fallback?: 'hide' | 'latest' | 'first' }): CursorSnapshot<Row>;
-  resetViewport(): void;
-  resumeFollow(): void;
-  setCursor(x: number | Date | string | null): void;
-  scale(key: string): FinalScale | undefined;
-  redraw(layer?: 'overlay' | 'data' | 'all'): void;
-  destroy(): void;
-}
+/**
+ * The exported `ChartHandle`, with `update` and `setOptions` typed loosely so that a test can
+ * pass an option the types reject (a wrong value, or a field the rows lack).
+ */
+export type FinalHandle<Row = Record<string, any>> = Omit<
+  ChartHandle<Row>,
+  'update' | 'setOptions'
+> & {
+  update(patch: Record<string, unknown>): void;
+  setOptions(options: Record<string, unknown>): void;
+};
+/** The D21 plugin contract (the exported `ChartPlugin`). */
+export type FinalPlugin<Row = Record<string, any>> = ChartPlugin<Row>;
 
 /** The members `ChartHandle` has in 1.0, in plan §4.4's order. */
 export const HANDLE_MEMBERS = [
@@ -118,25 +38,17 @@ export const HANDLE_MEMBERS = [
   'destroy',
 ] as const;
 
-/** The handle as the 1.0 contract types it. */
-export function final<Row>(chart: ChartHandle<Row> | FinalHandle<Row>): FinalHandle<Row> {
-  return chart as unknown as FinalHandle<Row>;
-}
-
-/** Mount through the fakes with options typed loosely (final names the old types lack). */
+/** Mount through the fakes, with options typed loosely so a test can pass a wrong one. */
 export function mount<Row = Record<string, any>>(
   fakes: Fakes,
   options: Record<string, unknown>,
   size?: { width?: number; height?: number },
 ): FinalHandle<Row> {
-  return final(fakes.mount<Row>(options as unknown as ChartOptions<Row>, size));
+  return fakes.mount<Row>(
+    options as unknown as ChartOptions<Row>,
+    size,
+  ) as unknown as FinalHandle<Row>;
 }
-
-/** The 0.12 axis and layout reads, for the commits before `scale()` lands. */
-type Legacy = {
-  getAxis?(key: string): { min: number; max: number } | undefined;
-  getLayout?(): { plot: FinalPlot };
-};
 
 /** Client coordinates of a data point, through `scale()` (boxes sit at the origin). */
 export function at(
@@ -144,16 +56,6 @@ export function at(
   x: number,
   y: number,
 ): { clientX: number; clientY: number } {
-  if (typeof chart.scale !== 'function') {
-    const legacy = chart as unknown as Required<Legacy>;
-    const { plot } = legacy.getLayout();
-    const xs = legacy.getAxis('x')!;
-    const ys = legacy.getAxis('y')!;
-    return {
-      clientX: plot.left + ((x - xs.min) / (xs.max - xs.min)) * plot.width,
-      clientY: plot.top + (1 - (y - ys.min) / (ys.max - ys.min)) * plot.height,
-    };
-  }
   const xs = chart.scale('x');
   const ys = chart.scale('y');
   if (!xs || !ys) throw new Error('at(): the chart has no x or y axis');
@@ -201,9 +103,6 @@ export function hoverAt(chart: FinalHandle<any>, x: number, y: number): void {
 
 /** The `[min, max]` of a scale, or undefined. */
 export function range(chart: FinalHandle<any>, key: string): [number, number] | undefined {
-  const scale =
-    typeof chart.scale === 'function'
-      ? chart.scale(key)
-      : (chart as unknown as Required<Legacy>).getAxis(key);
+  const scale = chart.scale(key);
   return scale ? [scale.min, scale.max] : undefined;
 }

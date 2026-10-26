@@ -49,7 +49,7 @@ function tooltipTokens(): string[] {
 function readout(chart: ChartHandle<Row>, t: number, y: number) {
   hover(chart, t, y);
   fakes.frames.flush();
-  const point = chart.getCursorSnapshot().points.find((candidate) => candidate.x === t);
+  const point = chart.getCursor().points.find((candidate) => candidate.x === t);
   return { tokens: tooltipTokens(), snapshot: point?.formattedY };
 }
 
@@ -105,15 +105,9 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
     });
     expectIntegerStep(bars);
     bars.setCursor('Q2');
-    expect(bars.getCursorSnapshot().points.map((point) => point.formattedY)).toEqual([
-      '-0.8',
-      '2.2',
-    ]);
+    expect(bars.getCursor().points.map((point) => point.formattedY)).toEqual(['-0.8', '2.2']);
     bars.setCursor('Q4');
-    expect(bars.getCursorSnapshot().points.map((point) => point.formattedY)).toEqual([
-      '2.7',
-      '-1.3',
-    ]);
+    expect(bars.getCursor().points.map((point) => point.formattedY)).toEqual(['2.7', '-1.3']);
     hover(bars, 1, -0.8);
     fakes.frames.flush();
     expect(tooltipTokens()).toEqual(expect.arrayContaining(['-0.8', '2.2']));
@@ -131,10 +125,7 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
       axes: { y2: { position: 'right' } },
     });
     dual.setCursor(1);
-    expect(dual.getCursorSnapshot().points.map((point) => point.formattedY)).toEqual([
-      '1,234.56',
-      '4.84',
-    ]);
+    expect(dual.getCursor().points.map((point) => point.formattedY)).toEqual(['1,234.56', '4.84']);
   });
 
   it('[visuals-01] a time Y axis reads as a time, never as an epoch number', () => {
@@ -148,7 +139,7 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
       axes: { y: { type: 'time' } },
     });
     times.setCursor(1);
-    const [point] = times.getCursorSnapshot().points;
+    const [point] = times.getCursor().points;
     expect(point.formattedY).toMatch(/\d:\d\d/);
     expect(point.formattedY).not.toMatch(/^[-\d,.\s]+$/);
     hover(times, 1, start + 3_600_000);
@@ -165,7 +156,7 @@ describe('[visuals-01][dxtrial-02] readouts keep value precision', () => {
       axes: { y: { type: 'log' } },
     });
     log.setCursor(2);
-    expect(log.getCursorSnapshot().points.map((p) => p.formattedY)).toEqual(['123,456']);
+    expect(log.getCursor().points.map((p) => p.formattedY)).toEqual(['123,456']);
   });
 
   it('[visuals-01] a clicked point reads like its tooltip', () => {

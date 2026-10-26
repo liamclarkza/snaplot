@@ -101,7 +101,7 @@ const snippets: Record<string, string> = {
   axisTypeIsAUnion: `
     const chart = createChart(el, { data: samples, x: 'time', series: [{ y: 'cpu' }] });
     // @ts-expect-error 'categroy' is not an axis type
-    if (chart.getAxis('x')?.type === 'categroy') void chart;`,
+    if (chart.scale('x')?.type === 'categroy') void chart;`,
   misspelledFieldIsRejected: `
     // @ts-expect-error a misspelled field must stay a type error (control)
     createChart(el, { data: samples, x: 'time', series: [{ y: 'cpuu' }] });`,
@@ -209,7 +209,8 @@ describe('typed rows compile with the public types', () => {
 });
 
 describe('[dxtrial-17] the declarations document the public API only', () => {
-  const golden = ['index', 'core', 'react', 'solid'].map((name) =>
+  // M8 removed the ./core entry, so its golden is gone too.
+  const golden = ['index', 'react', 'solid'].map((name) =>
     ts.sys.readFile(
       decodeURIComponent(new URL(`../../api/${name}.d.ts`, import.meta.url).pathname),
     ),
