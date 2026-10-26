@@ -103,41 +103,54 @@ export function createReferenceLinesPlugin(options: {
       }
 
       // Labels after every line, so none is crossed by a later line, each on a halo of the
-      // surface. A vertical line's label sits at the top, right of the line (left of it at the
-      // right edge), on the first row free of the labels before it; a horizontal line's sits at
-      // the right edge, pushed down clear of the one above it.
+      // surface and clear of every label placed before it. A horizontal line's label marks a
+      // value, so it goes first: at the right edge just above its line, moved a row down or up
+      // (nearest first) when that spot is taken. A vertical line's sits at the top, right of the
+      // line (left of it at the right edge), on the first free row.
       ctx.font = `11px ${theme.fontFamily}`;
       ctx.setLineDash([]);
       ctx.lineJoin = 'round';
       ctx.lineWidth = 3;
       ctx.strokeStyle = theme.surfaceColor ?? theme.backgroundColor;
       const ROW = 13;
-      const rowEnds: number[] = [];
-      let lastY = -Infinity;
-      const vertical = labels.filter(({ line }) => line.axis !== 'y').sort((p, q) => p.px - q.px);
-      const horizontal = labels.filter(({ line }) => line.axis === 'y').sort((p, q) => p.px - q.px);
-      const draw = (text: string, x: number, y: number, color: string) => {
+      const placed: Array<[number, number, number, number]> = [];
+      const free = (x: number, y: number, w: number) =>
+        !placed.some(
+          ([x1, y1, x2, y2]) => x < x2 + 4 && x + w + 4 > x1 && y - 10 < y2 && y + 3 > y1,
+        );
+      const draw = (text: string, x: number, y: number, w: number, color: string) => {
+        placed.push([x, y - 10, x + w, y + 3]);
         ctx.globalAlpha = 1;
         ctx.strokeText(text, x, y);
         ctx.fillStyle = color;
         ctx.globalAlpha = 0.9;
         ctx.fillText(text, x, y);
       };
-      for (const { line, px, color } of vertical) {
+      const byPixel = (p: { px: number }, q: { px: number }) => p.px - q.px;
+      for (const { line, px, color } of labels
+        .filter(({ line }) => line.axis === 'y')
+        .sort(byPixel)) {
         const text = line.label!;
-        const textWidth = ctx.measureText(text).width;
-        const x = px + 4 + textWidth > left + width ? px - 4 - textWidth : px + 4;
-        let row = rowEnds.findIndex((end) => end + 4 <= x);
-        if (row < 0) row = rowEnds.length;
-        rowEnds[row] = x + textWidth;
-        draw(text, x, top + 12 + row * ROW, color);
+        const w = ctx.measureText(text).width;
+        const x = left + width - w - 6;
+        const home = Math.max(top + 12, Math.min(top + height - 4, px - 4));
+        let y = home;
+        for (let step = 1; !free(x, y, w) && step <= 8; step++) {
+          const offset = Math.ceil(step / 2) * ROW * (step % 2 === 1 ? 1 : -1);
+          const candidate = home + offset;
+          if (candidate >= top + 12 && candidate <= top + height - 4) y = candidate;
+        }
+        draw(text, x, y, w, color);
       }
-      for (const { line, px, color } of horizontal) {
+      for (const { line, px, color } of labels
+        .filter(({ line }) => line.axis !== 'y')
+        .sort(byPixel)) {
         const text = line.label!;
-        const textWidth = ctx.measureText(text).width;
-        const y = Math.max(lastY + ROW, Math.max(top + 12, Math.min(top + height - 4, px - 4)));
-        lastY = y;
-        draw(text, left + width - textWidth - 6, y, color);
+        const w = ctx.measureText(text).width;
+        const x = px + 4 + w > left + width ? px - 4 - w : px + 4;
+        let y = top + 12;
+        while (!free(x, y, w) && y + ROW <= top + height - 4) y += ROW;
+        draw(text, x, y, w, color);
       }
 
       ctx.restore();

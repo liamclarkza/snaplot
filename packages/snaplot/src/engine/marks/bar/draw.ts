@@ -126,7 +126,8 @@ export function renderBarsSegments(
       const y = Math.min(barTop, baselinePixel);
       const h = Math.abs(barTop - baselinePixel);
 
-      if (fillFn) ctx.fillStyle = fillFn(yVal, i + logicalOffset);
+      // A per-bar colour is the bar's fill and outline, so a thin bar still shows it.
+      if (fillFn) ctx.fillStyle = ctx.strokeStyle = fillFn(yVal, i + logicalOffset);
       drawBar(ctx, rect.left, y, rect.width, h, barTop, baselinePixel);
     }
   }
