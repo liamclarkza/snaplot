@@ -1166,7 +1166,8 @@ export function createChart<Row = Record<string, any>>(
 /**
  * The handle createChart() returns (plan §4.4, gap-environments-03): its fourteen members, each
  * calling the chart, and nothing a group, a legend or the engine uses, so the runtime surface is
- * the typed one. Plugins, legends and groups receive this object too.
+ * the typed one. Plugins, the built-in legend and the legend table receive this object; a group's
+ * member is the chart itself.
  */
 function publicHandle<Row>(chart: Controller<Row>): ChartHandle<Row> {
   return {
