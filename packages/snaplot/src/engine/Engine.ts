@@ -44,7 +44,8 @@ import { deepMerge } from './merge';
 import { DEFAULT_CONFIG } from './defaults';
 import { applyThemeToElement, resolveTheme } from './theme/resolve';
 
-import { type AxesRenderResult, renderAxes, thinTicks, updateDOMLabels } from './axes/render';
+import { renderAxes } from './axes/render';
+import { type AxesRenderResult, updateDOMLabels } from './axes/labels';
 import {
   renderLineSegments,
   renderAreaSegments,
@@ -117,18 +118,13 @@ import {
   getCursorSnapshot,
 } from './cursor';
 import { setHighlight, clearProximityHighlight } from './highlight';
+import { computeCustomXTicks } from './axes/ticks';
 
 // Stable identity for user tickFormat functions in the layout cache key.
 // Stringifying the function body per frame allocated the whole source text
 // on every render; a WeakMap id is O(1) and never retains the function.
 const tickFormatIds = new WeakMap<(value: number) => string, number>();
 let nextTickFormatId = 1;
-
-type CustomXTicks = {
-  values: number[];
-  gridValues?: number[];
-  format?: (value: number) => string;
-};
 
 function tickFormatId(fn: ((value: number) => string) | undefined): number {
   if (!fn) return 0;
@@ -1615,7 +1611,7 @@ export class ChartCore implements EngineHost {
       this.canvasManager.clear('grid');
 
       // Compute custom X ticks for bar/histogram charts
-      const customXTicks = this.computeCustomXTicks();
+      const customXTicks = computeCustomXTicks(this);
 
       const labels = renderAxes(
         this.canvasManager.gridCtx,
@@ -2165,76 +2161,6 @@ export class ChartCore implements EngineHost {
 
   isValidColumn(columnIdx: number, store: DataStore): boolean {
     return Number.isInteger(columnIdx) && columnIdx >= 0 && columnIdx <= store.seriesCount;
-  }
-
-  private axisMarkCoordinates(type: 'bar' | 'histogram'): number[] {
-    const stores = new Set(
-      this.config.series.flatMap((series, si) =>
-        series.visible !== false && series.type === type && (series.xAxis ?? 'x') === 'x'
-          ? [this.storeForSeries(si)]
-          : [],
-      ),
-    );
-    if (stores.size === 1) return Array.from([...stores][0].x);
-    return [...new Set([...stores].flatMap((store) => Array.from(store.x)))].sort((a, b) => a - b);
-  }
-
-  private computeCustomXTicks(): CustomXTicks | undefined {
-    const visibleSeries = this.config.series.filter((s) => s.visible !== false);
-
-    // User-provided formatter on the X axis wins over the default numeric
-    // one for categorical bar / histogram charts.
-    const xAxisCfg = this.config.axes?.x;
-    const userFormat = xAxisCfg?.format;
-    const defaultFormat = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
-
-    // Category ticks are capped to what the plot width can label legibly
-    // (and to an explicit axes.x.tickCount when set): a year of daily bars
-    // used to tick every day, smearing labels and gridlines into a band.
-    const maxCategoryTicks = Math.min(
-      Math.max(2, Math.floor(this.layout.plot.width / 65)),
-      xAxisCfg?.tickCount ?? Number.POSITIVE_INFINITY,
-    );
-
-    // Histogram: X data = bin edges, use them as tick values
-    const histSeries = visibleSeries.find((s) => s.type === 'histogram');
-    if (histSeries && this.hasData()) {
-      // X column contains bin edges directly (pre-computed by user)
-      const edgeValues = thinTicks(this.axisMarkCoordinates('histogram'), maxCategoryTicks);
-      return { values: edgeValues, format: userFormat ?? defaultFormat };
-    }
-
-    const xScale = this.scales.get('x');
-    const barPlan = xScale ? this.barXAxisPlans.get('x') : undefined;
-    const hasVisibleBar = visibleSeries.some((series) => series.type === 'bar');
-    if (
-      barPlan &&
-      hasVisibleBar &&
-      xScale?.type === 'linear' &&
-      Math.abs(xScale.min - barPlan.domainMin) <=
-        Math.abs(barPlan.domainMax - barPlan.domainMin) * 1e-12 &&
-      Math.abs(xScale.max - barPlan.domainMax) <=
-        Math.abs(barPlan.domainMax - barPlan.domainMin) * 1e-12 &&
-      xAxisCfg?.nice !== false &&
-      (!xAxisCfg?.ticks || xAxisCfg.ticks.length === 0) &&
-      xAxisCfg?.min === undefined &&
-      xAxisCfg?.max === undefined
-    ) {
-      return {
-        values: barPlan.values,
-        gridValues: barPlan.gridValues,
-        format: userFormat ?? defaultFormat,
-      };
-    }
-
-    // Bar chart: tick at each category X value
-    const barSeries = visibleSeries.find((s) => s.type === 'bar');
-    if (barSeries && this.hasData()) {
-      const values = thinTicks(this.axisMarkCoordinates('bar'), maxCategoryTicks);
-      return { values, format: userFormat ?? defaultFormat };
-    }
-
-    return undefined;
   }
 
   /**

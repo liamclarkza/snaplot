@@ -1,14 +1,9 @@
 import type { AxisSpec, Layout, Scale, ThemeConfig, AxisPosition, ChartSpec } from '../spec';
-import {
-  AXIS_CORNER_GAP,
-  AXIS_LABEL_GAP,
-  AXIS_TICK_LENGTH,
-  DEFAULT_TICK_COUNT,
-  EDGE_MARGIN,
-  LABEL_MIN_GAP,
-} from '../../constants';
+import { AXIS_LABEL_GAP, AXIS_TICK_LENGTH, EDGE_MARGIN, LABEL_MIN_GAP } from '../../constants';
 import { inferPosition } from '../layout';
 import { opaqueColorOnBackground } from '../../utils/color';
+import { type AxesRenderResult, type AxisLabel, resolveAxisCornerCollisions } from './labels';
+import { axisTickValues, thinTicks } from './ticks';
 
 /**
  * Renders gridlines on the static (grid) canvas and returns label
@@ -17,54 +12,6 @@ import { opaqueColorOnBackground } from '../../utils/color';
  * 0.5px offset trick: for 1px gridlines on non-retina (dpr===1),
  * offset coordinates by 0.5 to avoid blurry sub-pixel rendering.
  */
-
-export interface AxisLabel {
-  text: string;
-  x: number;
-  y: number;
-  anchor: 'start' | 'middle' | 'end';
-  /** Axis titles render in the reserved outer gutter strip, rotated on vertical axes. */
-  kind?: 'tick' | 'title';
-}
-
-export interface AxesRenderResult {
-  /** Labels keyed by axis config key */
-  labels: Map<string, AxisLabel[]>;
-}
-
-/**
- * Tick values for an axis: explicit `ac.ticks` (clamped to the visible
- * domain) beat generated ticks at the `ac.tickCount` density. Shared by
- * the renderer and layout measurement so gutters match the labels drawn.
- */
-export function axisTickValues(scale: Scale, ac: AxisSpec): number[] {
-  if (ac.ticks && ac.ticks.length > 0) {
-    const lo = Math.min(scale.min, scale.max);
-    const hi = Math.max(scale.min, scale.max);
-    return ac.ticks.filter((t) => Number.isFinite(t) && t >= lo && t <= hi);
-  }
-  return scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT);
-}
-
-/**
- * Evenly thin a category tick list to at most `maxCount` entries. Bar and
- * histogram charts tick every category by default, which smears into an
- * unreadable band once categories outnumber the pixels available for
- * labels (a year of daily bars). Keeps the first entry and every nth after.
- */
-export function thinTicks(values: number[], maxCount: number, preserveEnds = false): number[] {
-  const max = Math.max(2, Math.floor(maxCount));
-  if (values.length <= max) return values;
-  let step = Math.ceil(values.length / max);
-  if (preserveEnds) {
-    // Select a stride that divides the full sequence: appending the last tick
-    // afterwards would create a shorter, misleading interval at the edge.
-    const intervals = values.length - 1;
-    step = Math.ceil(intervals / (max - 1));
-    while (intervals % step !== 0) step++;
-  }
-  return values.filter((_, i) => i % step === 0);
-}
 
 /** Resolve an axis's grid config to concrete draw values, or null when hidden. */
 function resolveGrid(
@@ -413,125 +360,4 @@ export function renderAxes(
   ctx.globalAlpha = 1;
 
   return result;
-}
-
-function resolveAxisCornerCollisions(
-  result: AxesRenderResult,
-  layout: Layout,
-  theme: ThemeConfig,
-  ctx: CanvasRenderingContext2D,
-): void {
-  const lineHeight = theme.fontSize * 1.4;
-  const horizontal: Array<{ label: AxisLabel; position: 'top' | 'bottom' }> = [];
-  const vertical: Array<{ label: AxisLabel; position: 'left' | 'right' }> = [];
-
-  ctx.font = `${theme.fontSize}px ${theme.fontFamily}`;
-  for (const [key, labels] of result.labels) {
-    const position = layout.axes[key]?.position;
-    if (!position) continue;
-    for (const label of labels) {
-      if (label.kind === 'title') continue;
-      if (position === 'top' || position === 'bottom') horizontal.push({ label, position });
-      else vertical.push({ label, position });
-    }
-  }
-
-  for (const h of horizontal) {
-    const hWidth = ctx.measureText(h.label.text).width;
-    for (const v of vertical) {
-      const sameCorner =
-        (v.position === 'left' && h.label.x <= layout.plot.left + hWidth) ||
-        (v.position === 'right' && h.label.x >= layout.plot.left + layout.plot.width - hWidth);
-      if (!sameCorner) continue;
-
-      const hTop = h.position === 'bottom' ? h.label.y : h.label.y - lineHeight;
-      const hBottom = hTop + lineHeight;
-      const vTop = v.label.y - lineHeight / 2;
-      const vBottom = v.label.y + lineHeight / 2;
-      if (Math.min(hBottom, vBottom) <= Math.max(hTop, vTop)) continue;
-
-      if (v.position === 'left') {
-        const vRight = v.label.x;
-        const hLeft = h.label.x - hWidth / 2;
-        const overlap = vRight + AXIS_CORNER_GAP - hLeft;
-        if (overlap > 0) h.label.x += overlap;
-      } else {
-        const vLeft = v.label.x;
-        const hRight = h.label.x + hWidth / 2;
-        const overlap = hRight + AXIS_CORNER_GAP - vLeft;
-        if (overlap > 0) h.label.x -= overlap;
-      }
-    }
-  }
-}
-
-/**
- * Update DOM labels from AxesRenderResult.
- *
- * Spans are pooled and updated in place: the grid layer redraws on every
- * pan/zoom frame, and rebuilding all label nodes per frame (the previous
- * innerHTML approach) churned the DOM at gesture rate. The static style
- * (font, color, transform) is stamped only when its signature changes;
- * steady-state frames touch just left/top/textContent.
- */
-export function updateDOMLabels(
-  domLayer: HTMLDivElement,
-  axesResult: AxesRenderResult,
-  theme: ThemeConfig,
-  layout: Layout,
-): void {
-  const baseStyle = `position:absolute;font-family:${theme.fontFamily};font-size:${theme.fontSize}px;font-variant-numeric:tabular-nums;color:${theme.axisLabelColor ?? theme.textColor};white-space:nowrap;pointer-events:none;`;
-
-  const pool = domLayer.children;
-  let used = 0;
-
-  for (const [key, labels] of axesResult.labels) {
-    const axisInfo = layout.axes[key];
-    if (!axisInfo) continue;
-
-    const pos = axisInfo.position;
-    let posStyle: string;
-    switch (pos) {
-      case 'left':
-        posStyle = 'text-align:right;transform:translate(-100%, -50%);';
-        break;
-      case 'right':
-        posStyle = 'transform:translateY(-50%);';
-        break;
-      case 'top':
-        posStyle = 'text-align:center;transform:translate(-50%, -100%);';
-        break;
-      default:
-        posStyle = 'transform:translateX(-50%);';
-        break;
-    }
-    // Titles center on their anchor point and rotate to read along
-    // vertical axes. Titles and tick labels share one quiet text role.
-    const vertical = pos === 'left' || pos === 'right';
-    const titleStyle =
-      `transform:translate(-50%, -50%)` +
-      (vertical ? ` rotate(${pos === 'left' ? -90 : 90}deg);` : ';');
-
-    for (const label of labels) {
-      let el = pool[used] as HTMLSpanElement | undefined;
-      if (!el) {
-        el = document.createElement('span');
-        domLayer.appendChild(el);
-      }
-      used++;
-
-      const styleSig = baseStyle + (label.kind === 'title' ? titleStyle : posStyle);
-      if (el.dataset.labelStyle !== styleSig) {
-        el.style.cssText = styleSig;
-        el.dataset.labelStyle = styleSig;
-      }
-      el.style.left = label.x + 'px';
-      el.style.top = label.y + 'px';
-      if (el.textContent !== label.text) el.textContent = label.text;
-    }
-  }
-
-  while (domLayer.children.length > used) {
-    domLayer.lastChild?.remove();
-  }
 }

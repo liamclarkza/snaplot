@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_THEME } from '../../constants';
 import type { Layout } from '../spec';
-import { updateDOMLabels } from './render';
+import { updateDOMLabels } from './labels';
 
 describe('axis text appearance', () => {
   it('shares one color for ticks and titles and updates pooled labels on theme changes', () => {
