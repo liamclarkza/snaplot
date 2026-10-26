@@ -15,6 +15,7 @@ import { scaleSignature, autoRangeVertical, autoRangeHorizontal, columnRange } f
 import { inferPosition } from './layout';
 import { scatterXColumn, seriesYColumn } from './marks/scatterEncoding';
 import { INTERACTION_REFINE_MS } from '../constants';
+import { refreshCursor } from './cursor';
 
 export function followWindow(engine: ChartCore): number | undefined {
   const follow = (engine.config.streaming as StreamingSpec | undefined)?.followWindow;
@@ -204,7 +205,7 @@ export function applyViewport(
     return !before || before[0] !== scale.min || before[1] !== scale.max;
   });
   if (moved) markViewportActive(engine);
-  engine.refreshCursor();
+  refreshCursor(engine);
   engine.scheduler.markDirty(DirtyFlag.ALL);
   publishResetViewport(engine, previous);
 }
@@ -239,7 +240,7 @@ export function scrollToLatest(engine: ChartCore): void {
     autoRangeHorizontal(engine);
     autoRangeVertical(engine);
   }
-  engine.refreshCursor();
+  refreshCursor(engine);
   engine.scheduler.markDirty(DirtyFlag.ALL);
   publishResetViewport(engine, previous);
 }
@@ -423,7 +424,7 @@ export function applyViewportChange(
     autoRangeVertical(engine, true);
   }
 
-  engine.refreshCursor();
+  refreshCursor(engine);
   engine.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID | DirtyFlag.OVERLAY);
   engine.emitEvent('viewport:change', scaleKey, { min, max });
 }

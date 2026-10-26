@@ -108,6 +108,14 @@ import {
   brushEnd,
   scatterPointsInSelection,
 } from './selection';
+import {
+  setCursorDataX,
+  updateLocalCursorFromPoint,
+  refreshCursor,
+  queueTouchCursor,
+  cancelPendingTouchCursor,
+  getCursorSnapshot,
+} from './cursor';
 
 // Stable identity for user tickFormat functions in the layout cache key.
 // Stringifying the function body per frame allocated the whole source text
@@ -326,27 +334,27 @@ export class ChartCore implements EngineHost {
 
   private gestureManager: GestureManager;
   private hitTester: HitTester;
-  private tooltipManager: TooltipManager;
+  tooltipManager: TooltipManager;
   private plugins = new PluginHost<unknown>();
 
   // Config
   config: ChartSpec;
 
   // Cursor state
-  private cursorX: number | null = null;
-  private cursorY: number | null = null;
-  private cursorDataX: number | null = null;
-  private cursorDataIdx: number | null = null;
-  private tooltipPoints: TooltipPoint[] = [];
+  cursorX: number | null = null;
+  cursorY: number | null = null;
+  cursorDataX: number | null = null;
+  cursorDataIdx: number | null = null;
+  tooltipPoints: TooltipPoint[] = [];
   /** True when cursor position comes from local pointer events (not sync) */
-  private cursorIsLocal = false;
+  cursorIsLocal = false;
   /** Raw mouse position in CSS pixels (not snapped), used for tooltip placement */
-  private mouseX: number | null = null;
-  private mouseY: number | null = null;
+  mouseX: number | null = null;
+  mouseY: number | null = null;
   /** Pointer type of the most recent cursor event, drives hit-test radius. */
-  private lastPointerType: 'mouse' | 'touch' | 'pen' = 'mouse';
-  private pendingTouchCursor: { x: number; y: number; pointerType: 'touch' | 'pen' } | null = null;
-  private touchCursorFrame: number | null = null;
+  lastPointerType: 'mouse' | 'touch' | 'pen' = 'mouse';
+  pendingTouchCursor: { x: number; y: number; pointerType: 'touch' | 'pen' } | null = null;
+  touchCursorFrame: number | null = null;
   /**
    * Re-resolves the theme when the document's theming context changes: an
    * attribute flip on <html>/<body> (the [data-theme] pattern) or an OS
@@ -567,7 +575,7 @@ export class ChartCore implements EngineHost {
     this.plotInsets = { ...insets };
     this.updateLayout();
     this.updateScalePixelRanges();
-    this.refreshCursor();
+    refreshCursor(this);
     this.scheduler.markDirty(DirtyFlag.ALL);
   }
 
@@ -657,7 +665,7 @@ export class ChartCore implements EngineHost {
     this.debugCounters.ingestCount++;
     this.replaceOptions(config);
     reconcileSelectionForDataChange(this);
-    this.refreshCursor();
+    refreshCursor(this);
   }
 
   getSourceData(sourceIndex: number): ColumnarData {
@@ -757,7 +765,7 @@ export class ChartCore implements EngineHost {
     this.dataVersion++;
     const gridDirty = rangeForDataChange(this);
     reconcileSelectionForDataChange(this);
-    this.refreshCursor();
+    refreshCursor(this);
     this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
   }
 
@@ -940,7 +948,7 @@ export class ChartCore implements EngineHost {
     if (this.destroyed) return;
     this.destroyed = true;
 
-    this.cancelPendingTouchCursor();
+    cancelPendingTouchCursor(this);
     if (this.refineTimer !== null) {
       clearTimeout(this.refineTimer);
       this.refineTimer = null;
@@ -987,92 +995,13 @@ export class ChartCore implements EngineHost {
   }
 
   setCursorDataX(dataX: number | null, origin: CursorEventOrigin = 'programmatic'): void {
-    this.cursorIsLocal = false; // Group- or application-driven cursor
-
-    if (dataX === null) {
-      this.cursorX = null;
-      this.cursorY = null;
-      this.cursorDataX = null;
-      this.cursorDataIdx = null;
-      this.tooltipPoints = [];
-      this.tooltipManager.hide();
-      this.scheduler.markDirty(DirtyFlag.OVERLAY);
-      this.emitEvent('cursor:move', null, null, origin);
-      return;
-    }
-
-    const xScale = this.scales.get('x');
-    if (!xScale) return;
-
-    if (this.hasOnlyVisibleHistograms()) {
-      const hit = this.resolveHistogramCursor(dataX);
-      this.cursorDataX = hit?.dataX ?? dataX;
-      this.cursorDataIdx = hit?.dataIndex ?? null;
-      this.cursorX = xScale.dataToPixel(this.cursorDataX);
-    } else {
-      this.cursorDataX = dataX;
-      // Mirror the local pointer path: column 0 is not the shared X axis when a
-      // visible scatter series draws against a different X column, so snapping
-      // this synced/programmatic cursor to nearestXIndex on column 0 would land
-      // on the wrong point. Fall back to placing the crosshair at the raw dataX.
-      if (this.canUseGlobalXCursor()) {
-        const store = this.sourceStores[0];
-        this.cursorDataIdx = store.nearestXIndex(dataX);
-        // Snap to nearest actual data point's X for accurate crosshair placement
-        if (this.cursorDataIdx < store.length) {
-          const snappedX = store.xAt(this.cursorDataIdx);
-          this.cursorX = xScale.dataToPixel(snappedX);
-        } else {
-          this.cursorX = xScale.dataToPixel(dataX);
-        }
-      } else {
-        this.cursorDataIdx = null;
-        this.cursorX = xScale.dataToPixel(dataX);
-      }
-    }
-
-    // Find Y position from first visible series at this index
-    this.cursorY = this.layout.plot.top + this.layout.plot.height / 2; // default to plot center
-    for (let si = 0; si < this.config.series.length; si++) {
-      const sc = this.config.series[si];
-      const store = this.storeForSeries(si);
-      if (sc.visible === false || !store.length) continue;
-      const colIdx = seriesYColumn(sc);
-      const yScale = this.scales.get(sc.yAxis ?? 'y');
-      if (!yScale || colIdx < 1 || colIdx > store.seriesCount) continue;
-      const yVal = store.yAt(colIdx - 1, store.nearestXIndex(dataX));
-      if (Number.isFinite(yVal)) {
-        this.cursorY = yScale.dataToPixel(yVal);
-        break;
-      }
-    }
-
-    // For synced cursors: show crosshair only, hide tooltip
-    // unless syncTooltip is explicitly enabled
-    if (this.config.cursor?.syncTooltip) {
-      this.updateTooltipPoints();
-    } else {
-      this.tooltipPoints = [];
-      this.tooltipManager.hide();
-    }
-
-    this.scheduler.markDirty(DirtyFlag.OVERLAY);
-    this.emitEvent('cursor:move', this.cursorDataX, this.cursorDataIdx, origin);
+    setCursorDataX(this, dataX, origin);
   }
 
   // ─── Cursor snapshot (legend table data source) ─────────────
 
-  /** Allocates and returns a fresh snapshot. */
   getCursorSnapshot(opts?: CursorSnapshotOptions): CursorSnapshot {
-    const target: CursorSnapshot = {
-      dataIndex: null,
-      dataX: null,
-      formattedX: '',
-      points: [],
-      source: 'none',
-      activeSeriesIndex: null,
-    };
-    return this.fillSnapshot(target, opts);
+    return getCursorSnapshot(this, opts);
   }
 
   // ─── Highlight (series highlight + dim) ─────────────────────
@@ -1453,52 +1382,22 @@ export class ChartCore implements EngineHost {
     }
   }
 
-  private queueTouchCursor(x: number, y: number, pointerType: 'touch' | 'pen'): void {
-    this.pendingTouchCursor = { x, y, pointerType };
-    if (this.touchCursorFrame !== null) return;
-
-    if (typeof requestAnimationFrame === 'undefined') {
-      this.flushPendingTouchCursor();
-      return;
-    }
-
-    this.touchCursorFrame = requestAnimationFrame(() => {
-      this.touchCursorFrame = null;
-      this.flushPendingTouchCursor();
-    });
-  }
-
-  private flushPendingTouchCursor(): void {
-    const pending = this.pendingTouchCursor;
-    this.pendingTouchCursor = null;
-    if (!pending) return;
-    this.updateLocalCursorFromPoint(pending.x, pending.y, pending.pointerType);
-  }
-
-  private cancelPendingTouchCursor(): void {
-    this.pendingTouchCursor = null;
-    if (this.touchCursorFrame !== null && typeof cancelAnimationFrame !== 'undefined') {
-      cancelAnimationFrame(this.touchCursorFrame);
-    }
-    this.touchCursorFrame = null;
-  }
-
   // ─── Private: Event wiring ──────────────────────────────────
 
   private wireEvents(): void {
     // ── Cursor tracking ──
     this.eventBus.on('action:cursor', ({ x, y, pointerType }) => {
       if (pointerType === 'touch' || pointerType === 'pen') {
-        this.queueTouchCursor(x, y, pointerType);
+        queueTouchCursor(this, x, y, pointerType);
         return;
       }
-      this.cancelPendingTouchCursor();
-      this.updateLocalCursorFromPoint(x, y, pointerType);
+      cancelPendingTouchCursor(this);
+      updateLocalCursorFromPoint(this, x, y, pointerType);
     });
 
     // ── Cursor leave ──
     this.eventBus.on('action:cursor-leave', () => {
-      this.cancelPendingTouchCursor();
+      cancelPendingTouchCursor(this);
       this.cursorX = null;
       this.cursorY = null;
       this.mouseX = null;
@@ -1597,7 +1496,7 @@ export class ChartCore implements EngineHost {
         return;
       }
       this.selectionBox = { x1: x, y1: y, x2: x, y2: y };
-      this.updateLocalCursorFromPoint(x, y, this.lastPointerType);
+      updateLocalCursorFromPoint(this, x, y, this.lastPointerType);
       this.scheduler.markDirty(DirtyFlag.OVERLAY);
     });
 
@@ -1702,9 +1601,9 @@ export class ChartCore implements EngineHost {
 
     // ── Tap (touch: show/persist tooltip) ──
     this.eventBus.on('action:tap', ({ x, y, pointerType }) => {
-      this.cancelPendingTouchCursor();
+      cancelPendingTouchCursor(this);
       const inPlot = this.isInPlotArea(x, y);
-      this.updateLocalCursorFromPoint(x, y, pointerType);
+      updateLocalCursorFromPoint(this, x, y, pointerType);
       if (inPlot) this.emitPointClick(x, y);
       if (inPlot && pointerType !== 'mouse') {
         // Leave a short-lived ring so the user can see the tap landed.
@@ -2329,67 +2228,13 @@ export class ChartCore implements EngineHost {
     ctx.restore();
   }
 
-  private updateLocalCursorFromPoint(x: number, y: number, pointerType: string): void {
-    this.cursorIsLocal = true;
-    this.cursorX = x;
-    this.cursorY = y;
-    this.mouseX = x;
-    this.mouseY = y;
-    if (pointerType === 'touch' || pointerType === 'pen' || pointerType === 'mouse') {
-      this.lastPointerType = pointerType;
-    }
-
-    const xScale = this.scales.get('x');
-    if (xScale && this.isInPlotArea(x, y)) {
-      const pointerDataX = xScale.pixelToData(x);
-      const hasOnlyHistograms = this.hasOnlyVisibleHistograms();
-      if (hasOnlyHistograms) {
-        const hit = this.resolveHistogramCursor(pointerDataX);
-        this.cursorDataX = hit?.dataX ?? pointerDataX;
-        this.cursorDataIdx = hit?.dataIndex ?? null;
-        this.cursorX = xScale.dataToPixel(this.cursorDataX);
-      } else {
-        this.cursorDataX = pointerDataX;
-        this.cursorDataIdx = this.canUseGlobalXCursor()
-          ? this.sourceStores[0].nearestXIndex(this.cursorDataX)
-          : null;
-      }
-
-      if (
-        !hasOnlyHistograms &&
-        this.config.cursor?.snap !== false &&
-        this.cursorDataIdx !== null &&
-        this.canUseGlobalXCursor()
-      ) {
-        const snappedX = this.sourceStores[0].xAt(this.cursorDataIdx);
-        this.cursorX = xScale.dataToPixel(snappedX);
-        this.cursorDataX = snappedX;
-      }
-
-      this.updateTooltipPoints();
-      this.applyNearestScatterCursor();
-      this.applyProximityHighlight();
-    } else {
-      this.cursorX = null;
-      this.cursorY = null;
-      this.cursorDataX = null;
-      this.cursorDataIdx = null;
-      this.tooltipPoints = [];
-      this.tooltipManager.hide();
-      this.clearProximityHighlight();
-    }
-
-    this.scheduler.markDirty(DirtyFlag.OVERLAY);
-    this.emitEvent('cursor:move', this.cursorDataX, this.cursorDataIdx, 'local');
-  }
-
   /**
    * highlight.proximity: auto-focus the series whose hit-tested point is
    * vertically closest to the pointer, clear when none is within range.
    * setHighlight() no-ops on unchanged values, so steady hover costs
    * nothing, and sync propagation rides the normal highlight path.
    */
-  private applyProximityHighlight(): void {
+  applyProximityHighlight(): void {
     const proximity = this.config.highlight?.proximity;
     if (proximity === undefined || this.config.highlight?.enabled === false) return;
     if (this.mouseY === null) return;
@@ -2413,13 +2258,13 @@ export class ChartCore implements EngineHost {
     this.setHighlight(bestDist <= proximity ? best : null);
   }
 
-  private clearProximityHighlight(): void {
+  clearProximityHighlight(): void {
     if (this.config.highlight?.proximity === undefined) return;
     if (this.config.highlight?.enabled === false) return;
     this.setHighlight(null);
   }
 
-  private updateTooltipPoints(): void {
+  updateTooltipPoints(): void {
     if (!this.hasData() || this.cursorX === null || this.cursorY === null) {
       this.tooltipPoints = [];
       return;
@@ -2576,229 +2421,6 @@ export class ChartCore implements EngineHost {
     return points;
   }
 
-  // ─── Private: Cursor snapshot helpers ───────────────────────
-
-  /**
-   * Mutate `target` to match the current snapshot. Shared implementation
-   * for both allocating and zero-alloc public variants.
-   */
-  private fillSnapshot(target: CursorSnapshot, opts?: CursorSnapshotOptions): CursorSnapshot {
-    if (this.sourceStores.length > 1 || !this.canUseGlobalXCursor())
-      return this.fillIndependentSnapshot(target, opts);
-    const store = this.sourceStores[0];
-    const fallback = opts?.fallback ?? 'hide';
-    const length = store.length;
-
-    // Resolve the index to read from.
-    let idx: number | null = this.cursorDataIdx;
-    let source: CursorSnapshot['source'] = idx !== null ? 'cursor' : 'none';
-
-    if (idx === null && length > 0) {
-      if (fallback === 'latest') {
-        idx = this.hasOnlyVisibleHistograms() && length > 1 ? length - 2 : length - 1;
-        source = 'latest';
-      } else if (fallback === 'first') {
-        idx = 0;
-        source = 'first';
-      }
-    }
-
-    if (idx === null || idx < 0 || idx >= length) {
-      target.dataIndex = null;
-      target.dataX = null;
-      target.formattedX = '';
-      target.points.length = 0;
-      target.source = 'none';
-      target.activeSeriesIndex = null;
-      return target;
-    }
-
-    const histogramRange = this.hasOnlyVisibleHistograms()
-      ? this.histogramBinRange(idx, store)
-      : null;
-    const xVal = histogramRange ? (histogramRange.min + histogramRange.max) / 2 : store.xAt(idx);
-    const xScale = this.scales.get('x');
-
-    target.dataIndex = idx;
-    target.dataX = xVal;
-    target.formattedX = histogramRange
-      ? this.formatHistogramBinRange(histogramRange.min, histogramRange.max)
-      : xScale
-        ? xScale.tickFormat(xVal)
-        : String(xVal);
-    target.source = source;
-
-    const palette = this.categoricalPalette();
-    const seriesList = this.config.series;
-    const points = target.points;
-
-    // Track the series whose Y is nearest the cursor (pixel-space).
-    // Only meaningful when the snapshot is cursor-driven; otherwise null.
-    const cursorY = source === 'cursor' ? this.cursorY : null;
-    let nearestSi: number | null = null;
-    let nearestDist = Infinity;
-
-    // Walk visible series, mutate row objects in place; reuse rows
-    // across calls to keep the cursor hot path allocation-free.
-    let writeIdx = 0;
-    for (let si = 0; si < seriesList.length; si++) {
-      const s = seriesList[si];
-      if (s.visible === false) continue;
-
-      const colIdx = seriesYColumn(s);
-      if (colIdx < 1 || colIdx > store.seriesCount) continue;
-
-      const value = store.yAt(colIdx - 1, idx);
-      const yScale = this.scales.get(s.yAxis ?? 'y');
-      const formattedValue = Number.isFinite(value)
-        ? this.formatReadout(s.yAxis ?? 'y', value)
-        : '';
-      const color = s.color ?? palette[(s.paletteIndex ?? si) % palette.length];
-
-      let row = points[writeIdx];
-      if (!row) {
-        row = {
-          seriesIndex: si,
-          dataIndex: idx,
-          dataX: xVal,
-          label: s.label,
-          color,
-          value,
-          formattedValue,
-          meta: s.meta,
-        };
-        points[writeIdx] = row;
-      } else {
-        row.seriesIndex = si;
-        row.dataIndex = idx;
-        row.dataX = xVal;
-        row.label = s.label;
-        row.color = color;
-        row.value = value;
-        row.formattedValue = formattedValue;
-        row.meta = s.meta;
-      }
-      writeIdx++;
-
-      // Nearest-series in pixel space: compare the series' Y pixel to
-      // the cursor's Y pixel. Skipped for NaN values or when no cursor.
-      if (cursorY !== null && yScale && value === value) {
-        const px = yScale.dataToPixel(value);
-        const d = Math.abs(px - cursorY);
-        if (d < nearestDist) {
-          nearestDist = d;
-          nearestSi = si;
-        }
-      }
-    }
-    points.length = writeIdx;
-    target.activeSeriesIndex = nearestSi;
-
-    return target;
-  }
-
-  private fillIndependentSnapshot(
-    target: CursorSnapshot,
-    opts?: CursorSnapshotOptions,
-  ): CursorSnapshot {
-    const fallback = opts?.fallback ?? 'hide';
-    const active = this.cursorDataX !== null && this.cursorX !== null;
-    const source: CursorSnapshot['source'] = active
-      ? 'cursor'
-      : this.hasData() && fallback !== 'hide'
-        ? fallback
-        : 'none';
-    target.source = source;
-    target.dataIndex = null;
-    target.dataX = active ? this.cursorDataX : null;
-    target.formattedX = '';
-    target.activeSeriesIndex = null;
-    if (source === 'none') {
-      target.points.length = 0;
-      return target;
-    }
-    const palette = this.categoricalPalette();
-    let count = 0;
-    let nearestDist = Infinity;
-    for (let si = 0; si < this.config.series.length; si++) {
-      const series = this.config.series[si];
-      const store = this.storeForSeries(si);
-      const column = seriesYColumn(series);
-      if (series.visible === false || !store.length || !this.isValidColumn(column, store)) continue;
-      const seriesX = this.scales.get(series.xAxis ?? 'x');
-      const targetX =
-        active && seriesX && this.cursorX !== null
-          ? seriesX.pixelToData(this.cursorX)
-          : this.cursorDataX!;
-      let dataIndex =
-        source === 'latest'
-          ? Math.max(0, store.length - (series.type === 'histogram' ? 2 : 1))
-          : source === 'first'
-            ? 0
-            : series.type === 'histogram'
-              ? this.histogramBinIndexForDataX(targetX, store)
-              : store.nearestXIndex(targetX);
-      const xColumn = series.type === 'scatter' ? scatterXColumn(series) : 0;
-      if (active && xColumn !== 0) {
-        let distance = Infinity;
-        dataIndex = null;
-        for (let i = 0; i < store.length; i++) {
-          const delta = Math.abs(store.valueAt(xColumn, i) - targetX);
-          if (delta < distance) {
-            distance = delta;
-            dataIndex = i;
-          }
-        }
-      }
-      if (dataIndex === null) continue;
-      const range = series.type === 'histogram' ? this.histogramBinRange(dataIndex, store) : null;
-      const dataX = range ? (range.min + range.max) / 2 : store.valueAt(xColumn, dataIndex);
-      const value = store.valueAt(column, dataIndex);
-      const yScale = this.scales.get(series.yAxis ?? 'y');
-      const formattedValue = Number.isFinite(value)
-        ? this.formatAxisReadout(series.yAxis ?? 'y', value)
-        : '';
-      const point =
-        target.points[count] ??
-        (target.points[count] = {
-          seriesIndex: si,
-          dataIndex,
-          label: series.label,
-          color: '',
-          value,
-          formattedValue,
-        });
-      point.seriesIndex = si;
-      point.dataIndex = dataIndex;
-      point.dataX = dataX;
-      point.label = series.label;
-      point.color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
-      point.value = value;
-      point.formattedValue = formattedValue;
-      point.meta = series.meta;
-      if (count === 0) {
-        target.dataIndex = dataIndex;
-        target.dataX ??= dataX;
-        target.formattedX = this.formatAxisValue(series.xAxis ?? 'x', target.dataX);
-      }
-      count++;
-      if (active && this.cursorY !== null && yScale && Number.isFinite(value)) {
-        const distance = Math.abs(yScale.dataToPixel(value) - this.cursorY);
-        if (distance < nearestDist) {
-          nearestDist = distance;
-          target.activeSeriesIndex = si;
-        }
-      }
-    }
-    target.points.length = count;
-    if (count === 0) {
-      target.source = 'none';
-      target.dataX = null;
-      target.dataIndex = null;
-    }
-    return target;
-  }
-
   // ─── Private: Helpers ───────────────────────────────────────
 
   categoricalPalette(): string[] {
@@ -2819,31 +2441,6 @@ export class ChartCore implements EngineHost {
 
   isValidColumn(columnIdx: number, store: DataStore): boolean {
     return Number.isInteger(columnIdx) && columnIdx >= 0 && columnIdx <= store.seriesCount;
-  }
-
-  private canUseGlobalXCursor(): boolean {
-    if (this.sourceStores.length > 1) return false;
-    return !this.config.series.some(
-      (series) =>
-        series.visible !== false && series.type === 'scatter' && scatterXColumn(series) !== 0,
-    );
-  }
-
-  private applyNearestScatterCursor(): void {
-    if ((this.config.tooltip?.mode ?? 'index') !== 'nearest') return;
-    const point = this.tooltipPoints[0];
-    if (!point) return;
-    if (this.config.series[point.seriesIndex]?.type !== 'scatter') return;
-
-    this.cursorDataX = point.x;
-    this.cursorDataIdx = point.dataIndex;
-  }
-
-  /** Re-run tooltip hit-test at current cursor position (called on data change) */
-  refreshCursor(): void {
-    if (this.mouseX === null || this.mouseY === null || !this.cursorIsLocal) return;
-    this.updateTooltipPoints();
-    this.scheduler.markDirty(DirtyFlag.OVERLAY);
   }
 
   private axisMarkCoordinates(type: 'bar' | 'histogram'): number[] {
@@ -2916,7 +2513,7 @@ export class ChartCore implements EngineHost {
     return undefined;
   }
 
-  private hasOnlyVisibleHistograms(): boolean {
+  hasOnlyVisibleHistograms(): boolean {
     if (this.sourceStores.length > 1) return false;
     let hasVisibleSeries = false;
     for (const series of this.config.series) {
@@ -2928,7 +2525,7 @@ export class ChartCore implements EngineHost {
   }
 
   /** The histogram bin under `dataX` (only-histogram charts, which have one source). */
-  private resolveHistogramCursor(dataX: number): { dataIndex: number; dataX: number } | null {
+  resolveHistogramCursor(dataX: number): { dataIndex: number; dataX: number } | null {
     const store = this.sourceStores[0];
     const dataIndex = this.histogramBinIndexForDataX(dataX, store);
     if (dataIndex === null) return null;
@@ -2941,7 +2538,7 @@ export class ChartCore implements EngineHost {
     };
   }
 
-  private histogramBinIndexForDataX(dataX: number, store: DataStore): number | null {
+  histogramBinIndexForDataX(dataX: number, store: DataStore): number | null {
     if (store.length < 2) return null;
 
     const firstEdge = store.xAt(0);
@@ -2957,10 +2554,7 @@ export class ChartCore implements EngineHost {
     return binIdx;
   }
 
-  private histogramBinRange(
-    dataIndex: number,
-    store: DataStore,
-  ): { min: number; max: number } | null {
+  histogramBinRange(dataIndex: number, store: DataStore): { min: number; max: number } | null {
     if (dataIndex < 0 || dataIndex >= store.length - 1) return null;
     return {
       min: store.xAt(dataIndex),
@@ -3002,18 +2596,18 @@ export class ChartCore implements EngineHost {
   }
 
   /** A readout where the axis's own format already applied (histogram counts, multi-source rows). */
-  private formatAxisReadout(axisKey: string, value: number): string {
+  formatAxisReadout(axisKey: string, value: number): string {
     const axisFormat = this.config.axes?.[axisKey]?.format;
     return axisFormat ? axisFormat(value) : this.formatReadout(axisKey, value);
   }
 
-  private formatAxisValue(axisKey: string, value: number): string {
+  formatAxisValue(axisKey: string, value: number): string {
     const axisFormat = this.config.axes?.[axisKey]?.format;
     if (axisFormat) return axisFormat(value);
     return this.scales.get(axisKey)?.tickFormat(value) ?? String(value);
   }
 
-  private formatHistogramBinRange(min: number, max: number, seriesIndex = 0): string {
+  formatHistogramBinRange(min: number, max: number, seriesIndex = 0): string {
     const tooltip = this.config.tooltip;
     if (tooltip?.rangeFormat) return tooltip.rangeFormat(min, max, seriesIndex);
 
