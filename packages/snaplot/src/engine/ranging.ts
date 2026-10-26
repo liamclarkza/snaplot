@@ -225,8 +225,9 @@ export function autoRangeHorizontal(engine: ChartCore): void {
 
     // One-signed X never gets an axis across zero (visuals-07).
     if (scale.type === 'linear' && !hasBarSeries) {
-      if (ac.min === undefined && xMin >= 0 && scale.min < 0) scale.min = 0;
-      if (ac.max === undefined && xMax <= 0 && scale.max > 0) scale.max = 0;
+      // Strictly one-signed only: all-zero data keeps its centred domain.
+      if (ac.min === undefined && xMin >= 0 && xMax > 0 && scale.min < 0) scale.min = 0;
+      if (ac.max === undefined && xMax <= 0 && xMin < 0 && scale.max > 0) scale.max = 0;
     }
 
     // Nicening may expand either side, but an explicitly pinned side must
@@ -375,8 +376,9 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
     }
     // One-signed data never gets an axis across zero (visuals-07, render-22).
     if (scale.type !== 'log') {
-      if (ac.min === undefined && yMin >= 0 && scale.min < 0) scale.min = 0;
-      if (ac.max === undefined && yMax <= 0 && scale.max > 0) scale.max = 0;
+      // Strictly one-signed only: all-zero data keeps its centred domain.
+      if (ac.min === undefined && yMin >= 0 && yMax > 0 && scale.min < 0) scale.min = 0;
+      if (ac.max === undefined && yMax <= 0 && yMin < 0 && scale.max > 0) scale.max = 0;
     }
 
     // Preserve one-sided explicit domains after automatic nicening.
