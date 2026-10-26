@@ -1,3 +1,4 @@
+import { stepDecimals } from '../format';
 import type { Scale, ScaleType } from '../spec';
 import { niceTicks, niceRange, niceStep } from './niceNumbers';
 import { DEFAULT_TICK_COUNT } from '../../constants';
@@ -51,29 +52,19 @@ export class LinearScale implements Scale {
     return ticks;
   }
 
+  /** BCP 47 locale of tick labels; the runtime default when unset (plan D7). */
+  locale: string | undefined = undefined;
+
   tickFormat(value: number): string {
-    // Derive precision from the spacing the last ticks() call actually used, so
-    // a high count (fine, fractional ticks) is not formatted with the coarse
-    // DEFAULT_TICK_COUNT step. Fall back to the default step before ticks() has
-    // run. Apply the same decimal count to every value so ticks line up.
-    // Previously integer-valued ticks short-circuited to "6" while their
-    // neighbours rendered as "6.20" / "6.40", breaking the column.
+    // Every tick of one axis gets the decimals of the step the last ticks() call used, so the
+    // column lines up and adjacent ticks differ: 0.2 → 1, 0.25 → 2, 5 → 0. Grouped, one locale.
     const step = Number.isFinite(this.lastTickStep)
       ? this.lastTickStep
       : niceStep(this.min, this.max, DEFAULT_TICK_COUNT);
     if (step === 0 || !Number.isFinite(step)) return String(value);
-
-    const absStep = Math.abs(step);
-
-    // Integer step >= 1: format every tick as an integer.
-    if (absStep >= 1 && Math.abs(absStep - Math.round(absStep)) < 1e-9) {
-      return String(Math.round(value));
-    }
-
-    // Fractional step: pad one extra decimal past the step's magnitude so
-    // adjacent ticks stay visually distinguishable (0.2 step -> 2 decimals).
-    const decimals = Math.max(1, -Math.floor(Math.log10(absStep)) + 1);
-    return value.toFixed(Math.min(decimals, 8));
+    const decimals = Math.min(20, stepDecimals(step));
+    const rounded = Math.abs(value) < Math.abs(step) * 1e-9 ? 0 : value;
+    return tickNumberFormat(this.locale, decimals).format(rounded);
   }
 
   nice(count: number = DEFAULT_TICK_COUNT): void {
@@ -111,4 +102,20 @@ export class LinearScale implements Scale {
     this.pxToDataOffset = this.min - this.pxMin * this.pxToDataScale;
     return true;
   }
+}
+
+const tickFormats = new Map<string, Intl.NumberFormat>();
+
+/** A cached fixed-decimals number format for tick labels. */
+export function tickNumberFormat(locale: string | undefined, decimals: number): Intl.NumberFormat {
+  const key = `${locale ?? ''}|${decimals}`;
+  let format = tickFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+    tickFormats.set(key, format);
+  }
+  return format;
 }

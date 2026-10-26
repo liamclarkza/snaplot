@@ -1,19 +1,20 @@
 import type { Scale, ScaleType } from '../spec';
 
 /**
- * Time scale: linear on epoch milliseconds with hierarchical interval
- * selection, calendar-aligned tick generation, and multi-level formatting.
+ * Time scale: linear on epoch milliseconds, with ticks on calendar boundaries
+ * in the viewer's local time or in UTC (`timeZone`, plan D7).
  *
- * Ticks land where a reader expects dates to land: hour-level intervals
- * anchor to the viewer's local midnight, day and week intervals land on
- * local midnights (weeks on Mondays), and month/year intervals walk the
- * real calendar (the 1st of the month, January 1st) instead of stepping
- * fixed 30/365-day widths from the UTC epoch. Remaining approximations:
- * sub-hour timezone offsets and a DST change inside a single hour-stepped
- * day can shift sub-day ticks, and `nice()` still rounds to nominal
- * interval multiples.
+ * Ticks land where a reader expects dates to land: hours on the hour grid of
+ * the day (stepped on the calendar, so a DST change does not shift them),
+ * minutes and seconds on the local hour (so :00/:30 also hold in zones with a
+ * :45 offset), days on midnights (weeks on Mondays), months on the 1st and
+ * years on January 1st. Labels are chosen from the tick interval, not the
+ * visible span, so adjacent labels never read the same, and all text goes
+ * through cached `Intl.DateTimeFormat`s in one `locale`.
  */
 
+const SECOND_MS = 1000;
+const MINUTE_MS = 60_000;
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 // Nominal widths for month/year entries; used only to pick an interval.
@@ -21,41 +22,112 @@ const DAY_MS = 86_400_000;
 const MONTH_MS = 2_592_000_000;
 const YEAR_MS = 31_536_000_000;
 
-// [milliseconds, label]
-const TIME_INTERVALS: [number, string][] = [
-  [10, '10ms'],
-  [50, '50ms'],
-  [100, '100ms'],
-  [250, '250ms'],
-  [500, '500ms'],
-  [1000, '1s'],
-  [5000, '5s'],
-  [15000, '15s'],
-  [30000, '30s'],
-  [60000, '1m'],
-  [300000, '5m'],
-  [900000, '15m'],
-  [1800000, '30m'],
-  [3600000, '1h'],
-  [10800000, '3h'],
-  [21600000, '6h'],
-  [43200000, '12h'],
-  [86400000, '1d'],
-  [172800000, '2d'],
-  [604800000, '1w'],
-  [1209600000, '2w'],
-  [2592000000, '1M'],
-  [5184000000, '2M'],
-  [7776000000, '3M'],
-  [15552000000, '6M'],
-  [31536000000, '1y'],
+const TIME_INTERVALS: number[] = [
+  10,
+  50,
+  100,
+  250,
+  500,
+  SECOND_MS,
+  5 * SECOND_MS,
+  15 * SECOND_MS,
+  30 * SECOND_MS,
+  MINUTE_MS,
+  5 * MINUTE_MS,
+  15 * MINUTE_MS,
+  30 * MINUTE_MS,
+  HOUR_MS,
+  3 * HOUR_MS,
+  6 * HOUR_MS,
+  12 * HOUR_MS,
+  DAY_MS,
+  2 * DAY_MS,
+  7 * DAY_MS,
+  14 * DAY_MS,
+  MONTH_MS,
+  2 * MONTH_MS,
+  3 * MONTH_MS,
+  6 * MONTH_MS,
+  YEAR_MS,
 ];
+
+export type TimeZoneMode = 'local' | 'UTC';
+
+interface Parts {
+  y: number;
+  mo: number;
+  d: number;
+  h: number;
+  mi: number;
+  s: number;
+  ms: number;
+  dow: number;
+}
+
+function parts(t: number, zone: TimeZoneMode): Parts {
+  const date = new Date(t);
+  return zone === 'UTC'
+    ? {
+        y: date.getUTCFullYear(),
+        mo: date.getUTCMonth(),
+        d: date.getUTCDate(),
+        h: date.getUTCHours(),
+        mi: date.getUTCMinutes(),
+        s: date.getUTCSeconds(),
+        ms: date.getUTCMilliseconds(),
+        dow: date.getUTCDay(),
+      }
+    : {
+        y: date.getFullYear(),
+        mo: date.getMonth(),
+        d: date.getDate(),
+        h: date.getHours(),
+        mi: date.getMinutes(),
+        s: date.getSeconds(),
+        ms: date.getMilliseconds(),
+        dow: date.getDay(),
+      };
+}
+
+/** Epoch ms of a calendar time; out-of-range fields roll over (month 13, hour 26). */
+function make(zone: TimeZoneMode, y: number, mo: number, d = 1, h = 0, mi = 0): number {
+  return zone === 'UTC' ? Date.UTC(y, mo, d, h, mi) : new Date(y, mo, d, h, mi).getTime();
+}
+
+const formats = new Map<string, Intl.DateTimeFormat>();
+
+function dateFormat(
+  locale: string | undefined,
+  zone: TimeZoneMode,
+  zoneKey: string,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  const key = `${locale ?? ''}|${zone === 'UTC' ? 'UTC' : zoneKey}|${JSON.stringify(options)}`;
+  let format = formats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(
+      locale,
+      zone === 'UTC' ? { ...options, timeZone: 'UTC' } : options,
+    );
+    formats.set(key, format);
+  }
+  return format;
+}
+
+const HM: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+const HMS: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', second: '2-digit' };
+const MD: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+const MDY: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
 
 export class TimeScale implements Scale {
   readonly type: ScaleType = 'time';
   readonly key: string;
   min: number;
   max: number;
+  /** Calendar of ticks and labels (plan D7). */
+  timeZone: TimeZoneMode = 'local';
+  /** BCP 47 locale of labels; the runtime default when unset. */
+  locale: string | undefined = undefined;
   private pxMin = 0;
   private pxMax = 0;
   private cacheMin = Number.NaN;
@@ -66,6 +138,10 @@ export class TimeScale implements Scale {
   private dataToPxOffset = 0;
   private pxToDataScale = 0;
   private pxToDataOffset = 0;
+  /** The interval of the ticks last produced by ticks(); labels and readouts read it. */
+  private lastInterval = Number.NaN;
+  /** The runtime's zone when ticks() last ran, so cached local formats follow a TZ change. */
+  private zoneKey = '';
 
   constructor(key: string, min = 0, max = Date.now()) {
     this.key = key;
@@ -85,11 +161,10 @@ export class TimeScale implements Scale {
 
   /**
    * `count` caps the label density; the pixel width sets the default
-   * (about one label per 100px). Ticks land on calendar boundaries in the
-   * viewer's local time; the axis fit pass in the renderer may thin them
-   * further when the formatted labels are wide.
+   * (about one label per 100px). The axis fit pass may thin them further.
    */
   ticks(count: number = 6): number[] {
+    this.zoneKey = this.timeZone === 'UTC' ? 'UTC' : localZone();
     const pxRange = Math.abs(this.pxMax - this.pxMin);
     if (pxRange <= 0) return [];
 
@@ -98,32 +173,30 @@ export class TimeScale implements Scale {
 
     const widthTarget = Math.max(2, Math.floor(pxRange / 100));
     const targetLabels = Math.max(2, Math.min(count, widthTarget));
-    const rawStep = domain / targetLabels;
+    const interval = this.pickInterval(domain / targetLabels);
 
-    // Find the best matching time interval
-    const interval = this.pickInterval(rawStep);
-
-    // Generate ticks aligned to the interval
     const ticks = this.alignTicks(interval);
-    if (ticks.length >= 2) return ticks;
+    if (ticks.length >= 2) {
+      this.lastInterval = interval;
+      return ticks;
+    }
 
-    // The picked interval straddles the domain: e.g. a 90-day window on a
-    // narrow chart picks 2-month ticks, but only one 1st-of-month lands
-    // inside. Step down the ladder until at least two aligned boundaries
-    // fit, so the axis keeps calendar dates instead of arbitrary ones.
+    // The picked interval straddles the domain (a 90-day window on a narrow
+    // chart picks 2-month ticks, one 1st-of-month inside): step down the
+    // ladder until two aligned boundaries fit.
     for (const smaller of this.intervalsBelow(interval)) {
       const stepped = this.alignTicks(smaller);
-      if (stepped.length >= 2) return stepped;
+      if (stepped.length >= 2) {
+        this.lastInterval = smaller;
+        return stepped;
+      }
     }
 
-    // Safety net: the domain is tighter than the smallest interval (or
-    // degenerate). Fall back to an even linear subdivision so the axis
-    // always has multiple references.
-    const fallbackSteps = Math.max(2, Math.min(targetLabels, 6));
-    const fallback: number[] = new Array(fallbackSteps + 1);
-    for (let i = 0; i <= fallbackSteps; i++) {
-      fallback[i] = this.min + (domain * i) / fallbackSteps;
-    }
+    // The domain is tighter than the smallest interval: an even subdivision.
+    const steps = Math.max(2, Math.min(targetLabels, 6));
+    const fallback: number[] = new Array(steps + 1);
+    for (let i = 0; i <= steps; i++) fallback[i] = this.min + (domain * i) / steps;
+    this.lastInterval = domain / steps;
     return fallback;
   }
 
@@ -134,171 +207,118 @@ export class TimeScale implements Scale {
       if (ms < interval) yield ms;
     }
     for (let i = TIME_INTERVALS.length - 1; i >= 0; i--) {
-      const ms = TIME_INTERVALS[i][0];
-      if (ms < interval) yield ms;
+      if (TIME_INTERVALS[i] < interval) yield TIME_INTERVALS[i];
     }
   }
 
   private alignTicks(interval: number): number[] {
-    if (interval >= YEAR_MS) return this.yearTicks(Math.round(interval / YEAR_MS));
-    if (interval >= MONTH_MS) return this.monthTicks(Math.round(interval / MONTH_MS));
-    if (interval >= DAY_MS) return this.dayTicks(Math.round(interval / DAY_MS));
-    if (interval >= HOUR_MS) return this.hourAnchoredTicks(interval);
-    // Sub-hour intervals: epoch multiples divide evenly into local time for
-    // whole-hour timezone offsets, so plain alignment reads correctly.
-    const start = Math.ceil(this.min / interval) * interval;
-    const ticks: number[] = [];
-    for (let t = start; t <= this.max; t += interval) {
-      ticks.push(t);
+    const zone = this.timeZone;
+    const p = parts(this.min, zone);
+    if (!Number.isFinite(p.y)) return [];
+    const out: number[] = [];
+    const push = (t: number) => {
+      if (t >= this.min && t <= this.max && (out.length === 0 || t > out[out.length - 1]))
+        out.push(t);
+    };
+
+    if (interval >= YEAR_MS) {
+      const step = Math.round(interval / YEAR_MS);
+      for (let y = Math.floor(p.y / step) * step; make(zone, y, 0) <= this.max; y += step) {
+        push(make(zone, y, 0));
+      }
+      return out;
     }
-    return ticks;
+    if (interval >= MONTH_MS) {
+      // Steps count from January so 3M reads Jan / Apr / Jul / Oct.
+      const step = Math.round(interval / MONTH_MS);
+      for (let m = Math.floor(p.mo / step) * step; make(zone, p.y, m) <= this.max; m += step) {
+        push(make(zone, p.y, m));
+      }
+      return out;
+    }
+    if (interval >= DAY_MS) {
+      const step = Math.round(interval / DAY_MS);
+      let d = p.d;
+      // Week steps start on a Monday.
+      if (step % 7 === 0) d += (8 - p.dow) % 7;
+      for (; make(zone, p.y, p.mo, d) <= this.max; d += step) push(make(zone, p.y, p.mo, d));
+      return out;
+    }
+    if (interval >= HOUR_MS) {
+      // On the hour grid of the first day, stepped on the calendar.
+      const step = Math.round(interval / HOUR_MS);
+      for (let h = 0; make(zone, p.y, p.mo, p.d, h) <= this.max; h += step) {
+        push(make(zone, p.y, p.mo, p.d, h));
+      }
+      return out;
+    }
+    if (interval >= MINUTE_MS) {
+      // On the minute grid of the first hour (local hours start on whole minutes).
+      const step = Math.round(interval / MINUTE_MS);
+      for (let mi = 0; make(zone, p.y, p.mo, p.d, p.h, mi) <= this.max; mi += step) {
+        push(make(zone, p.y, p.mo, p.d, p.h, mi));
+      }
+      return out;
+    }
+    // Seconds and below: every zone's minutes start on whole seconds of the epoch.
+    for (let t = Math.ceil(this.min / interval) * interval; t <= this.max; t += interval) push(t);
+    return out;
+  }
+
+  private fmt(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+    if (!this.zoneKey) this.zoneKey = this.timeZone === 'UTC' ? 'UTC' : localZone();
+    return dateFormat(this.locale, this.timeZone, this.zoneKey, options);
+  }
+
+  private interval(): number {
+    if (Number.isFinite(this.lastInterval)) return this.lastInterval;
+    return this.pickInterval((this.max - this.min) / 6);
+  }
+
+  /** A tick label, as fine as the tick interval needs and no finer. */
+  tickFormat(value: number): string {
+    if (!Number.isFinite(value)) return '';
+    const interval = this.interval();
+    const p = parts(value, this.timeZone);
+    const midnight = p.h === 0 && p.mi === 0 && p.s === 0 && p.ms === 0;
+    if (interval < SECOND_MS) {
+      const digits = interval >= 100 ? 1 : interval >= 10 ? 2 : 3;
+      return this.fmt({ ...HMS, fractionalSecondDigits: digits as 1 | 2 | 3 }).format(value);
+    }
+    if (interval < MINUTE_MS) return this.fmt(HMS).format(value);
+    if (interval < DAY_MS) {
+      // A day boundary on an hour axis names the day.
+      return midnight ? this.fmt(MD).format(value) : this.fmt(HM).format(value);
+    }
+    if (interval < MONTH_MS) return this.fmt(MD).format(value);
+    if (interval < YEAR_MS) {
+      if (midnight && p.d === 1) {
+        return p.mo === 0
+          ? this.fmt({ month: 'short', year: 'numeric' }).format(value)
+          : this.fmt({ month: 'short' }).format(value);
+      }
+      return this.fmt(MD).format(value);
+    }
+    if (midnight && p.d === 1 && p.mo === 0) return this.fmt({ year: 'numeric' }).format(value);
+    return this.fmt({ month: 'short', year: 'numeric' }).format(value);
   }
 
   /**
-   * Hour-level intervals anchored to the local midnight of the first
-   * visible day, so 6h ticks read 00:00 / 06:00 / 12:00 rather than the
-   * UTC-offset residue (02:00 / 08:00 / 14:00 in a UTC+2 zone).
+   * A readout of one moment (the tooltip header, the cursor's X): always the date, plus the time
+   * of day as finely as the visible ticks need it.
    */
-  private hourAnchoredTicks(interval: number): number[] {
-    const anchor = new Date(this.min);
-    anchor.setHours(0, 0, 0, 0);
-    let t = anchor.getTime();
-    if (!Number.isFinite(t)) return [];
-    t += Math.ceil((this.min - t) / interval) * interval;
-    const ticks: number[] = [];
-    while (t <= this.max) {
-      ticks.push(t);
-      t += interval;
+  readoutFormat(value: number): string {
+    if (!Number.isFinite(value)) return '';
+    const interval = this.interval();
+    if (interval >= DAY_MS) {
+      // Daily records (midnight) read as a date; an event keeps its time of day.
+      const p = parts(value, this.timeZone);
+      const midnight = p.h === 0 && p.mi === 0 && p.s === 0 && p.ms === 0;
+      return midnight ? this.fmt(MDY).format(value) : this.fmt({ ...MDY, ...HM }).format(value);
     }
-    return ticks;
-  }
-
-  /** Local midnights stepped by whole days; week steps anchor to Monday. */
-  private dayTicks(stepDays: number): number[] {
-    const d = new Date(this.min);
-    d.setHours(0, 0, 0, 0);
-    if (!Number.isFinite(d.getTime())) return [];
-    if (d.getTime() < this.min) d.setDate(d.getDate() + 1);
-    if (stepDays % 7 === 0) {
-      while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
-    }
-    const ticks: number[] = [];
-    while (d.getTime() <= this.max) {
-      ticks.push(d.getTime());
-      d.setDate(d.getDate() + stepDays);
-    }
-    return ticks;
-  }
-
-  /** The 1st of the month at local midnight, on multiples of the step. */
-  private monthTicks(stepMonths: number): number[] {
-    const d = new Date(this.min);
-    if (!Number.isFinite(d.getTime())) return [];
-    d.setDate(1);
-    d.setHours(0, 0, 0, 0);
-    // Steps count from January so 3M reads Jan / Apr / Jul / Oct.
-    d.setMonth(Math.floor(d.getMonth() / stepMonths) * stepMonths);
-    while (d.getTime() < this.min) d.setMonth(d.getMonth() + stepMonths);
-    const ticks: number[] = [];
-    while (d.getTime() <= this.max) {
-      ticks.push(d.getTime());
-      d.setMonth(d.getMonth() + stepMonths);
-    }
-    return ticks;
-  }
-
-  /** January 1st at local midnight, on multiples of the step. */
-  private yearTicks(stepYears: number): number[] {
-    const d = new Date(this.min);
-    if (!Number.isFinite(d.getTime())) return [];
-    d.setMonth(0, 1);
-    d.setHours(0, 0, 0, 0);
-    d.setFullYear(Math.floor(d.getFullYear() / stepYears) * stepYears);
-    while (d.getTime() < this.min) d.setFullYear(d.getFullYear() + stepYears);
-    const ticks: number[] = [];
-    while (d.getTime() <= this.max) {
-      ticks.push(d.getTime());
-      d.setFullYear(d.getFullYear() + stepYears);
-    }
-    return ticks;
-  }
-
-  tickFormat(value: number): string {
-    const domain = this.max - this.min;
-    const date = new Date(value);
-
-    if (domain < 1000) {
-      // < 1 second: show HH:MM:SS.mmm so sub-second ticks are distinguishable.
-      const base = date.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
-      // Floored-modulo: JS `%` keeps the sign of the dividend, so a pre-1970
-      // epoch (negative value) would otherwise yield a negative "sub-second"
-      // label like ".-500". Wrap into [0, 999].
-      const ms = String(((Math.floor(value) % 1000) + 1000) % 1000).padStart(3, '0');
-      return `${base}.${ms}`;
-    }
-    if (domain < 3600000) {
-      // < 1 hour: show HH:MM:SS so per-second precision is visible whenever
-      // the visible window is short enough that adjacent minute-only ticks
-      // would otherwise read identically.
-      return date.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
-    }
-    if (domain < 86400000) {
-      // < 1 day: show HH:MM
-      return date.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    }
-    const isLocalMidnight =
-      date.getHours() === 0 &&
-      date.getMinutes() === 0 &&
-      date.getSeconds() === 0 &&
-      date.getMilliseconds() === 0;
-
-    if (domain < 2592000000) {
-      // < 30 days: Mon DD, with the time only when the tick is not a day
-      // boundary. Day-aligned ticks used to render a junk "02:00" suffix
-      // (the local rendering of a UTC-aligned midnight).
-      const datePart = date.toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-      });
-      if (isLocalMidnight) return datePart;
-      return (
-        datePart +
-        ' ' +
-        date.toLocaleTimeString(undefined, {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      );
-    }
-    if (domain < 31536000000) {
-      // < 1 year: Mon DD; a month boundary reads as the bare month name.
-      if (isLocalMidnight && date.getDate() === 1) {
-        return date.toLocaleDateString(undefined, { month: 'short' });
-      }
-      return date.toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-      });
-    }
-    // >= 1 year: Mon YYYY; a year boundary reads as the bare year.
-    if (isLocalMidnight && date.getMonth() === 0 && date.getDate() === 1) {
-      return String(date.getFullYear());
-    }
-    return date.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-    });
+    if (interval >= MINUTE_MS) return this.fmt({ ...MD, ...HM }).format(value);
+    if (interval >= SECOND_MS) return this.fmt({ ...MD, ...HMS }).format(value);
+    return this.fmt({ ...HMS, fractionalSecondDigits: 3 }).format(value);
   }
 
   nice(_count?: number): void {
@@ -321,12 +341,10 @@ export class TimeScale implements Scale {
       return (nice ?? Math.ceil(years / 100) * 100) * YEAR_MS;
     }
     // Closest interval in log space, not the next larger one: a 14-day
-    // domain targeting 6 labels (rawStep 2.3d) should pick 2d ticks, not
-    // jump to weekly and leave the axis nearly empty. Overshoot is capped
-    // by the renderer's width fit pass.
-    let best = TIME_INTERVALS[0][0];
+    // domain targeting 6 labels (rawStep 2.3d) picks 2d ticks.
+    let best = TIME_INTERVALS[0];
     let bestScore = Number.POSITIVE_INFINITY;
-    for (const [ms] of TIME_INTERVALS) {
+    for (const ms of TIME_INTERVALS) {
       const score = Math.abs(Math.log(ms / rawStep));
       if (score < bestScore) {
         bestScore = score;
@@ -360,4 +378,9 @@ export class TimeScale implements Scale {
     this.pxToDataOffset = this.min - this.pxMin * this.pxToDataScale;
     return true;
   }
+}
+
+/** The runtime's IANA zone (a cache key for local formats; read once per tick pass). */
+function localZone(): string {
+  return new Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'local';
 }

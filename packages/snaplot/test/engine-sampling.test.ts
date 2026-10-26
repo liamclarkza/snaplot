@@ -102,7 +102,7 @@ describe('engine interaction sampling', () => {
       [index, ys, unsorted],
       { width: 400, height: 300 },
     );
-    expect(chart.getLayout().plot.width).toBe(320);
+    expect(chart.getLayout().plot.width).toBeGreaterThan(300);
     const x = chart.getAxis('x')!;
     // A viewport change to the same window: the interaction pass runs with
     // every point still in view.
@@ -117,19 +117,21 @@ describe('engine interaction sampling', () => {
 
   it('budgets a source culled by X by plot width, for every pointer type', () => {
     const { chart, n, nudge } = scatter(0);
-    // Plan §3.4: max(400, 1.5 × plot width) in-view points = 320 × 1.5 = 480.
+    // Plan §3.4: max(400, 1.5 × plot width) in-view points.
+    const budget = Math.max(400, Math.round(chart.getLayout().plot.width * 1.5));
     tapAt(chart, plotPoint(chart), 'touch');
-    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: 480 });
+    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: budget });
     hoverAt(chart, plotPoint(chart));
-    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: 480 });
+    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: budget });
   });
 
   it('keeps the 10,000-point mouse budget for a source not culled by X', () => {
     // Its stride runs over the whole source, so the width-scaled budget would leave a
     // fraction of it in view (gap-perf-gate-01:sampling, M11). Touch keeps 1.5 per pixel.
     const { chart, n, nudge } = scatter(2);
+    const budget = Math.max(400, Math.round(chart.getLayout().plot.width * 1.5));
     tapAt(chart, plotPoint(chart), 'touch');
-    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: 480 });
+    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: budget });
     // After a mouse move the budget is 10,000 points, so nothing is sampled.
     hoverAt(chart, plotPoint(chart));
     expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: n });

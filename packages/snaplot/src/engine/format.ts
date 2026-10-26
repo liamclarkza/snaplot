@@ -173,8 +173,8 @@ export const NO_FORMAT: FormatQuirks = Object.freeze({ tooltipFormat: false, axi
 
 /**
  * The label of tick `value` on axis `axis`: the axis `format`, else the scale's tick format.
- * `'slot'` ticks (bar and histogram X ticks from the data) take the X axis' `format`, else an
- * integer as is and anything else with one decimal.
+ * `'slot'` ticks (bar and histogram X ticks from the data) take the X axis' `format`, else a
+ * time axis' tick format (render-01), else an integer as is and anything else with one decimal.
  */
 export function formatTick(
   ctx: FormatContext,
@@ -184,43 +184,51 @@ export function formatTick(
 ): string {
   const format = ctx.config.axes?.[axis]?.format;
   if (format) return format(value);
-  if (kind === 'slot') return Number.isInteger(value) ? String(value) : value.toFixed(1);
   const scale = ctx.scales.get(axis);
+  if (kind === 'slot' && scale?.type !== 'time') {
+    return Number.isInteger(value)
+      ? formatValue(value, { stepDecimals: 0, locale: ctx.config.locale })
+      : formatValue(value, { stepDecimals: 1, locale: ctx.config.locale });
+  }
   return scale ? scale.tickFormat(value) : String(value);
 }
 
 /**
- * The readout of `value` for series `series` (an index): `tooltip.yFormat` (the series formats),
- * else its value axis' `format`, else the automatic readout on that axis (`axisReadout`).
+ * The readout of `value` for series `series` (an index), one precedence for every call site
+ * (plan §5.2): the series `format`, else its value axis' `format`, else the automatic readout on
+ * that axis at value precision (`axisReadout`). `quirks` are accepted and ignored (M10).
  */
 export function formatReadout(
   ctx: FormatContext,
   series: number,
   value: number,
-  quirks?: FormatQuirks,
+  _quirks?: FormatQuirks,
 ): string {
   const yFormat = ctx.config.tooltip?.yFormat;
-  if (yFormat && quirks?.tooltipFormat !== false) return yFormat(value, series);
-  const axis = ctx.config.series[series]?.yAxis ?? 'y';
-  const format = quirks?.axisFormat !== false ? ctx.config.axes?.[axis]?.format : undefined;
+  if (yFormat) return yFormat(value, series);
+  const spec = ctx.config.series[series];
+  if (spec?.format) return spec.format(value);
+  const axis = spec?.yAxis ?? 'y';
+  const format = ctx.config.axes?.[axis]?.format;
   return format ? format(value) : axisReadout(ctx, axis, value);
 }
 
 /**
  * The X readout of `value` on axis `axis` (default `'x'`): `tooltip.xFormat`, else the axis
- * `format`, else the scale's tick format (`String(value)` without a scale).
+ * `format` (a category axis' labels), else the automatic readout: a time axis' readout format
+ * (date plus time of day), a number at value precision.
  */
 export function formatX(
   ctx: FormatContext,
   value: number,
   axis = 'x',
-  quirks?: FormatQuirks,
+  _quirks?: FormatQuirks,
 ): string {
   const xFormat = ctx.config.tooltip?.xFormat;
-  if (xFormat && quirks?.tooltipFormat !== false) return xFormat(value);
-  const format = quirks?.axisFormat !== false ? ctx.config.axes?.[axis]?.format : undefined;
+  if (xFormat) return xFormat(value);
+  const format = ctx.config.axes?.[axis]?.format;
   if (format) return format(value);
-  return ctx.scales.get(axis)?.tickFormat(value) ?? String(value);
+  return axisReadout(ctx, axis, value);
 }
 
 /**
@@ -269,8 +277,12 @@ const readoutSteps = new WeakMap<FormatContext, Map<string, ReadoutStep>>();
  */
 export function axisReadout(ctx: FormatContext, axis: string, value: number): string {
   const scale = ctx.scales.get(axis);
-  if (!scale) return formatValue(value);
-  if (scale.type === 'time') return scale.tickFormat(value);
+  const locale = ctx.config.locale;
+  if (!scale) return formatValue(value, { locale });
+  if (scale.type === 'time') {
+    const time = scale as Scale & { readoutFormat?: (value: number) => string };
+    return time.readoutFormat ? time.readoutFormat(value) : scale.tickFormat(value);
+  }
   const spec = ctx.config.axes?.[axis];
   let steps = readoutSteps.get(ctx);
   if (!steps) {
@@ -296,7 +308,7 @@ export function axisReadout(ctx: FormatContext, axis: string, value: number): st
     };
     steps.set(axis, step);
   }
-  return formatValue(value, { stepDecimals: step.decimals });
+  return formatValue(value, { stepDecimals: step.decimals, locale });
 }
 
 /** A scatter tooltip field's value without a `format`: integers as is, else four significant places. */

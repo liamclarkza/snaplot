@@ -54,8 +54,16 @@ function formatY(
 ): string {
   if (formatters?.y) return formatters.y(value, seriesIndex);
   if (formatters?.readout) return formatters.readout(value, seriesIndex);
-  if (yScale?.type === 'time') return yScale.tickFormat(value);
-  return formatValue(value, yScale ? { stepDecimals: scaleStepDecimals(yScale) } : {});
+  return scaleReadout(yScale, value);
+}
+
+/** A value readout on `scale` without a formatter: a time readout, else value precision (P9). */
+function scaleReadout(scale: Scale | undefined, value: number): string {
+  if (scale?.type === 'time') {
+    const time = scale as Scale & { readoutFormat?: (value: number) => string };
+    return time.readoutFormat ? time.readoutFormat(value) : scale.tickFormat(value);
+  }
+  return formatValue(value, scale ? { stepDecimals: scaleStepDecimals(scale) } : {});
 }
 
 export class HitTester {
@@ -205,7 +213,7 @@ export class HitTester {
         x: xVal,
         y: yVal,
         color: sc.color ?? palette[(sc.paletteIndex ?? si) % palette.length],
-        formattedX: formatters?.x ? formatters.x(xVal, si) : xScale.tickFormat(xVal),
+        formattedX: formatters?.x ? formatters.x(xVal, si) : scaleReadout(xScale, xVal),
         formattedY: formatY(formatters, yScale, yVal, si),
       });
     }
@@ -300,7 +308,7 @@ export class HitTester {
             x: xVal,
             y: yVal,
             color: sc.color ?? palette[(sc.paletteIndex ?? si) % palette.length],
-            formattedX: formatters?.x ? formatters.x(xVal, si) : xScale.tickFormat(xVal),
+            formattedX: formatters?.x ? formatters.x(xVal, si) : scaleReadout(xScale, xVal),
             formattedY: formatY(formatters, yScale, yVal, si),
           };
         }
@@ -393,7 +401,7 @@ export class HitTester {
         y: yVal,
         color: style.colorAt(bestIdx),
         radius: style.radiusAt(bestIdx),
-        formattedX: formatters?.x ? formatters.x(xVal, seriesIndex) : xScale.tickFormat(xVal),
+        formattedX: formatters?.x ? formatters.x(xVal, seriesIndex) : scaleReadout(xScale, xVal),
         formattedY: formatY(formatters, yScale, yVal, seriesIndex),
         fields: scatterTooltipFields(sc, bestIdx, store.seriesCount + 1, (columnIdx, index) =>
           store.valueAt(columnIdx, index),

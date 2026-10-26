@@ -882,6 +882,7 @@ function seriesSpec<Row>(
   encodings: Map<string, string[]>,
 ): SeriesSpec {
   const spec: SeriesSpec = { ...s.spec, label: s.label, type: s.type };
+  if (s.format) spec.format = s.format;
   if (s.xAxis !== 'x') spec.xAxis = s.xAxis;
   if (s.yAxis !== 'y') spec.yAxis = s.yAxis;
   if (s.type === 'histogram') {
@@ -998,16 +999,9 @@ function epochWarning(
   }
 }
 
-function tooltipSpec<Row>(n: NormalizedOptions<Row>, series: SeriesSpec[]): ChartSpec['tooltip'] {
-  const tooltip: NonNullable<ChartSpec['tooltip']> = { ...n.engine.tooltip };
-  if (n.series.some((s) => s.format)) {
-    tooltip.yFormat = (value, index) => {
-      const s = n.series[index];
-      const axisFormat = n.axes[series[index]?.yAxis ?? 'y']?.spec.format;
-      return s?.format?.(value) ?? axisFormat?.(value) ?? String(value);
-    };
-  }
-  return tooltip;
+function tooltipSpec<Row>(n: NormalizedOptions<Row>, _series: SeriesSpec[]): ChartSpec['tooltip'] {
+  // Series formats live on each SeriesSpec (engine/format.ts applies series > axis > automatic).
+  return { ...n.engine.tooltip };
 }
 
 function orientation(axes: Record<string, AxisSpec>, key: string): 'x' | 'y' {

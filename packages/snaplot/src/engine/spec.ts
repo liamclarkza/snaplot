@@ -238,6 +238,8 @@ export interface SeriesSpec<TMeta = unknown> {
   type?: ChartType;
   /** Display label */
   label: string;
+  /** This series' value readout format; it wins over its value axis' `format` (plan §5.2). */
+  format?: (value: number) => string;
   /**
    * The source column of the series' value (`y`; the counts of a histogram).
    * Required for every mark.

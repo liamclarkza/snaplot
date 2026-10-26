@@ -11,7 +11,6 @@ import {
   MAX_READOUT_DECIMALS,
   NO_AXIS_FORMAT,
   NO_FORMAT,
-  NO_TOOLTIP_FORMAT,
   scaleStepDecimals,
   stepDecimals,
 } from './format';
@@ -171,46 +170,51 @@ describe('formatTick (engine/format.ts contract)', () => {
     expect(formatTick(plain, 'missing', 2)).toBe('2');
   });
 
-  it("labels 'slot' ticks with the axis format, else integers as is and one decimal", () => {
+  it("labels 'slot' ticks with the axis format, else integers as is and a value readout", () => {
     expect(formatTick(plain, 'x', 3, 'slot')).toBe('3');
-    expect(formatTick(plain, 'x', 2.25, 'slot')).toBe('2.3');
+    expect(formatTick(plain, 'x', 2.25, 'slot')).toBe('2.25');
     expect(formatTick(formatted, 'x', 2.25, 'slot')).toBe('x=2.25');
   });
 });
 
 describe('formatReadout (engine/format.ts contract)', () => {
-  it('applies the tooltip format, then the axis format, then the automatic readout', () => {
+  it('applies the tooltip format, then the series format, then the axis format, then the automatic readout', () => {
     expect(formatReadout(formatted, 1, 42)).toBe('42 (s1)');
-    expect(formatReadout(formatted, 0, 0.5, NO_TOOLTIP_FORMAT)).toBe('0.5%');
-    expect(formatReadout(formatted, 1, 42.123, NO_TOOLTIP_FORMAT)).toBe('42.12');
+    const noTooltip = context({ ...formatted.config, tooltip: {} }, [...formatted.scales.values()]);
+    expect(formatReadout(noTooltip, 0, 0.5)).toBe('0.5%');
+    expect(formatReadout(noTooltip, 1, 42.123)).toBe('42.12');
+    const seriesFormat = context(
+      {
+        ...noTooltip.config,
+        series: noTooltip.config.series.map((s, i) =>
+          i === 0 ? { ...s, format: (v: number) => `#${v}` } : s,
+        ),
+      },
+      [...formatted.scales.values()],
+    );
+    expect(formatReadout(seriesFormat, 0, 0.5)).toBe('#0.5');
+    expect(formatReadout(seriesFormat, 1, 42.123)).toBe('42.12');
     expect(formatReadout(plain, 0, 0.123456)).toBe('0.123');
   });
 
-  it("keeps today's call-site quirks: no axis format in tooltip rows, none at all on a shared row", () => {
-    expect(formatReadout(formatted, 0, 0.5, NO_AXIS_FORMAT)).toBe('0.5 (s0)');
-    expect(formatReadout(formatted, 0, 0.5, NO_FORMAT)).toBe('0.5');
-    expect(
-      formatReadout(
-        context({ ...formatted.config, tooltip: {} }, [...formatted.scales.values()]),
-        0,
-        0.5,
-        NO_AXIS_FORMAT,
-      ),
-    ).toBe('0.5');
+  it('ignores the old call-site quirks: every call site reads the same', () => {
+    expect(formatReadout(formatted, 0, 0.5, NO_AXIS_FORMAT)).toBe(formatReadout(formatted, 0, 0.5));
+    expect(formatReadout(formatted, 0, 0.5, NO_FORMAT)).toBe(formatReadout(formatted, 0, 0.5));
   });
 });
 
 describe('formatX and formatBinRange (engine/format.ts contract)', () => {
-  it('applies the tooltip X format, then the axis format, then the tick format', () => {
+  it('applies the tooltip X format, then the axis format, then the automatic readout', () => {
     expect(formatX(formatted, 3)).toBe('at 3');
-    expect(formatX(formatted, 3, 'x', NO_TOOLTIP_FORMAT)).toBe('x=3');
-    expect(formatX(formatted, 3, 'x2', NO_TOOLTIP_FORMAT)).toBe('x2:3');
-    expect(formatX(formatted, 3, 'x', NO_FORMAT)).toBe('x:3');
+    const noTooltip = context({ ...formatted.config, tooltip: {} }, [...formatted.scales.values()]);
+    expect(formatX(noTooltip, 3, 'x')).toBe('x=3');
+    expect(formatX(plain, 3.25, 'x')).toBe('3.25');
     expect(formatX(plain, 3, 'nope')).toBe('3');
+    expect(formatX(formatted, 3, 'x', NO_FORMAT)).toBe(formatX(formatted, 3, 'x'));
   });
 
   it("writes a bin range through the series' X axis and separates edges a coarse format merges", () => {
-    expect(formatBinRange(plain, 1, 2)).toBe('x:1 \u2013 x:2');
+    expect(formatBinRange(plain, 1, 2)).toBe('1 \u2013 2');
     const coarse = context(
       { series: [{ label: 'h', yColumn: 1 }], axes: { x: { format: () => 'same' } } },
       [scale('x', 'linear', 0, 1)],

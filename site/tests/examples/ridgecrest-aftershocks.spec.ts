@@ -173,11 +173,9 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       );
     });
 
-    // M10 implements `timeZone` and readouts with the time of day; flip this when it merges.
     test('[demos-07] times read in UTC whatever the viewer’s zone (Asia/Tokyo)', async ({
       browser,
     }) => {
-      test.fail(true, '[demos-07][backlog-06] M10: readouts use the viewer’s zone, to the day');
       const context = await browser.newContext({ ...DESKTOP, timezoneId: 'Asia/Tokyo' });
       const page = await context.newPage();
       await openDemo(page, SLUG);
@@ -193,7 +191,8 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       const formatted = await page.evaluate(
         () => (window as unknown as { demo: Demo }).demo.scatter.getCursor().formattedX,
       );
-      expect(formatted).toContain('03:19');
+      // 03:19 UTC on 6 July 2019, whatever the locale's hour style.
+      expect(formatted).toMatch(/Jul 6, 2019.*\b0?3:19\b/);
       await context.close();
     });
 

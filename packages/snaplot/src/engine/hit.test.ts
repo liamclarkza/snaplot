@@ -168,7 +168,7 @@ describe('HitTester tooltip formatters', () => {
     expect(points[0].formattedY).toBe('20 req/s (s0)');
   });
 
-  it('falls back to the X tick format and a Y value readout when no formatters are set', () => {
+  it('falls back to value readouts for X and Y when no formatters are set', () => {
     const store = new ColumnarStore([f([0, 50, 100]), f([10, 20.125, 30])]);
     const scales = new Map<string, Scale>([
       ['x', scale('x', 0, 100)],
@@ -187,8 +187,8 @@ describe('HitTester tooltip formatters', () => {
       'mouse',
     );
 
-    expect(points[0].formattedX).toBe('x:50');
-    // Readouts keep value precision (plan P9), never the tick format's.
+    // Readouts keep value precision (plan P9), never the tick format's: X and Y alike.
+    expect(points[0].formattedX).toBe('50');
     expect(points[0].formattedY).toBe('20.13');
   });
 

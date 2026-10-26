@@ -176,8 +176,10 @@ export function autoRangeHorizontal(engine: ChartCore): void {
       scale.min = ac.min ?? min;
       scale.max = ac.max ?? max;
     } else if (xMin === xMax) {
-      scale.min = xMin - 1;
-      scale.max = xMax + 1;
+      // A single value: one unit either side, or half an hour on a time axis (render-11).
+      const half = scale.type === 'time' ? 1_800_000 : 1;
+      scale.min = xMin - half;
+      scale.max = xMax + half;
     } else if (hasBarSeries && !hasHistogramSeries && barX.length > 1) {
       const canPlanBarTicks =
         scale.type === 'linear' &&
@@ -660,6 +662,13 @@ export function initAxes(engine: ChartCore): void {
         if (ac.max !== undefined) existing.max = ac.max;
       }
     }
+  }
+
+  // One locale and calendar for every scale's labels (plan D7).
+  for (const scale of engine.scales.values()) {
+    const labelled = scale as { locale?: string; timeZone?: 'local' | 'UTC' };
+    labelled.locale = engine.config.locale;
+    if (scale.type === 'time') labelled.timeZone = engine.config.timeZone ?? 'local';
   }
 
   autoRange(engine);

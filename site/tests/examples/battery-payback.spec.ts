@@ -214,14 +214,12 @@ test.describe('desktop, 1280 px', () => {
   };
 
   test('the first day is 1 January for a reader in Los Angeles', async ({ browser }) => {
-    test.fail(true, '[demos-07:utc] time readouts ignore the timeZone option');
     const { min, text } = await firstDay(browser, 'America/Los_Angeles');
     expect(min).toBe(Date.UTC(2017, 0, 1));
     expect(text).not.toMatch(/Dec/);
   });
 
   test("a day's readout names the day, not only its month", async ({ browser }) => {
-    test.fail(true, '[interact-02:format] time readouts round to the tick step');
     const { min, text } = await firstDay(browser, 'UTC');
     expect(min).toBe(Date.UTC(2017, 0, 1));
     expect(text).toMatch(/Jan[a-z]* 1\b|\b1 Jan/);

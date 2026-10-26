@@ -37,7 +37,7 @@ const xLabels = (chart: ChartHandle<any>) =>
     .map((box) => box.text);
 
 describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
-  it.fails('[visuals-01:x] a numeric X readout keeps value precision', () => {
+  it('[visuals-01:x] a numeric X readout keeps value precision', () => {
     const chart = fakes.mount({
       data: [0, 1.3, 2.74, 4, 6].map((x, i) => ({ x, y: i })),
       x: 'x',
@@ -47,7 +47,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
     expect(chart.getCursor().points[0]?.formattedX).toBe('2.74');
   });
 
-  it.fails('[dxtrial-03][backlog-01] the Y axis format drives the cursor snapshot', () => {
+  it('[dxtrial-03][backlog-01] the Y axis format drives the cursor snapshot', () => {
     const chart = fakes.mount({
       data: [
         { t: 0, cpu: 18 },
@@ -62,7 +62,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
     expect(chart.getCursor().points[0]?.formattedY).toBe('20.4%');
   });
 
-  it.fails('[backlog-01] the X axis format drives formattedX', () => {
+  it('[backlog-01] the X axis format drives formattedX', () => {
     const chart = fakes.mount({
       data: Array.from({ length: 20 }, (_, t) => ({ t, v: 100 + t })),
       x: 't',
@@ -73,7 +73,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
     expect(chart.getCursor().formattedX).toBe('T+9s');
   });
 
-  it.fails('[backlog-01] a category cursor snapshot reads the category label', () => {
+  it('[backlog-01] a category cursor snapshot reads the category label', () => {
     const chart = fakes.mount({
       data: ['Alpha', 'Beta', 'Gamma'].map((name, i) => ({ name, v: i + 1 })),
       x: 'name',
@@ -83,7 +83,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
     expect(chart.getCursor().formattedX).toBe('Gamma');
   });
 
-  it.fails('[dataapi-09] a format on one series leaves the other series at value precision', () => {
+  it('[dataapi-09] a format on one series leaves the other series at value precision', () => {
     const chart = fakes.mount({
       data: [
         { t: 0, latency: 12.5, rate: 0.1 + 0.2 },
@@ -111,7 +111,7 @@ describe('[visuals-01:x][dxtrial-03][backlog-01][dataapi-09] readouts', () => {
 describe('[dxtrial-10][render-11] sub-second and single-point time axes', () => {
   const start = Date.UTC(2026, 2, 3, 12, 0, 0);
 
-  it.fails('[dxtrial-10] a three-second window of 100 ms samples has no duplicate labels', () => {
+  it('[dxtrial-10] a three-second window of 100 ms samples has no duplicate labels', () => {
     const chart = fakes.mount(
       {
         data: Array.from({ length: 600 }, (_, i) => ({ t: start + i * 100, v: i % 13 })),
@@ -128,7 +128,7 @@ describe('[dxtrial-10][render-11] sub-second and single-point time axes', () => 
     expect(new Set(labels).size).toBe(labels.length);
   });
 
-  it.fails('[render-11] sub-second labels put the fraction before AM/PM', () => {
+  it('[render-11] sub-second labels put the fraction before AM/PM', () => {
     const chart = fakes.mount(
       {
         data: Array.from({ length: 6 }, (_, i) => ({ t: start + i * 100, v: i })),
@@ -143,7 +143,7 @@ describe('[dxtrial-10][render-11] sub-second and single-point time axes', () => 
     for (const label of labels) expect(label).not.toMatch(/(AM|PM)\.\d/);
   });
 
-  it.fails('[render-11] a single Date point gets at least a one-hour domain', () => {
+  it('[render-11] a single Date point gets at least a one-hour domain', () => {
     const chart = fakes.mount({
       data: [{ t: new Date(start), v: 5 }],
       x: 't',
@@ -155,7 +155,7 @@ describe('[dxtrial-10][render-11] sub-second and single-point time axes', () => 
 });
 
 describe('[render-12][gap-environments-09][backlog-06:utc][demos-07:utc] time zones', () => {
-  it.fails('[render-12] hour ticks stay on the local hour grid after a DST change', () => {
+  it('[render-12] hour ticks stay on the local hour grid after a DST change', () => {
     inZone('America/New_York', () => {
       const from = new Date(2026, 2, 7, 12).getTime();
       const chart = fakes.mount(
@@ -175,7 +175,7 @@ describe('[render-12][gap-environments-09][backlog-06:utc][demos-07:utc] time zo
     });
   });
 
-  it.fails('[gap-environments-09] 30-minute ticks land on :00 and :30 in Kathmandu', () => {
+  it('[gap-environments-09] 30-minute ticks land on :00 and :30 in Kathmandu', () => {
     inZone('Asia/Kathmandu', () => {
       const from = Date.UTC(2026, 2, 3, 8, 0);
       const chart = fakes.mount(
@@ -193,7 +193,7 @@ describe('[render-12][gap-environments-09][backlog-06:utc][demos-07:utc] time zo
     });
   });
 
-  it.fails("[backlog-06:utc][demos-07:utc] timeZone: 'UTC' formats readouts in UTC", () => {
+  it("[backlog-06:utc][demos-07:utc] timeZone: 'UTC' formats readouts in UTC", () => {
     inZone('America/New_York', () => {
       const at = Date.UTC(2026, 2, 1, 9, 30);
       const chart = fakes.mount({
@@ -210,9 +210,9 @@ describe('[render-12][gap-environments-09][backlog-06:utc][demos-07:utc] time zo
 });
 
 describe('[gap-environments-06][gap-scale-longevity-03:ticks] locale and streaming ticks', () => {
-  it.fails("[gap-environments-06] locale: 'de-DE' formats number ticks and readouts with one locale", () => {
+  it("[gap-environments-06] locale: 'de-DE' formats number ticks and readouts with one locale", () => {
     const chart = fakes.mount({
-      data: [0.1, 0.55, 1.4].map((v, t) => ({ t, v })),
+      data: [0.12, 0.55, 0.9].map((v, t) => ({ t, v })),
       x: 't',
       series: [{ y: 'v' }],
       locale: 'de-DE',

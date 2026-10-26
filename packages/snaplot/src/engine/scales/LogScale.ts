@@ -1,3 +1,4 @@
+import { niceTicks } from './niceNumbers';
 import type { Scale, ScaleType } from '../spec';
 
 /**
@@ -60,14 +61,22 @@ export class LogScale implements Scale {
       }
     }
 
-    return ticks.filter((t) => t >= this.min && t <= this.max).sort((a, b) => a - b);
+    const inside = ticks.filter((t) => t >= this.min && t <= this.max).sort((a, b) => a - b);
+    if (inside.length >= 2) return inside;
+    // Within one decade (120–180): evenly spaced nice values, so the axis keeps references (render-06).
+    const linear = niceTicks(this.min, this.max, 4).filter((t) => t > 0);
+    return linear.length >= 2 ? linear : inside;
   }
 
+  /** BCP 47 locale of tick labels; the runtime default when unset (plan D7). */
+  locale: string | undefined = undefined;
+
   tickFormat(value: number): string {
-    if (value >= 1e6) return value.toExponential(0);
-    if (value >= 1) return String(Math.round(value));
-    if (value >= 0.01) return value.toFixed(2);
-    return value.toExponential(0);
+    // One style per axis: plain numbers with up to 3 significant digits between 0.001 and 1e6,
+    // scientific outside that (visuals-11).
+    const abs = Math.abs(value);
+    const scientific = abs !== 0 && (abs < 1e-3 || abs >= 1e6);
+    return logFormat(this.locale, scientific).format(value);
   }
 
   nice(_count?: number): void {
@@ -105,4 +114,21 @@ export class LogScale implements Scale {
     this.pxToLogScale = logDomain / pxRange;
     return true;
   }
+}
+
+const logFormats = new Map<string, Intl.NumberFormat>();
+
+function logFormat(locale: string | undefined, scientific: boolean): Intl.NumberFormat {
+  const key = `${locale ?? ''}|${scientific}`;
+  let format = logFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(
+      locale,
+      scientific
+        ? { notation: 'scientific', maximumFractionDigits: 1 }
+        : { maximumSignificantDigits: 3 },
+    );
+    logFormats.set(key, format);
+  }
+  return format;
 }

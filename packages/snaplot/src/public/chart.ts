@@ -6,7 +6,7 @@ import { ChartCore } from '../engine/Engine';
 import { inferPosition } from '../engine/layout';
 import { ColumnarStore } from '../engine/data/ColumnarStore';
 import { fail, hint, warnOnce } from '../engine/errors';
-import { formatValue } from '../engine/format';
+import { formatValue, formatX } from '../engine/format';
 import type { ScaleRange, SelectionRange, TooltipPoint } from '../engine/spec';
 import { createReferenceLinesPlugin, createReferenceRegionsPlugin } from '../engine/annotations';
 import { createScale } from '../engine/scales/createScale';
@@ -936,12 +936,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const formatter = this.ingested.spec.axes?.[axis]?.format;
     return formatter ? formatter(value) : this.engine.formatReadout(axis, value);
   }
+  /** An X readout through the one formatter: the axis format, else a time or value-precision readout. */
   private format(axis: string, value: number): string {
     if (!Number.isFinite(value)) return '';
-    const formatter = this.ingested.spec.axes?.[axis]?.format;
-    return formatter
-      ? formatter(value)
-      : (this.engine.getAxis(axis)?.tickFormat(value) ?? String(value));
+    return formatX(this.engine, value, axis);
   }
   /** The values under the cursor, or at a fallback position, computed when asked. */
   getCursor(options?: CursorOptions): CursorSnapshot<Row> {

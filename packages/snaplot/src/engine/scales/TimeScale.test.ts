@@ -8,13 +8,13 @@ describe('TimeScale.tickFormat', () => {
     const scale = new TimeScale('x', -800, -300); // domain 500ms, sub-second path
     const label = scale.tickFormat(-500);
 
-    expect(label.endsWith('.500')).toBe(true);
+    expect(label).toMatch(/[.,]5\b/);
     expect(label).not.toContain('-');
   });
 
   it('still renders the fractional part for post-1970 epochs', () => {
     const scale = new TimeScale('x', 300, 800);
-    expect(scale.tickFormat(500).endsWith('.500')).toBe(true);
+    expect(scale.tickFormat(500)).toMatch(/[.,]5\b/);
   });
 });
 
@@ -106,11 +106,11 @@ describe('calendar-aligned ticks', () => {
     expect(label).not.toMatch(/\d:\d\d/);
   });
 
-  it('renders month boundaries as the bare month name in day-domain charts', () => {
+  it('renders a month boundary in a day-domain chart as a date, without a time of day', () => {
     const s = scaleFor(120);
     const monthStart = s.ticks(6).find((t) => new Date(t).getDate() === 1);
     expect(monthStart).toBeDefined();
     const label = s.tickFormat(monthStart!);
-    expect(label).not.toMatch(/\d/);
+    expect(label).not.toMatch(/:/);
   });
 });

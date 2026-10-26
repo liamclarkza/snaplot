@@ -93,7 +93,7 @@ describe('[render-02][backlog-03][visuals-21:def-03] category labels thin to fit
 });
 
 describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] numeric ticks', () => {
-  it.fails('[render-06] a log axis within one decade (120–180) has at least 2 labels', () => {
+  it('[render-06] a log axis within one decade (120–180) has at least 2 labels', () => {
     const chart = fakes.mount(
       {
         data: [120, 150, 180].map((v, t) => ({ t, v })),
@@ -106,7 +106,7 @@ describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] nu
     expect(texts(chart, 'y').length).toBeGreaterThanOrEqual(2);
   });
 
-  it.fails('[render-06] a log axis over 11–19 still has at least 2 labels', () => {
+  it('[render-06] a log axis over 11–19 still has at least 2 labels', () => {
     const chart = fakes.mount(
       {
         data: [11, 14, 19].map((v, t) => ({ t, v })),
@@ -130,7 +130,7 @@ describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] nu
     expect(new Set(labels).size).toBe(labels.length);
   });
 
-  it.fails('[render-07] values near 1e-9 do not all read 0.00000000', () => {
+  it('[render-07] values near 1e-9 do not all read 0.00000000', () => {
     const chart = fakes.mount({
       data: [0, 1e-9, 2e-9].map((v, t) => ({ t, v })),
       x: 't',
@@ -200,7 +200,7 @@ describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] nu
     expect(nice.some((candidate) => Math.abs(candidate - step) < 1e-9)).toBe(true);
   });
 
-  it.fails('[render-01] bars on a Date X axis are labelled as dates, not epoch milliseconds', () => {
+  it('[render-01] bars on a Date X axis are labelled as dates, not epoch milliseconds', () => {
     const chart = fakes.mount({
       data: Array.from({ length: 6 }, (_, m) => ({ month: new Date(2026, m, 1), sales: 10 + m })),
       x: 'month',

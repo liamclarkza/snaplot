@@ -7,7 +7,6 @@ test.describe('tooltip formatting', () => {
   test('[dxtrial-03] the Y axis format drives the tooltip values', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[dxtrial-03]');
     await page.evaluate(() => {
       window.harness.mount({
         data: [
@@ -30,7 +29,6 @@ test.describe('tooltip formatting', () => {
   });
 
   test('[dxtrial-03] a dual-axis chart reads 4.84% and 718 ms', async ({ harnessPage: page }) => {
-    test.fail(true, '[dxtrial-03]');
     await page.evaluate(() => {
       window.harness.mount({
         data: [
@@ -80,7 +78,6 @@ test.describe('tooltip formatting', () => {
   test('[backlog-01] the X axis format drives the tooltip header', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[backlog-01]');
     await page.evaluate(() => {
       window.harness.mount({
         data: Array.from({ length: 40 }, (_, t) => ({ t, p95: 100 + (t % 7) * 5 })),
@@ -98,7 +95,6 @@ test.describe('tooltip formatting', () => {
   test('[interact-02:format] a currency axis format reads $206k in the tooltip', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-02:format]');
     await page.evaluate(() => {
       window.harness.mount({
         data: Array.from({ length: 6 }, (_, i) => ({ i, revenue: 180_000 + i * 13_000 })),
