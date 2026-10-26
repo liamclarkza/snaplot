@@ -26,7 +26,7 @@ import { CanvasManager } from './render/surface';
 import { RenderScheduler } from './render/scheduler';
 import { EventBus } from './interaction/bus';
 import { GestureManager } from './interaction/gestures';
-import { TooltipManager } from '../interaction/TooltipManager';
+import { TooltipManager } from '../dom/tooltip';
 
 // Data, scales, options and theme.
 import type { DataStore } from './data/DataStore';
