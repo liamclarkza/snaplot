@@ -2,15 +2,14 @@
  * The createChart facade: normalize → classify → ingest or describe → the engine (plan §3.1,
  * D3, D16). State options and every notification go through one dispatcher (`./state.ts`).
  */
-import { ChartCore } from '../core/Chart';
-import { inferPosition } from '../core/Layout';
-import { ColumnarStore } from '../data/ColumnarStore';
+import { ChartCore } from '../engine/Engine';
+import { inferPosition } from '../engine/layout';
+import { ColumnarStore } from '../engine/data/ColumnarStore';
 import { fail, hint, warnOnce } from '../engine/errors';
 import { formatValue } from '../engine/format';
 import type { ScaleRange, SelectionRange, TooltipPoint } from '../engine/spec';
-import { createReferenceLinesPlugin } from '../plugins/builtins/referenceLinesPlugin';
-import { createReferenceRegionsPlugin } from '../plugins/builtins/referenceRegionsPlugin';
-import { createScale } from '../scales/createScale';
+import { createReferenceLinesPlugin, createReferenceRegionsPlugin } from '../engine/annotations';
+import { createScale } from '../engine/scales/createScale';
 import { categoryLabels, commitAppend, planAppend, refreshCategoryAxis } from './append';
 import { classify, sameData, STATE_KEYS, type StateKey, type Work } from './classify';
 import {

@@ -9,7 +9,7 @@ import {
   plotPoint,
   replaceData,
 } from './fakes/engine';
-import type { ChartCore } from '../src/core/Chart';
+import type { ChartCore } from '../src/engine/Engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2). Brushes are mouse
 // drags on the input layer.

@@ -1,0 +1,193 @@
+import { describe, expect, it, vi } from 'vitest';
+import { renderAreaSegments, renderBandSegments, renderLineSegments } from './line';
+import type { Layout, Scale, SeriesSpec } from '../spec';
+
+const f = (xs: number[]) => Float64Array.from(xs);
+
+function createScale(): Scale {
+  return {
+    type: 'linear',
+    key: 'x',
+    min: 0,
+    max: 10,
+    dataToPixel: (value: number) => value,
+    pixelToData: (pixel: number) => pixel,
+    ticks: () => [],
+    tickFormat: (value: number) => String(value),
+    nice: () => {},
+    setPixelRange: () => {},
+  };
+}
+
+function createLayout(): Layout {
+  return {
+    width: 100,
+    height: 100,
+    plot: { left: 0, top: 0, width: 100, height: 100 },
+    axes: {},
+    dpr: 1,
+  };
+}
+
+function createContext(): CanvasRenderingContext2D {
+  return {
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    bezierCurveTo: vi.fn(),
+    closePath: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    setLineDash: vi.fn(),
+    createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    lineJoin: 'miter',
+    lineCap: 'butt',
+    globalAlpha: 1,
+  } as unknown as CanvasRenderingContext2D;
+}
+
+describe('filled line renderers', () => {
+  it('fills area charts as separate segments around NaN gaps', () => {
+    const ctx = createContext();
+    const scale = createScale();
+    const layout = createLayout();
+    const series: SeriesSpec = { label: 'area', yColumn: 1, type: 'area' };
+
+    renderAreaSegments(
+      ctx,
+      [{ xData: f([0, 1, 2]), yData: f([10, NaN, 20]), startIdx: 0, endIdx: 2 }],
+      scale,
+      scale,
+      layout,
+      series,
+      '#4e79a7',
+    );
+
+    expect(ctx.fill).toHaveBeenCalledTimes(2);
+    expect(ctx.stroke).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies alpha to non-hex area fills without producing NaN colors', () => {
+    const ctx = createContext();
+    const stops: string[] = [];
+    (ctx.createLinearGradient as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      addColorStop: (_offset: number, color: string) => {
+        stops.push(color);
+      },
+    });
+    const scale = createScale();
+    const layout = createLayout();
+    const series: SeriesSpec = { label: 'area', yColumn: 1, type: 'area' };
+
+    // A named color (not #rrggbb) previously yielded 'rgba(NaN,NaN,NaN,...)'.
+    renderAreaSegments(
+      ctx,
+      [{ xData: f([0, 1, 2]), yData: f([10, 15, 20]), startIdx: 0, endIdx: 2 }],
+      scale,
+      scale,
+      layout,
+      series,
+      'red',
+    );
+
+    expect(stops.length).toBe(2);
+    for (const stop of stops) expect(stop).not.toContain('NaN');
+    expect(stops[0]).toBe('rgba(255,0,0,0.3)');
+    expect(stops[1]).toBe('rgba(255,0,0,0.05)');
+  });
+
+  it('fills band charts as separate segments around NaN bound gaps', () => {
+    const ctx = createContext();
+    const scale = createScale();
+    const layout = createLayout();
+    const series: SeriesSpec = { label: 'band', yColumn: 1, type: 'band' };
+
+    renderBandSegments(
+      ctx,
+      [
+        {
+          xData: f([0, 1, 2]),
+          centerYData: f([15, 16, 17]),
+          upperYData: f([20, NaN, 30]),
+          lowerYData: f([10, NaN, 20]),
+          startIdx: 0,
+          endIdx: 2,
+        },
+      ],
+      scale,
+      scale,
+      layout,
+      series,
+      '#4e79a7',
+    );
+
+    expect(ctx.fill).toHaveBeenCalledTimes(2);
+    expect(ctx.stroke).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('line gap rendering', () => {
+  it('renders monotone interpolation as separate finite runs around NaN gaps', () => {
+    const ctx = createContext();
+    const scale = createScale();
+    const layout = createLayout();
+    const series: SeriesSpec = {
+      label: 'line',
+      yColumn: 1,
+      type: 'line',
+      interpolation: 'monotone',
+    };
+
+    renderLineSegments(
+      ctx,
+      [
+        {
+          xData: f([0, 1, 2, 3, 4, 5, 6]),
+          yData: f([1, 2, 3, NaN, 4, 5, 6]),
+          startIdx: 0,
+          endIdx: 6,
+        },
+      ],
+      scale,
+      scale,
+      layout,
+      series,
+      '#4e79a7',
+    );
+
+    expect(ctx.moveTo).toHaveBeenCalledTimes(2);
+    expect(ctx.bezierCurveTo).toHaveBeenCalledTimes(4);
+  });
+
+  it('treats non-positive log-scale Y values as gaps', () => {
+    const ctx = createContext();
+    const xScale = createScale();
+    const yScale = {
+      ...createScale(),
+      type: 'log' as const,
+      dataToPixel: (value: number) => (value > 0 ? value : Number.NaN),
+    };
+    const layout = createLayout();
+    const series: SeriesSpec = { label: 'loss', yColumn: 1, type: 'line' };
+
+    renderLineSegments(
+      ctx,
+      [{ xData: f([0, 1, 2]), yData: f([1, 0, 2]), startIdx: 0, endIdx: 2 }],
+      xScale,
+      yScale,
+      layout,
+      series,
+      '#4e79a7',
+    );
+
+    expect(ctx.moveTo).toHaveBeenCalledTimes(2);
+    expect(ctx.lineTo).not.toHaveBeenCalled();
+  });
+});

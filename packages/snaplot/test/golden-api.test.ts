@@ -13,7 +13,7 @@ const manifest = JSON.parse(manifestText) as {
 };
 
 /**
- * P4: public declarations never name these engine types (engine/spec.ts, core/Chart.ts). The
+ * P4: public declarations never name these engine types (engine/spec.ts, engine/Engine.ts). The
  * public SeriesState, CursorSnapshot and SelectionResult are written by hand under the same names.
  */
 const FORBIDDEN = [

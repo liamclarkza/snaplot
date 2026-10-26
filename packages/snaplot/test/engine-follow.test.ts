@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ChartCore } from '../src/core/Chart';
+import type { ChartCore } from '../src/engine/Engine';
 import type { SeriesSpec } from '../src/engine/spec';
 import { type EngineFakes, f, installEngineFakes, press } from './fakes/engine';
 

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createChart, createChartGroup } from './chart';
 import type { ChartHandle, ChartOptions, ChartPoint } from './types';
-import { ChartCore } from '../core/Chart';
+import { ChartCore } from '../engine/Engine';
 
 const live: Array<{ destroy(): void }> = [];
 beforeEach(() => {

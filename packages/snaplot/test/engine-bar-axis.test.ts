@@ -8,7 +8,7 @@ import {
   installEngineFakes,
   tickValues,
 } from './fakes/engine';
-import type { ChartCore } from '../src/core/Chart';
+import type { ChartCore } from '../src/engine/Engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2). The planned bar axis
 // is read from the grid paint: its labels name the slot centres, and its

@@ -1,0 +1,47 @@
+import type { ColumnarData } from '../spec';
+
+export interface ColumnarSegment {
+  logicalStart: number;
+  logicalEnd: number;
+  physicalStart: number;
+  physicalEnd: number;
+}
+
+export interface DataStore {
+  readonly x: Float64Array;
+  readonly length: number;
+  readonly seriesCount: number;
+
+  y(seriesIdx: number): Float64Array;
+  getColumn(index: number): Float64Array;
+  getPhysicalColumn(index: number): Float64Array;
+  getData(): ColumnarData;
+
+  append(data: ColumnarData): boolean;
+  /**
+   * Overwrite the last row in place, one value per column (row[0] is X).
+   * Powers streaming tail corrections (in-progress buckets) without a
+   * full-window reallocation. The new X must keep the column sorted.
+   * Throws on an empty store.
+   */
+  replaceLast(row: number[]): void;
+
+  xAt(index: number): number;
+  yAt(seriesIdx: number, index: number): number;
+  valueAt(columnIdx: number, index: number): number;
+
+  lowerBoundX(value: number): number;
+  upperBoundX(value: number): number;
+  nearestXIndex(value: number): number;
+  getViewportIndices(xMin: number, xMax: number): [number, number];
+  getSegments(startIdx: number, endIdx: number): ColumnarSegment[];
+  yRange(seriesIndices: number[], startIdx: number, endIdx: number): [number, number];
+}
+
+export function validateMaxLen(maxLen: number): void {
+  if (!Number.isInteger(maxLen) || maxLen < 0) {
+    throw new Error(
+      `snaplot: streaming.maxPoints must be a non-negative integer, received ${maxLen}.`,
+    );
+  }
+}

@@ -1,0 +1,537 @@
+import type { AxisSpec, Layout, Scale, ThemeConfig, AxisPosition, ChartSpec } from '../spec';
+import {
+  AXIS_CORNER_GAP,
+  AXIS_LABEL_GAP,
+  AXIS_TICK_LENGTH,
+  DEFAULT_TICK_COUNT,
+  EDGE_MARGIN,
+  LABEL_MIN_GAP,
+} from '../../constants';
+import { inferPosition } from '../layout';
+import { opaqueColorOnBackground } from '../../utils/color';
+
+/**
+ * Renders gridlines on the static (grid) canvas and returns label
+ * positions for DOM rendering (P2: hybrid, canvas marks, DOM text).
+ *
+ * 0.5px offset trick: for 1px gridlines on non-retina (dpr===1),
+ * offset coordinates by 0.5 to avoid blurry sub-pixel rendering.
+ */
+
+export interface AxisLabel {
+  text: string;
+  x: number;
+  y: number;
+  anchor: 'start' | 'middle' | 'end';
+  /** Axis titles render in the reserved outer gutter strip, rotated on vertical axes. */
+  kind?: 'tick' | 'title';
+}
+
+export interface AxesRenderResult {
+  /** Labels keyed by axis config key */
+  labels: Map<string, AxisLabel[]>;
+}
+
+/**
+ * Tick values for an axis: explicit `ac.ticks` (clamped to the visible
+ * domain) beat generated ticks at the `ac.tickCount` density. Shared by
+ * the renderer and layout measurement so gutters match the labels drawn.
+ */
+export function axisTickValues(scale: Scale, ac: AxisSpec): number[] {
+  if (ac.ticks && ac.ticks.length > 0) {
+    const lo = Math.min(scale.min, scale.max);
+    const hi = Math.max(scale.min, scale.max);
+    return ac.ticks.filter((t) => Number.isFinite(t) && t >= lo && t <= hi);
+  }
+  return scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT);
+}
+
+/**
+ * Evenly thin a category tick list to at most `maxCount` entries. Bar and
+ * histogram charts tick every category by default, which smears into an
+ * unreadable band once categories outnumber the pixels available for
+ * labels (a year of daily bars). Keeps the first entry and every nth after.
+ */
+export function thinTicks(values: number[], maxCount: number, preserveEnds = false): number[] {
+  const max = Math.max(2, Math.floor(maxCount));
+  if (values.length <= max) return values;
+  let step = Math.ceil(values.length / max);
+  if (preserveEnds) {
+    // Select a stride that divides the full sequence: appending the last tick
+    // afterwards would create a shorter, misleading interval at the edge.
+    const intervals = values.length - 1;
+    step = Math.ceil(intervals / (max - 1));
+    while (intervals % step !== 0) step++;
+  }
+  return values.filter((_, i) => i % step === 0);
+}
+
+/** Resolve an axis's grid config to concrete draw values, or null when hidden. */
+function resolveGrid(
+  ac: AxisSpec,
+  theme: ThemeConfig,
+): { color: string; opacity: number; dash: number[] } | null {
+  const grid = ac.grid;
+  if (grid === false) return null;
+  const cfg = typeof grid === 'object' ? grid : {};
+  if (cfg.show === false) return null;
+  return {
+    color: cfg.color ?? theme.gridColor,
+    opacity: cfg.opacity ?? theme.gridOpacity,
+    dash: cfg.dash ?? [],
+  };
+}
+
+export function renderAxes(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  scales: Map<string, Scale>,
+  theme: ThemeConfig,
+  config: ChartSpec,
+  /** Override X-axis ticks with explicit values (e.g. bin edges, category values) */
+  customXTicks?: { values: number[]; format?: (v: number) => string; gridValues?: number[] },
+): AxesRenderResult {
+  const { plot, dpr } = layout;
+  const offset = dpr === 1 ? 0.5 : 0;
+
+  const result: AxesRenderResult = {
+    labels: new Map(),
+  };
+  const tickMarks: Array<{
+    position: AxisPosition;
+    pixels: number[];
+    length: number;
+    direction: 'out' | 'in' | 'both';
+    color: string;
+    opacity: number;
+  }> = [];
+
+  // Fill background on grid canvas (opaque, alpha:false)
+  ctx.fillStyle = theme.backgroundColor;
+  ctx.fillRect(0, 0, layout.width, layout.height);
+
+  // Square plot corners keep endpoint ticks connected to the frame.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(plot.left, plot.top, plot.width, plot.height);
+  ctx.clip();
+
+  // Track which positions have already drawn gridlines (only first axis per position draws them)
+  const gridDrawn = new Set<AxisPosition>();
+
+  const axisConfigs = config.axes ?? {};
+
+  for (const [key, ac] of Object.entries(axisConfigs)) {
+    const scale = scales.get(key);
+    if (!scale) continue;
+
+    const pos = inferPosition(key, ac.position);
+    const labels: AxisLabel[] = [];
+
+    // Tick precedence: explicit ac.ticks -> bar/histogram category ticks ->
+    // generated at the ac.tickCount density.
+    const isHorizontal = pos === 'bottom' || pos === 'top';
+    const hasExplicitTicks = !!ac.ticks && ac.ticks.length > 0;
+    const useCustomTicks = isHorizontal && customXTicks && !hasExplicitTicks;
+    let ticks = useCustomTicks ? customXTicks!.values : axisTickValues(scale, ac);
+    const edgeTolerance = Math.abs(scale.max - scale.min) * 1e-9;
+    const preserveEnds =
+      !useCustomTicks &&
+      scale.type === 'linear' &&
+      ticks.length > 1 &&
+      Math.abs(ticks[0] - scale.min) <= edgeTolerance &&
+      Math.abs(ticks[ticks.length - 1] - scale.max) <= edgeTolerance;
+    // Bar labels name slot centers; their grid spans the slot boundaries.
+    // Keep that full grid when label fitting skips crowded center labels.
+    const customGridValues = useCustomTicks ? customXTicks?.gridValues : undefined;
+    // Formatter precedence: custom-tick formatter (bar/histogram path) ->
+    // user's axes.x.tickFormat -> the scale's built-in tickFormat.
+    const formatTick =
+      useCustomTicks && customXTicks!.format
+        ? customXTicks!.format
+        : (ac.format ?? ((v: number) => scale.tickFormat(v)));
+
+    // Width fit pass: generated tick counts are density targets that know
+    // nothing about the rendered strings, so measure the actual labels and
+    // thin until the widest fits the spacing. Thinning every nth entry
+    // preserves calendar/nice alignment (every second Monday is still a
+    // Monday). Explicit ac.ticks are the user's exact choice and are
+    // exempt. Canvas measureText matches the DOM labels' font closely
+    // enough for spacing and forces no reflow.
+    ctx.font = `${theme.fontSize}px ${theme.fontFamily}`;
+    let widestLabel = 0;
+    if (isHorizontal && ticks.length > 1) {
+      for (const t of ticks) {
+        const w = ctx.measureText(formatTick(t)).width;
+        if (w > widestLabel) widestLabel = w;
+      }
+      const spacing = plot.width / (ticks.length - 1);
+      if (!hasExplicitTicks && widestLabel + LABEL_MIN_GAP > spacing) {
+        ticks = thinTicks(
+          ticks,
+          Math.max(2, Math.floor(plot.width / (widestLabel + LABEL_MIN_GAP)) + 1),
+          preserveEnds,
+        );
+      }
+    } else if (!isHorizontal && !hasExplicitTicks && ticks.length > 1) {
+      // Vertical labels collide when tick spacing drops below a line height.
+      const minSpacing = theme.fontSize * 1.4;
+      const spacing = plot.height / (ticks.length - 1);
+      if (spacing < minSpacing) {
+        ticks = thinTicks(
+          ticks,
+          Math.max(2, Math.floor(plot.height / minSpacing) + 1),
+          preserveEnds,
+        );
+      }
+    }
+
+    if (ac.tickMarks !== false) {
+      const mark = typeof ac.tickMarks === 'object' ? ac.tickMarks : undefined;
+      tickMarks.push({
+        position: pos,
+        pixels: (customGridValues ?? ticks).map((tick) => scale.dataToPixel(tick)),
+        length: Math.max(0, mark?.length ?? AXIS_TICK_LENGTH),
+        direction: mark?.direction ?? 'out',
+        color: mark?.color ?? theme.axisLineColor,
+        opacity: mark?.color !== undefined ? 1 : theme.gridOpacity,
+      });
+    }
+
+    // The first axis at each position decides that position's gridlines
+    // (draw styled by its grid config, or hide them entirely); later axes
+    // at the same position never add a second grid on top.
+    const grid = resolveGrid(ac, theme);
+    const shouldDrawGrid = !gridDrawn.has(pos);
+    if (shouldDrawGrid) gridDrawn.add(pos);
+    if (shouldDrawGrid && grid !== null) {
+      ctx.strokeStyle = opaqueColorOnBackground(grid.color, grid.opacity, theme.backgroundColor);
+      // Solid hairlines stay stable while panning; explicit dashes remain supported.
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1;
+      if (grid.dash.length > 0) ctx.setLineDash(grid.dash);
+      ctx.beginPath();
+
+      if (isHorizontal) {
+        // Vertical gridlines across plot area
+        for (const t of customGridValues ?? ticks) {
+          const px = Math.round(scale.dataToPixel(t)) + offset;
+          if (px >= plot.left && px <= plot.left + plot.width) {
+            ctx.moveTo(px, plot.top);
+            ctx.lineTo(px, plot.top + plot.height);
+          }
+        }
+      } else {
+        // Horizontal gridlines across plot area
+        for (const t of ticks) {
+          const py = Math.round(scale.dataToPixel(t)) + offset;
+          ctx.moveTo(plot.left, py);
+          ctx.lineTo(plot.left + plot.width, py);
+        }
+      }
+
+      ctx.stroke();
+      if (grid.dash.length > 0) ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+
+    // Generate tick labels based on position
+    switch (pos) {
+      case 'left':
+        for (const t of ticks) {
+          const py = scale.dataToPixel(t);
+          if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
+            labels.push({
+              text: formatTick(t),
+              x: plot.left - AXIS_TICK_LENGTH - AXIS_LABEL_GAP,
+              y: py,
+              anchor: 'end',
+            });
+          }
+        }
+        break;
+      case 'right':
+        for (const t of ticks) {
+          const py = scale.dataToPixel(t);
+          if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
+            labels.push({
+              text: formatTick(t),
+              x: plot.left + plot.width + AXIS_TICK_LENGTH + AXIS_LABEL_GAP,
+              y: py,
+              anchor: 'start',
+            });
+          }
+        }
+        break;
+      case 'bottom':
+      case 'top': {
+        // Centered labels near the plot edges overhang: the last one can
+        // spill past the container (clipped by the host card) and the first
+        // into the left gutter. Clamp the label center so the text box stays
+        // inside the container; only the edge labels ever shift, and by at
+        // most half their own width.
+        const labelY =
+          pos === 'bottom'
+            ? plot.top + plot.height + AXIS_TICK_LENGTH + AXIS_LABEL_GAP
+            : plot.top - AXIS_TICK_LENGTH - AXIS_LABEL_GAP;
+        for (const t of ticks) {
+          const px = scale.dataToPixel(t);
+          if (px >= plot.left - 10 && px <= plot.left + plot.width + 10) {
+            const text = formatTick(t);
+            const half = ctx.measureText(text).width / 2;
+            const x = Math.max(half + 2, Math.min(layout.width - half - 2, px));
+            labels.push({ text, x, y: labelY, anchor: 'middle' });
+          }
+        }
+        break;
+      }
+    }
+
+    if (ac.title) {
+      const area = layout.axes[key]?.area;
+      if (area) {
+        // Center of the title glyph sits EDGE_MARGIN + half a line in from
+        // the outer edge, mirroring the titleStrip Layout reserves, so the
+        // glyph never touches the canvas edge (or the host's card border).
+        const inset = EDGE_MARGIN + theme.fontSize / 2;
+        switch (pos) {
+          case 'left':
+            labels.push({
+              text: ac.title,
+              x: area.left + inset,
+              y: plot.top + plot.height / 2,
+              anchor: 'middle',
+              kind: 'title',
+            });
+            break;
+          case 'right':
+            labels.push({
+              text: ac.title,
+              x: area.left + area.width - inset,
+              y: plot.top + plot.height / 2,
+              anchor: 'middle',
+              kind: 'title',
+            });
+            break;
+          case 'bottom':
+            labels.push({
+              text: ac.title,
+              x: plot.left + plot.width / 2,
+              y: area.top + area.height - inset,
+              anchor: 'middle',
+              kind: 'title',
+            });
+            break;
+          case 'top':
+            labels.push({
+              text: ac.title,
+              x: plot.left + plot.width / 2,
+              y: area.top + inset,
+              anchor: 'middle',
+              kind: 'title',
+            });
+            break;
+        }
+      }
+    }
+
+    result.labels.set(key, labels);
+  }
+
+  // Release the plot clip used for gridlines.
+  ctx.restore();
+
+  resolveAxisCornerCollisions(result, layout, theme, ctx);
+
+  // Tick marks deliberately paint outside the plot clip. Bar marks follow
+  // slot boundaries; other axes share the final label tick set.
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1;
+  for (const marks of tickMarks) {
+    if (marks.length <= 0 || marks.pixels.length === 0) continue;
+    ctx.strokeStyle = opaqueColorOnBackground(marks.color, marks.opacity, theme.backgroundColor);
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    for (const pixel of marks.pixels) {
+      const p = Math.round(pixel) + offset;
+      const inward = marks.direction === 'in' || marks.direction === 'both';
+      const outward = marks.direction === 'out' || marks.direction === 'both';
+      switch (marks.position) {
+        case 'bottom': {
+          const edge = Math.round(plot.top + plot.height) + offset;
+          ctx.moveTo(p, edge - (inward ? marks.length : 0));
+          ctx.lineTo(p, edge + (outward ? marks.length : 0));
+          break;
+        }
+        case 'top': {
+          const edge = Math.round(plot.top) + offset;
+          ctx.moveTo(p, edge + (inward ? marks.length : 0));
+          ctx.lineTo(p, edge - (outward ? marks.length : 0));
+          break;
+        }
+        case 'left': {
+          const edge = Math.round(plot.left) + offset;
+          ctx.moveTo(edge + (inward ? marks.length : 0), p);
+          ctx.lineTo(edge - (outward ? marks.length : 0), p);
+          break;
+        }
+        case 'right': {
+          const edge = Math.round(plot.left + plot.width) + offset;
+          ctx.moveTo(edge - (inward ? marks.length : 0), p);
+          ctx.lineTo(edge + (outward ? marks.length : 0), p);
+          break;
+        }
+      }
+    }
+    ctx.stroke();
+  }
+
+  // ─── Plot area border ────────────────────────────────────────
+  // `borderColor` / `borderOpacity` are their own knobs so the frame
+  // can sit one visual step above the grid while sharing its hue.
+  // Falls back to `axisLineColor` / `gridOpacity` for themes that
+  // pre-date the split.
+  ctx.strokeStyle = opaqueColorOnBackground(
+    theme.borderColor ?? theme.axisLineColor,
+    theme.borderOpacity ?? theme.gridOpacity,
+    theme.backgroundColor,
+  );
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1;
+  // Round all four edges independently, then derive width/height from the
+  // snapped corners. Rounding only the origin and adding an unrounded
+  // (possibly fractional) plot.width/height left the right and bottom strokes
+  // off the pixel grid, so they blurred at dpr 1 while the top/left stayed
+  // crisp. `offset` is the standard half-pixel nudge for 1px strokes at dpr 1.
+  const bx = Math.round(plot.left) + offset;
+  const by = Math.round(plot.top) + offset;
+  const bRight = Math.round(plot.left + plot.width) + offset;
+  const bBottom = Math.round(plot.top + plot.height) + offset;
+  ctx.beginPath();
+  ctx.rect(bx, by, bRight - bx, bBottom - by);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  return result;
+}
+
+function resolveAxisCornerCollisions(
+  result: AxesRenderResult,
+  layout: Layout,
+  theme: ThemeConfig,
+  ctx: CanvasRenderingContext2D,
+): void {
+  const lineHeight = theme.fontSize * 1.4;
+  const horizontal: Array<{ label: AxisLabel; position: 'top' | 'bottom' }> = [];
+  const vertical: Array<{ label: AxisLabel; position: 'left' | 'right' }> = [];
+
+  ctx.font = `${theme.fontSize}px ${theme.fontFamily}`;
+  for (const [key, labels] of result.labels) {
+    const position = layout.axes[key]?.position;
+    if (!position) continue;
+    for (const label of labels) {
+      if (label.kind === 'title') continue;
+      if (position === 'top' || position === 'bottom') horizontal.push({ label, position });
+      else vertical.push({ label, position });
+    }
+  }
+
+  for (const h of horizontal) {
+    const hWidth = ctx.measureText(h.label.text).width;
+    for (const v of vertical) {
+      const sameCorner =
+        (v.position === 'left' && h.label.x <= layout.plot.left + hWidth) ||
+        (v.position === 'right' && h.label.x >= layout.plot.left + layout.plot.width - hWidth);
+      if (!sameCorner) continue;
+
+      const hTop = h.position === 'bottom' ? h.label.y : h.label.y - lineHeight;
+      const hBottom = hTop + lineHeight;
+      const vTop = v.label.y - lineHeight / 2;
+      const vBottom = v.label.y + lineHeight / 2;
+      if (Math.min(hBottom, vBottom) <= Math.max(hTop, vTop)) continue;
+
+      if (v.position === 'left') {
+        const vRight = v.label.x;
+        const hLeft = h.label.x - hWidth / 2;
+        const overlap = vRight + AXIS_CORNER_GAP - hLeft;
+        if (overlap > 0) h.label.x += overlap;
+      } else {
+        const vLeft = v.label.x;
+        const hRight = h.label.x + hWidth / 2;
+        const overlap = hRight + AXIS_CORNER_GAP - vLeft;
+        if (overlap > 0) h.label.x -= overlap;
+      }
+    }
+  }
+}
+
+/**
+ * Update DOM labels from AxesRenderResult.
+ *
+ * Spans are pooled and updated in place: the grid layer redraws on every
+ * pan/zoom frame, and rebuilding all label nodes per frame (the previous
+ * innerHTML approach) churned the DOM at gesture rate. The static style
+ * (font, color, transform) is stamped only when its signature changes;
+ * steady-state frames touch just left/top/textContent.
+ */
+export function updateDOMLabels(
+  domLayer: HTMLDivElement,
+  axesResult: AxesRenderResult,
+  theme: ThemeConfig,
+  layout: Layout,
+): void {
+  const baseStyle = `position:absolute;font-family:${theme.fontFamily};font-size:${theme.fontSize}px;font-variant-numeric:tabular-nums;color:${theme.axisLabelColor ?? theme.textColor};white-space:nowrap;pointer-events:none;`;
+
+  const pool = domLayer.children;
+  let used = 0;
+
+  for (const [key, labels] of axesResult.labels) {
+    const axisInfo = layout.axes[key];
+    if (!axisInfo) continue;
+
+    const pos = axisInfo.position;
+    let posStyle: string;
+    switch (pos) {
+      case 'left':
+        posStyle = 'text-align:right;transform:translate(-100%, -50%);';
+        break;
+      case 'right':
+        posStyle = 'transform:translateY(-50%);';
+        break;
+      case 'top':
+        posStyle = 'text-align:center;transform:translate(-50%, -100%);';
+        break;
+      default:
+        posStyle = 'transform:translateX(-50%);';
+        break;
+    }
+    // Titles center on their anchor point and rotate to read along
+    // vertical axes. Titles and tick labels share one quiet text role.
+    const vertical = pos === 'left' || pos === 'right';
+    const titleStyle =
+      `transform:translate(-50%, -50%)` +
+      (vertical ? ` rotate(${pos === 'left' ? -90 : 90}deg);` : ';');
+
+    for (const label of labels) {
+      let el = pool[used] as HTMLSpanElement | undefined;
+      if (!el) {
+        el = document.createElement('span');
+        domLayer.appendChild(el);
+      }
+      used++;
+
+      const styleSig = baseStyle + (label.kind === 'title' ? titleStyle : posStyle);
+      if (el.dataset.labelStyle !== styleSig) {
+        el.style.cssText = styleSig;
+        el.dataset.labelStyle = styleSig;
+      }
+      el.style.left = label.x + 'px';
+      el.style.top = label.y + 'px';
+      if (el.textContent !== label.text) el.textContent = label.text;
+    }
+  }
+
+  while (domLayer.children.length > used) {
+    domLayer.lastChild?.remove();
+  }
+}

@@ -7,7 +7,7 @@
  * precedence, locale and time zone).
  */
 import { DEFAULT_TICK_COUNT } from '../constants';
-import { niceStep, niceTicks } from '../scales/niceNumbers';
+import { niceStep, niceTicks } from './scales/niceNumbers';
 
 export interface ValueFormatOptions {
   /** Decimals of the axis tick step: 0 for an integer step, 1 for 0.2, 2 for 0.25. */

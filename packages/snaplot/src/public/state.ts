@@ -11,7 +11,7 @@
  *   hear about it at most once per animation frame. The cursor is not in it: it is the hot
  *   channel, `cursor:change`.
  */
-import { nextFrame } from '../core/RenderScheduler';
+import { nextFrame } from '../engine/render/scheduler';
 import { fail, hint } from '../engine/errors';
 import { equivalent } from './options';
 

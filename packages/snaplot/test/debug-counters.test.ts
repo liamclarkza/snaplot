@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { RingColumnarStore } from '../src/data/RingColumnarStore';
+import { RingColumnarStore } from '../src/engine/data/RingColumnarStore';
 import type { ChartHandle, ChartOptions } from '../src/index';
 import { debug, type Fakes, installFakes } from './fakes';
 

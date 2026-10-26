@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChartCore } from '../../src/core/Chart';
+import { ChartCore } from '../../src/engine/Engine';
 import { createChartGroup } from '../../src/index';
 import { axis, clientPoint, debug, type Fakes, installFakes, pointerTarget } from '../fakes';
 
