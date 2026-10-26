@@ -92,7 +92,7 @@ describe('[research-14] seven events, one name per concept', () => {
 });
 
 describe('[gap-overhaul-delta-03] isolated listeners over a snapshot (P14)', () => {
-  it.fails('[gap-overhaul-delta-03] a throwing on() listener does not stop later listeners, and is rethrown asynchronously', () => {
+  it('[gap-overhaul-delta-03] a throwing on() listener does not stop later listeners, and is rethrown asynchronously', () => {
     const queued = captureRethrows();
     const chart = mount<Row>(fakes, base);
     const group = linked(chart);
@@ -108,7 +108,7 @@ describe('[gap-overhaul-delta-03] isolated listeners over a snapshot (P14)', () 
     expect(() => queued[0]()).toThrow('first listener fails');
   });
 
-  it.fails('[gap-overhaul-delta-03] a throwing subscriber does not stop later subscribers', () => {
+  it('[gap-overhaul-delta-03] a throwing subscriber does not stop later subscribers', () => {
     captureRethrows();
     const chart = mount<Row>(fakes, base);
     let later = 0;
@@ -123,7 +123,7 @@ describe('[gap-overhaul-delta-03] isolated listeners over a snapshot (P14)', () 
     expect(later).toBe(1);
   });
 
-  it.fails('[gap-overhaul-delta-03] a listener added during dispatch runs from the next emit', () => {
+  it('[gap-overhaul-delta-03] a listener added during dispatch runs from the next emit', () => {
     const chart = mount<Row>(fakes, base);
     const group = linked(chart);
     const late = vi.fn();
@@ -136,7 +136,7 @@ describe('[gap-overhaul-delta-03] isolated listeners over a snapshot (P14)', () 
     expect(late).toHaveBeenCalledWith('w');
   });
 
-  it.fails('[gap-overhaul-delta-03] an unsubscribe during dispatch still lets that dispatch finish', () => {
+  it('[gap-overhaul-delta-03] an unsubscribe during dispatch still lets that dispatch finish', () => {
     const chart = mount<Row>(fakes, base);
     const group = linked(chart);
     const second = vi.fn();
@@ -158,7 +158,12 @@ describe('[backlog-02][dataapi-21] events are queued until the call commits', ()
     });
     const seen: unknown[] = [];
     chart.on('selection:change', (selection) =>
-      seen.push([selection, chart.getState().selection, chart.scale('x')?.min]),
+      // scale() lands with the plugin contract; until then the listener must not throw.
+      seen.push([
+        selection,
+        chart.getState().selection,
+        typeof chart.scale === 'function' ? chart.scale('x')?.min : undefined,
+      ]),
     );
     chart.update({ data: Array.from({ length: 10 }, (_, i) => ({ t: 500 + i, v: 1, w: 1 })) });
     expect(seen).toEqual([[null, null, 500]]);
@@ -201,7 +206,7 @@ describe('[backlog-02][dataapi-21] events are queued until the call commits', ()
 });
 
 describe('[arch-07][frameworks-01] cold state, revision and the cursor channel', () => {
-  it.fails('[arch-07] cursor moves do not notify state subscribers', () => {
+  it('[arch-07] cursor moves do not notify state subscribers', () => {
     const chart = mount<Row>(fakes, base);
     let notified = 0;
     chart.subscribe(() => {
@@ -230,7 +235,7 @@ describe('[arch-07][frameworks-01] cold state, revision and the cursor channel',
     ]);
   });
 
-  it.fails('[frameworks-01] every data, option or state commit bumps the revision', () => {
+  it('[frameworks-01] every data, option or state commit bumps the revision', () => {
     const chart = mount<Row>(fakes, base);
     const revisions = [chart.getState().revision];
     const record = () => revisions.push(chart.getState().revision);
@@ -246,7 +251,7 @@ describe('[arch-07][frameworks-01] cold state, revision and the cursor channel',
       expect(revisions[i]).toBeGreaterThan(revisions[i - 1]);
   });
 
-  it.fails('[frameworks-01] subscribers are notified once per frame however many commits it holds', () => {
+  it('[frameworks-01] subscribers are notified once per frame however many commits it holds', () => {
     const chart = mount<Row>(fakes, { ...base, streaming: { maxPoints: 1000 } });
     let notified = 0;
     chart.subscribe(() => {
@@ -261,7 +266,7 @@ describe('[arch-07][frameworks-01] cold state, revision and the cursor channel',
     expect(notified).toBe(2);
   });
 
-  it.fails('[frameworks-01] getState().series lists every series with its colour and visibility', () => {
+  it('[frameworks-01] getState().series lists every series with its colour and visibility', () => {
     const chart = mount<Row>(fakes, { ...base, hiddenSeries: ['w'] });
     expect(
       chart.getState().series.map(({ id, label, type, visible }) => ({ id, label, type, visible })),

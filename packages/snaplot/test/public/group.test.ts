@@ -134,7 +134,7 @@ describe('[frameworks-21] colours by series id', () => {
     expect(new Set([colour(b, 'cpu'), colour(b, 'mem'), colour(b, 'disk')]).size).toBe(3);
   });
 
-  it.fails('[frameworks-21] an explicit series colour still wins', () => {
+  it('[frameworks-21] an explicit series colour still wins', () => {
     const group = createChartGroup();
     mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group });
     const b = mount<Row>(fakes, {

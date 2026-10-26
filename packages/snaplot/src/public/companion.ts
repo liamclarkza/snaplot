@@ -19,6 +19,8 @@ export interface Companion {
   cursor(fallback: 'latest' | 'first' | 'hide'): CursorSnapshot<any>;
   /** The X axis title, for the legend table's header. */
   xTitle(): string | undefined;
+  /** Follow every data, option and state commit as it happens; returns the unsubscribe. */
+  observe(listener: () => void): () => void;
 }
 
 /** The companion of each live chart handle. */

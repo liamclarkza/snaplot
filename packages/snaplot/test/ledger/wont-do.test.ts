@@ -18,7 +18,7 @@ afterEach(() => {
 
 /** Series colours, read from the final state shape when it exists. */
 function seriesColours(chart: ChartHandle<any>): string[] {
-  const state = chart.getState() as { series?: Array<{ color: string }> };
+  const state = chart.getState() as unknown as { series?: Array<{ color: string }> };
   return state.series?.map((series) => series.color) ?? chart.getLegendItems().map((i) => i.color);
 }
 

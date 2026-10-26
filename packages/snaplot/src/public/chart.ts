@@ -55,6 +55,7 @@ import type {
   CursorSnapshot,
   DataSource,
   Selection,
+  SeriesState,
   Viewport,
   ViewportRanges,
 } from './types';
@@ -120,8 +121,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   /** The one X pass per source and append batch (plan §3.4), for the debug symbol. */
   private counters = { xValidations: 0 };
   private hidden = new Set<string>();
-  private state!: ChartState<Row>;
-  private subscribers = new Set<() => void>();
+  /** getState()'s snapshot, taken at its revision. */
+  private cold?: ChartState;
   private events: Dispatcher<ChartEvents<Row>>;
   private off: Array<() => void> = [];
   private mutating = false;
@@ -146,7 +147,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       EVENTS,
       (key) => this.read(key),
       (event, value) => this.callback(event, value),
-      () => this.publish(),
     );
     // User plugin install hooks need the completed public handle, not a half-built engine,
     // so plugins are installed below, and the engine's first paint waits for them.
@@ -175,13 +175,13 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       toggle: (id) => this.toggleSeries(id),
       highlight: (id) => this.syncHighlight(id),
       highlighted: () => this.read('highlight') as string | null,
-      series: () => this.getLegendItems(),
+      series: () => this.getState().series,
       cursor: (fallback) => this.getCursorSnapshot({ fallback }),
       xTitle: () => this.ingested.spec.axes?.x?.title,
+      observe: (listener) => this.events.observe(listener),
     });
     try {
       this.applyAccessibleName();
-      this.state = this.readState();
       this.bindEngine();
       this.lines.setLines(this.ingested.referenceLines);
       this.regions.setRegions(this.ingested.referenceRegions);
@@ -198,7 +198,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.engine.paint();
       groups.get(normalized.group!)?.members.add(this);
       coordinate(normalized.group);
-      this.state = this.readState();
       this.events.reset();
     } catch (error) {
       // Every option is checked before the engine exists. Should anything here throw anyway,
@@ -786,12 +785,13 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (this.mutating) return this.liveOptions();
     return (this.optionsSnapshot ??= this.liveOptions());
   }
-  getState(): ChartState<Row> {
-    return this.state;
+  /** The cold state: one frozen snapshot per revision (plan §3.2). */
+  getState(): ChartState {
+    if (this.cold?.revision !== this.events.revision) this.cold = this.readState();
+    return this.cold;
   }
   subscribe(listener: () => void): () => void {
-    this.subscribers.add(listener);
-    return () => this.subscribers.delete(listener);
+    return this.events.subscribe(listener);
   }
   on<K extends keyof ChartEvents<Row>>(
     event: K,
@@ -1132,33 +1132,53 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   coordinatePadding(left: number | undefined, right: number | undefined): void {
     this.engine.setOptions({ padding: { left: left ?? 56, right: right ?? 24 } });
   }
-  private readState(): ChartState<Row> {
+  private readState(): ChartState {
     return Object.freeze({
+      revision: this.events.revision,
       viewport: this.viewport(),
       selection: this.selection(),
       hiddenSeries: Object.freeze([...this.hidden]),
       highlight: this.read('highlight') as string | null,
       following: this.engine.isFollowing(),
-      cursor: this.getCursorSnapshot(),
+      series: this.seriesStates(),
     });
   }
+  /** Each series' colour, mark and visibility, as `getState().series` reports them. */
+  private seriesStates(): readonly SeriesState[] {
+    return Object.freeze(
+      this.engine.getLegendItems().map(({ seriesIndex: _index, meta: _meta, ...item }, index) =>
+        Object.freeze({
+          ...item,
+          dash: Object.freeze(item.dash),
+          id: this.ingested.seriesIds[index],
+        }),
+      ),
+    );
+  }
+  /** A data, option or state commit: bump the revision (subscribers hear once per frame). */
   private publish(): void {
     if (this.mutating || this.destroyed) return;
-    const next = this.readState();
-    if (equivalent(this.state, next)) return;
-    this.state = next;
-    for (const listener of this.subscribers) listener();
-    this.emit('state:change', this.state);
+    this.events.commit();
+    if (this.events.listened('state:change')) this.emit('state:change', this.getState());
+  }
+  /** The cursor's X as the axis reads it: a category label, else the data value. */
+  private cursorLabel(): number | string | null {
+    const x = this.engine.getCursorX();
+    if (x === null) return null;
+    return this.ingested.categories.get('x')?.labels.get(Math.round(x)) ?? x;
   }
   private bindEngine(): void {
     this.off.push(
       this.engine.on('action', (start) => this.events.bracket(start)),
       this.engine.on('cursor:move', () => {
         if (this.mutating) return;
-        this.publish();
-        this.emit('cursor:change', this.state.cursor);
-        if (this.options.group?.options.cursor)
-          broadcast(this.options.group, (member) => member.syncCursor(this.state.cursor.x), this);
+        // The hot channel: a snapshot only when something listens (plan §3.2).
+        if (this.events.listened('cursor:change') || this.normalized.callbacks.onCursorChange)
+          this.emit('cursor:change', this.getCursor());
+        if (this.options.group?.options.cursor) {
+          const x = this.cursorLabel();
+          broadcast(this.options.group, (member) => member.syncCursor(x), this);
+        }
       }),
       this.engine.on('viewport:change', (key, range) => {
         this.events.mark('viewport');
@@ -1198,7 +1218,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       }),
       this.engine.on('resize', (width, height) => {
         this.syncLegend();
-        this.publish();
         this.emit('resize', { width, height });
         coordinate(this.options.group);
       }),
@@ -1225,7 +1244,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     for (const off of this.off) off();
     this.engine?.destroy();
     this.destroyed = true;
-    this.subscribers.clear();
     this.events?.clear();
     coordinate(this.options.group);
   }

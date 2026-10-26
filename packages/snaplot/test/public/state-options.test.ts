@@ -191,7 +191,7 @@ describe('[dataapi-16][backlog-02] selection', () => {
 });
 
 describe('hiddenSeries and highlight', () => {
-  it.fails('[frameworks-05] hiddenSeries applies once per changed value; update({ hiddenSeries: undefined }) shows every series', () => {
+  it('[frameworks-05] hiddenSeries applies once per changed value; update({ hiddenSeries: undefined }) shows every series', () => {
     const chart = mount<Row>(fakes, { ...base, hiddenSeries: ['w'] });
     expect(chart.getState().hiddenSeries).toEqual(['w']);
     fakes.frames.flush();
@@ -204,7 +204,7 @@ describe('hiddenSeries and highlight', () => {
     expect(chart.getState().series.map((s) => s.visible)).toEqual([true, true]);
   });
 
-  it.fails('[frameworks-05] a hiddenSeries option kept in setOptions survives a series change that drops it', () => {
+  it('[frameworks-05] a hiddenSeries option kept in setOptions survives a series change that drops it', () => {
     const chart = mount<Row>(fakes, base);
     chart.update({ hiddenSeries: ['w'] });
     chart.update({ series: [base.series[0]] });

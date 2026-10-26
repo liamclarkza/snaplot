@@ -71,6 +71,15 @@ to [Semantic Versioning](https://semver.org/).
   once.
 - Events: `follow:change` is `following:change` and `visibility:change` is
   `hiddenSeries:change`; an event name that does not exist throws.
+- `getState()` is `{ revision, viewport, selection, hiddenSeries, highlight, following, series }`,
+  one frozen object per revision: every data, option or state commit bumps `revision`, and
+  `series` lists each series' id, label, mark, colour, fill, dash, opacity and visibility (it
+  replaces `getLegendItems()`). The cursor left the state: read it with `getCursor({ fallback })`
+  or listen to `cursor:change`, so cursor moves no longer wake `subscribe()` listeners, which are
+  called at most once per animation frame.
+- Listeners are isolated: one that throws is reported asynchronously and the others still run.
+  Events raised inside a call are delivered after it commits, and a listener added during a
+  dispatch runs from the next one.
 
 ### Legends (1.0)
 

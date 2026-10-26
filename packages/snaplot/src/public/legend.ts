@@ -123,13 +123,9 @@ export function mountLegend<Row>(
     });
   };
   refresh();
-  const offs = [
-    chart.subscribe(refresh),
-    chart.on('options:update', refresh),
-    chart.on('theme:update', refresh),
-  ];
+  const unobserve = control.observe(refresh);
   return () => {
-    for (const off of offs) off();
+    unobserve();
     root.remove();
     buttons.clear();
     parent.style.display = restore.display;
@@ -340,13 +336,7 @@ export function createLegendTable<Row = Record<string, any>>(
   const bind = () => {
     unbind();
     const chart = current.chart;
-    const offs = [
-      chart.subscribe(refresh),
-      chart.on('cursor:change', refresh),
-      chart.on('options:update', refresh),
-      chart.on('theme:update', refresh),
-      chart.on('data:update', refresh),
-    ];
+    const offs = [companion(chart).observe(refresh), chart.on('cursor:change', refresh)];
     unbind = () => {
       for (const off of offs) off();
     };

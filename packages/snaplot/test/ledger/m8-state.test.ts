@@ -139,7 +139,7 @@ describe('[gap-overhaul-delta-03] one bad listener never blocks the others', () 
     return queued;
   }
 
-  it.fails('[gap-overhaul-delta-03] a throwing on() listener does not stop later listeners', () => {
+  it('[gap-overhaul-delta-03] a throwing on() listener does not stop later listeners', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const queued = captureRethrows();
     const chart = mountLine({ highlight: { enabled: true } });
@@ -173,7 +173,7 @@ describe('[gap-overhaul-delta-03] one bad listener never blocks the others', () 
 });
 
 describe('[arch-07][frameworks-01] cold state and the cursor are separate channels', () => {
-  it.fails('[arch-07] cursor moves do not notify state subscribers', () => {
+  it('[arch-07] cursor moves do not notify state subscribers', () => {
     const chart = mountLine();
     let notified = 0;
     chart.subscribe(() => {
@@ -183,7 +183,7 @@ describe('[arch-07][frameworks-01] cold state and the cursor are separate channe
     expect(notified).toBe(0);
   });
 
-  it.fails('[frameworks-01] a data commit that keeps the viewport bumps the state revision', () => {
+  it('[frameworks-01] a data commit that keeps the viewport bumps the state revision', () => {
     const chart = mountLine();
     let notified = 0;
     chart.subscribe(() => {

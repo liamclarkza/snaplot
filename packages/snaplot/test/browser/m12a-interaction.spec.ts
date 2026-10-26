@@ -50,7 +50,7 @@ test.describe('hover model', () => {
       window.harness.chart('chart-0').setViewport({ x: { min: 15, max: 44 } }),
     );
     await settle(page);
-    const cursor = await page.evaluate(() => window.harness.chart('chart-0').getState().cursor.x);
+    const cursor = await page.evaluate(() => window.harness.chart('chart-0').getCursor().x);
     expect(cursor).not.toBe(13);
     expect(Number(cursor)).toBeGreaterThanOrEqual(15);
   });
@@ -400,7 +400,7 @@ test.describe('containers', () => {
     });
     await page.mouse.move(visible.left + visible.width * 0.75, visible.top + visible.height / 2);
     await settle(page);
-    const cursor = await page.evaluate(() => window.harness.chart('chart-0').getState().cursor.x);
+    const cursor = await page.evaluate(() => window.harness.chart('chart-0').getCursor().x);
     expect(Number(cursor)).toBeGreaterThanOrEqual(44);
     expect(Number(cursor)).toBeLessThanOrEqual(46);
   });

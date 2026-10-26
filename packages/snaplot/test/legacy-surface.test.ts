@@ -29,8 +29,8 @@ describe('[arch-10] the removed engine sync is unreachable through untyped optio
 
     hover(a, 50, 0);
 
-    expect(a.getState().cursor.x).not.toBeNull();
-    expect(b.getState().cursor.x).toBeNull();
+    expect(a.getCursor().x).not.toBeNull();
+    expect(b.getCursor().x).toBeNull();
   });
 
   it('[arch-10] an untyped highlight.syncKey does not link two charts', () => {

@@ -53,3 +53,21 @@ export class RenderScheduler {
     }
   }
 }
+
+/**
+ * Run `callback` on the next animation frame (or a microtask where there are no frames, as
+ * during server rendering). Returns a cancel function.
+ */
+export function nextFrame(callback: () => void): () => void {
+  if (typeof requestAnimationFrame !== 'function') {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) callback();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }
+  const id = requestAnimationFrame(() => callback());
+  return () => cancelAnimationFrame(id);
+}

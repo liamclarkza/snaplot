@@ -419,10 +419,11 @@ describe('public chart transactions', () => {
     chart.setCursor(1);
     const state = chart.getState();
     expect(chart.getState()).toBe(state);
-    expect(Object.isFrozen(state.cursor)).toBe(true);
-    expect(Object.isFrozen(state.cursor.points)).toBe(true);
-    expect(Object.isFrozen(state.cursor.points[0])).toBe(true);
-    expect(state.cursor.points[0].row).toBe(row);
+    const cursor = chart.getCursor();
+    expect(Object.isFrozen(cursor)).toBe(true);
+    expect(Object.isFrozen(cursor.points)).toBe(true);
+    expect(Object.isFrozen(cursor.points[0])).toBe(true);
+    expect(cursor.points[0].row).toBe(row);
     expect(Object.isFrozen(row)).toBe(false);
   });
 

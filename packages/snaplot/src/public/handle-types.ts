@@ -134,8 +134,13 @@ export interface SeriesState {
   opacity: number;
 }
 
-/** The chart's state, as `getState()` reports it. */
-export interface ChartState<Row = Record<string, any>> {
+/**
+ * The chart's state, as `getState()` reports it: one frozen snapshot per revision. The cursor
+ * is not part of it; read it with `getCursor()` or listen to `cursor:change`.
+ */
+export interface ChartState {
+  /** Bumped by every data, option or state commit, so a subscriber can tell a change. */
+  revision: number;
   /** The pinned axes, as `[from, to]`; `{}` when every axis is automatic. */
   viewport: Viewport;
   /** The selection, or `null`. */
@@ -146,8 +151,8 @@ export interface ChartState<Row = Record<string, any>> {
   highlight: string | null;
   /** Whether the X viewport follows the latest data. */
   following: boolean;
-  /** The values under the cursor. */
-  cursor: CursorSnapshot<Row>;
+  /** Every series with its colour, mark and visibility, in paint order. */
+  series: readonly SeriesState[];
 }
 
 /** Event payloads by event name, for `chart.on()`. */
@@ -167,7 +172,7 @@ export interface ChartEvents<Row = Record<string, any>> {
   /** A point was clicked. */
   'point:click': ChartPoint<Row>;
   /** Any state changed. */
-  'state:change': ChartState<Row>;
+  'state:change': ChartState;
   /** A box selection finished. */
   select: SelectionResult<Row>;
   /** Data was replaced or appended. */
@@ -360,9 +365,12 @@ export interface ChartHandle<Row = Record<string, any>> {
   appendData(data: DataSource<Row>, options?: AppendOptions): void;
   /** The options as last applied. */
   getOptions(): Readonly<ChartOptions<Row>>;
-  /** The current state. */
-  getState(): ChartState<Row>;
-  /** Called after any state change; returns the unsubscribe function. */
+  /** The current state: the same frozen object until the next commit. */
+  getState(): ChartState;
+  /**
+   * Called after data, options or state change, at most once per animation frame; returns the
+   * unsubscribe function. Cursor moves do not call it: listen to `cursor:change`.
+   */
   subscribe(listener: () => void): () => void;
   /** Listen to one event; returns the unsubscribe function. */
   on<K extends keyof ChartEvents<Row>>(

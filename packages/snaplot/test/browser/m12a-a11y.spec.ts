@@ -63,7 +63,7 @@ test.describe('accessibility', () => {
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(300);
     await settle(page);
-    const cursor = await page.evaluate(() => window.harness.chart('chart-0').getState().cursor.x);
+    const cursor = await page.evaluate(() => window.harness.chart('chart-0').getCursor().x);
     expect(cursor).not.toBeNull();
     const live = await page.evaluate(() =>
       [...document.querySelectorAll('[aria-live="polite"]')].map((node) => node.textContent ?? ''),

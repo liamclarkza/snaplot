@@ -89,7 +89,7 @@ describe('[arch-03][dataapi-10] presentation changes never ingest (P6)', () => {
     expect(texts(chart)).toContain('Load');
   });
 
-  it.fails('[arch-03] a series colour change repaints the data without an ingest', () => {
+  it('[arch-03] a series colour change repaints the data without an ingest', () => {
     const chart = mount<Row>(fakes, base);
     const work = measure(chart, () =>
       chart.update({ series: [{ y: 'cpu', label: 'CPU', color: '#ff0000' }, base.series[1]] }),

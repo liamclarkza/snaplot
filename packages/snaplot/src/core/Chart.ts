@@ -1428,6 +1428,11 @@ export class ChartCore implements EngineHost {
     return this.highlightedSeries;
   }
 
+  /** The data X of the cursor, or `null` when there is none. */
+  getCursorX(): number | null {
+    return this.cursorDataX;
+  }
+
   getStats(): ChartStats {
     return {
       dataVersion: this.stats.dataVersion,
