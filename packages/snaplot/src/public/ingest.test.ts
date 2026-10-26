@@ -558,3 +558,165 @@ describe('[dataapi-20] an append plan changes nothing until it is committed (D23
     expect(colorBy().format?.(1)).toBe('new');
   });
 });
+
+describe('[arch-03] ingest reads again only the sources and columns that changed (D16)', () => {
+  type R = { t: number; a: number; b: number; k: string };
+  const data: R[] = Array.from({ length: 6 }, (_, t) => ({
+    t,
+    a: t,
+    b: 10 * t,
+    k: t % 2 ? 'odd' : 'even',
+  }));
+
+  /** Ingest `next` as an update after `before` does: the X passes it makes, and the result. */
+  function again<Row>(
+    before: ChartOptions<Row>,
+    next: ChartOptions<Row>,
+    context: Partial<IngestContext<Row>> = {},
+  ) {
+    const previous = run(before);
+    const counters = { xValidations: 0 };
+    const result = ingest(normalize(next), {
+      counters,
+      previousEncodings: previous.encodings,
+      previousCategories: previous.categories,
+      previous: { sources: previous.sources, options: normalize(before) },
+      ...context,
+    });
+    return { previous, result, passes: counters.xValidations };
+  }
+  const yColumn = (ingested: ReturnType<typeof run>, si: number) =>
+    ingested.sources[ingested.seriesSources[si]].columns[ingested.spec.series[si].yColumn!];
+
+  it.fails('[arch-03] a new accessor identity keeps the X and the other columns, and replaces its own', () => {
+    const b = (row: R) => row.b;
+    const { previous, result, passes } = again<R>(
+      {
+        data,
+        x: 't',
+        series: [
+          { id: 's', y: (row) => row.a },
+          { id: 'u', y: b },
+        ],
+      },
+      {
+        data,
+        x: 't',
+        series: [
+          { id: 's', y: (row) => -row.a },
+          { id: 'u', y: b },
+        ],
+      },
+    );
+    expect(passes).toBe(0);
+    expect(result.sources[0].columns[0]).toBe(previous.sources[0].columns[0]);
+    expect(result.sources[0].columns).toHaveLength(3);
+    expect(values(yColumn(result, 0))).toEqual(data.map((row) => -row.a));
+    expect(yColumn(result, 1)).toBe(yColumn(previous, 1));
+  });
+
+  it.fails('[arch-03] reads only the source whose input changed, rows or typed columns', () => {
+    const columns = { columns: { t: Float64Array.of(0, 1, 2), v: Float64Array.of(1, 2, 3) } };
+    const options = (rows: R[]): ChartOptions<any> => ({
+      data: rows,
+      x: 't',
+      series: [
+        { id: 's', y: 'a' },
+        { id: 'c', data: columns, y: 'v' },
+      ],
+    });
+    const { previous, result, passes } = again(options(data), options(data.slice()));
+    expect(passes).toBe(1);
+    expect(result.sources[1].columns[0]).toBe(previous.sources[1].columns[0]);
+    expect(result.sources[0].columns[0]).not.toBe(previous.sources[0].columns[0]);
+  });
+
+  it.fails('[arch-03] keeps a category axis whose sources are all unchanged', () => {
+    type C = { c: string; v: number };
+    const rows: C[] = [
+      { c: 'x', v: 1 },
+      { c: 'y', v: 2 },
+    ];
+    const { previous, result, passes } = again<C>(
+      { data: rows, x: 'c', series: [{ id: 'a', y: (row) => row.v }] },
+      { data: rows, x: 'c', series: [{ id: 'a', y: (row) => row.v * 2 }] },
+    );
+    expect(passes).toBe(0);
+    expect(result.categories.get('x')?.list()).toEqual(['x', 'y']);
+    expect(result.sources[0].columns[0]).toBe(previous.sources[0].columns[0]);
+    expect(values(yColumn(result, 0))).toEqual([2, 4]);
+  });
+
+  it('[arch-03] reads a source again when update({ data }) names it, or what ingest reads changes', () => {
+    const before: ChartOptions<R> = { data, x: 't', series: [{ id: 's', y: 'a' }] };
+    const cases: Array<[string, ChartOptions<R>, Partial<IngestContext<R>>?]> = [
+      ['update({ data }) names it', before, { replace: data }],
+      ['the X field', { ...before, x: (row) => row.t }],
+      ['the axis type', { ...before, axes: { x: { type: 'linear' } } }],
+      ['the time zone', { ...before, timeZone: 'UTC' }],
+      ['the window', { ...before, streaming: { maxPoints: 4 } }],
+    ];
+    for (const [what, next, context] of cases)
+      expect(again(before, next, context).passes, what).toBe(1);
+    const scatter: ChartOptions<R> = { ...before, series: [{ id: 's', type: 'scatter', y: 'a' }] };
+    expect(again(scatter, before).passes, 'a scatter series that becomes a line').toBe(1);
+    expect(
+      again(before, before, { unsorted: new Set(['x#0']) }).passes,
+      'a scatter source an append demotes',
+    ).toBe(1);
+  });
+
+  it('[arch-03] reads every source on a category axis again when one of them changed', () => {
+    type C = { c: string; v: number };
+    const b: C[] = [
+      { c: 'y', v: 3 },
+      { c: 'z', v: 4 },
+    ];
+    const options = (a: C[]): ChartOptions<C> => ({
+      x: 'c',
+      series: [
+        { id: 'a', data: a, y: 'v' },
+        { id: 'b', data: b, y: 'v' },
+      ],
+    });
+    const next = options([
+      { c: 'w', v: 5 },
+      { c: 'y', v: 6 },
+    ]);
+    const { result, passes } = again(
+      options([
+        { c: 'x', v: 1 },
+        { c: 'y', v: 2 },
+      ]),
+      next,
+    );
+    expect(passes).toBe(2);
+    expect(result.categories.get('x')?.list()).toEqual(run(next).categories.get('x')?.list());
+  });
+
+  it('[arch-03] a new colorBy or rowId function reads its colours or ids again', () => {
+    const scatter = (color: (row: R) => string, id: (row: R) => string): ChartOptions<R> => ({
+      data,
+      x: 't',
+      rowId: id,
+      series: [{ id: 's', type: 'scatter', y: 'a', colorBy: { field: color } }],
+    });
+    const { result } = again(
+      scatter(
+        (row) => row.k,
+        (row) => `a${row.t}`,
+      ),
+      scatter(
+        (row) => row.k.toUpperCase(),
+        (row) => `b${row.t}`,
+      ),
+    );
+    const encoding = result.spec.series[0].colorBy;
+    if (typeof encoding !== 'object') throw new Error('expected an encoding');
+    const codes = values(result.sources[0].columns[encoding.column]);
+    expect(codes.map((code) => encoding.format?.(code))).toEqual(
+      data.map((row) => row.k.toUpperCase()),
+    );
+    expect(result.sources[0].rowIds).toEqual(data.map((row) => `b${row.t}`));
+  });
+});

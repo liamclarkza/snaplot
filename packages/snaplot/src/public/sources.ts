@@ -5,7 +5,7 @@
  */
 import { fail } from '../engine/errors';
 import type { AxisSpec, ChartSpec, ColumnarData } from '../engine/spec';
-import type { AccessorLike } from './normalize';
+import type { AccessorLike, NormalizedOptions } from './normalize';
 import type { ColumnData, HistogramBins, RowId } from './types';
 
 // ─── Kinds, ISO dates and categories ─────────────────────────────────
@@ -242,6 +242,14 @@ export interface IngestContext<Row> {
    * stored unsorted stays so on its own (`Retained.unsorted`).
    */
   unsorted?: ReadonlySet<string>;
+  /**
+   * The previous ingest's sources and the options it read (plan D16), passed with its
+   * `previousEncodings` and `previousCategories`: a source whose input, X, axis and ingest
+   * options are unchanged is reused, and only the series columns it lacks are read.
+   */
+  previous?: { sources: readonly SourceState<Row>[]; options: NormalizedOptions<Row> };
+  /** The input `update({ data })` names: read again even if it is the same array (D16). */
+  replace?: unknown;
 }
 
 /** A streamed source's retained data, to ingest instead of its declared input. */
