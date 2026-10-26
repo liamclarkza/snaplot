@@ -99,6 +99,8 @@ const interval = (range: ScaleRange): Interval => Object.freeze([range.min, rang
 
 class Controller<Row> implements ChartHandle<Row>, GroupMember {
   readonly container: HTMLElement;
+  /** The public handle: the fourteen members of plan §4.4 and the debug symbol. */
+  readonly handle: ChartHandle<Row>;
   private engine: ChartCore;
   private options: ChartOptions<Row>;
   private normalized: NormalizedOptions<Row>;
@@ -123,6 +125,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
 
   constructor(element: HTMLElement, options: ChartOptions<Row>) {
     this.container = element;
+    this.handle = publicHandle(this);
     const normalized = normalize(options);
     this.normalized = normalized;
     this.options = normalized.options;
@@ -147,7 +150,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     );
     // Plan D31: untyped debug counters for tests and the bench, never part of
     // ChartHandle. Non-enumerable so nothing that walks the handle sees it.
-    Object.defineProperty(this, Symbol.for('snaplot.debug'), {
+    Object.defineProperty(this.handle, Symbol.for('snaplot.debug'), {
       get: () =>
         Object.freeze(
           Object.defineProperties(
@@ -159,7 +162,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           ),
         ),
     });
-    companions.set(this, {
+    companions.set(this.handle, {
       toggle: (id) => this.toggleSeries(id),
       highlight: (id) => this.syncHighlight(id),
       highlighted: () => this.read('highlight') as string | null,
@@ -176,7 +179,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       // Built-in annotations first, then the user's plugins, which install with the handle.
       this.engine.use(this.regions);
       this.engine.use(this.lines);
-      this.engine.setPlugins(normalized.plugins, this);
+      this.engine.setPlugins(normalized.plugins, this.handle);
       this.mutating = true;
       try {
         this.applyState(this.stateChanges(normalized));
@@ -459,7 +462,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     // A group change moves the palette slots of series without a colour (plan D17).
     if (work.engine || work.group) this.engine.replaceOptions(this.configFor(ingested, normalized));
     // Plugins are reconciled by id: an inline object with a known id only repaints (D21).
-    if (work.plugins) this.engine.setPlugins(normalized.plugins, this);
+    if (work.plugins) this.engine.setPlugins(normalized.plugins, this.handle);
     if (work.annotations) {
       this.lines.setLines(ingested.referenceLines);
       this.regions.setRegions(ingested.referenceRegions);
@@ -514,7 +517,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         /* trusted */ true,
       );
       replaced = true;
-      this.engine.setPlugins(normalized.plugins, this);
+      this.engine.setPlugins(normalized.plugins, this.handle);
       this.lines.setLines(ingested.referenceLines);
       this.regions.setRegions(ingested.referenceRegions);
       this.engine.setHighlight(highlighted ? ingested.seriesIds.indexOf(highlighted) : null);
@@ -794,7 +797,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.legend = undefined;
     } else if (this.legend || !show) return;
     if (show)
-      this.legend = { position, unmount: mountLegend(this, this.engine.root, { position }) };
+      this.legend = { position, unmount: mountLegend(this.handle, this.engine.root, { position }) };
     this.engine.fitToRoot();
   }
 
@@ -1130,7 +1133,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (this.destroyed) return;
     this.legend?.unmount();
     this.legend = undefined;
-    companions.delete(this);
+    companions.delete(this.handle);
     membership(this.options.group, this, false);
     for (const off of this.off) off();
     this.engine?.destroy();
@@ -1157,7 +1160,31 @@ export function createChart<Row = Record<string, any>>(
   element: HTMLElement,
   options: ChartOptions<Row>,
 ): ChartHandle<Row> {
-  return new Controller(element, options);
+  return new Controller(element, options).handle;
+}
+
+/**
+ * The handle createChart() returns (plan §4.4, gap-environments-03): its fourteen members, each
+ * calling the chart, and nothing a group, a legend or the engine uses, so the runtime surface is
+ * the typed one. Plugins, legends and groups receive this object too.
+ */
+function publicHandle<Row>(chart: Controller<Row>): ChartHandle<Row> {
+  return {
+    container: chart.container,
+    update: (patch) => chart.update(patch),
+    setOptions: (options) => chart.setOptions(options),
+    appendData: (data, options) => chart.appendData(data, options),
+    getState: () => chart.getState(),
+    subscribe: (listener) => chart.subscribe(listener),
+    on: (event, listener) => chart.on(event, listener),
+    getCursor: (options) => chart.getCursor(options),
+    resetViewport: () => chart.resetViewport(),
+    resumeFollow: () => chart.resumeFollow(),
+    setCursor: (x) => chart.setCursor(x),
+    scale: (key) => chart.scale(key),
+    redraw: (layer) => chart.redraw(layer),
+    destroy: () => chart.destroy(),
+  };
 }
 
 // The stores only skip validation inside ColumnarStore.trusted; keep the import live.

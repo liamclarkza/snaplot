@@ -386,7 +386,7 @@ describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] a
 });
 
 describe('[gap-environments-03] the final handle', () => {
-  it('[gap-environments-03] the handle has exactly the fourteen 1.0 members and no resize', () => {
+  it('[gap-environments-03] the handle has the fourteen 1.0 members, and no resize or 0.12 member', () => {
     const chart = mount<Row>(fakes, base);
     const members = new Set<string>();
     for (let o: object | null = chart; o && o !== Object.prototype; o = Object.getPrototypeOf(o))
@@ -406,7 +406,7 @@ describe('[gap-environments-03] the final handle', () => {
       expect(removed in chart).toBe(false);
   });
 
-  it.fails('[gap-environments-03] the handle has no member beyond the fourteen, and one symbol', () => {
+  it('[gap-environments-03] the handle has no member beyond the fourteen, and one symbol', () => {
     const chart = mount<Row>(fakes, base);
     const members = new Set<string>();
     for (let o: object | null = chart; o && o !== Object.prototype; o = Object.getPrototypeOf(o))
