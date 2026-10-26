@@ -4,7 +4,7 @@
  * count the area and band marks share.
  */
 import { affineParams } from '../../scales/affine';
-import type { Layout, Scale, SeriesSpec } from '../../spec';
+import type { InterpolationMode, Layout, Scale, SeriesSpec } from '../../spec';
 import { NO_COLUMNS } from '../columns';
 import type { MarkDraw } from '../index';
 
@@ -16,7 +16,7 @@ export interface LineRenderSegment {
 }
 
 /**
- * Line and area chart renderer. Pure function, no state.
+ * Line renderer. Pure function, no state.
  *
  * Interpolation modes:
  * - linear: moveTo/lineTo (fastest, most honest)
@@ -25,9 +25,10 @@ export interface LineRenderSegment {
  *
  * Missing-value handling: non-finite Y (NaN, Infinity) breaks the path,
  * the next valid point starts with moveTo(). `series.spanGaps` skips the
- * break and connects across the gap instead.
+ * break and connects across the gap instead. A run of one point (a single
+ * observation, or a value between two gaps) has no length to stroke, so it
+ * paints as a dot the width of the line.
  */
-
 export function renderLineSegments(
   ctx: CanvasRenderingContext2D,
   segments: LineRenderSegment[],
@@ -39,40 +40,57 @@ export function renderLineSegments(
   /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
 ): void {
-  if (segments.length === 0) return;
-  if (segmentPointCount(segments) <= 1) return;
-
-  const interp = series.interpolation ?? 'linear';
-  const lineWidth = series.lineWidth ?? 1.5;
+  if (segmentPointCount(segments) === 0) return;
 
   // Clip to plot area
   ctx.save();
   ctx.beginPath();
   ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
   ctx.clip();
+  ctx.globalAlpha = (series.opacity ?? 1) * opacityMultiplier;
+  strokeSeriesPath(ctx, segments, scaleX, scaleY, series, color);
+  ctx.restore();
+}
 
+/**
+ * Stroke the path through `segments` in the series' interpolation, dash and width, then the dots
+ * of its one-point runs. Shared by the line, area and band marks.
+ */
+export function strokeSeriesPath(
+  ctx: CanvasRenderingContext2D,
+  segments: LineRenderSegment[],
+  scaleX: Scale,
+  scaleY: Scale,
+  series: SeriesSpec,
+  color: string,
+): void {
+  const lineWidth = series.lineWidth ?? 1.5;
+  if (lineWidth <= 0) return;
   ctx.strokeStyle = color;
   ctx.lineWidth = lineWidth;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  ctx.globalAlpha = (series.opacity ?? 1) * opacityMultiplier;
+  if (series.dash && series.dash.length > 0) ctx.setLineDash(series.dash);
 
-  // Apply dash pattern (if configured)
-  if (series.dash && series.dash.length > 0) {
-    ctx.setLineDash(series.dash);
-  }
-
-  const spanGaps = series.spanGaps === true;
-  if (interp === 'monotone') {
-    drawMonotoneCubicSegments(ctx, segments, scaleX, scaleY, spanGaps);
-  } else if (interp.startsWith('step')) {
-    drawSteppedSegments(ctx, segments, scaleX, scaleY, interp, spanGaps);
-  } else {
-    drawLinearSegments(ctx, segments, scaleX, scaleY, spanGaps);
-  }
-
+  const dots: number[] = [];
+  const tracer = new PathTracer(ctx, series.interpolation ?? 'linear');
+  ctx.beginPath();
+  tracePath(tracer, segments, scaleX, scaleY, series.spanGaps === true, () => {
+    if (tracer.count === 1) dots.push(tracer.lastX, tracer.lastY);
+  });
   ctx.stroke();
-  ctx.restore();
+
+  if (dots.length > 0) {
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    const radius = Math.max(2, lineWidth);
+    for (let i = 0; i < dots.length; i += 2) {
+      ctx.moveTo(dots[i] + radius, dots[i + 1]);
+      ctx.arc(dots[i], dots[i + 1], radius, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
 }
 
 export const lineDraw: MarkDraw = {
@@ -96,18 +114,22 @@ export const lineDraw: MarkDraw = {
     ),
 };
 
-// ─── Linear interpolation ──────────────────────────────────────
+// ─── Path tracing ──────────────────────────────────────────────
 
-function drawLinearSegments(
-  ctx: CanvasRenderingContext2D,
+/**
+ * Walk the finite pixel points of `segments` into `tracer`, one run per stretch between gaps
+ * (one run in all with `spanGaps`). `endRun` runs after each run is traced, with the tracer
+ * still holding its first and last points, so a caller can close it (an area to its baseline)
+ * or note a one-point run.
+ */
+export function tracePath(
+  tracer: PathTracer,
   segments: LineRenderSegment[],
   scaleX: Scale,
   scaleY: Scale,
   spanGaps: boolean,
+  endRun?: () => void,
 ): void {
-  ctx.beginPath();
-  let moved = false;
-
   // Hoist affine scale transforms so the hot loop is inline multiply-add
   // instead of a polymorphic dataToPixel call per point; log/custom scales
   // fall back to the method path.
@@ -118,86 +140,101 @@ function drawLinearSegments(
   const ky = ay ? ay[0] : 0;
   const by = ay ? ay[1] : 0;
 
+  const finish = () => {
+    if (tracer.count === 0) return;
+    tracer.end();
+    endRun?.();
+    tracer.begin();
+  };
+
+  tracer.begin();
+  // Runs accumulate across segment boundaries: a ring buffer splits
+  // logically contiguous data into two physical segments, and breaking
+  // between them would leave a visible gap at the seam.
   for (const segment of segments) {
     const { xData, yData, startIdx, endIdx } = segment;
     for (let i = startIdx; i <= endIdx; i++) {
       const yVal = yData[i];
       if (!Number.isFinite(yVal)) {
-        if (!spanGaps) moved = false;
+        if (!spanGaps) finish();
         continue;
       }
-
       const px = ax ? xData[i] * kx + bx : scaleX.dataToPixel(xData[i]);
       const py = ay ? yVal * ky + by : scaleY.dataToPixel(yVal);
       if (!Number.isFinite(px) || !Number.isFinite(py)) {
-        if (!spanGaps) moved = false;
+        if (!spanGaps) finish();
         continue;
       }
-
-      if (!moved) {
-        ctx.moveTo(px, py);
-        moved = true;
-      } else {
-        ctx.lineTo(px, py);
-      }
+      tracer.point(px, py);
     }
   }
+  finish();
 }
 
-// ─── Stepped interpolation ─────────────────────────────────────
+/**
+ * Emits one run of pixel points as path commands in an interpolation mode. Linear and stepped
+ * runs stream; monotone runs buffer until `end()`, since each tangent needs both neighbours.
+ * `begin(true)` joins the run to the current point with a lineTo instead of a moveTo, so a band
+ * can trace its lower edge backwards onto the end of its upper edge.
+ */
+export class PathTracer {
+  count = 0;
+  firstX = 0;
+  firstY = 0;
+  lastX = 0;
+  lastY = 0;
+  private connect = false;
+  private readonly xs: number[] = [];
+  private readonly ys: number[] = [];
 
-function drawSteppedSegments(
-  ctx: CanvasRenderingContext2D,
-  segments: LineRenderSegment[],
-  scaleX: Scale,
-  scaleY: Scale,
-  mode: string,
-  spanGaps: boolean,
-): void {
-  ctx.beginPath();
-  let moved = false;
-  let prevPx = 0,
-    prevPy = 0;
+  constructor(
+    private readonly ctx: CanvasRenderingContext2D,
+    private readonly mode: InterpolationMode,
+  ) {}
 
-  for (const segment of segments) {
-    const { xData, yData, startIdx, endIdx } = segment;
-    for (let i = startIdx; i <= endIdx; i++) {
-      const yVal = yData[i];
-      if (!Number.isFinite(yVal)) {
-        if (!spanGaps) moved = false;
-        continue;
-      }
+  begin(connect = false): void {
+    this.count = 0;
+    this.connect = connect;
+    this.xs.length = 0;
+    this.ys.length = 0;
+  }
 
-      const px = scaleX.dataToPixel(xData[i]);
-      const py = scaleY.dataToPixel(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) {
-        if (!spanGaps) moved = false;
-        continue;
-      }
-
-      if (!moved) {
-        ctx.moveTo(px, py);
-        moved = true;
-      } else {
-        if (mode === 'step-after') {
-          // Horizontal to new X at old Y, then vertical
-          ctx.lineTo(px, prevPy);
-          ctx.lineTo(px, py);
-        } else if (mode === 'step-before') {
-          // Vertical at old X to new Y, then horizontal
-          ctx.lineTo(prevPx, py);
-          ctx.lineTo(px, py);
-        } else {
-          // step-middle: horizontal to midpoint, vertical, horizontal
-          const midX = (prevPx + px) / 2;
-          ctx.lineTo(midX, prevPy);
-          ctx.lineTo(midX, py);
-          ctx.lineTo(px, py);
-        }
-      }
-      prevPx = px;
-      prevPy = py;
+  point(px: number, py: number): void {
+    const { ctx, mode } = this;
+    if (mode === 'monotone') {
+      this.xs.push(px);
+      this.ys.push(py);
+    } else if (this.count === 0) {
+      if (this.connect) ctx.lineTo(px, py);
+      else ctx.moveTo(px, py);
+    } else if (mode === 'linear') {
+      ctx.lineTo(px, py);
+    } else if (mode === 'step-after') {
+      // Horizontal to new X at old Y, then vertical
+      ctx.lineTo(px, this.lastY);
+      ctx.lineTo(px, py);
+    } else if (mode === 'step-before') {
+      // Vertical at old X to new Y, then horizontal
+      ctx.lineTo(this.lastX, py);
+      ctx.lineTo(px, py);
+    } else {
+      // step-middle: horizontal to midpoint, vertical, horizontal
+      const midX = (this.lastX + px) / 2;
+      ctx.lineTo(midX, this.lastY);
+      ctx.lineTo(midX, py);
+      ctx.lineTo(px, py);
     }
+    if (this.count === 0) {
+      this.firstX = px;
+      this.firstY = py;
+    }
+    this.lastX = px;
+    this.lastY = py;
+    this.count++;
+  }
+
+  end(): void {
+    if (this.mode === 'monotone') drawMonotoneRun(this.ctx, this.xs, this.ys, this.connect);
   }
 }
 
@@ -208,57 +245,18 @@ function drawSteppedSegments(
  * Guarantees no overshoot between data points.
  * Per spec §4.4: "critical for metrics that can't go negative"
  */
-function drawMonotoneCubicSegments(
+function drawMonotoneRun(
   ctx: CanvasRenderingContext2D,
-  segments: LineRenderSegment[],
-  scaleX: Scale,
-  scaleY: Scale,
-  spanGaps: boolean,
+  px: number[],
+  py: number[],
+  connect: boolean,
 ): void {
-  ctx.beginPath();
-  let px: number[] = [];
-  let py: number[] = [];
-
-  const flushRun = () => {
-    drawMonotoneRun(ctx, px, py);
-    px = [];
-    py = [];
-  };
-
-  // Runs accumulate across segment boundaries: a ring buffer splits
-  // logically contiguous data into two physical segments, and flushing
-  // between them would leave a visible gap in the curve at the seam.
-  for (const segment of segments) {
-    const { xData, yData, startIdx, endIdx } = segment;
-    for (let i = startIdx; i <= endIdx; i++) {
-      const yVal = yData[i];
-      if (!Number.isFinite(yVal)) {
-        if (!spanGaps) flushRun();
-        continue;
-      }
-      const x = scaleX.dataToPixel(xData[i]);
-      const y = scaleY.dataToPixel(yVal);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) {
-        if (!spanGaps) flushRun();
-        continue;
-      }
-      px.push(x);
-      py.push(y);
-    }
-  }
-
-  flushRun();
-}
-
-function drawMonotoneRun(ctx: CanvasRenderingContext2D, px: number[], py: number[]): void {
   const n = px.length;
   if (n === 0) return;
-  if (n === 1) {
-    ctx.moveTo(px[0], py[0]);
-    return;
-  }
+  if (connect) ctx.lineTo(px[0], py[0]);
+  else ctx.moveTo(px[0], py[0]);
+  if (n === 1) return;
   if (n === 2) {
-    ctx.moveTo(px[0], py[0]);
     ctx.lineTo(px[1], py[1]);
     return;
   }
@@ -310,8 +308,6 @@ function drawMonotoneRun(ctx: CanvasRenderingContext2D, px: number[], py: number
   }
 
   // Draw using bezierCurveTo
-  ctx.moveTo(px[0], py[0]);
-
   for (let i = 0; i < n - 1; i++) {
     const d = dx[i] / 3;
     ctx.bezierCurveTo(

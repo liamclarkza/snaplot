@@ -26,6 +26,7 @@ function chart(redraw = vi.fn()): EngineHost {
       setPixelRange: () => {},
     }),
     getTheme: () => lightTheme,
+    resolveColor: (color: string) => color,
   } as unknown as EngineHost;
 }
 

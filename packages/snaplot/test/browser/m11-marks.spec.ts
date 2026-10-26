@@ -51,7 +51,6 @@ test.describe('marks paint every finite datum', () => {
   test('[render-05] an isolated point between gaps paints on a line', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[render-05]');
     const data: Datum[] = [
       { t: 0, v: 2 },
       { t: 1, v: 3 },
@@ -68,7 +67,6 @@ test.describe('marks paint every finite datum', () => {
   test('[render-05] an isolated point between gaps paints on an area', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[render-05]');
     const data: Datum[] = [
       { t: 0, v: 2 },
       { t: 1, v: null },
@@ -84,7 +82,6 @@ test.describe('marks paint every finite datum', () => {
   test('[backlog-04][visuals-21:def-04] a single observation paints a marker', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[backlog-04]');
     const data: Datum[] = [{ t: 3, v: 5 }];
     await mount(page, data);
     expect(await unpainted(page, data)).toEqual([]);

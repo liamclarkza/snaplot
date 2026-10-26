@@ -274,12 +274,13 @@ describe('CSS variable and color-space resolution', () => {
     expect(theme.crosshairColor).toBe('rgb(122, 162, 247)');
   });
 
-  it('normalizes oklch backgrounds so dark detection picks dark role palettes', () => {
+  it('reads oklch backgrounds so dark detection picks dark role palettes', () => {
     const container = stubDom({});
     const theme = resolveTheme(container, {
       backgroundColor: 'oklch(0.32 0.02 260)',
     });
-    expect(theme.backgroundColor).toBe('rgb(40, 44, 60)');
+    // The canvas paints oklch as given; the parser reads it back as rgb(40, 44, 60).
+    expect(theme.backgroundColor).toBe('oklch(0.32 0.02 260)');
     // rgb(40,44,60) is dark: the sequential ramp must be the dark-anchored one.
     const darkDefault = resolveTheme(container, { backgroundColor: '#14161f' });
     expect(theme.sequentialPalette).toEqual(darkDefault.sequentialPalette);

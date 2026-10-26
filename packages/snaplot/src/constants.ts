@@ -47,11 +47,13 @@ export const PALETTE_CATEGORICAL_DARK = [
  * for a neutral midpoint.
  */
 export const PALETTE_SEQUENTIAL_LIGHT = [
-  '#f8fbff',
-  '#dceeff',
-  '#9ecae1',
-  '#4292c6',
-  '#1368aa',
+  // The lightest stop keeps 1.5:1 against white at the scatter's 0.8 alpha, so the lowest
+  // values still read.
+  '#8cb8de',
+  '#6aa3d4',
+  '#4a8ac4',
+  '#2b6fae',
+  '#155394',
   '#08306b',
 ] as const;
 

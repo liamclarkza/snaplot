@@ -148,12 +148,22 @@ function canvases(id = 'chart-0'): HTMLCanvasElement[] {
   return [...chart(id).container.querySelectorAll('canvas')];
 }
 
+/** The first opaque background behind an element, as RGBA (white when none is set). */
+function pageSurface(element: Element | null): [number, number, number, number] {
+  for (let node = element; node; node = node.parentElement) {
+    const match = getComputedStyle(node).backgroundColor.match(/[\d.]+/g);
+    if (match && (match.length < 4 || Number(match[3]) === 1))
+      return [Number(match[0]), Number(match[1]), Number(match[2]), 255];
+  }
+  return [255, 255, 255, 255];
+}
+
 /**
- * Composite RGBA of every chart canvas at a client point (the canvases are
- * stacked, so the topmost opaque sample wins; alpha is combined over).
+ * Composite RGBA of every chart canvas at a client point over the page surface behind the chart
+ * (the plot is transparent), as a reader sees it.
  */
 function pixel(id: string, clientX: number, clientY: number): [number, number, number, number] {
-  let out: [number, number, number, number] = [0, 0, 0, 0];
+  let out = pageSurface(document.getElementById(id));
   for (const canvas of canvases(id)) {
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) continue;

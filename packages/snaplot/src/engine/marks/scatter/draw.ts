@@ -12,7 +12,7 @@ import type { MarkDraw } from '../index';
 import {
   createScatterStyleResolver,
   type IndexRange,
-  parseHex,
+  rgbOf,
   type ScatterStyleResolver,
   type ScatterPalettes,
   scatterResolvers,
@@ -560,7 +560,7 @@ function drawHeatmapSegments(
   }
 
   // Pre-parse the gradient once per render; fall back to Viridis.
-  const parsedStops = gradient && gradient.length >= 2 ? gradient.map(parseHex) : null;
+  const parsedStops = gradient && gradient.length >= 2 ? gradient.map(rgbOf) : null;
 
   // Bin all points. Affine scales fold the whole data-to-bin transform
   // into one multiply-add per axis.
@@ -686,10 +686,10 @@ export const scatterDraw: MarkDraw = {
   legendFill: () => null,
   draw(pass) {
     const { engine, seriesIndex: si, series } = pass;
-    const renderSeries =
-      series.heatmap && !series.heatmapGradient
-        ? { ...series, heatmapGradient: heatmapGradient(engine) }
-        : series;
+    // A density render (forced, or by point count) ramps through the theme's heatmap colours.
+    const renderSeries = series.heatmapGradient
+      ? series
+      : { ...series, heatmapGradient: heatmapGradient(engine) };
     let cache = engine.scatterSeriesCaches.get(si);
     if (!cache) {
       cache = new ScatterSeriesCache();

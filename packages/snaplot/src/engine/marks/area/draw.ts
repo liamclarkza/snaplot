@@ -1,14 +1,24 @@
 /**
- * The area mark's draw half (plan §3.1; M11): a gradient fill down to the plot's bottom edge under
- * a stroke, M4-decimated like a line while a gesture moves the viewport.
+ * The area mark's draw half (plan §3.1; M11): a fill between the curve and zero under a stroke,
+ * both in the series' interpolation, M4-decimated like a line while a gesture moves the viewport.
  */
-import { affineParams } from '../../scales/affine';
 import type { Layout, Scale, SeriesSpec } from '../../spec';
 import { withAlpha } from '../../theme/color';
 import type { MarkDraw } from '../index';
 import { NO_COLUMNS } from '../columns';
-import { type LineRenderSegment, segmentPointCount } from '../line/draw';
+import {
+  type LineRenderSegment,
+  PathTracer,
+  segmentPointCount,
+  strokeSeriesPath,
+  tracePath,
+} from '../line/draw';
 
+/**
+ * Render an area: `fill` paints exactly as given (`null` paints none); by default a ramp of
+ * `color` runs from 30% alpha at the plot edge away from zero to 5% at zero. `opacity` scales the
+ * whole mark, fill and stroke, like a line's.
+ */
 export function renderAreaSegments(
   ctx: CanvasRenderingContext2D,
   segments: LineRenderSegment[],
@@ -20,131 +30,61 @@ export function renderAreaSegments(
   /** Multiplied with `series.opacity`. Used by the highlight system to dim non-highlighted series. */
   opacityMultiplier: number = 1,
 ): void {
-  if (segments.length === 0) return;
-  if (segmentPointCount(segments) <= 1) return;
+  if (segmentPointCount(segments) === 0) return;
 
-  // Clip to plot area
+  const { plot } = layout;
   ctx.save();
   ctx.beginPath();
-  ctx.rect(layout.plot.left, layout.plot.top, layout.plot.width, layout.plot.height);
+  ctx.rect(plot.left, plot.top, plot.width, plot.height);
   ctx.clip();
-  ctx.globalAlpha = opacityMultiplier;
+  ctx.globalAlpha = (series.opacity ?? 1) * opacityMultiplier;
 
-  const baselineY = layout.plot.top + layout.plot.height;
-
-  // Gradient fill (alpha 0.3 top → 0.05 bottom, per spec §4.2)
-  if (series.fillGradient) {
-    const grad = ctx.createLinearGradient(0, layout.plot.top, 0, baselineY);
-    grad.addColorStop(0, series.fillGradient.top);
-    grad.addColorStop(1, series.fillGradient.bottom);
-    ctx.fillStyle = grad;
-  } else {
-    const grad = ctx.createLinearGradient(0, layout.plot.top, 0, baselineY);
-    grad.addColorStop(0, withAlpha(color, 0.3));
-    grad.addColorStop(1, withAlpha(color, 0.05));
-    ctx.fillStyle = grad;
-  }
-
-  // Hoist affine transforms; both the fill and stroke passes reuse them.
-  const ax = affineParams(scaleX);
-  const ay = affineParams(scaleY);
-  const kx = ax ? ax[0] : 0;
-  const bx = ax ? ax[1] : 0;
-  const ky = ay ? ay[0] : 0;
-  const by = ay ? ay[1] : 0;
-  const projX = (v: number) => (ax ? v * kx + bx : scaleX.dataToPixel(v));
-  const projY = (v: number) => (ay ? v * ky + by : scaleY.dataToPixel(v));
-
-  // Fill each contiguous valid segment separately so NaN gaps stay visible
-  // (unless the series opts into spanGaps, which fills straight across).
-  const spanGaps = series.spanGaps === true;
-  let firstPx = 0;
-  let lastPx = 0;
-  let hasSegment = false;
-  let hasAnySegment = false;
-
-  const closeAndFillSegment = () => {
-    ctx.lineTo(lastPx, baselineY);
-    ctx.lineTo(firstPx, baselineY);
-    ctx.closePath();
+  const fill = areaFill(ctx, layout, series, color, scaleY);
+  if (fill) {
+    const { baseline } = fill;
+    ctx.fillStyle = fill.style;
+    // Each run between gaps is its own closed subpath down to zero, so gaps stay visible
+    // (unless the series opts into spanGaps, which fills straight across).
+    const tracer = new PathTracer(ctx, series.interpolation ?? 'linear');
+    ctx.beginPath();
+    tracePath(tracer, segments, scaleX, scaleY, series.spanGaps === true, () => {
+      ctx.lineTo(tracer.lastX, baseline);
+      ctx.lineTo(tracer.firstX, baseline);
+      ctx.closePath();
+    });
     ctx.fill();
-  };
-
-  for (const segment of segments) {
-    const { xData, yData, startIdx, endIdx } = segment;
-    for (let i = startIdx; i <= endIdx; i++) {
-      const yVal = yData[i];
-      if (!Number.isFinite(yVal)) {
-        if (hasSegment && !spanGaps) {
-          closeAndFillSegment();
-          hasSegment = false;
-        }
-        continue;
-      }
-
-      const px = projX(xData[i]);
-      const py = projY(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) {
-        if (hasSegment && !spanGaps) {
-          closeAndFillSegment();
-          hasSegment = false;
-        }
-        continue;
-      }
-
-      if (!hasSegment) {
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        firstPx = px;
-        hasSegment = true;
-        hasAnySegment = true;
-      } else {
-        ctx.lineTo(px, py);
-      }
-      lastPx = px;
-    }
   }
 
-  if (hasSegment) closeAndFillSegment();
-  if (!hasAnySegment) {
-    ctx.restore();
-    return;
-  }
-
-  // Stroke the line on top
-  ctx.beginPath();
-  let hasPath = false;
-  for (const segment of segments) {
-    const { xData, yData, startIdx, endIdx } = segment;
-    for (let i = startIdx; i <= endIdx; i++) {
-      const yVal = yData[i];
-      if (!Number.isFinite(yVal)) {
-        if (!spanGaps) hasPath = false;
-        continue;
-      }
-      const px = projX(xData[i]);
-      const py = projY(yVal);
-      if (!Number.isFinite(px) || !Number.isFinite(py)) {
-        if (!spanGaps) hasPath = false;
-        continue;
-      }
-      if (!hasPath) {
-        ctx.moveTo(px, py);
-        hasPath = true;
-      } else {
-        ctx.lineTo(px, py);
-      }
-    }
-  }
-  ctx.strokeStyle = color;
-  ctx.lineWidth = series.lineWidth ?? 1.5;
-  ctx.lineJoin = 'round';
-  if (series.dash && series.dash.length > 0) {
-    ctx.setLineDash(series.dash);
-  }
-  ctx.stroke();
-
+  strokeSeriesPath(ctx, segments, scaleX, scaleY, series, color);
   ctx.restore();
+}
+
+/** The area's fill style and the pixel row of zero (clamped into the plot), or null for none. */
+function areaFill(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  series: SeriesSpec,
+  color: string,
+  scaleY: Scale,
+): { style: string | CanvasGradient; baseline: number } | null {
+  if (series.fill === null) return null;
+  const { plot } = layout;
+  const top = plot.top;
+  const bottom = plot.top + plot.height;
+  const zero = scaleY.dataToPixel(0);
+  // Zero off a log axis or outside the domain: fill to the nearer edge.
+  const baseline = Number.isFinite(zero) ? Math.max(top, Math.min(bottom, zero)) : bottom;
+  if (typeof series.fill === 'string') return { style: series.fill, baseline };
+
+  // Strongest at the plot edges, faintest at zero, so negative areas ramp the same way.
+  const grad = ctx.createLinearGradient(0, top, 0, bottom);
+  const at = plot.height > 0 ? (baseline - top) / plot.height : 1;
+  const strong = withAlpha(color, 0.3);
+  const faint = withAlpha(color, 0.05);
+  if (at > 0) grad.addColorStop(0, strong);
+  grad.addColorStop(at, faint);
+  if (at < 1) grad.addColorStop(1, strong);
+  return { style: grad, baseline };
 }
 
 export const areaDraw: MarkDraw = {

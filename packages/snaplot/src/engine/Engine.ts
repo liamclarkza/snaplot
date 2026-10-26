@@ -33,6 +33,7 @@ import { axisReadout } from './format';
 import { deepMerge } from './merge';
 import { DEFAULT_CONFIG } from './defaults';
 import { applyThemeToElement, resolveTheme } from './theme/resolve';
+import { cssColor, resolveColor } from './theme/color';
 import { type HostedPlugin, PluginHost } from './plugins';
 import { EngineEvents } from './events';
 
@@ -523,6 +524,27 @@ export class ChartCore implements EngineHost {
   getTheme(): ThemeConfig {
     return this.theme;
   }
+
+  /**
+   * A user colour as the canvas can paint it: `var()` resolves in the container's cascade, once
+   * per theme (a theme refresh re-reads the custom properties); anything else returns unchanged.
+   */
+  resolveColor(color: string): string {
+    if (!color.includes('var(')) return color;
+    if (this.colorCacheTheme !== this.theme) {
+      this.colorCache.clear();
+      this.colorCacheTheme = this.theme;
+    }
+    let resolved = this.colorCache.get(color);
+    if (resolved === undefined) {
+      const rgba = resolveColor(color, this.container);
+      resolved = rgba ? cssColor(rgba) : color;
+      this.colorCache.set(color, resolved);
+    }
+    return resolved;
+  }
+  private readonly colorCache = new Map<string, string>();
+  private colorCacheTheme: ThemeConfig | null = null;
 
   getLegendItems(): LegendItem[] {
     return legendItems(this);

@@ -5,6 +5,7 @@
  */
 import type { ChartCore } from '../../Engine';
 import { formatFieldValue } from '../../format';
+import { parseColor } from '../../theme/color';
 import type {
   ScatterColorEncoding,
   ScatterSizeEncoding,
@@ -309,7 +310,7 @@ function buildColorState(
     type,
     palette,
     domain,
-    rgbStops: palette.map(parseHex),
+    rgbStops: palette.map(rgbOf),
   };
 }
 
@@ -367,21 +368,10 @@ function scanColumn(
   };
 }
 
-/** Parse a #rrggbb or #rgb hex string into [r, g, b] 0-255. */
-export function parseHex(hex: string): [number, number, number] {
-  const h = hex.replace('#', '');
-  const full =
-    h.length === 3
-      ? h
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : h;
-  return [
-    parseInt(full.slice(0, 2), 16) || 0,
-    parseInt(full.slice(2, 4), 16) || 0,
-    parseInt(full.slice(4, 6), 16) || 0,
-  ];
+/** The sRGB channels of any CSS colour (black for one that is not), for ramp interpolation. */
+export function rgbOf(color: string): [number, number, number] {
+  const rgba = parseColor(color);
+  return rgba ? [rgba.r, rgba.g, rgba.b] : [0, 0, 0];
 }
 
 /**

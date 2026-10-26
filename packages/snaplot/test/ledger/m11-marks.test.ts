@@ -31,7 +31,7 @@ describe('[visuals-18] interpolation on every line-like mark', () => {
     expect(dataCalls(chart, 'bezierCurveTo')).toBeGreaterThan(0);
   });
 
-  it.fails('[visuals-18] a monotone area draws curves', () => {
+  it('[visuals-18] a monotone area draws curves', () => {
     const chart = fakes.mount({
       data,
       x: 't',
@@ -40,7 +40,7 @@ describe('[visuals-18] interpolation on every line-like mark', () => {
     expect(dataCalls(chart, 'bezierCurveTo')).toBeGreaterThan(0);
   });
 
-  it.fails('[visuals-18] a monotone band draws curves', () => {
+  it('[visuals-18] a monotone band draws curves', () => {
     const chart = fakes.mount({
       data,
       x: 't',

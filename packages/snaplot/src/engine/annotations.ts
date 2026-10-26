@@ -81,7 +81,7 @@ export function createReferenceLinesPlugin(options: {
         if (!scale) continue;
 
         const px = scale.dataToPixel(line.value);
-        const color = line.color ?? theme.tickColor;
+        const color = chart.resolveColor(line.color ?? theme.tickColor);
         const lw = line.lineWidth ?? 1;
 
         ctx.strokeStyle = color;
@@ -195,7 +195,7 @@ export function createReferenceRegionsPlugin(options: {
       for (const region of regions) {
         const geometry = visibleGeometry(chart, region);
         if (!geometry) continue;
-        const color = region.fill ?? theme.textColor;
+        const color = chart.resolveColor(region.fill ?? theme.textColor);
         ctx.fillStyle = withAlpha(color, region.opacity ?? 0.06);
         ctx.fillRect(geometry.x, geometry.y, geometry.width, geometry.height);
         if (region.edges) {

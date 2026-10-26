@@ -41,6 +41,7 @@ function createContext(): CanvasRenderingContext2D {
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     bezierCurveTo: vi.fn(),
+    arc: vi.fn(),
     closePath: vi.fn(),
     fill: vi.fn(),
     stroke: vi.fn(),
@@ -56,7 +57,7 @@ function createContext(): CanvasRenderingContext2D {
 }
 
 describe('filled line renderers', () => {
-  it('fills area charts as separate segments around NaN gaps', () => {
+  it('fills area charts as one closed subpath per run around NaN gaps', () => {
     const ctx = createContext();
     const scale = createScale();
     const layout = createLayout();
@@ -72,7 +73,10 @@ describe('filled line renderers', () => {
       '#4e79a7',
     );
 
+    // The fill, then the stroke with a dot for each one-point run beside the gap.
+    expect(ctx.closePath).toHaveBeenCalledTimes(2);
     expect(ctx.fill).toHaveBeenCalledTimes(2);
+    expect(ctx.arc).toHaveBeenCalledTimes(2);
     expect(ctx.stroke).toHaveBeenCalledTimes(1);
   });
 
@@ -99,13 +103,14 @@ describe('filled line renderers', () => {
       'red',
     );
 
+    // This scale puts zero on the plot's top edge, so the ramp runs from zero down.
     expect(stops.length).toBe(2);
     for (const stop of stops) expect(stop).not.toContain('NaN');
-    expect(stops[0]).toBe('rgba(255,0,0,0.3)');
-    expect(stops[1]).toBe('rgba(255,0,0,0.05)');
+    expect(stops[0]).toBe('rgba(255,0,0,0.05)');
+    expect(stops[1]).toBe('rgba(255,0,0,0.3)');
   });
 
-  it('fills band charts as separate segments around NaN bound gaps', () => {
+  it('fills band charts as one closed subpath per run around NaN bound gaps', () => {
     const ctx = createContext();
     const scale = createScale();
     const layout = createLayout();
@@ -130,7 +135,8 @@ describe('filled line renderers', () => {
       '#4e79a7',
     );
 
-    expect(ctx.fill).toHaveBeenCalledTimes(2);
+    expect(ctx.closePath).toHaveBeenCalledTimes(2);
+    expect(ctx.fill).toHaveBeenCalledTimes(1);
     expect(ctx.stroke).toHaveBeenCalledTimes(1);
   });
 });
@@ -189,7 +195,8 @@ describe('line gap rendering', () => {
       '#4e79a7',
     );
 
-    expect(ctx.moveTo).toHaveBeenCalledTimes(2);
+    // Two one-point runs: each a moveTo in the stroke and a dot.
     expect(ctx.lineTo).not.toHaveBeenCalled();
+    expect(ctx.arc).toHaveBeenCalledTimes(2);
   });
 });

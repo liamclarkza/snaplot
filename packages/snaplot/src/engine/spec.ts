@@ -265,19 +265,9 @@ export interface SeriesSpec<TMeta = unknown> {
    */
   paletteIndex?: number;
   /**
-   * Area / bar fill color. `null` forces no fill (useful to draw an
-   * `area` series as a bare outline). Defaults to a translucent `color`
-   * for areas and the series color for bars.
-   *
-   * Bar series also accept a per-datum callback `(value, index) => color`
-   * for emphasis patterns like highlighting the most recent bar:
-   *
-   * ```ts
-   * fill: (v, i) => i === data[0].length - 1 ? '#e8590c' : '#4f8fea'
-   * ```
-   *
-   * Callbacks are honored by bar series only; other series types fall
-   * back to their default fill.
+   * The area or band fill, painted as given; `null` paints none (an outline-only area, a band's
+   * centre line alone). Unset, an area ramps `color` and a band fills `color` at its opacity.
+   * A bar's per-bar `color` arrives here as a callback `(value, index) => colour`.
    */
   fill?: string | null | ((value: number, index: number) => string);
   /** Stroke width in CSS pixels. Default: 1.5. Applies to line and area outlines. */
@@ -320,13 +310,6 @@ export interface SeriesSpec<TMeta = unknown> {
    */
   dash?: number[];
 
-  // Area
-  /**
-   * Vertical fill gradient for `area` series, `top` at the line, `bottom`
-   * at the baseline. Overrides `fill`. Each stop is a full CSS color
-   * including its own alpha. Default: a translucent `color` ramp.
-   */
-  fillGradient?: { top: string; bottom: string };
   // Band (confidence interval / error band)
   /**
    * Column index for the upper bound of a `type: 'band'` series.
@@ -1057,6 +1040,8 @@ export interface EngineHost {
    * overrides.
    */
   getTheme(): ThemeConfig;
+  /** A user colour the canvas can paint: `var()` resolved in the chart's cascade. */
+  resolveColor(color: string): string;
   /** Force full redraw */
   redraw(): void;
 }

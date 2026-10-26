@@ -22,7 +22,7 @@ import {
   PALETTE_DIVERGING_DARK,
 } from '../../constants';
 import { deepMerge } from '../merge';
-import { isDarkColor, parseColor, withAlpha } from './color';
+import { cssColor, isDarkColor, parseColor, resolveColor, withAlpha } from './color';
 
 export {
   DEFAULT_THEME as lightTheme,
@@ -43,7 +43,8 @@ export {
 
 /**
  * CSS custom properties resolveTheme reads from the chart container's
- * computed style. Define any of these on the container (or an ancestor)
+ * computed style. `--chart-text` also colours the axis text unless
+ * `--chart-tick` or `--chart-axis-label` is set. Define any of these on the container (or an ancestor)
  * and the chart inherits them; combined with the automatic re-resolution
  * on `data-theme`/`prefers-color-scheme` changes, this is the zero-config
  * path for token-driven design systems. Values may be any CSS color the
@@ -200,98 +201,18 @@ const PALETTE_FIELDS: (keyof ThemeConfig)[] = [
 ];
 
 /**
- * Canvas cannot read CSS custom properties, so theme values like
- * `var(--surface)` (or colors in spaces our small parser does not speak,
- * like `oklch`) are resolved through a hidden probe element inside the
- * container: assign the value to the probe's `color`, read the computed
- * `rgb()`/`rgba()` back. The CSSOM rejects invalid values (the property
- * stays empty), so unresolvable input is returned unchanged rather than
- * silently inheriting the container's text color. Resolution happens once
- * per theme application, never per frame.
+ * Canvas cannot read CSS custom properties, so theme values like `var(--surface)` resolve through
+ * the container's cascade to concrete sRGB, once per theme application, never per frame.
+ * Unresolvable input is returned unchanged. Palette entries normalize to `#rrggbb` (alpha dropped: translucency belongs in the
+ * theme's opacity knobs), since ramps interpolate channels.
  */
-function createCssColorResolver(container: HTMLElement): {
-  resolve: (value: string, asHex: boolean) => string;
-  dispose: () => void;
-} {
-  let probe: HTMLElement | null = null;
-  let canvasCtx: CanvasRenderingContext2D | null | undefined;
-
-  // Modern browsers serialize computed colors in their original space
-  // (an oklch token stays "oklch(...)"), which the canvas can paint but
-  // our small parser cannot reason about (dark detection, gradient
-  // interpolation). Painting one pixel and reading it back converts any
-  // color the canvas accepts into concrete sRGB bytes.
-  const toRgbBytes = (value: string): [number, number, number, number] | null => {
-    if (canvasCtx === undefined) {
-      canvasCtx =
-        typeof document !== 'undefined'
-          ? document.createElement('canvas').getContext('2d', { willReadFrequently: true })
-          : null;
-      if (canvasCtx) {
-        canvasCtx.canvas.width = 1;
-        canvasCtx.canvas.height = 1;
-      }
-    }
-    if (!canvasCtx) return null;
-    canvasCtx.fillStyle = '#010203';
-    canvasCtx.fillStyle = value;
-    // The canvas keeps the previous fillStyle for unparseable input; the
-    // sentinel makes that case detectable (unless the value IS #010203,
-    // which round-trips correctly anyway).
-    canvasCtx.clearRect(0, 0, 1, 1);
-    canvasCtx.fillRect(0, 0, 1, 1);
-    const d = canvasCtx.getImageData(0, 0, 1, 1).data;
-    if (canvasCtx.fillStyle === '#010203' && value !== '#010203') return null;
-    return [d[0], d[1], d[2], d[3]];
-  };
-
-  const resolve = (value: string, asHex: boolean): string => {
-    const needsDom = value.includes('var(') || parseColor(value) === null;
-    if (!needsDom) return value;
-    if (typeof getComputedStyle === 'undefined' || typeof document === 'undefined') return value;
-
-    // Stage 1: resolve var() references through the container's cascade.
-    let computed = value;
-    if (value.includes('var(')) {
-      if (!probe) {
-        probe = document.createElement('span');
-        probe.style.display = 'none';
-        container.appendChild(probe);
-      }
-      probe.style.color = '';
-      probe.style.color = value;
-      if (probe.style.color === '') return value;
-      computed = getComputedStyle(probe).color.trim() || value;
-    }
-
-    // Stage 2: normalize to parseable sRGB when the small parser cannot
-    // read the result (oklch, hsl, color-mix, uncommon named colors).
-    const parsed = parseColor(computed);
-    let rgb: [number, number, number] | null = parsed ? [parsed.r, parsed.g, parsed.b] : null;
-    let alpha = 1;
-    if (rgb === null) {
-      const bytes = toRgbBytes(computed);
-      if (!bytes) return computed;
-      rgb = [bytes[0], bytes[1], bytes[2]];
-      alpha = bytes[3] / 255;
-      computed =
-        alpha >= 1
-          ? `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`
-          : `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${Math.round(alpha * 1000) / 1000})`;
-    }
-    if (!asHex) return computed;
-    // Gradient ramps are interpolated by a hex-only parser, so palette
-    // entries normalize all the way to #rrggbb (alpha is dropped; encode
-    // translucency in the theme's opacity knobs instead).
-    return `#${rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
-  };
-
-  return {
-    resolve,
-    dispose: () => {
-      probe?.remove();
-      probe = null;
-    },
+function cssColorResolver(container: HTMLElement): (value: string, asHex: boolean) => string {
+  return (value, asHex) => {
+    if (!asHex && !value.includes('var(')) return value;
+    const rgba = resolveColor(value, container);
+    if (!rgba) return value;
+    if (!asHex) return cssColor(rgba);
+    return `#${[rgba.r, rgba.g, rgba.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
   };
 }
 
@@ -396,51 +317,52 @@ export function resolveTheme(
         (cssOverrides as Record<string, unknown>)[key] = value;
       }
     }
+    // --chart-text is the chart's text, axis text included, unless the axis has its own.
+    if (cssOverrides.textColor) {
+      cssOverrides.tickColor ??= cssOverrides.textColor;
+      cssOverrides.axisLabelColor ??= cssOverrides.textColor;
+    }
   }
 
   // The theme follows the page, not the OS (plan D4): an explicit surface (tokens or the
   // --chart-bg variable) wins, then the first opaque ancestor background, then the luminance of
   // the page's text colour, then white. Only an explicit surface is painted (plan D5).
-  const { resolve, dispose } = createCssColorResolver(container);
-  try {
-    const explicit = userTheme?.backgroundColor ?? cssOverrides.backgroundColor;
-    const page =
-      explicit === undefined || explicit === 'container' || explicit === 'transparent'
-        ? findPageSurface(container)
-        : undefined;
-    const surface =
-      explicit === undefined || explicit === 'container' || explicit === 'transparent'
-        ? page!
-        : resolve(explicit, false);
-    const mode = userTheme?.mode ?? (isDarkColor(surface, false) ? 'dark' : 'light');
-    const baseTheme = mode === 'dark' ? DARK_THEME : DEFAULT_THEME;
+  const resolve = cssColorResolver(container);
+  const explicit = userTheme?.backgroundColor ?? cssOverrides.backgroundColor;
+  const page =
+    explicit === undefined || explicit === 'container' || explicit === 'transparent'
+      ? findPageSurface(container)
+      : undefined;
+  const surface =
+    explicit === undefined || explicit === 'container' || explicit === 'transparent'
+      ? page!
+      : resolve(explicit, false);
+  const mode = userTheme?.mode ?? (isDarkColor(surface, false) ? 'dark' : 'light');
+  const baseTheme = mode === 'dark' ? DARK_THEME : DEFAULT_THEME;
 
-    const merged = deepMerge(
-      baseTheme as unknown as Record<string, unknown>,
-      cssOverrides as unknown as Record<string, unknown>,
-      (userTheme ?? {}) as unknown as Record<string, unknown>,
-    ) as unknown as ThemeConfig;
-    merged.mode = mode;
-    merged.surfaceColor = surface;
-    merged.backgroundColor =
-      explicit === undefined || explicit === 'transparent'
-        ? 'transparent'
-        : explicit === 'container'
-          ? surface
-          : explicit;
+  const merged = deepMerge(
+    baseTheme as unknown as Record<string, unknown>,
+    cssOverrides as unknown as Record<string, unknown>,
+    (userTheme ?? {}) as unknown as Record<string, unknown>,
+  ) as unknown as ThemeConfig;
+  merged.mode = mode;
+  merged.surfaceColor = surface;
+  merged.backgroundColor =
+    explicit === undefined || explicit === 'transparent'
+      ? 'transparent'
+      : explicit === 'container'
+        ? surface
+        : explicit;
 
-    // Scalars resolve before normalization so the light/dark detection that
-    // picks the default role palettes sees a parseable surface; palettes
-    // resolve after it, because normalization chooses between the user's raw
-    // arrays and the merged theme's, and the winners are what need concrete
-    // values.
-    resolveScalarColors(merged, resolve);
-    const normalized = normalizeTheme(merged, userTheme, Object.keys(cssOverrides).length > 0);
-    resolvePaletteColors(normalized, resolve);
-    return normalized;
-  } finally {
-    dispose();
-  }
+  // Scalars resolve before normalization so the light/dark detection that
+  // picks the default role palettes sees a parseable surface; palettes
+  // resolve after it, because normalization chooses between the user's raw
+  // arrays and the merged theme's, and the winners are what need concrete
+  // values.
+  resolveScalarColors(merged, resolve);
+  const normalized = normalizeTheme(merged, userTheme, Object.keys(cssOverrides).length > 0);
+  resolvePaletteColors(normalized, resolve);
+  return normalized;
 }
 
 /** The page surface behind `container`: an opaque ancestor background, else from the text colour. */
@@ -465,17 +387,8 @@ function findContainerSurface(container: HTMLElement, fallback: string): string 
 }
 
 function isOpaqueColor(color: string): boolean {
-  const normalized = color.trim().toLowerCase();
-  if (!normalized || normalized === 'transparent') return false;
-  const rgba = normalized.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\s*\)$/);
-  if (rgba) return Number(rgba[1]) >= 1;
-  const slashAlpha = normalized.match(/\/\s*([\d.]+%?)\s*\)$/);
-  if (slashAlpha) {
-    const raw = slashAlpha[1];
-    const alpha = raw.endsWith('%') ? Number(raw.slice(0, -1)) / 100 : Number(raw);
-    return alpha >= 1;
-  }
-  if (/^#[\da-f]{4}$/i.test(normalized)) return normalized[4] === 'f';
-  if (/^#[\da-f]{8}$/i.test(normalized)) return normalized.slice(7, 9) === 'ff';
-  return true;
+  if (!color.trim()) return false;
+  // A colour the parser cannot read (no DOM) counts as opaque, as an author-set surface would.
+  const rgba = parseColor(color);
+  return rgba ? rgba.a >= 1 : true;
 }

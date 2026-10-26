@@ -44,7 +44,6 @@ test.describe('colour parsing', () => {
   test('[arch-02][backlog-17][render-17] a named continuous colorBy palette renders like its hex twin', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[arch-02]');
     await page.evaluate(() => {
       const data = [0, 5, 10].map((i) => ({ x: i, y: 5, c: i }));
       for (const [id, palette] of [
@@ -80,7 +79,6 @@ test.describe('colour parsing', () => {
   test('[gap-annotations-extensibility-03] a named region fill keeps its opacity', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[gap-annotations-extensibility-03]');
     await page.evaluate(() => {
       const chart = window.harness.mount({
         data: [0, 10].map((t) => ({ t, v: 1 })),
@@ -100,7 +98,6 @@ test.describe('colour parsing', () => {
   test('[gap-annotations-extensibility-03] a var() region fill resolves its own colour', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[gap-annotations-extensibility-03]');
     await page.evaluate(() => {
       document.body.style.setProperty('--accent', '#ff00ff');
       const chart = window.harness.mount({
@@ -138,7 +135,6 @@ test.describe('mark fills', () => {
   }
 
   test('[render-03] an area honours fill: null', async ({ harnessPage: page }) => {
-    test.fail(true, '[render-03]');
     await mountArea(page, { fill: null });
     const body = await pixelAt(page, 'chart-0', 5, 3);
     const outside = await pixelAt(page, 'chart-0', 5, 9.5);
@@ -146,7 +142,6 @@ test.describe('mark fills', () => {
   });
 
   test('[render-03] an area honours opacity', async ({ harnessPage: page }) => {
-    test.fail(true, '[render-03]');
     await mountArea(page, {});
     const normal = await pixelAt(page, 'chart-0', 5, 3);
     await page.evaluate(() => window.harness.reset());
@@ -156,7 +151,6 @@ test.describe('mark fills', () => {
   });
 
   test('[render-03] a named-colour area fills translucently', async ({ harnessPage: page }) => {
-    test.fail(true, '[render-03]');
     await mountArea(page, { color: 'steelblue' });
     const body = await pixelAt(page, 'chart-0', 5, 3);
     // Opaque steelblue is (70, 130, 180); a translucent fill is much lighter.
@@ -166,7 +160,6 @@ test.describe('mark fills', () => {
   test('[visuals-02:fill] an area fills to zero, not to the plot bottom', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[visuals-02:fill]');
     await page.evaluate(() => {
       window.harness.mount({
         data: Array.from({ length: 11 }, (_, t) => ({ t, v: -20 })),
@@ -234,7 +227,6 @@ test.describe('ramps and surfaces', () => {
   test('[render-09] the lowest continuous colorBy values contrast with the surface', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[render-09]');
     await page.evaluate(() => {
       window.harness.mount({
         data: Array.from({ length: 12 }, (_, i) => ({ x: i, y: 5, c: i })),
@@ -246,7 +238,7 @@ test.describe('ramps and surfaces', () => {
       });
     });
     await settle(page);
-    const surface = await pixelAt(page, 'chart-0', 5, 9);
+    const surface = await pixelAt(page, 'chart-0', 5.5, 8.5); // between gridlines
     const lowest = await pixelAt(page, 'chart-0', 0, 5);
     expect(contrast(lowest, surface)).toBeGreaterThanOrEqual(1.5);
   });
@@ -254,7 +246,6 @@ test.describe('ramps and surfaces', () => {
   test('[visuals-06] density is darkest where dense on a light surface', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[visuals-06]');
     await page.evaluate(() => {
       const data: Array<{ x: number; y: number }> = [];
       for (let i = 0; i < 4000; i++)
@@ -393,7 +384,6 @@ test.describe('ramps and surfaces', () => {
   test('[gap-overhaul-delta-01] --chart-text drives the axis label colour', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[gap-overhaul-delta-01]');
     await page.evaluate(() => {
       const card = document.createElement('div');
       card.id = 'text';
@@ -411,7 +401,10 @@ test.describe('ramps and surfaces', () => {
     await settle(page);
     const colours = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>('#chart-0 span, #chart-0 div')]
-        .filter((element) => /^\d+$/.test(element.textContent?.trim() ?? ''))
+        .filter(
+          (element) =>
+            element.children.length === 0 && /^\d+$/.test(element.textContent?.trim() ?? ''),
+        )
         .map((element) => getComputedStyle(element).color),
     );
     expect(colours.length).toBeGreaterThan(0);
