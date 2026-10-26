@@ -134,7 +134,6 @@ export function demoPageChecks(demo: DemoPage): void {
       test('the footer carries the SOURCE.md attribution line and the licence', async ({
         page,
       }) => {
-        test.fail(true, '[backlog-20] the footer reads "· <licence>", not "(<licence>)"');
         await openDemo(page, demo.slug);
         const footer = page.locator('footer');
         // §10.1 #8: "← Examples · Source · Data: <attribution line> (<licence>)".

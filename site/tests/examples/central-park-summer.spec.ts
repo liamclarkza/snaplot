@@ -126,7 +126,6 @@ test.describe(`[demos-03] ${SLUG}`, () => {
     });
 
     test('the palette is greys plus one red and one blue (§10.2)', async ({ page }) => {
-      test.fail(true, '[demos-02] the ranges are tan, not grey');
       await openDemo(page, SLUG);
       const { series } = await demo(page);
       const channels = (css: string) =>
