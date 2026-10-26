@@ -109,6 +109,9 @@ export default defineConfig({
           // notDocumented check before every build, as an error (plan §8.4).
           typeDoc: {
             excludeInternal: true,
+            // HostAttributes extends the DOM attribute types of React and Solid: list what snaplot
+            // declares, not the hundreds of attributes and handlers inherited from node_modules.
+            excludeExternals: true,
             // With several entry points and no `readme`, the plugin deletes every
             // `<module>/README.md`, the default entry file, while the landing page still links
             // to them. Named `index`, the landing page is /reference/api/ (the URL the site's API
