@@ -18,7 +18,6 @@ import type {
   StreamingSpec,
   ThemeConfig,
   TooltipPoint,
-  ZoomBoundsSpec,
 } from './spec';
 import { DirtyFlag } from './spec';
 
@@ -36,7 +35,6 @@ import { createScale } from './scales/createScale';
 import {
   BRUSH_EDGE_GRAB_PX,
   DEFAULT_INTERACTION_SAMPLING,
-  INTERACTION_REFINE_MS,
   MIN_TOUCH_INTERACTION_SAMPLING,
   MIN_DRAG_DISTANCE,
   TOUCH_INTERACTION_POINTS_PER_PIXEL,
@@ -82,16 +80,24 @@ import { TooltipManager } from '../interaction/TooltipManager';
 
 import { type HostedPlugin, PluginHost } from './plugins';
 import { isDarkColor } from '../utils/color';
+import { rangeForDataChange, autoRange, invalidateRangeCache, type BarXAxisPlan } from './ranging';
 import {
-  rangeForDataChange,
-  scaleSignature,
-  autoRange,
-  autoRangeHorizontal,
-  autoRangeVertical,
-  invalidateRangeCache,
-  columnRange,
-  type BarXAxisPlan,
-} from './ranging';
+  applyFollowWindow,
+  unpinMissedAxes,
+  setAxis,
+  getNaturalRange,
+  setCoordinatedAxis,
+  pinnedAxes,
+  applyViewport,
+  resetZoom,
+  scrollToLatest,
+  zoomedScaleRange,
+  canZoomFromAnchor,
+  applyUniformZoom,
+  scaleDomainSpan,
+  pannedScaleRange,
+  applyViewportChange,
+} from './viewport';
 
 // Stable identity for user tickFormat functions in the layout cache key.
 // Stringifying the function body per frame allocated the whole source text
@@ -244,19 +250,19 @@ function debugLabelBoxes(labels: AxesRenderResult['labels'] | null): DebugLabelB
  * Render pipeline follows the exact order from §2.3 of the plan.
  */
 export class ChartCore implements EngineHost {
-  private coordinatingAxis = false;
+  coordinatingAxis = false;
 
   // Public
   readonly container: HTMLElement;
 
   // Internal modules
   private canvasManager: CanvasManager;
-  private scheduler: RenderScheduler;
+  scheduler: RenderScheduler;
   private eventBus: EventBus;
   sourceStores: DataStore[] = [];
-  private seriesSources: readonly number[] = [];
+  seriesSources: readonly number[] = [];
   scales: Map<string, Scale> = new Map();
-  private layout!: Layout;
+  layout!: Layout;
   private layoutCacheKey = '';
   private theme!: ThemeConfig;
   /**
@@ -283,9 +289,9 @@ export class ChartCore implements EngineHost {
    * stride-sampled, then repainted at full fidelity once the viewport has
    * been quiet for INTERACTION_REFINE_MS.
    */
-  private viewportActiveUntil = 0;
-  private refineTimer: ReturnType<typeof setTimeout> | null = null;
-  private sampledLastDataRender = false;
+  viewportActiveUntil = 0;
+  refineTimer: ReturnType<typeof setTimeout> | null = null;
+  sampledLastDataRender = false;
   /**
    * Scatter style resolvers cached per series index. Building one scans
    * the encoded columns (colorBy/sizeBy domains, category detection), so
@@ -375,7 +381,7 @@ export class ChartCore implements EngineHost {
   private listeners = new Map<string, Set<(...args: never[]) => unknown>>();
 
   // Cleanup
-  private destroyed = false;
+  destroyed = false;
 
   // Highlight state
   private highlightedSeries: number | null = null;
@@ -636,49 +642,12 @@ export class ChartCore implements EngineHost {
     this.sourceStores = stores;
     this.seriesSources = seriesSources.slice();
     invalidateRangeCache(this);
-    this.unpinMissedAxes(resolved);
+    unpinMissedAxes(this, resolved);
     this.dataVersion++;
     this.debugCounters.ingestCount++;
     this.replaceOptions(config);
     this.reconcileSelectionForDataChange();
     this.refreshCursor();
-  }
-
-  /**
-   * Replaced data that does not reach a pinned horizontal range unpins that axis (plan D23,
-   * dataapi-14): a viewport kept from the old data would show nothing.
-   */
-  private unpinMissedAxes(config: ChartSpec): void {
-    let unpinned = false;
-    for (const key of [...this.userZoomedAxes]) {
-      const scale = this.scales.get(key);
-      const position = inferPosition(key, config.axes?.[key]?.position);
-      if (!scale || (position !== 'bottom' && position !== 'top')) continue;
-      let min = Infinity;
-      let max = -Infinity;
-      config.series.forEach((series, si) => {
-        const store = this.sourceStores[this.seriesSources[si] ?? 0];
-        if ((series.xAxis ?? 'x') !== key || !store?.length) return;
-        const xColumn = scatterXColumn(series);
-        if (xColumn === 0) {
-          min = Math.min(min, store.xAt(0));
-          max = Math.max(max, store.xAt(store.length - 1));
-          return;
-        }
-        // An unsorted scatter source keeps X in its own column, in row order.
-        for (let i = 0; i < store.length; i++) {
-          const x = store.valueAt(xColumn, i);
-          if (x < min) min = x;
-          if (x > max) max = x;
-        }
-      });
-      if (min === Infinity || max < scale.min || min > scale.max) {
-        this.userZoomedAxes.delete(key);
-        unpinned = true;
-      }
-    }
-    if (unpinned && ![...this.userZoomedAxes].some((key) => this.isHorizontalAxis(key)))
-      this.setFollowing(true);
   }
 
   getSourceData(sourceIndex: number): ColumnarData {
@@ -721,7 +690,7 @@ export class ChartCore implements EngineHost {
     return this.sourceStores.some((store) => store.length > 0);
   }
 
-  private sourceExtent(axisKey?: string): [number, number] | null {
+  sourceExtent(axisKey?: string): [number, number] | null {
     let min = Infinity;
     let max = -Infinity;
     const stores =
@@ -782,98 +751,16 @@ export class ChartCore implements EngineHost {
     this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
   }
 
-  followWindow(): number | undefined {
-    const follow = (this.config.streaming as StreamingSpec | undefined)?.followWindow;
-    if (follow === undefined) return undefined;
-    // A non-positive window is meaningless; treat it as "no window" so the
-    // chart follows the full extent rather than collapsing to a zero span.
-    return follow > 0 ? follow : undefined;
-  }
-
-  /**
-   * Pin every horizontal axis to `[latestX - window, latestX]` (clamped to
-   * the data) and re-fit Y over that window. Returns whether any scale bound
-   * moved (X or the follow-driven Y auto-range), so the caller knows if the
-   * grid must repaint.
-   *
-   * This does not publish to zoom sync: a follow scroll is a local,
-   * data-driven motion, and syncing it would fight peers that have their own
-   * data or a paused viewport. Manual pan/zoom (applyViewportChange) and the
-   * explicit resume actions (resetZoom/scrollToLatest) are what sync.
-   */
-  applyFollowWindow(): boolean {
-    const window = this.followWindow();
-    if (window === undefined || !this.hasData()) return false;
-    const before = scaleSignature(this);
-    const axisConfigs = this.config.axes ?? {};
-    const proposals: Array<{ key: string; scale: Scale; min: number; max: number }> = [];
-    for (const [key, scale] of this.scales) {
-      const pos = inferPosition(key, axisConfigs[key]?.position);
-      if (pos !== 'bottom' && pos !== 'top') continue;
-      const extent = this.sourceExtent(key);
-      if (!extent) continue;
-      // The window has its full width from the first sample (dxtrial-19).
-      const lastX = extent[1];
-      const min = lastX - window;
-      const max = lastX;
-      proposals.push({ key, scale, min, max });
-    }
-    for (const { key, scale, min, max } of proposals) {
-      scale.min = min;
-      scale.max = max;
-      this.naturalExtent.set(key, [min, max]);
-    }
-    if (!this.config.zoom?.y) autoRangeVertical(this, true);
-    return scaleSignature(this) !== before;
-  }
-
   setAxis(key: string, range: Partial<ScaleRange>): void {
-    if (this.destroyed) return;
-    const scale = this.scales.get(key);
-    if (!scale) return;
-
-    if (range.min !== undefined) scale.min = range.min;
-    if (range.max !== undefined) scale.max = range.max;
-
-    // A peer-applied viewport must survive the next data update the same way a
-    // local zoom does. Without marking the axis user-zoomed, this receiving
-    // chart's next data replacement or append would auto-range back to the full extent
-    // and snap out of sync with the chart that drove the zoom.
-    if (!this.coordinatingAxis) this.userZoomedAxes.add(key);
-
-    // When X axis changes (e.g. from a zoom sync peer), re-fit Y axis
-    // to the new visible X range, otherwise the band/data may clip.
-    const ac = this.config.axes?.[key];
-    const pos = inferPosition(key, ac?.position);
-    const isHoriz = pos === 'bottom' || pos === 'top';
-    // A received horizontal viewport means a peer took manual control; pause
-    // live-follow so this chart pins to the synced window instead of scrolling
-    // its own follow window back over the driver on the next data tick.
-    if (isHoriz && !this.coordinatingAxis) this.setFollowing(false);
-    if (isHoriz && !this.config.zoom?.y) {
-      autoRangeVertical(this, true);
-    }
-
-    // Group peers relay a gesture in flight on another chart, so they get
-    // the same interaction-pass sampling the originating chart does.
-    this.markViewportActive();
-
-    this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID | DirtyFlag.OVERLAY);
-    this.emitEvent('viewport:change', key, { min: scale.min, max: scale.max });
+    setAxis(this, key, range);
   }
 
   getNaturalRange(key: string): ScaleRange | undefined {
-    const range = this.naturalExtent.get(key);
-    return range ? { min: range[0], max: range[1] } : undefined;
+    return getNaturalRange(this, key);
   }
 
   setCoordinatedAxis(key: string, range: ScaleRange): void {
-    this.coordinatingAxis = true;
-    try {
-      this.setAxis(key, range);
-    } finally {
-      this.coordinatingAxis = false;
-    }
+    setCoordinatedAxis(this, key, range);
   }
 
   getAxis(key: string): Scale | undefined {
@@ -886,56 +773,12 @@ export class ChartCore implements EngineHost {
     return position === 'bottom' || position === 'top';
   }
 
-  /** The pinned axes and their ranges: the viewport state (plan D3). */
   pinnedAxes(): Record<string, ScaleRange> {
-    const pinned: Record<string, ScaleRange> = {};
-    for (const key of this.userZoomedAxes) {
-      const scale = this.scales.get(key);
-      if (scale) pinned[key] = { min: scale.min, max: scale.max };
-    }
-    return pinned;
+    return pinnedAxes(this);
   }
 
-  /**
-   * Pin exactly the axes `viewport` names, at its ranges, and return every other axis to its
-   * automatic range (plan D3: a viewport names only the axes it pins, and `{}` pins none).
-   * Pinning a horizontal axis pauses following; a viewport without one follows again.
-   */
   applyViewport(viewport: Readonly<Record<string, ScaleRange>>): void {
-    if (this.destroyed) return;
-    const previous = new Map(
-      [...this.scales].map(([key, scale]) => [key, [scale.min, scale.max] as const]),
-    );
-    const keys = Object.keys(viewport).filter((key) => this.scales.has(key));
-    // A horizontal axis this viewport no longer pins returns to its automatic range.
-    const released = [...this.userZoomedAxes].some(
-      (key) => !keys.includes(key) && this.isHorizontalAxis(key),
-    );
-    this.userZoomedAxes = new Set(keys);
-    for (const key of keys) {
-      const scale = this.scales.get(key)!;
-      scale.min = viewport[key].min;
-      scale.max = viewport[key].max;
-    }
-    const horizontal = keys.some((key) => this.isHorizontalAxis(key));
-    this.setFollowing(!horizontal);
-    // A pan (the same horizontal axes pinned at a new range) changes no natural extent, so it
-    // skips the horizontal auto-range and its pass over every X, as a gesture does.
-    if (released || !horizontal) autoRangeHorizontal(this);
-    if (!horizontal) this.applyFollowWindow();
-    autoRangeVertical(this, horizontal);
-    // A pinned axis that moved is a view in motion as far as drawing goes: an app that drives the
-    // viewport from a slider or another chart gets the gesture pass, refined once it settles, as
-    // a pan or a group sync does.
-    const moved = keys.some((key) => {
-      const before = previous.get(key);
-      const scale = this.scales.get(key)!;
-      return !before || before[0] !== scale.min || before[1] !== scale.max;
-    });
-    if (moved) this.markViewportActive();
-    this.refreshCursor();
-    this.scheduler.markDirty(DirtyFlag.ALL);
-    this.publishResetViewport(previous);
+    applyViewport(this, viewport);
   }
 
   setOptions(partial: DeepPartial<ChartSpec>): void {
@@ -979,7 +822,7 @@ export class ChartCore implements EngineHost {
     // Reapply the follow window that autoRange just overwrote with the full
     // extent, so a config update does not knock a following chart off its
     // trailing window (matches initAxes).
-    if (this.following) this.applyFollowWindow();
+    if (this.following) applyFollowWindow(this);
     this.scheduler.markDirty(DirtyFlag.ALL);
     this.emitEvent('options:update', this.config);
     if (themeChanged) this.emitEvent('theme:update', this.theme);
@@ -1057,49 +900,12 @@ export class ChartCore implements EngineHost {
     );
   }
 
-  /** Reset zoom to full data extent (double-click handler) */
   resetZoom(): void {
-    if (this.destroyed) return;
-    const previous = new Map(
-      [...this.scales].map(([key, scale]) => [key, [scale.min, scale.max] as const]),
-    );
-    this.userZoomedAxes.clear();
-    this.setFollowing(true);
-    autoRangeHorizontal(this);
-    // Follow window (if configured) takes precedence over full-extent X.
-    this.applyFollowWindow();
-    autoRangeVertical(this);
-    this.scheduler.markDirty(DirtyFlag.ALL);
-
-    this.publishResetViewport(previous);
+    resetZoom(this);
   }
 
   scrollToLatest(): void {
-    if (this.destroyed) return;
-    const previous = new Map(
-      [...this.scales].map(([key, scale]) => [key, [scale.min, scale.max] as const]),
-    );
-    this.userZoomedAxes.clear();
-    this.setFollowing(true);
-    if (this.followWindow() !== undefined && this.hasData()) {
-      this.applyFollowWindow();
-    } else {
-      autoRangeHorizontal(this);
-      autoRangeVertical(this);
-    }
-    this.refreshCursor();
-    this.scheduler.markDirty(DirtyFlag.ALL);
-    this.publishResetViewport(previous);
-  }
-
-  /** Report every scale a reset action moved. */
-  private publishResetViewport(previous: ReadonlyMap<string, readonly [number, number]>): void {
-    for (const [scaleKey, scale] of this.scales) {
-      const before = previous.get(scaleKey);
-      if (!before || before[0] !== scale.min || before[1] !== scale.max) {
-        this.emitEvent('viewport:change', scaleKey, { min: scale.min, max: scale.max });
-      }
-    }
+    scrollToLatest(this);
   }
 
   isFollowing(): boolean {
@@ -1237,13 +1043,6 @@ export class ChartCore implements EngineHost {
       this.selection = null;
     }
     this.emitSelectionChange();
-  }
-
-  /** Set follow state and emit `follow:change` only on a real transition. */
-  private setFollowing(next: boolean): void {
-    if (this.following === next) return;
-    this.following = next;
-    this.emitEvent('follow:change', next);
   }
 
   resize(width: number, height: number): void {
@@ -1573,26 +1372,14 @@ export class ChartCore implements EngineHost {
     autoRange(this);
     // A configured follow window overrides full-extent X on first paint and
     // after a config replace, as long as the user has not paused following.
-    if (this.following) this.applyFollowWindow();
-  }
-
-  private markViewportActive(): void {
-    if (this.interactionSamplingBudget() === null) return;
-    this.viewportActiveUntil = performance.now() + INTERACTION_REFINE_MS;
-    if (this.refineTimer !== null) clearTimeout(this.refineTimer);
-    this.refineTimer = setTimeout(() => {
-      this.refineTimer = null;
-      if (this.destroyed) return;
-      // Only repaint if the last data pass actually dropped points.
-      if (this.sampledLastDataRender) this.scheduler.markDirty(DirtyFlag.DATA);
-    }, INTERACTION_REFINE_MS);
+    if (this.following) applyFollowWindow(this);
   }
 
   /**
    * The most scatter points drawn per frame during a gesture, or null when sampling is off.
    * `culledByX`: the series' X is the store's X, so its segments hold the in-view points only.
    */
-  private interactionSamplingBudget(culledByX = false): number | null {
+  interactionSamplingBudget(culledByX = false): number | null {
     const configured = this.config.performance?.interactionSampling;
     if (configured === false) return null;
     if (typeof configured === 'number') return configured > 0 ? configured : null;
@@ -1859,8 +1646,8 @@ export class ChartCore implements EngineHost {
           const pos = inferPosition(axis, axisConfigs[axis]?.position);
           const isHoriz = pos === 'bottom' || pos === 'top';
           const delta = isHoriz ? dx : dy;
-          const [min, max] = this.pannedScaleRange(scale, delta);
-          this.applyViewportChange(axis, min, max);
+          const [min, max] = pannedScaleRange(scale, delta);
+          applyViewportChange(this, axis, min, max);
         }
       } else {
         // Drag in plot area, pan all enabled axes. Axes the user has actively
@@ -1872,11 +1659,11 @@ export class ChartCore implements EngineHost {
           const isHoriz = pos === 'bottom' || pos === 'top';
           const userZoomed = this.userZoomedAxes.has(key);
           if (isHoriz && (pan.x !== false || userZoomed)) {
-            const [min, max] = this.pannedScaleRange(scale, dx);
-            this.applyViewportChange(key, min, max);
+            const [min, max] = pannedScaleRange(scale, dx);
+            applyViewportChange(this, key, min, max);
           } else if (!isHoriz && (pan.y || userZoomed)) {
-            const [min, max] = this.pannedScaleRange(scale, dy);
-            this.applyViewportChange(key, min, max);
+            const [min, max] = pannedScaleRange(scale, dy);
+            applyViewportChange(this, key, min, max);
           }
         }
       }
@@ -1888,10 +1675,10 @@ export class ChartCore implements EngineHost {
       if (!zoom.enabled) return;
 
       const axisConfigs = this.config.axes ?? {};
-      if (!this.canZoomFromAnchor(axis, anchorX, anchorY, zoom.axis === true, axisConfigs)) return;
+      if (!canZoomFromAnchor(this, axis, anchorX, anchorY, zoom.axis === true, axisConfigs)) return;
 
       if (axis === 'xy') {
-        this.applyUniformZoom(factor, anchorX, anchorY);
+        applyUniformZoom(this, factor, anchorX, anchorY);
       } else {
         // Zoom a specific axis by key
         const scale = this.scales.get(axis);
@@ -1899,19 +1686,19 @@ export class ChartCore implements EngineHost {
           const pos = inferPosition(axis, axisConfigs[axis]?.position);
           const isHoriz = pos === 'bottom' || pos === 'top';
           const anchorPx = isHoriz ? anchorX : anchorY;
-          const [newMin, newMax] = this.zoomedScaleRange(scale, anchorPx, factor);
+          const [newMin, newMax] = zoomedScaleRange(scale, anchorPx, factor);
           // minRange/maxRange are enforced in the scale's own span metric
           // (`scaleDomainSpan`): a data-unit span for linear/time axes, a
           // log10-decade span for log axes. Measuring in that metric keeps the
           // limit consistent with how `zoomedScaleRange` applies the factor,
           // and applies to vertical axes too, not just horizontal.
-          const span = this.scaleDomainSpan(scale, newMin, newMax);
+          const span = scaleDomainSpan(scale, newMin, newMax);
           if (zoom.minRange && span < zoom.minRange) return;
           if (zoom.maxRange && span > zoom.maxRange) return;
           if (isHoriz) {
-            if (zoom.x !== false) this.applyViewportChange(axis, newMin, newMax);
+            if (zoom.x !== false) applyViewportChange(this, axis, newMin, newMax);
           } else {
-            this.applyViewportChange(axis, newMin, newMax);
+            applyViewportChange(this, axis, newMin, newMax);
           }
         }
       }
@@ -2015,10 +1802,10 @@ export class ChartCore implements EngineHost {
 
       if (zoom.enabled !== false) {
         if (zoom.x !== false && selectionX) {
-          this.applyViewportChange('x', selectionX.min, selectionX.max);
+          applyViewportChange(this, 'x', selectionX.min, selectionX.max);
         }
         if (zoom.y && selectionY) {
-          this.applyViewportChange('y', selectionY.min, selectionY.max);
+          applyViewportChange(this, 'y', selectionY.min, selectionY.max);
         }
       }
     });
@@ -2104,299 +1891,6 @@ export class ChartCore implements EngineHost {
     }
     const point = points[0];
     if (point) this.emitEvent('point:click', point);
-  }
-
-  private zoomedScaleRange(scale: Scale, anchorPx: number, factor: number): [number, number] {
-    const anchor = scale.pixelToData(anchorPx);
-    if (scale.type !== 'log') {
-      return [anchor - (anchor - scale.min) * factor, anchor + (scale.max - anchor) * factor];
-    }
-
-    const logMin = Math.log10(Math.max(scale.min, 1e-10));
-    const logMax = Math.log10(Math.max(scale.max, 1e-10));
-    const logAnchor = Math.log10(Math.max(anchor, 1e-10));
-    return [
-      10 ** (logAnchor - (logAnchor - logMin) * factor),
-      10 ** (logAnchor + (logMax - logAnchor) * factor),
-    ];
-  }
-
-  private canZoomFromAnchor(
-    axis: string,
-    anchorX: number,
-    anchorY: number,
-    axisControlsEnabled: boolean,
-    axisConfigs: NonNullable<ChartSpec['axes']>,
-  ): boolean {
-    if (axisControlsEnabled) return true;
-    const { plot } = this.layout;
-    if (axis === 'xy') return this.isInPlotArea(anchorX, anchorY);
-
-    const ac = axisConfigs[axis];
-    const pos = inferPosition(axis, ac?.position);
-    if (pos === 'bottom' || pos === 'top') {
-      return anchorY > plot.top && anchorY < plot.top + plot.height;
-    }
-    return anchorX > plot.left && anchorX < plot.left + plot.width;
-  }
-
-  private applyUniformZoom(factor: number, anchorX: number, anchorY: number): void {
-    const zoom = this.config.zoom ?? { enabled: true, x: true };
-    const axisConfigs = this.config.axes ?? {};
-    const targets: Array<{
-      key: string;
-      scale: Scale;
-      pos: 'top' | 'bottom' | 'left' | 'right';
-      anchorPx: number;
-    }> = [];
-
-    for (const [key, scale] of this.scales) {
-      const pos = inferPosition(key, axisConfigs[key]?.position);
-      const isHoriz = pos === 'bottom' || pos === 'top';
-      if (isHoriz ? zoom.x !== false : zoom.y) {
-        targets.push({ key, scale, pos, anchorPx: isHoriz ? anchorX : anchorY });
-      }
-    }
-    if (targets.length === 0) return;
-
-    let effectiveFactor = factor;
-    for (const target of targets) {
-      const span = this.scaleDomainSpan(target.scale, target.scale.min, target.scale.max);
-      if (span <= 0 || !Number.isFinite(span)) continue;
-
-      const proposed = this.zoomedScaleRange(target.scale, target.anchorPx, effectiveFactor);
-      const proposedSpan = this.scaleDomainSpan(target.scale, proposed[0], proposed[1]);
-
-      // minRange/maxRange are measured in the scale's own span metric so the
-      // factor correction matches how zoomedScaleRange applies it (linear span
-      // on linear/time axes, log10-decade span on log axes). Applies to every
-      // zoomed axis, including vertical, not just horizontal.
-      if (zoom.minRange && proposedSpan < zoom.minRange) {
-        effectiveFactor = Math.max(effectiveFactor, zoom.minRange / span);
-      }
-      if (zoom.maxRange && proposedSpan > zoom.maxRange) {
-        effectiveFactor = Math.min(effectiveFactor, zoom.maxRange / span);
-      }
-
-      const bounds = this.resolveBounds(target.key, target.pos);
-      if (bounds?.min !== undefined && bounds.max !== undefined && proposedSpan > 0) {
-        const boundsSpan = this.scaleDomainSpan(target.scale, bounds.min, bounds.max);
-        if (Number.isFinite(boundsSpan) && boundsSpan > 0 && proposedSpan > boundsSpan) {
-          effectiveFactor = Math.min(effectiveFactor, boundsSpan / span);
-        }
-      }
-    }
-
-    for (const target of targets) {
-      const [newMin, newMax] = this.zoomedScaleRange(
-        target.scale,
-        target.anchorPx,
-        effectiveFactor,
-      );
-      this.applyViewportChange(target.key, newMin, newMax);
-    }
-  }
-
-  private scaleDomainSpan(scale: Scale, min: number, max: number): number {
-    if (scale.type !== 'log') return max - min;
-    const safeMin = Math.max(min, 1e-10);
-    const safeMax = Math.max(max, safeMin);
-    return Math.log10(safeMax) - Math.log10(safeMin);
-  }
-
-  private pannedScaleRange(scale: Scale, deltaPx: number): [number, number] {
-    if (scale.type !== 'log') {
-      const dataD = scale.pixelToData(0) - scale.pixelToData(deltaPx);
-      return [scale.min + dataD, scale.max + dataD];
-    }
-
-    const logDelta =
-      Math.log10(Math.max(scale.pixelToData(0), 1e-10)) -
-      Math.log10(Math.max(scale.pixelToData(deltaPx), 1e-10));
-    return [
-      10 ** (Math.log10(Math.max(scale.min, 1e-10)) + logDelta),
-      10 ** (Math.log10(Math.max(scale.max, 1e-10)) + logDelta),
-    ];
-  }
-
-  /** Apply a viewport change, shared by pan, zoom and box-end */
-  private applyViewportChange(scaleKey: string, min: number, max: number): void {
-    const scale = this.scales.get(scaleKey);
-    if (!scale) return;
-
-    const ac = this.config.axes?.[scaleKey];
-    const pos = inferPosition(scaleKey, ac?.position);
-    const isHoriz = pos === 'bottom' || pos === 'top';
-
-    // Clamp to configured bounds (defaults to data extent). Keeps pan at
-    // the edge when you push past it, and stops zoom-out at the full extent.
-    const clamped = this.clampViewportToBounds(scaleKey, pos, min, max);
-    min = clamped[0];
-    max = clamped[1];
-
-    // Fully clamped no-op (panning at the data edge, zooming out at full
-    // extent): nothing changes, so skip the repaint, events, and sync
-    // publish. Without this, dragging against the edge repaints all three
-    // layers at gesture rate for zero visual change.
-    if (scale.min === min && scale.max === max) return;
-
-    this.markViewportActive();
-    this.userZoomedAxes.add(scaleKey);
-    // A horizontal pan/zoom pauses live-follow (the user took control of the
-    // X window); a Y-only change leaves follow untouched.
-    if (isHoriz) this.setFollowing(false);
-
-    scale.min = min;
-    scale.max = max;
-
-    if (isHoriz && !this.config.zoom?.y) {
-      autoRangeVertical(this, true);
-    }
-
-    this.refreshCursor();
-    this.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID | DirtyFlag.OVERLAY);
-    this.emitEvent('viewport:change', scaleKey, { min, max });
-  }
-
-  /**
-   * Every visible series bound to this Y axis is a scatter. Used to
-   * default `zoom.bounds.y` to `'data'` on scatter-only charts where
-   * there is no viewport-driven Y auto-range to take up the slack.
-   */
-  private isScatterOnlyAxis(scaleKey: string): boolean {
-    const bound = this.config.series.filter(
-      (s) => (s.yAxis ?? 'y') === scaleKey && s.visible !== false,
-    );
-    return bound.length > 0 && bound.every((s) => s.type === 'scatter');
-  }
-
-  /**
-   * Resolve the `zoom.bounds` config for a specific axis.
-   *
-   * Returns `null` when no clamping should happen, or `{ min, max }` with
-   * either bound potentially `undefined` (half-open). The `'data'` literal
-   * is resolved here from the source extents / Y-range over the visible X window.
-   */
-  private resolveBounds(
-    scaleKey: string,
-    pos: 'top' | 'bottom' | 'left' | 'right',
-  ): { min?: number; max?: number } | null {
-    const raw = this.config.zoom?.bounds;
-    if (raw === false || raw === 'unbounded') return null;
-
-    const isHoriz = pos === 'top' || pos === 'bottom';
-    let spec: ZoomBoundsSpec | undefined;
-
-    // Default for Y: line/area/bar charts auto-range Y from the visible
-    // X window, so leaving Y unbounded lets the user stretch the viewport
-    // while the data still fills it. Scatter-only axes have no such
-    // driver, a point cloud lives in both dimensions independently,    // so we default those to 'data' to match the X-axis behaviour.
-    const scatterDefault = !isHoriz && this.isScatterOnlyAxis(scaleKey);
-    const yDefault: ZoomBoundsSpec = scatterDefault ? 'data' : 'unbounded';
-
-    if (raw === undefined || raw === true) {
-      spec = isHoriz ? 'data' : yDefault;
-    } else if (
-      typeof raw === 'string' ||
-      (typeof raw === 'object' && ('min' in raw || 'max' in raw))
-    ) {
-      // Top-level scalar spec applies to every axis.
-      spec = raw as ZoomBoundsSpec;
-    } else {
-      const perAxis = raw as { x?: ZoomBoundsSpec; y?: ZoomBoundsSpec };
-      spec = (isHoriz ? perAxis.x : perAxis.y) ?? (isHoriz ? 'data' : yDefault);
-    }
-
-    if (spec === 'unbounded' || spec === undefined) return null;
-
-    if (typeof spec === 'object') return { ...spec };
-
-    // spec === 'data', use the cached natural extent (output of autoRange,
-    // which already honors axis pins and any explicit `nice: true` expansion).
-    // Falls back to the raw data range if autoRange hasn't run yet for this axis.
-    const natural = this.naturalExtent.get(scaleKey);
-    if (natural) return { min: natural[0], max: natural[1] };
-
-    if (!this.hasData()) return null;
-    if (isHoriz) {
-      const extent = this.sourceExtent();
-      return extent ? { min: extent[0], max: extent[1] } : null;
-    }
-    let min = Infinity;
-    let max = -Infinity;
-    this.config.series.forEach((series, si) => {
-      if ((series.yAxis ?? 'y') !== scaleKey || series.visible === false) return;
-      const store = this.storeForSeries(si);
-      const range = columnRange(
-        this,
-        seriesYColumn(series) - 1,
-        0,
-        store.length - 1,
-        'linear',
-        false,
-        store,
-      );
-      if (range) {
-        min = Math.min(min, range[0]);
-        max = Math.max(max, range[1]);
-      }
-    });
-    return min === Infinity ? null : { min, max };
-  }
-
-  /**
-   * Apply bounds clamping to a proposed [min, max] viewport. Preserves the
-   * viewport's span when shifting away from an edge (pan-into-wall stops
-   * at the wall); collapses to the full bounded extent when the proposed
-   * span exceeds the allowed one (zoom-out stops at data extent).
-   */
-  private clampViewportToBounds(
-    scaleKey: string,
-    pos: 'top' | 'bottom' | 'left' | 'right',
-    min: number,
-    max: number,
-  ): [number, number] {
-    const b = this.resolveBounds(scaleKey, pos);
-    if (!b) return [min, max];
-
-    const bMin = b.min;
-    const bMax = b.max;
-    const scale = this.scales.get(scaleKey);
-    const span = scale ? this.scaleDomainSpan(scale, min, max) : max - min;
-
-    if (bMin !== undefined && bMax !== undefined) {
-      const boundedSpan = scale ? this.scaleDomainSpan(scale, bMin, bMax) : bMax - bMin;
-      if (span >= boundedSpan) {
-        // User is trying to see more than the full range, clamp to it.
-        return [bMin, bMax];
-      }
-    }
-    if (bMin !== undefined && min < bMin) {
-      [min, max] = this.rangeFromMin(scale, bMin, span);
-    }
-    if (bMax !== undefined && max > bMax) {
-      [min, max] = this.rangeFromMax(scale, bMax, span);
-    }
-    // After shifting, the opposite edge may have crossed its bound.
-    if (bMin !== undefined && min < bMin) min = bMin;
-    if (bMax !== undefined && max > bMax) max = bMax;
-    return [min, max];
-  }
-
-  private rangeFromMin(scale: Scale | undefined, min: number, span: number): [number, number] {
-    if (scale?.type === 'log') {
-      const safeMin = Math.max(min, 1e-10);
-      return [min, 10 ** (Math.log10(safeMin) + span)];
-    }
-    return [min, min + span];
-  }
-
-  private rangeFromMax(scale: Scale | undefined, max: number, span: number): [number, number] {
-    if (scale?.type === 'log') {
-      const safeMax = Math.max(max, 1e-10);
-      return [10 ** (Math.log10(safeMax) - span), max];
-    }
-    return [max - span, max];
   }
 
   // ─── Private: Render pipeline ───────────────────────────────
@@ -3506,7 +3000,7 @@ export class ChartCore implements EngineHost {
   }
 
   /** Re-run tooltip hit-test at current cursor position (called on data change) */
-  private refreshCursor(): void {
+  refreshCursor(): void {
     if (this.mouseX === null || this.mouseY === null || !this.cursorIsLocal) return;
     this.updateTooltipPoints();
     this.scheduler.markDirty(DirtyFlag.OVERLAY);
@@ -3701,7 +3195,7 @@ export class ChartCore implements EngineHost {
     return `${formattedMin} \u2013 ${formattedMax}`;
   }
 
-  private isInPlotArea(x: number, y: number): boolean {
+  isInPlotArea(x: number, y: number): boolean {
     const { plot } = this.layout;
     return (
       x >= plot.left && x <= plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height
@@ -3715,7 +3209,7 @@ export class ChartCore implements EngineHost {
     this.emitEvent('resize', width, height);
   }
 
-  private emitEvent(event: string, ...args: any[]): void {
+  emitEvent(event: string, ...args: any[]): void {
     const handlers = this.listeners.get(event);
     if (!handlers) return;
     for (const handler of handlers) {

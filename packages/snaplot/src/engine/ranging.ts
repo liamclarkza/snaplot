@@ -13,6 +13,7 @@ import type { Scale, AxisSpec } from './spec';
 import { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeIndex';
 import { ColumnarStore } from './data/ColumnarStore';
 import { niceStep } from './scales/niceNumbers';
+import { followWindow, applyFollowWindow } from './viewport';
 
 export type BarXAxisPlan = {
   values: number[];
@@ -28,8 +29,8 @@ export type BarXAxisPlan = {
  * user-zoomed axes). Returns whether the grid layer needs a repaint.
  */
 export function rangeForDataChange(engine: ChartCore): boolean {
-  if (engine.following && engine.followWindow() !== undefined && engine.hasData()) {
-    return engine.applyFollowWindow();
+  if (engine.following && followWindow(engine) !== undefined && engine.hasData()) {
+    return applyFollowWindow(engine);
   }
   return autoRangeTracked(engine);
 }
