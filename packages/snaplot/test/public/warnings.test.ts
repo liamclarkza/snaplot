@@ -74,10 +74,10 @@ describe('[arch-10] unknown option keys warn', () => {
     });
     const text = warnings().join('\n');
     expect(text).toMatch(/"plugins\[0\]\.onDataUpdate" is not a plugin hook/);
-    expect(text).toMatch(/"plugins\[0\]\.drawAbov" is not a plugin hook/);
+    expect(text).toMatch(/"plugins\[0\]\.drawAbov" is not a plugin hook.*Did you mean "drawAbove"/);
   });
 
-  it.fails('[arch-10] a plugin object may hold its own data and helpers without a warning', () => {
+  it('[arch-10] a plugin object may hold its own data and helpers without a warning', () => {
     mount({
       ...base,
       plugins: [

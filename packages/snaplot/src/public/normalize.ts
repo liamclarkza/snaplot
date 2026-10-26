@@ -465,12 +465,18 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
     pluginIds.add(id);
     for (const [key, value] of Object.entries(plugin)) {
       if (key === 'id' || value === undefined) continue;
-      if (!PLUGIN_HOOKS.has(key)) {
+      if (PLUGIN_HOOKS.has(key)) {
+        if (typeof value !== 'function') fail(`plugins[${i}].${key} must be a function.`);
+        continue;
+      }
+      // A plugin object may keep its own state and helpers: only a 0.12 hook, or a function
+      // named like a hook, is a mistake worth a warning.
+      const near = typeof value === 'function' ? hint(key, PLUGIN_HOOKS) : '';
+      if (PLUGIN_HINTS[key] || near)
         warnOnce(
           'unknown-option',
-          `"plugins[${i}].${key}" is not a plugin hook and is ignored. ${PLUGIN_HINTS[key] ?? 'Use install, drawBelow, drawAbove or drawOverlay.'}`,
+          `"plugins[${i}].${key}" is not a plugin hook and is ignored.${PLUGIN_HINTS[key] ? ` ${PLUGIN_HINTS[key]}` : near}`,
         );
-      } else if (typeof value !== 'function') fail(`plugins[${i}].${key} must be a function.`);
     }
     return plugin as ChartPlugin<Row>;
   });
