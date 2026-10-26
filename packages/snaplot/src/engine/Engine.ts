@@ -35,7 +35,7 @@ import { ColumnarStore } from './data/ColumnarStore';
 import type { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeIndex';
 import { RingColumnarStore } from './data/RingColumnarStore';
 import { createScale } from './scales/createScale';
-import { formatValue, scaleStepDecimals } from './format';
+import { axisReadout } from './format';
 import { deepMerge } from './merge';
 import { DEFAULT_CONFIG } from './defaults';
 import { applyThemeToElement, resolveTheme } from './theme/resolve';
@@ -244,15 +244,6 @@ export class ChartCore implements EngineHost {
   };
   lastDataPass: DataPassSeries[] = [];
   lastAxisLabels: AxesRenderResult['labels'] | null = null;
-
-  // Readout precision per axis (plan P9), recomputed when the domain or the
-  // tick settings change; read on the cursor hot path.
-  private readoutSteps = new Map<
-    string,
-    { scale: Scale; min: number; max: number; ticks?: number[]; count?: number; decimals: number }
-  >();
-  readonly readoutY = (value: number, seriesIndex: number): string =>
-    this.formatReadout(this.config.series[seriesIndex]?.yAxis ?? 'y', value);
 
   /**
    * Per-axis "reset-zoom" extent, the scale's min/max after the last
@@ -990,70 +981,11 @@ export class ChartCore implements EngineHost {
   }
 
   /**
-   * A value readout on `axisKey` at value precision (plan P9): never the tick
-   * formatter, whose precision is the tick step's. A time axis reads as a
-   * time (§5.2), through its tick format until M10's time readout. Internal;
-   * also used by the public controller.
+   * The automatic value readout on `axisKey` (engine/format.ts `axisReadout`), for the public
+   * layer's cursor points.
    */
   formatReadout(axisKey: string, value: number): string {
-    const scale = this.scales.get(axisKey);
-    if (!scale) return formatValue(value);
-    if (scale.type === 'time') return scale.tickFormat(value);
-    const axis = this.config.axes?.[axisKey];
-    let step = this.readoutSteps.get(axisKey);
-    if (
-      !step ||
-      step.scale !== scale ||
-      step.min !== scale.min ||
-      step.max !== scale.max ||
-      step.ticks !== axis?.ticks ||
-      step.count !== axis?.tickCount
-    ) {
-      step = {
-        scale,
-        min: scale.min,
-        max: scale.max,
-        ticks: axis?.ticks,
-        count: axis?.tickCount,
-        decimals: scaleStepDecimals(scale, axis?.ticks, axis?.tickCount),
-      };
-      this.readoutSteps.set(axisKey, step);
-    }
-    return formatValue(value, { stepDecimals: step.decimals });
-  }
-
-  /** A readout where the axis's own format already applied (histogram counts, multi-source rows). */
-  formatAxisReadout(axisKey: string, value: number): string {
-    const axisFormat = this.config.axes?.[axisKey]?.format;
-    return axisFormat ? axisFormat(value) : this.formatReadout(axisKey, value);
-  }
-
-  formatAxisValue(axisKey: string, value: number): string {
-    const axisFormat = this.config.axes?.[axisKey]?.format;
-    if (axisFormat) return axisFormat(value);
-    return this.scales.get(axisKey)?.tickFormat(value) ?? String(value);
-  }
-
-  formatHistogramBinRange(min: number, max: number, seriesIndex = 0): string {
-    const tooltip = this.config.tooltip;
-    if (tooltip?.rangeFormat) return tooltip.rangeFormat(min, max, seriesIndex);
-
-    const series = this.config.series[seriesIndex];
-    const axisKey = series?.xAxis ?? 'x';
-    const format = tooltip?.xFormat ?? ((value: number) => this.formatAxisValue(axisKey, value));
-    let formattedMin = format(min);
-    let formattedMax = format(max);
-
-    // Coarse axis formatters can collapse two different bin edges to the same
-    // label. Preserve an intelligible interval without forcing app code to
-    // supply a histogram-only formatter.
-    if (min !== max && formattedMin === formattedMax && !tooltip?.xFormat) {
-      const width = Math.abs(max - min);
-      const decimals = width > 0 ? Math.max(0, Math.min(6, Math.ceil(-Math.log10(width)))) : 0;
-      formattedMin = min.toFixed(decimals);
-      formattedMax = max.toFixed(decimals);
-    }
-    return `${formattedMin} \u2013 ${formattedMax}`;
+    return axisReadout(this, axisKey, value);
   }
 
   private onResize(width: number, height: number): void {

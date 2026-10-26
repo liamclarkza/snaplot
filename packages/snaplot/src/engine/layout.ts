@@ -8,6 +8,7 @@ import {
   EDGE_MARGIN,
 } from '../constants';
 import type { ChartCore } from './Engine';
+import { type FormatContext, formatTick } from './format';
 import { refreshCursor } from './cursor';
 import { DirtyFlag } from './spec';
 
@@ -109,6 +110,8 @@ export function computeLayout(
   // gutter on every side; title space is not added on top of caller padding.
   const titleStrip = EDGE_MARGIN + lineHeight + AXIS_TITLE_GAP;
 
+  const formats: FormatContext = { config, scales };
+
   // Build a map of axis key → position for later use
   const axisPositions = new Map<string, AxisPosition>();
   const axisConfigs = config.axes ?? {};
@@ -141,7 +144,7 @@ export function computeLayout(
         ac.ticks && ac.ticks.length > 0
           ? ac.ticks.filter((t) => Number.isFinite(t) && t >= lo && t <= hi)
           : scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT);
-      const format = ac.format ?? ((v: number) => scale.tickFormat(v));
+      const format = (v: number) => formatTick(formats, key, v);
       let maxWidth = 0;
       for (const t of ticks) {
         const width = measureTextWidth(format(t), fontFamily, fontSize);
@@ -165,7 +168,7 @@ export function computeLayout(
         ac.ticks && ac.ticks.length > 0
           ? ac.ticks.filter((t) => Number.isFinite(t) && t >= lo && t <= hi).sort((a, b) => a - b)
           : scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT).sort((a, b) => a - b);
-      const format = ac.format ?? ((value: number) => scale.tickFormat(value));
+      const format = (value: number) => formatTick(formats, key, value);
       if (ticks.length > 0) {
         horizontalEdges.push({
           firstHalf: measureTextWidth(format(ticks[0]), fontFamily, fontSize) / 2,

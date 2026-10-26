@@ -4,6 +4,7 @@ import { inferPosition } from '../layout';
 import { opaqueColorOnBackground } from '../../utils/color';
 import { type AxesRenderResult, type AxisLabel, resolveAxisCornerCollisions } from './labels';
 import { axisTickValues, thinTicks } from './ticks';
+import { type FormatContext, formatTick } from '../format';
 
 /**
  * Renders gridlines on the static (grid) canvas and returns label
@@ -40,6 +41,7 @@ export function renderAxes(
 ): AxesRenderResult {
   const { plot, dpr } = layout;
   const offset = dpr === 1 ? 0.5 : 0;
+  const formats: FormatContext = { config, scales };
 
   const result: AxesRenderResult = {
     labels: new Map(),
@@ -92,11 +94,11 @@ export function renderAxes(
     // Keep that full grid when label fitting skips crowded center labels.
     const customGridValues = useCustomTicks ? customXTicks?.gridValues : undefined;
     // Formatter precedence: custom-tick formatter (bar/histogram path) ->
-    // user's axes.x.tickFormat -> the scale's built-in tickFormat.
-    const formatTick =
+    // engine/format.ts (the axis format, else the scale's tick format).
+    const tickLabel =
       useCustomTicks && customXTicks!.format
         ? customXTicks!.format
-        : (ac.format ?? ((v: number) => scale.tickFormat(v)));
+        : (v: number) => formatTick(formats, key, v);
 
     // Width fit pass: generated tick counts are density targets that know
     // nothing about the rendered strings, so measure the actual labels and
@@ -109,7 +111,7 @@ export function renderAxes(
     let widestLabel = 0;
     if (isHorizontal && ticks.length > 1) {
       for (const t of ticks) {
-        const w = ctx.measureText(formatTick(t)).width;
+        const w = ctx.measureText(tickLabel(t)).width;
         if (w > widestLabel) widestLabel = w;
       }
       const spacing = plot.width / (ticks.length - 1);
@@ -189,7 +191,7 @@ export function renderAxes(
           const py = scale.dataToPixel(t);
           if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
             labels.push({
-              text: formatTick(t),
+              text: tickLabel(t),
               x: plot.left - AXIS_TICK_LENGTH - AXIS_LABEL_GAP,
               y: py,
               anchor: 'end',
@@ -202,7 +204,7 @@ export function renderAxes(
           const py = scale.dataToPixel(t);
           if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
             labels.push({
-              text: formatTick(t),
+              text: tickLabel(t),
               x: plot.left + plot.width + AXIS_TICK_LENGTH + AXIS_LABEL_GAP,
               y: py,
               anchor: 'start',
@@ -224,7 +226,7 @@ export function renderAxes(
         for (const t of ticks) {
           const px = scale.dataToPixel(t);
           if (px >= plot.left - 10 && px <= plot.left + plot.width + 10) {
-            const text = formatTick(t);
+            const text = tickLabel(t);
             const half = ctx.measureText(text).width / 2;
             const x = Math.max(half + 2, Math.min(layout.width - half - 2, px));
             labels.push({ text, x, y: labelY, anchor: 'middle' });

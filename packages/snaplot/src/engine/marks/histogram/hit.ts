@@ -5,7 +5,7 @@
  */
 import type { ChartCore } from '../../Engine';
 import type { DataStore } from '../../data/DataStore';
-import { tooltipFormatters } from '../../format';
+import { formatBinRange, formatReadout } from '../../format';
 import type { MarkHit } from '../../hit';
 import type { TooltipPoint } from '../../spec';
 import { barSpan } from '../bar/hit';
@@ -68,7 +68,6 @@ function binPoint(engine: ChartCore, si: number): TooltipPoint | null {
   const binMax = store.xAt(b + 1);
   const count = store.yAt(colIdx - 1, b);
 
-  const fmt = tooltipFormatters(engine);
   return {
     seriesIndex: si,
     dataIndex: b,
@@ -77,8 +76,8 @@ function binPoint(engine: ChartCore, si: number): TooltipPoint | null {
     xRange: { min: binMin, max: binMax },
     y: count,
     color,
-    formattedX: engine.formatHistogramBinRange(binMin, binMax, si),
-    formattedY: fmt?.y ? fmt.y(count, si) : engine.formatAxisReadout(series.yAxis ?? 'y', count),
+    formattedX: formatBinRange(engine, binMin, binMax, si),
+    formattedY: formatReadout(engine, si, count),
   };
 }
 

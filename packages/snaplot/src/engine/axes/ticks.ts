@@ -5,6 +5,7 @@
 import type { AxisSpec, Scale } from '../spec';
 import { DEFAULT_TICK_COUNT } from '../../constants';
 import type { ChartCore } from '../Engine';
+import { formatTick } from '../format';
 import { markOf } from '../marks/index';
 
 /**
@@ -63,11 +64,10 @@ export function axisMarkCoordinates(engine: ChartCore, x: 'slot' | 'bin'): numbe
 export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined {
   const visibleSeries = engine.config.series.filter((s) => s.visible !== false);
 
-  // User-provided formatter on the X axis wins over the default numeric
-  // one for categorical bar / histogram charts.
+  // The X axis' format wins over the default slot label (engine/format.ts) for bar and
+  // histogram ticks.
   const xAxisCfg = engine.config.axes?.x;
-  const userFormat = xAxisCfg?.format;
-  const defaultFormat = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+  const format = (v: number) => formatTick(engine, 'x', v, 'slot');
 
   // Category ticks are capped to what the plot width can label legibly
   // (and to an explicit axes.x.tickCount when set): a year of daily bars
@@ -82,7 +82,7 @@ export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined
   if (histSeries && engine.hasData()) {
     // X column contains bin edges directly (pre-computed by user)
     const edgeValues = thinTicks(axisMarkCoordinates(engine, 'bin'), maxCategoryTicks);
-    return { values: edgeValues, format: userFormat ?? defaultFormat };
+    return { values: edgeValues, format };
   }
 
   const xScale = engine.scales.get('x');
@@ -104,7 +104,7 @@ export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined
     return {
       values: barPlan.values,
       gridValues: barPlan.gridValues,
-      format: userFormat ?? defaultFormat,
+      format,
     };
   }
 
@@ -112,7 +112,7 @@ export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined
   const barSeries = visibleSeries.find((s) => markOf(s).draw.x === 'slot');
   if (barSeries && engine.hasData()) {
     const values = thinTicks(axisMarkCoordinates(engine, 'slot'), maxCategoryTicks);
-    return { values, format: userFormat ?? defaultFormat };
+    return { values, format };
   }
 
   return undefined;

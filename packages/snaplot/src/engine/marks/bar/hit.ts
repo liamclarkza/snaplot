@@ -4,7 +4,7 @@
  * lightens that rectangle.
  */
 import type { ChartCore } from '../../Engine';
-import { tooltipFormatters } from '../../format';
+import { formatReadout, formatX, NO_AXIS_FORMAT } from '../../format';
 import type { MarkHit, SlotPlace } from '../../hit';
 import type { Scale, TooltipPoint } from '../../spec';
 import { seriesYColumn } from '../columns';
@@ -42,7 +42,6 @@ function barPoint(engine: ChartCore, si: number): TooltipPoint | null {
   if (!Number.isFinite(yVal)) return null;
 
   const color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
-  const fmt = tooltipFormatters(engine);
 
   return {
     seriesIndex: si,
@@ -51,8 +50,8 @@ function barPoint(engine: ChartCore, si: number): TooltipPoint | null {
     x: xVal,
     y: yVal,
     color,
-    formattedX: fmt?.x ? fmt.x(xVal) : engine.formatAxisValue(series.xAxis ?? 'x', xVal),
-    formattedY: fmt?.y ? fmt.y(yVal, si) : engine.formatReadout(series.yAxis ?? 'y', yVal),
+    formattedX: formatX(engine, xVal, series.xAxis ?? 'x'),
+    formattedY: formatReadout(engine, si, yVal, NO_AXIS_FORMAT),
   };
 }
 

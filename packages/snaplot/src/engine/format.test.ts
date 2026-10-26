@@ -1,5 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { formatValue, MAX_READOUT_DECIMALS, scaleStepDecimals, stepDecimals } from './format';
+import {
+  axisReadout,
+  type FormatContext,
+  formatBinRange,
+  formatFieldValue,
+  formatReadout,
+  formatTick,
+  formatValue,
+  formatX,
+  MAX_READOUT_DECIMALS,
+  NO_AXIS_FORMAT,
+  NO_FORMAT,
+  NO_TOOLTIP_FORMAT,
+  scaleStepDecimals,
+  stepDecimals,
+} from './format';
+import type { ChartSpec, Scale } from './spec';
 
 // The expectations assume an English default locale (grouping with ",").
 afterEach(() => vi.restoreAllMocks());
@@ -104,5 +120,132 @@ describe('scaleStepDecimals', () => {
     expect(scaleStepDecimals({ type: 'log', min: 0.05, max: 100 })).toBe(2);
     expect(scaleStepDecimals({ type: 'log', min: 1, max: 1000 })).toBe(0);
     expect(scaleStepDecimals({ type: 'time', min: 0, max: 86_400_000 })).toBe(0);
+  });
+});
+
+// ─── The W5 contract (M9b, over today's behaviour; M10 implements §5.2) ───
+
+function scale(key: string, type: Scale['type'], min: number, max: number): Scale {
+  return {
+    key,
+    type,
+    min,
+    max,
+    tickFormat: (v: number) => `${key}:${v}`,
+  } as unknown as Scale;
+}
+
+function context(config: Partial<ChartSpec>, scales: Scale[]): FormatContext {
+  return {
+    config: { series: [], ...config } as ChartSpec,
+    scales: new Map(scales.map((s) => [s.key, s])),
+  };
+}
+
+const pct = (v: number) => `${v}%`;
+const plain = context({ series: [{ label: 'a', yColumn: 1 }], axes: { x: {}, y: {} } }, [
+  scale('x', 'linear', 0, 10),
+  scale('y', 'linear', 0, 1),
+]);
+const formatted = context(
+  {
+    series: [
+      { label: 'a', yColumn: 1 },
+      { label: 'b', yColumn: 2, yAxis: 'y2', xAxis: 'x2' },
+    ],
+    axes: { x: { format: (v) => `x=${v}` }, y: { format: pct }, y2: {}, x2: {} },
+    tooltip: { yFormat: (v, si) => `${v} (s${si})`, xFormat: (v) => `at ${v}` },
+  },
+  [
+    scale('x', 'linear', 0, 10),
+    scale('y', 'linear', 0, 1),
+    scale('y2', 'linear', 0, 100),
+    scale('x2', 'linear', 0, 5),
+  ],
+);
+
+describe('formatTick (engine/format.ts contract)', () => {
+  it('uses the axis format, else the scale tick format', () => {
+    expect(formatTick(plain, 'x', 2)).toBe('x:2');
+    expect(formatTick(formatted, 'x', 2)).toBe('x=2');
+    expect(formatTick(plain, 'missing', 2)).toBe('2');
+  });
+
+  it("labels 'slot' ticks with the axis format, else integers as is and one decimal", () => {
+    expect(formatTick(plain, 'x', 3, 'slot')).toBe('3');
+    expect(formatTick(plain, 'x', 2.25, 'slot')).toBe('2.3');
+    expect(formatTick(formatted, 'x', 2.25, 'slot')).toBe('x=2.25');
+  });
+});
+
+describe('formatReadout (engine/format.ts contract)', () => {
+  it('applies the tooltip format, then the axis format, then the automatic readout', () => {
+    expect(formatReadout(formatted, 1, 42)).toBe('42 (s1)');
+    expect(formatReadout(formatted, 0, 0.5, NO_TOOLTIP_FORMAT)).toBe('0.5%');
+    expect(formatReadout(formatted, 1, 42.123, NO_TOOLTIP_FORMAT)).toBe('42.12');
+    expect(formatReadout(plain, 0, 0.123456)).toBe('0.123');
+  });
+
+  it("keeps today's call-site quirks: no axis format in tooltip rows, none at all on a shared row", () => {
+    expect(formatReadout(formatted, 0, 0.5, NO_AXIS_FORMAT)).toBe('0.5 (s0)');
+    expect(formatReadout(formatted, 0, 0.5, NO_FORMAT)).toBe('0.5');
+    expect(
+      formatReadout(
+        context({ ...formatted.config, tooltip: {} }, [...formatted.scales.values()]),
+        0,
+        0.5,
+        NO_AXIS_FORMAT,
+      ),
+    ).toBe('0.5');
+  });
+});
+
+describe('formatX and formatBinRange (engine/format.ts contract)', () => {
+  it('applies the tooltip X format, then the axis format, then the tick format', () => {
+    expect(formatX(formatted, 3)).toBe('at 3');
+    expect(formatX(formatted, 3, 'x', NO_TOOLTIP_FORMAT)).toBe('x=3');
+    expect(formatX(formatted, 3, 'x2', NO_TOOLTIP_FORMAT)).toBe('x2:3');
+    expect(formatX(formatted, 3, 'x', NO_FORMAT)).toBe('x:3');
+    expect(formatX(plain, 3, 'nope')).toBe('3');
+  });
+
+  it("writes a bin range through the series' X axis and separates edges a coarse format merges", () => {
+    expect(formatBinRange(plain, 1, 2)).toBe('x:1 \u2013 x:2');
+    const coarse = context(
+      { series: [{ label: 'h', yColumn: 1 }], axes: { x: { format: () => 'same' } } },
+      [scale('x', 'linear', 0, 1)],
+    );
+    expect(formatBinRange(coarse, 0.1, 0.2)).toBe('0.1 \u2013 0.2');
+    const ranged = context(
+      { ...plain.config, tooltip: { rangeFormat: (a, b, si) => `${a}..${b}#${si}` } },
+      [],
+    );
+    expect(formatBinRange(ranged, 1, 2, 0)).toBe('1..2#0');
+  });
+});
+
+describe('axisReadout and formatFieldValue', () => {
+  it('reads at the tick step plus two decimals, a time axis through its tick format', () => {
+    expect(axisReadout(plain, 'y', 0.123456)).toBe('0.123');
+    expect(axisReadout(plain, 'x', 1.23456)).toBe('1.23');
+    const time = context({ series: [], axes: { t: {} } }, [scale('t', 'time', 0, 1)]);
+    expect(axisReadout(time, 't', 5)).toBe('t:5');
+    expect(axisReadout(plain, 'missing', 1.23456)).toBe('1.23');
+  });
+
+  it('recomputes the step when the domain changes', () => {
+    const y = scale('y', 'linear', 0, 1);
+    const ctx = context({ series: [], axes: { y: {} } }, [y]);
+    expect(axisReadout(ctx, 'y', 1.23456)).toBe('1.235');
+    y.max = 1000;
+    expect(axisReadout(ctx, 'y', 1.23456)).toBe('1.23');
+  });
+
+  it('writes field values to four places, or four significant digits when tiny or huge', () => {
+    expect(formatFieldValue(3)).toBe('3');
+    expect(formatFieldValue(1.5)).toBe('1.5');
+    expect(formatFieldValue(0.000123456)).toBe('0.0001235');
+    expect(formatFieldValue(123456.7)).toBe('1.235e+5');
+    expect(formatFieldValue(Number.NaN)).toBe('');
   });
 });

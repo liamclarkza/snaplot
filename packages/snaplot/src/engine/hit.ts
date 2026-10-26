@@ -1,7 +1,7 @@
 import type { Scale, SeriesSpec, TooltipPoint } from './spec';
 import type { DataStore } from './data/DataStore';
 import { MOUSE_HIT_RADIUS, TOUCH_HIT_RADIUS } from '../constants';
-import { formatValue, scaleStepDecimals, tooltipFormatters } from './format';
+import { formatReadout, formatValue, formatX, NO_AXIS_FORMAT, scaleStepDecimals } from './format';
 import { seriesYColumn } from './marks/columns';
 import { markOf, slotOf, TOOLTIP_RANKS, xColumnOf } from './marks/index';
 import { histogramBinIndexForDataX, histogramBinRange } from './marks/histogram/hit';
@@ -33,7 +33,7 @@ export type PointerKind = 'mouse' | 'touch' | 'pen';
  * a custom tooltip renderer.
  */
 export interface TooltipFormatters {
-  x?: (x: number) => string;
+  x?: (x: number, seriesIndex: number) => string;
   y?: (y: number, seriesIndex: number) => string;
   /**
    * The chart's value readout (plan P9), used for formattedY when `y` is
@@ -205,7 +205,7 @@ export class HitTester {
         x: xVal,
         y: yVal,
         color: sc.color ?? palette[(sc.paletteIndex ?? si) % palette.length],
-        formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
+        formattedX: formatters?.x ? formatters.x(xVal, si) : xScale.tickFormat(xVal),
         formattedY: formatY(formatters, yScale, yVal, si),
       });
     }
@@ -300,7 +300,7 @@ export class HitTester {
             x: xVal,
             y: yVal,
             color: sc.color ?? palette[(sc.paletteIndex ?? si) % palette.length],
-            formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
+            formattedX: formatters?.x ? formatters.x(xVal, si) : xScale.tickFormat(xVal),
             formattedY: formatY(formatters, yScale, yVal, si),
           };
         }
@@ -393,7 +393,7 @@ export class HitTester {
         y: yVal,
         color: style.colorAt(bestIdx),
         radius: style.radiusAt(bestIdx),
-        formattedX: formatters?.x ? formatters.x(xVal) : xScale.tickFormat(xVal),
+        formattedX: formatters?.x ? formatters.x(xVal, seriesIndex) : xScale.tickFormat(xVal),
         formattedY: formatY(formatters, yScale, yVal, seriesIndex),
         fields: scatterTooltipFields(sc, bestIdx, store.seriesCount + 1, (columnIdx, index) =>
           store.valueAt(columnIdx, index),
@@ -536,6 +536,17 @@ export interface MarkHit {
 // marks' own rows for bars and histograms), the point a click lands on, and the histogram bin
 // under a data X.
 
+/**
+ * The HitTester's formatters: the tooltip's X and value readouts through engine/format.ts, with
+ * today's tooltip quirk (no axis format; M10 removes it).
+ */
+export function tooltipReadouts(engine: ChartCore): TooltipFormatters {
+  return {
+    x: (x, si) => formatX(engine, x, engine.config.series[si]?.xAxis ?? 'x', NO_AXIS_FORMAT),
+    y: (y, si) => formatReadout(engine, si, y, NO_AXIS_FORMAT),
+  };
+}
+
 /** The highest tooltip rank among the visible series' marks (0 when none is a slot mark). */
 export function leadingTooltipRank(engine: ChartCore): number {
   let rank = 0;
@@ -590,7 +601,7 @@ export function updateTooltipPoints(engine: ChartCore): void {
         const fallback = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
         return scatterResolvers(engine, si, series, fallback).logicalResolver;
       },
-      { ...tooltipFormatters(engine), readout: engine.readoutY },
+      tooltipReadouts(engine),
       (si) => engine.storeForSeries(si),
     );
   }
@@ -620,7 +631,7 @@ export function emitPointClick(engine: ChartCore, pixelX: number, pixelY: number
         palette[(engine.config.series[si]?.paletteIndex ?? si) % palette.length],
       ).logicalResolver,
     // The tooltip's readout, so a clicked point reads like its tooltip.
-    { ...tooltipFormatters(engine), readout: engine.readoutY },
+    tooltipReadouts(engine),
     (si) => engine.storeForSeries(si),
   );
   // A click inside a bar or bin wins over the nearest point; the last slot hit wins.

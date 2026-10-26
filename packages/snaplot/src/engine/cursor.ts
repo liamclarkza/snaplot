@@ -12,6 +12,7 @@ import {
   type SeriesSpec,
 } from './spec';
 import type { DataStore } from './data/DataStore';
+import { formatBinRange, formatReadout, formatX, NO_FORMAT, NO_TOOLTIP_FORMAT } from './format';
 import { seriesYColumn } from './marks/columns';
 import { histogramBinIndexForDataX, histogramBinRange } from './marks/histogram/hit';
 import { markOf, xColumnOf } from './marks/index';
@@ -242,8 +243,8 @@ export function getCursorSnapshot(engine: ChartCore, opts?: CursorSnapshotOption
  * | | one shared row | a row per series |
  * |---|---|---|
  * | source | the cursor index, else the fallback row | the cursor, else the fallback if any data |
- * | value readout | `formatReadout` (no axis format) | `formatAxisReadout` (axis format first) |
- * | header X | the row's X (tick format), or a histogram bin range | the first row's X (axis format) |
+ * | value readout | `formatReadout`, `NO_FORMAT` | `formatReadout`, `NO_TOOLTIP_FORMAT` (axis format) |
+ * | header X | the row's X (`NO_FORMAT`), or a histogram bin range | the first row's X (axis format) |
  * | histogram rows | only when every visible series is one | per histogram series |
  * | no rows | the source stands | the source becomes `'none'` |
  */
@@ -290,15 +291,12 @@ export function fillSnapshot(
   // The header: the shared row's X, or (per-series rows) the cursor's X until the first row.
   const sharedRange = shared && onlyBins ? histogramBinRange(row!, shared) : null;
   if (shared) {
-    const xScale = engine.scales.get('x');
     const x = sharedRange ? (sharedRange.min + sharedRange.max) / 2 : shared.xAt(row!);
     target.dataIndex = row;
     target.dataX = x;
     target.formattedX = sharedRange
-      ? engine.formatHistogramBinRange(sharedRange.min, sharedRange.max)
-      : xScale
-        ? xScale.tickFormat(x)
-        : String(x);
+      ? formatBinRange(engine, sharedRange.min, sharedRange.max)
+      : formatX(engine, x, 'x', NO_FORMAT);
   } else if (source === 'cursor') {
     target.dataX = engine.cursorDataX;
   }
@@ -324,9 +322,7 @@ export function fillSnapshot(
     const value = store.valueAt(column, dataIndex);
     const yAxis = series.yAxis ?? 'y';
     const formattedValue = Number.isFinite(value)
-      ? shared
-        ? engine.formatReadout(yAxis, value)
-        : engine.formatAxisReadout(yAxis, value)
+      ? formatReadout(engine, si, value, shared ? NO_FORMAT : NO_TOOLTIP_FORMAT)
       : '';
 
     const point =
@@ -351,7 +347,7 @@ export function fillSnapshot(
     if (!shared && count === 0) {
       target.dataIndex = dataIndex;
       target.dataX ??= dataX;
-      target.formattedX = engine.formatAxisValue(series.xAxis ?? 'x', target.dataX);
+      target.formattedX = formatX(engine, target.dataX, series.xAxis ?? 'x', NO_TOOLTIP_FORMAT);
     }
     count++;
 

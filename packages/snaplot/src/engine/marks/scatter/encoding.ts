@@ -4,6 +4,7 @@
  * draw and hit halves and the box selection share. A leaf module: it imports types only.
  */
 import type { ChartCore } from '../../Engine';
+import { formatFieldValue } from '../../format';
 import type {
   ScatterColorEncoding,
   ScatterSizeEncoding,
@@ -82,15 +83,6 @@ export function normalizeScatterTooltipField(
   return typeof field === 'number' ? { column: field } : field;
 }
 
-export function formatScatterValue(value: number): string {
-  if (value !== value) return '';
-  if (!Number.isFinite(value)) return String(value);
-  if (Number.isInteger(value)) return String(value);
-  const abs = Math.abs(value);
-  if ((abs !== 0 && abs < 0.001) || abs >= 10_000) return value.toPrecision(4);
-  return value.toFixed(4).replace(/\.?0+$/, '');
-}
-
 export function scatterTooltipFields(
   series: SeriesSpec,
   index: number,
@@ -122,7 +114,7 @@ export function scatterTooltipFields(
     out.push({
       label: field.label ?? `col ${field.column}`,
       value,
-      formatted: field.format ? field.format(value) : formatScatterValue(value),
+      formatted: field.format ? field.format(value) : formatFieldValue(value),
     });
   }
 
