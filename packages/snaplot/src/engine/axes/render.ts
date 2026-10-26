@@ -1,17 +1,18 @@
 import type { AxisSpec, Layout, Scale, ThemeConfig, AxisPosition, ChartSpec } from '../spec';
 import { AXIS_LABEL_GAP, AXIS_TICK_LENGTH, EDGE_MARGIN, LABEL_MIN_GAP } from '../../constants';
 import { inferPosition } from '../layout';
-import { opaqueColorOnBackground } from '../../utils/color';
-import { type AxesRenderResult, type AxisLabel, resolveAxisCornerCollisions } from './labels';
+import { opaqueColorOnBackground } from '../theme/color';
+import { type AxesRenderResult, type LabelBox, resolveAxisCornerCollisions } from './labels';
 import { axisTickValues, thinTicks } from './ticks';
 import { type FormatContext, formatTick } from '../format';
+import { crisp } from '../render/crisp';
 
 /**
  * Renders gridlines on the static (grid) canvas and returns label
  * positions for DOM rendering (P2: hybrid, canvas marks, DOM text).
  *
- * 0.5px offset trick: for 1px gridlines on non-retina (dpr===1),
- * offset coordinates by 0.5 to avoid blurry sub-pixel rendering.
+ * Every 1 px stroke (gridlines, tick marks, the plot frame) is snapped by
+ * render/crisp.ts, so it stays sharp at the canvas' device pixel ratio.
  */
 
 /** Resolve an axis's grid config to concrete draw values, or null when hidden. */
@@ -40,11 +41,10 @@ export function renderAxes(
   customXTicks?: { values: number[]; format?: (v: number) => string; gridValues?: number[] },
 ): AxesRenderResult {
   const { plot, dpr } = layout;
-  const offset = dpr === 1 ? 0.5 : 0;
   const formats: FormatContext = { config, scales };
 
   const result: AxesRenderResult = {
-    labels: new Map(),
+    labels: [],
   };
   const tickMarks: Array<{
     position: AxisPosition;
@@ -75,7 +75,7 @@ export function renderAxes(
     if (!scale) continue;
 
     const pos = inferPosition(key, ac.position);
-    const labels: AxisLabel[] = [];
+    const labels: LabelBox[] = result.labels;
 
     // Tick precedence: explicit ac.ticks -> bar/histogram category ticks ->
     // generated at the ac.tickCount density.
@@ -164,7 +164,7 @@ export function renderAxes(
       if (isHorizontal) {
         // Vertical gridlines across plot area
         for (const t of customGridValues ?? ticks) {
-          const px = Math.round(scale.dataToPixel(t)) + offset;
+          const px = crisp(scale.dataToPixel(t), dpr);
           if (px >= plot.left && px <= plot.left + plot.width) {
             ctx.moveTo(px, plot.top);
             ctx.lineTo(px, plot.top + plot.height);
@@ -173,7 +173,7 @@ export function renderAxes(
       } else {
         // Horizontal gridlines across plot area
         for (const t of ticks) {
-          const py = Math.round(scale.dataToPixel(t)) + offset;
+          const py = crisp(scale.dataToPixel(t), dpr);
           ctx.moveTo(plot.left, py);
           ctx.lineTo(plot.left + plot.width, py);
         }
@@ -191,6 +191,8 @@ export function renderAxes(
           const py = scale.dataToPixel(t);
           if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
             labels.push({
+              axis: key,
+              kind: 'tick',
               text: tickLabel(t),
               x: plot.left - AXIS_TICK_LENGTH - AXIS_LABEL_GAP,
               y: py,
@@ -204,6 +206,8 @@ export function renderAxes(
           const py = scale.dataToPixel(t);
           if (py >= plot.top - 10 && py <= plot.top + plot.height + 10) {
             labels.push({
+              axis: key,
+              kind: 'tick',
               text: tickLabel(t),
               x: plot.left + plot.width + AXIS_TICK_LENGTH + AXIS_LABEL_GAP,
               y: py,
@@ -229,7 +233,7 @@ export function renderAxes(
             const text = tickLabel(t);
             const half = ctx.measureText(text).width / 2;
             const x = Math.max(half + 2, Math.min(layout.width - half - 2, px));
-            labels.push({ text, x, y: labelY, anchor: 'middle' });
+            labels.push({ axis: key, kind: 'tick', text, x, y: labelY, anchor: 'middle' });
           }
         }
         break;
@@ -246,45 +250,47 @@ export function renderAxes(
         switch (pos) {
           case 'left':
             labels.push({
+              axis: key,
+              kind: 'title',
               text: ac.title,
               x: area.left + inset,
               y: plot.top + plot.height / 2,
               anchor: 'middle',
-              kind: 'title',
             });
             break;
           case 'right':
             labels.push({
+              axis: key,
+              kind: 'title',
               text: ac.title,
               x: area.left + area.width - inset,
               y: plot.top + plot.height / 2,
               anchor: 'middle',
-              kind: 'title',
             });
             break;
           case 'bottom':
             labels.push({
+              axis: key,
+              kind: 'title',
               text: ac.title,
               x: plot.left + plot.width / 2,
               y: area.top + area.height - inset,
               anchor: 'middle',
-              kind: 'title',
             });
             break;
           case 'top':
             labels.push({
+              axis: key,
+              kind: 'title',
               text: ac.title,
               x: plot.left + plot.width / 2,
               y: area.top + inset,
               anchor: 'middle',
-              kind: 'title',
             });
             break;
         }
       }
     }
-
-    result.labels.set(key, labels);
   }
 
   // Release the plot clip used for gridlines.
@@ -302,30 +308,30 @@ export function renderAxes(
     ctx.globalAlpha = 1;
     ctx.beginPath();
     for (const pixel of marks.pixels) {
-      const p = Math.round(pixel) + offset;
+      const p = crisp(pixel, dpr);
       const inward = marks.direction === 'in' || marks.direction === 'both';
       const outward = marks.direction === 'out' || marks.direction === 'both';
       switch (marks.position) {
         case 'bottom': {
-          const edge = Math.round(plot.top + plot.height) + offset;
+          const edge = crisp(plot.top + plot.height, dpr);
           ctx.moveTo(p, edge - (inward ? marks.length : 0));
           ctx.lineTo(p, edge + (outward ? marks.length : 0));
           break;
         }
         case 'top': {
-          const edge = Math.round(plot.top) + offset;
+          const edge = crisp(plot.top, dpr);
           ctx.moveTo(p, edge + (inward ? marks.length : 0));
           ctx.lineTo(p, edge - (outward ? marks.length : 0));
           break;
         }
         case 'left': {
-          const edge = Math.round(plot.left) + offset;
+          const edge = crisp(plot.left, dpr);
           ctx.moveTo(edge + (inward ? marks.length : 0), p);
           ctx.lineTo(edge - (outward ? marks.length : 0), p);
           break;
         }
         case 'right': {
-          const edge = Math.round(plot.left + plot.width) + offset;
+          const edge = crisp(plot.left + plot.width, dpr);
           ctx.moveTo(edge - (inward ? marks.length : 0), p);
           ctx.lineTo(edge + (outward ? marks.length : 0), p);
           break;
@@ -347,15 +353,15 @@ export function renderAxes(
   );
   ctx.lineWidth = 1;
   ctx.globalAlpha = 1;
-  // Round all four edges independently, then derive width/height from the
-  // snapped corners. Rounding only the origin and adding an unrounded
+  // Snap all four edges independently, then derive width/height from the
+  // snapped corners. Snapping only the origin and adding an unrounded
   // (possibly fractional) plot.width/height left the right and bottom strokes
   // off the pixel grid, so they blurred at dpr 1 while the top/left stayed
-  // crisp. `offset` is the standard half-pixel nudge for 1px strokes at dpr 1.
-  const bx = Math.round(plot.left) + offset;
-  const by = Math.round(plot.top) + offset;
-  const bRight = Math.round(plot.left + plot.width) + offset;
-  const bBottom = Math.round(plot.top + plot.height) + offset;
+  // crisp.
+  const bx = crisp(plot.left, dpr);
+  const by = crisp(plot.top, dpr);
+  const bRight = crisp(plot.left + plot.width, dpr);
+  const bBottom = crisp(plot.top + plot.height, dpr);
   ctx.beginPath();
   ctx.rect(bx, by, bRight - bx, bBottom - by);
   ctx.stroke();

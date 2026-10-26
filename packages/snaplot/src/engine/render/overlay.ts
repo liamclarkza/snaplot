@@ -3,8 +3,9 @@ import { prefersReducedMotion } from '../../utils/motion';
 import type { ChartCore } from '../Engine';
 import { brushPixelRange } from '../selection';
 import { DirtyFlag } from '../spec';
-import { isDarkColor } from '../../utils/color';
+import { isDarkColor } from '../theme/color';
 import { markOf, slotOf, visibleSlots } from '../marks/index';
+import { crisp } from './crisp';
 
 /**
  * Renders crosshair and selection box on the overlay canvas.
@@ -40,14 +41,14 @@ export function renderCrosshair(
 
   // Vertical crosshair line
   if (config.xLine !== false) {
-    const px = Math.round(x) + (layout.dpr === 1 ? 0.5 : 0);
+    const px = crisp(x, layout.dpr);
     ctx.moveTo(px, plot.top);
     ctx.lineTo(px, plot.top + plot.height);
   }
 
   // Horizontal crosshair line
   if (config.yLine) {
-    const py = Math.round(y) + (layout.dpr === 1 ? 0.5 : 0);
+    const py = crisp(y, layout.dpr);
     ctx.moveTo(plot.left, py);
     ctx.lineTo(plot.left + plot.width, py);
   }
@@ -110,7 +111,6 @@ export function renderSelectionBox(
   const y2 = Math.min(plot.top + plot.height, Math.max(startY, endY));
 
   // Snap to the pixel grid so the 1px outline stays crisp during the drag.
-  const offset = layout.dpr === 1 ? 0.5 : 0;
   const rx = Math.round(x1);
   const ry = Math.round(y1);
   const rw = Math.round(x2) - rx;
@@ -124,7 +124,7 @@ export function renderSelectionBox(
   ctx.fillRect(rx, ry, rw, rh);
   ctx.strokeStyle = 'rgba(99, 148, 255, 0.9)';
   ctx.lineWidth = 1;
-  ctx.strokeRect(rx + offset, ry + offset, rw, rh);
+  ctx.strokeRect(crisp(x1, layout.dpr), crisp(y1, layout.dpr), rw, rh);
   ctx.restore();
 }
 
@@ -147,7 +147,6 @@ export function renderBrushSelection(
   const right = Math.min(plot.left + plot.width, Math.max(pxMin, pxMax));
   if (right < plot.left || left > plot.left + plot.width) return;
 
-  const offset = layout.dpr === 1 ? 0.5 : 0;
   const rx = Math.round(left);
   const rw = Math.round(right) - rx;
 
@@ -166,12 +165,12 @@ export function renderBrushSelection(
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   if (pxMin >= plot.left && pxMin <= plot.left + plot.width) {
-    const x = Math.round(Math.min(pxMin, pxMax)) + offset;
+    const x = crisp(Math.min(pxMin, pxMax), layout.dpr);
     ctx.moveTo(x, plot.top);
     ctx.lineTo(x, plot.top + plot.height);
   }
   if (pxMax >= plot.left && pxMax <= plot.left + plot.width) {
-    const x = Math.round(Math.max(pxMin, pxMax)) + offset;
+    const x = crisp(Math.max(pxMin, pxMax), layout.dpr);
     ctx.moveTo(x, plot.top);
     ctx.lineTo(x, plot.top + plot.height);
   }

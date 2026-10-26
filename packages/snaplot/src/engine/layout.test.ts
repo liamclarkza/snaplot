@@ -115,3 +115,56 @@ describe('computeLayout edge margin', () => {
     expect(rightGutter).toBe(12);
   });
 });
+
+describe('reserveChrome (render/surface.ts, the W5 contract the legend calls)', () => {
+  const config = {
+    series: [],
+    axes: { x: { position: 'bottom' }, x2: { position: 'top' }, y: { position: 'left' } },
+  } as unknown as ChartSpec;
+  const scales = new Map<string, Scale>([
+    ['x', scale('x', [0, 50, 100])],
+    ['x2', scale('x2', [0, 50, 100])],
+    ['y', scale('y', [0, 100])],
+  ]);
+
+  it('lays out the axes and the plot between the reserved strips', () => {
+    const open = computeLayout(640, 240, config, scales, 1, 'sans-serif', FONT_SIZE);
+    const reserved = computeLayout(
+      640,
+      240,
+      config,
+      scales,
+      1,
+      'sans-serif',
+      FONT_SIZE,
+      {},
+      {
+        top: 30,
+        bottom: 12,
+      },
+    );
+    expect(reserved.plot.top).toBe(open.plot.top + 30);
+    expect(reserved.plot.height).toBe(open.plot.height - 42);
+    expect(reserved.plot.left).toBe(open.plot.left);
+    expect(reserved.plot.width).toBe(open.plot.width);
+    expect(reserved.axes.x2?.area.top).toBe(30);
+    expect(reserved.axes.x?.area.top).toBe(reserved.plot.top + reserved.plot.height);
+    expect(reserved.axes.y?.area.top).toBe(reserved.plot.top);
+  });
+
+  it("is today's layout when nothing is reserved", () => {
+    expect(
+      computeLayout(
+        640,
+        240,
+        config,
+        scales,
+        1,
+        'sans-serif',
+        FONT_SIZE,
+        {},
+        { top: 0, bottom: 0 },
+      ),
+    ).toEqual(computeLayout(640, 240, config, scales, 1, 'sans-serif', FONT_SIZE));
+  });
+});

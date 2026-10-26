@@ -22,7 +22,7 @@ import {
   PALETTE_DIVERGING_DARK,
 } from '../../constants';
 import { deepMerge } from '../merge';
-import { isDarkColor, parseColor, withAlpha } from '../../utils/color';
+import { isDarkColor, parseColor, withAlpha } from './color';
 
 export {
   DEFAULT_THEME as lightTheme,
@@ -266,7 +266,8 @@ function createCssColorResolver(container: HTMLElement): {
 
     // Stage 2: normalize to parseable sRGB when the small parser cannot
     // read the result (oklch, hsl, color-mix, uncommon named colors).
-    let rgb = parseColor(computed);
+    const parsed = parseColor(computed);
+    let rgb: [number, number, number] | null = parsed ? [parsed.r, parsed.g, parsed.b] : null;
     let alpha = 1;
     if (rgb === null) {
       const bytes = toRgbBytes(computed);

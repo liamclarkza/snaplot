@@ -1,5 +1,9 @@
+/** A side of the chart's root that chrome (the built-in legend) can take space from. */
+export type ChromeSide = 'top' | 'bottom';
+
 /**
- * Creates and manages the 3-layer canvas stack + DOM overlay.
+ * Creates and manages the 3-layer canvas stack + DOM overlay, and the space chrome reserves at
+ * the top and bottom of the root (`reserveChrome`, a W5 contract: plan §3.2).
  *
  * Layer 0 (grid):    Gridlines, axis lines. alpha:false for perf.
  * Layer 1 (data):    Series marks (lines, fills, points, bars).
@@ -27,6 +31,8 @@ export class CanvasManager {
   private allocated: { width: number; height: number; dpr: number } | null = null;
   private dprMediaQuery: MediaQueryList | null = null;
   private boundDprChange: (() => void) | null = null;
+  /** CSS pixels reserved for chrome at each side of the root. */
+  private chrome: Record<ChromeSide, number> = { top: 0, bottom: 0 };
 
   constructor(
     parent: HTMLElement,
@@ -174,6 +180,24 @@ export class CanvasManager {
     this.dataCtx.scale(this._dpr, this._dpr);
     this.overlayCtx.scale(this._dpr, this._dpr);
     return true;
+  }
+
+  /**
+   * Reserve `px` CSS pixels at the `side` of the root for chrome shown there (the built-in legend;
+   * M12b calls this): the layout (M10) keeps the plot and its axes out of them. A non-finite or
+   * negative `px` reserves nothing. Returns whether the reservation changed, so the caller lays
+   * out and repaints (`ChartCore.reserveChrome` does both).
+   */
+  reserveChrome(side: ChromeSide, px: number): boolean {
+    const value = Number.isFinite(px) && px > 0 ? px : 0;
+    if (this.chrome[side] === value) return false;
+    this.chrome[side] = value;
+    return true;
+  }
+
+  /** The CSS pixels reserved at `side` of the root (0 until chrome reserves some). */
+  reservedChrome(side: ChromeSide): number {
+    return this.chrome[side];
   }
 
   /** Clear a specific layer or all layers */

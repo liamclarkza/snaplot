@@ -15,15 +15,17 @@ describe('axis text appearance', () => {
       axes: { x: { position: 'bottom', area: { left: 40, top: 150, width: 240, height: 50 } } },
     };
     const result = {
-      labels: new Map([
-        [
-          'x',
-          [
-            { text: '0', x: 40, y: 160, anchor: 'middle' as const },
-            { text: 'Time (s)', x: 160, y: 188, anchor: 'middle' as const, kind: 'title' as const },
-          ],
-        ],
-      ]),
+      labels: [
+        { axis: 'x', kind: 'tick' as const, text: '0', x: 40, y: 160, anchor: 'middle' as const },
+        {
+          axis: 'x',
+          kind: 'title' as const,
+          text: 'Time (s)',
+          x: 160,
+          y: 188,
+          anchor: 'middle' as const,
+        },
+      ],
     };
     updateDOMLabels(
       host,

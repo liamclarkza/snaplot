@@ -4,7 +4,7 @@
  */
 import { affineParams } from '../../scales/affine';
 import type { Layout, Scale, SeriesSpec } from '../../spec';
-import { withAlpha } from '../../../utils/color';
+import { withAlpha } from '../../theme/color';
 import type { MarkDraw } from '../index';
 import { NO_COLUMNS } from '../columns';
 import { type LineRenderSegment, segmentPointCount } from '../line/draw';

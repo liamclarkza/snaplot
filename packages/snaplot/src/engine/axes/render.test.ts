@@ -79,7 +79,7 @@ describe('renderAxes vertical label filtering', () => {
     const config = { series: [], axes: { y: { position: 'left' } } } as unknown as ChartSpec;
 
     const result = renderAxes(context(), layout(), scales, theme, config);
-    const labels = result.labels.get('y') ?? [];
+    const labels = result.labels.filter((l) => l.axis === 'y');
 
     expect(labels.map((l) => l.text)).toEqual(['50']);
   });
@@ -98,7 +98,7 @@ describe('per-axis grid config', () => {
 
     // Gridlines are absent, but the short tick anchors still paint.
     expect(ctx.moveTo).toHaveBeenCalledTimes(3);
-    expect((result.labels.get('y') ?? []).length).toBe(3);
+    expect(result.labels.filter((l) => l.axis === 'y').length).toBe(3);
   });
 
   it('can hide tick marks independently of gridlines and labels', () => {
@@ -113,7 +113,7 @@ describe('per-axis grid config', () => {
     const result = renderAxes(ctx, layout(), scales, theme, config);
 
     expect(ctx.moveTo).not.toHaveBeenCalled();
-    expect((result.labels.get('y') ?? []).length).toBe(3);
+    expect(result.labels.filter((l) => l.axis === 'y').length).toBe(3);
   });
 
   it('applies dash, color, and opacity from the grid object', () => {
@@ -168,8 +168,8 @@ describe('axis title placement', () => {
 
     const result = renderAxes(ctx, fullLayout, scales, theme, config);
 
-    const yTitle = (result.labels.get('y') ?? []).find((l) => l.kind === 'title');
-    const xTitle = (result.labels.get('x') ?? []).find((l) => l.kind === 'title');
+    const yTitle = result.labels.filter((l) => l.axis === 'y').find((l) => l.kind === 'title');
+    const xTitle = result.labels.filter((l) => l.axis === 'x').find((l) => l.kind === 'title');
     const fontSize = 12;
     // Rotated left title: glyph left edge = x - fontSize / 2.
     expect(yTitle).toBeDefined();
@@ -204,7 +204,7 @@ describe('axis corner collision handling', () => {
       axes: { x: { position: 'bottom' }, y: { position: 'left' } },
     } as ChartSpec);
 
-    expect(result.labels.get('x')?.[0].x).toBeGreaterThan(20);
+    expect(result.labels.filter((l) => l.axis === 'x')[0]?.x).toBeGreaterThan(20);
   });
 });
 
@@ -277,10 +277,45 @@ describe('bar slot grids', () => {
         format: (v) => `Category ${v}`,
       },
     );
-    expect(result.labels.get('x')?.length).toBeLessThan(3);
+    expect(result.labels.filter((l) => l.axis === 'x').length).toBeLessThan(3);
     // Every boundary remains, including both ends; no shortened edge cell.
     for (const x of [0.5, 20.5, 40.5, 60.5]) expect(ctx.moveTo).toHaveBeenCalledWith(x, 100.5);
     expect(ctx.moveTo).toHaveBeenCalledWith(20.5, 0);
     expect(ctx.moveTo).toHaveBeenCalledWith(40.5, 0);
+  });
+});
+
+describe('the LabelBox[] layout (W5 contract, axes/labels.ts)', () => {
+  it('lays labels out in paint order, axis by axis, ticks before the title', () => {
+    const scales = new Map<string, Scale>([
+      ['x', { ...linearScale(0, 100, [0, 50, 100]), key: 'x' }],
+      ['y', linearScale(0, 100, [0, 100])],
+    ]);
+    const config = {
+      series: [],
+      axes: { x: { position: 'bottom', title: 'Time' }, y: { position: 'left', title: 'Load' } },
+    } as unknown as ChartSpec;
+    const boxes: Layout = {
+      width: 200,
+      height: 140,
+      plot: { left: 0, top: 0, width: 100, height: 100 },
+      axes: {
+        x: { position: 'bottom', area: { left: 0, top: 100, width: 100, height: 40 } },
+        y: { position: 'left', area: { left: 0, top: 0, width: 0, height: 100 } },
+      },
+      dpr: 1,
+    };
+    const { labels } = renderAxes(context(), boxes, scales, theme, config);
+    expect(labels.map((l) => `${l.axis} ${l.kind} ${l.text} ${l.anchor}`)).toEqual([
+      'x tick 0 middle',
+      'x tick 50 middle',
+      'x tick 100 middle',
+      'x title Time middle',
+      'y tick 0 end',
+      'y tick 100 end',
+      'y title Load middle',
+    ]);
+    for (const label of labels)
+      expect(Object.keys(label)).toEqual(['axis', 'kind', 'text', 'x', 'y', 'anchor']);
   });
 });

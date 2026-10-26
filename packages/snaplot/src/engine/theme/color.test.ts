@@ -1,31 +1,35 @@
 import { describe, expect, it } from 'vitest';
 import { isDarkColor, parseColor, withAlpha, opaqueColorOnBackground } from './color';
 
-describe('parseColor', () => {
+const rgba = (r: number, g: number, b: number, a = 1) => ({ r, g, b, a });
+
+describe('parseColor → RGBA (the W5 colour contract)', () => {
   it('parses 6-digit hex', () => {
-    expect(parseColor('#1a2b3c')).toEqual([26, 43, 60]);
-    expect(parseColor('#FFFFFF')).toEqual([255, 255, 255]);
+    expect(parseColor('#1a2b3c')).toEqual(rgba(26, 43, 60));
+    expect(parseColor('#FFFFFF')).toEqual(rgba(255, 255, 255));
   });
 
   it('parses 3-digit hex by doubling digits', () => {
-    expect(parseColor('#000')).toEqual([0, 0, 0]);
-    expect(parseColor('#abc')).toEqual([170, 187, 204]);
+    expect(parseColor('#000')).toEqual(rgba(0, 0, 0));
+    expect(parseColor('#abc')).toEqual(rgba(170, 187, 204));
   });
 
-  it('parses 8-digit and 4-digit hex, ignoring alpha', () => {
-    expect(parseColor('#11223380')).toEqual([17, 34, 51]);
-    expect(parseColor('#1238')).toEqual([17, 34, 51]);
+  it('parses 8-digit and 4-digit hex with their alpha', () => {
+    expect(parseColor('#11223380')).toEqual(rgba(17, 34, 51, 0x80 / 255));
+    expect(parseColor('#1238')).toEqual(rgba(17, 34, 51, 8 / 15));
   });
 
-  it('parses rgb() and rgba() in comma and space syntax', () => {
-    expect(parseColor('rgb(10, 20, 30)')).toEqual([10, 20, 30]);
-    expect(parseColor('rgba(10,20,30,0.5)')).toEqual([10, 20, 30]);
-    expect(parseColor('rgb(10 20 30 / 0.5)')).toEqual([10, 20, 30]);
+  it('parses rgb() and rgba() in comma and space syntax, with their alpha', () => {
+    expect(parseColor('rgb(10, 20, 30)')).toEqual(rgba(10, 20, 30));
+    expect(parseColor('rgba(10,20,30,0.5)')).toEqual(rgba(10, 20, 30, 0.5));
+    expect(parseColor('rgb(10 20 30 / 0.5)')).toEqual(rgba(10, 20, 30, 0.5));
+    expect(parseColor('rgb(10 20 30 / 25%)')).toEqual(rgba(10, 20, 30, 0.25));
   });
 
-  it('parses common named colors', () => {
-    expect(parseColor('black')).toEqual([0, 0, 0]);
-    expect(parseColor('White')).toEqual([255, 255, 255]);
+  it('parses common named colors; transparent has alpha 0', () => {
+    expect(parseColor('black')).toEqual(rgba(0, 0, 0));
+    expect(parseColor('White')).toEqual(rgba(255, 255, 255));
+    expect(parseColor('transparent')).toEqual(rgba(255, 255, 255, 0));
   });
 
   it('returns null for unsupported formats', () => {

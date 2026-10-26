@@ -2,7 +2,7 @@ import type { ChartCore } from './Engine';
 import type { SeriesSpec, Layout, ThemeConfig } from './spec';
 import type { ColumnarSegment } from './data/DataStore';
 import type { LineRenderSegment } from './marks/line/draw';
-import type { AxesRenderResult } from './axes/labels';
+import type { LabelBox } from './axes/labels';
 
 // ─── Debug counters (plan D31) ──────────────────────────────
 // Tests and the bench read these through `chart[Symbol.for('snaplot.debug')]`
@@ -29,15 +29,8 @@ export interface DataPassSeries {
   yMax: number;
 }
 
-/** An axis label as last laid out: its text and anchor point in CSS pixels. */
-export interface DebugLabelBox {
-  axis: string;
-  kind: 'tick' | 'title';
-  text: string;
-  x: number;
-  y: number;
-  anchor: 'start' | 'middle' | 'end';
-}
+/** An axis label as last laid out: the engine's `LabelBox` (axes/labels.ts). */
+export type DebugLabelBox = LabelBox;
 
 /** A point-in-time read of the debug counters. Read it again after acting. */
 export interface DebugSnapshot {
@@ -109,21 +102,9 @@ function countDataPass(pass: readonly DataPassSeries[]): { drawn: number; inView
   return { drawn, inView };
 }
 
-function debugLabelBoxes(labels: AxesRenderResult['labels'] | null): DebugLabelBox[] {
-  const boxes: DebugLabelBox[] = [];
-  for (const [axis, list] of labels ?? []) {
-    for (const label of list) {
-      boxes.push({
-        axis,
-        kind: label.kind ?? 'tick',
-        text: label.text,
-        x: label.x,
-        y: label.y,
-        anchor: label.anchor,
-      });
-    }
-  }
-  return boxes;
+/** Copies of the last paint's label boxes, so a reader cannot move the engine's. */
+function debugLabelBoxes(labels: readonly LabelBox[] | null): DebugLabelBox[] {
+  return (labels ?? []).map((label) => ({ ...label }));
 }
 
 /**

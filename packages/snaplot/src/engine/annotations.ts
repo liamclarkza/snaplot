@@ -1,5 +1,5 @@
 import type { EngineHost, Plugin } from './spec';
-import { withAlpha } from '../utils/color';
+import { withAlpha } from './theme/color';
 
 /**
  * Configuration for a single reference line, a horizontal or vertical

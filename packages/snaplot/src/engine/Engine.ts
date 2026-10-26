@@ -65,10 +65,11 @@ import { setHighlight } from './highlight';
 import { HitTester } from './hit';
 import { computeCustomXTicks } from './axes/ticks';
 import { renderAxes } from './axes/render';
-import { type AxesRenderResult, updateDOMLabels } from './axes/labels';
+import { type LabelBox, updateDOMLabels } from './axes/labels';
 import {
   inferPosition,
   type PlotInsets,
+  reserveChrome,
   setPlotInsets,
   naturalGutters,
   layoutIsStale,
@@ -243,7 +244,8 @@ export class ChartCore implements EngineHost {
     renderCount: { grid: 0, data: 0, overlay: 0 },
   };
   lastDataPass: DataPassSeries[] = [];
-  lastAxisLabels: AxesRenderResult['labels'] | null = null;
+  /** The labels of the last grid paint (the debug hook's `labelBoxes()`). */
+  lastAxisLabels: LabelBox[] | null = null;
 
   /**
    * Per-axis "reset-zoom" extent, the scale's min/max after the last
@@ -388,6 +390,11 @@ export class ChartCore implements EngineHost {
 
   setPlotInsets(insets: PlotInsets): void {
     setPlotInsets(this, insets);
+  }
+
+  /** Reserve CSS pixels at the top or bottom of the root for chrome (layout.ts `reserveChrome`). */
+  reserveChrome(side: 'top' | 'bottom', px: number): void {
+    reserveChrome(this, side, px);
   }
 
   naturalGutters(): { left: number; right: number } {

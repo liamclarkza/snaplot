@@ -82,6 +82,14 @@ export interface PlotInsets {
   right?: number;
 }
 
+/** The CSS pixels chrome reserves at the top and bottom of the root (`reserveChrome`). */
+export interface ReservedChrome {
+  top: number;
+  bottom: number;
+}
+
+const NO_CHROME: ReservedChrome = Object.freeze({ top: 0, bottom: 0 });
+
 export function computeLayout(
   containerWidth: number,
   containerHeight: number,
@@ -91,6 +99,8 @@ export function computeLayout(
   fontFamily: string,
   fontSize: number,
   insets: PlotInsets = {},
+  /** Space reserved for chrome (the built-in legend): the axes and the plot sit between it. */
+  chrome: ReservedChrome = NO_CHROME,
 ): Layout {
   const padding: { top: number; right: number; bottom: number; left: number } = {
     top: DEFAULT_PADDING.top,
@@ -221,9 +231,12 @@ export function computeLayout(
   }
 
   const plotLeft = leftAxisWidth;
-  const plotTop = topAxisHeight;
+  const plotTop = chrome.top + topAxisHeight;
   const plotWidth = Math.max(0, containerWidth - leftAxisWidth - rightAxisWidth);
-  const plotHeight = Math.max(0, containerHeight - topAxisHeight - bottomAxisHeight);
+  const plotHeight = Math.max(
+    0,
+    containerHeight - chrome.top - chrome.bottom - topAxisHeight - bottomAxisHeight,
+  );
 
   // Build axis regions keyed by axis config key
   const axes: Layout['axes'] = {};
@@ -232,7 +245,7 @@ export function computeLayout(
       case 'top':
         axes[key] = {
           position: 'top',
-          area: { left: plotLeft, top: 0, width: plotWidth, height: topAxisHeight },
+          area: { left: plotLeft, top: chrome.top, width: plotWidth, height: topAxisHeight },
         };
         break;
       case 'bottom':
@@ -367,9 +380,30 @@ export function updateLayout(engine: ChartCore): void {
     engine.theme.fontFamily,
     engine.theme.fontSize,
     engine.plotInsets,
+    reservedChrome(engine),
   );
   engine.layoutCacheKey = cacheKey;
   updateInteractionLayer(engine);
+}
+
+/** The space chrome reserves at the top and bottom of the root (render/surface.ts). */
+export function reservedChrome(engine: ChartCore): ReservedChrome {
+  return {
+    top: engine.canvasManager.reservedChrome('top'),
+    bottom: engine.canvasManager.reservedChrome('bottom'),
+  };
+}
+
+/**
+ * Reserve `px` CSS pixels at the top or bottom of the root for chrome (the W5 contract M12b's
+ * legend calls): applied only when it changes, as a relayout and a repaint.
+ */
+export function reserveChrome(engine: ChartCore, side: 'top' | 'bottom', px: number): void {
+  if (engine.destroyed || !engine.canvasManager.reserveChrome(side, px)) return;
+  updateLayout(engine);
+  updateScalePixelRanges(engine);
+  refreshCursor(engine);
+  engine.scheduler.markDirty(DirtyFlag.ALL);
 }
 
 export function updateInteractionLayer(engine: ChartCore): void {
@@ -405,6 +439,8 @@ export function createLayoutCacheKey(engine: ChartCore, width: number, height: n
     engine.theme.fontSize,
     engine.plotInsets.left,
     engine.plotInsets.right,
+    engine.canvasManager.reservedChrome('top'),
+    engine.canvasManager.reservedChrome('bottom'),
     axes,
   ].join('|');
 }
