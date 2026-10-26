@@ -5,6 +5,7 @@ import { act, createElement as h, createRef, StrictMode, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import manifestText from '../../package.json?raw';
 import { debug, type Fakes, installFakes } from '../fakes';
 import type { ChartHandle, ChartOptions, ChartState } from '../../src/public/types';
 import { Chart } from '../../src/react/Chart';
@@ -34,6 +35,14 @@ function host(): HTMLElement {
   document.body.append(element);
   return element;
 }
+
+describe('[research-07] React 18.3 and 19', () => {
+  it('[research-07] the React peer range takes React 18.3 and 19', () => {
+    // The React 18 runtime itself runs the conformance suite (test/conformance/react18).
+    const manifest = JSON.parse(manifestText) as { peerDependencies: Record<string, string> };
+    expect(manifest.peerDependencies.react).toBe('^18.3.0 || ^19.0.0');
+  });
+});
 
 describe('React Chart', () => {
   it('mounts one chart with the options as props and passes host attributes through', async () => {
