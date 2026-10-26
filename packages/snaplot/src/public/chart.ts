@@ -433,16 +433,21 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           : this.ingested;
       this.validateState(checked, ingested);
       if (work.group) validateGroup(normalized.group, this.candidate(ingested), this);
-      this.present(normalized, ingested, work, applyState);
+      this.present(normalized, ingested, work, applyState, state.length > 0);
     });
   }
 
-  /** Apply a change that reads no data: engine options, annotations, plugins, group and name. */
+  /**
+   * Apply a change that reads no data: engine options, annotations, plugins, group and name.
+   * Options equal to the last applied ones (or differing only in callbacks, read through the
+   * latest options) commit nothing, so the revision stays and no subscriber is called.
+   */
   private present(
     normalized: NormalizedOptions<Row>,
     ingested: Ingested<Row>,
     work: Work,
     after: () => void,
+    stateChanged: boolean,
   ): void {
     const previous = this.options;
     this.ingested = ingested;
@@ -460,7 +465,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (work.engine) this.syncLegend();
     after();
     if (work.group) this.moveGroup(previous.group, normalized.options.group);
-    this.publish();
+    if (work.engine || work.annotations || work.plugins || work.group || work.aria || stateChanged)
+      this.publish();
     if (work.group) coordinate(previous.group);
     if (work.engine || work.group) coordinate(this.options.group);
   }
