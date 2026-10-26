@@ -10,7 +10,7 @@ import type { ChartGroup, ChartGroupOptions, ChartHandle, ChartOptions, ChartSta
 
 /** What a group needs from each member chart. */
 export interface GroupMember {
-  getState(): Pick<ChartState, 'viewport' | 'highlightedSeries' | 'hiddenSeries'>;
+  getState(): Pick<ChartState, 'viewport' | 'highlight' | 'hiddenSeries'>;
   getOptions(): { axes?: ChartOptions['axes']; group?: ChartGroup };
   getAxis(key: string): Readonly<{ type: string; min: number; max: number }> | undefined;
   getLayout(): ReturnType<ChartHandle['getLayout']>;

@@ -425,7 +425,7 @@ export function createLegendTablePlugin<Row = Record<string, any>>(
         const items = chart.getLegendItems();
         const ids = new Set(items.map((item) => item.id));
         const points = new Map(snapshot.points.map((point) => [point.seriesId, point]));
-        const highlighted = chart.getState().highlightedSeries;
+        const highlighted = chart.getState().highlight;
         const specs = chart.getOptions().series;
         for (const [id, entry] of rows)
           if (!ids.has(id)) {

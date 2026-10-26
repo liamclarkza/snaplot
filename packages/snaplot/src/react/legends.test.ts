@@ -31,7 +31,7 @@ function chartFixture() {
     viewport: {},
     selection: null,
     hiddenSeries: [],
-    highlightedSeries: null,
+    highlight: null,
     following: false,
     cursor: {
       x: 1,

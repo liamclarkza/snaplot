@@ -185,7 +185,7 @@ describe('[dataapi-22] one policy for unknown series ids and cursor labels: thro
     expect(thrown(() => chart.update({ hiddenSeries: ['zzz'] }))).toMatch(
       /^snaplot: hiddenSeries names "zzz", which is not a series id/,
     );
-    expect(chart.getState()).toMatchObject({ highlightedSeries: 'mem', hiddenSeries: [] });
+    expect(chart.getState()).toMatchObject({ highlight: 'mem', hiddenSeries: [] });
   });
 
   it('[dataapi-22] setHighlight() throws on an unknown id, as setSeriesVisible() does', () => {
@@ -198,9 +198,9 @@ describe('[dataapi-22] one policy for unknown series ids and cursor labels: thro
         /^snaplot: set\w+\(\) names "cpus", which is not a series id\. Did you mean "cpu"\?/,
       );
     }
-    expect(chart.getState()).toMatchObject({ highlightedSeries: null, hiddenSeries: [] });
+    expect(chart.getState()).toMatchObject({ highlight: null, hiddenSeries: [] });
     chart.setHighlight('mem');
-    expect(chart.getState().highlightedSeries).toBe('mem');
+    expect(chart.getState().highlight).toBe('mem');
   });
 
   it('[dataapi-22] setCursor() throws on a string a numeric axis cannot read', () => {
@@ -253,9 +253,9 @@ describe('[dataapi-22] one policy for unknown series ids and cursor labels: thro
     const a = mount({ data: rows, x: 't', group, series: [{ y: 'cpu' }] });
     const b = mount({ data: rows, x: 't', group, series: [{ y: 'mem' }] });
     group.setHighlight('cpu');
-    expect([a.getState().highlightedSeries, b.getState().highlightedSeries]).toEqual(['cpu', null]);
+    expect([a.getState().highlight, b.getState().highlight]).toEqual(['cpu', null]);
     b.setHighlight('mem');
-    expect([a.getState().highlightedSeries, b.getState().highlightedSeries]).toEqual([null, 'mem']);
+    expect([a.getState().highlight, b.getState().highlight]).toEqual([null, 'mem']);
     expect(thrown(() => group.setHighlight('mems'))).toMatch(
       /^snaplot: setHighlight\(\) names "mems", which is not a series id\. Did you mean "mem"\?/,
     );
@@ -685,7 +685,7 @@ describe('state options at creation (D3)', () => {
       series: [{ y: 'cpu' }, { y: 'mem' }],
       highlight: 'mem',
     });
-    expect(chart.getState().highlightedSeries).toBe('mem');
+    expect(chart.getState().highlight).toBe('mem');
   });
 
   it("[arch-15] selection sets the brush with interaction: { drag: 'select' }", () => {
@@ -696,7 +696,7 @@ describe('state options at creation (D3)', () => {
       interaction: { drag: 'select' },
       selection: { x: [2, 6] },
     });
-    expect(chart.getState().selection).toEqual({ x: { min: 2, max: 6 } });
+    expect(chart.getState().selection).toEqual({ x: [2, 6] });
   });
 
   it('[arch-15] update({ viewport }) applies the viewport', () => {

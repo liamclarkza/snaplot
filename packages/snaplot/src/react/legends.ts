@@ -141,8 +141,7 @@ export function LegendTable<Row>(props: LegendTableProps<Row>) {
     fallback: fallback === 'series-only' ? 'latest' : fallback,
   });
   const setHighlight = (id: string | null) => props.chart?.setHighlight(id);
-  if (props.children)
-    return props.children(snapshot, state?.highlightedSeries ?? null, setHighlight);
+  if (props.children) return props.children(snapshot, state?.highlight ?? null, setHighlight);
   const columns: readonly LegendTableColumn<Row>[] = props.columns ?? [
     {
       key: 'name',
@@ -262,11 +261,8 @@ export function LegendTable<Row>(props: LegendTableProps<Row>) {
                 key: item.id,
                 className: 'snaplot-legend-row',
                 'data-series-id': item.id,
-                'data-highlighted': state?.highlightedSeries === item.id ? 'true' : undefined,
-                'data-dimmed':
-                  state?.highlightedSeries && state.highlightedSeries !== item.id
-                    ? 'true'
-                    : undefined,
+                'data-highlighted': state?.highlight === item.id ? 'true' : undefined,
+                'data-dimmed': state?.highlight && state.highlight !== item.id ? 'true' : undefined,
                 onMouseEnter: () => props.highlightOnHover !== false && setHighlight(item.id),
                 onMouseLeave: () => props.highlightOnHover !== false && setHighlight(null),
               },

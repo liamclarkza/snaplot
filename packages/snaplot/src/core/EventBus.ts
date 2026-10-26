@@ -20,6 +20,9 @@ type Handler<T> = (payload: T) => void;
 export class EventBus {
   private listeners = new Map<string, Set<Handler<any>>>();
 
+  /** `around` runs each emit, so the owner can bracket one user action. */
+  constructor(private readonly around?: (run: () => void) => void) {}
+
   on<K extends keyof EventMap>(event: K, handler: Handler<EventMap[K]>): () => void {
     let set = this.listeners.get(event);
     if (!set) {
@@ -33,6 +36,15 @@ export class EventBus {
   emit<K extends keyof EventMap>(event: K, payload: EventMap[K]): void {
     const set = this.listeners.get(event);
     if (!set) return;
+    if (this.around) this.around(() => this.deliver(event, set, payload));
+    else this.deliver(event, set, payload);
+  }
+
+  private deliver<K extends keyof EventMap>(
+    event: K,
+    set: Set<Handler<any>>,
+    payload: EventMap[K],
+  ): void {
     // Snapshot before iterating: a handler may add or remove listeners during
     // delivery. Iterating the live Set would run a just-added handler inside
     // this same emit (a self-re-adding handler would loop forever).

@@ -64,7 +64,7 @@ describe('[frameworks-03][arch-04] React', () => {
     let handle: ChartHandle<Row> | null = null;
     function Probe({ chart }: { chart: ChartHandle<Row> | null }) {
       renders++;
-      useChartState(chart, (state) => state?.highlight ?? state?.highlightedSeries ?? null);
+      useChartState(chart, (state) => state?.highlight ?? state?.highlight ?? null);
       return null;
     }
     function App() {

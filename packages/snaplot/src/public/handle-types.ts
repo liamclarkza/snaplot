@@ -136,14 +136,14 @@ export interface LegendItem {
 
 /** The chart's state, as `getState()` reports it. */
 export interface ChartState<Row = Record<string, any>> {
-  /** The current range of every axis. */
-  viewport: ViewportRanges;
-  /** The persistent selection, or `null`. */
-  selection: SelectionRange | null;
+  /** The pinned axes, as `[from, to]`; `{}` when every axis is automatic. */
+  viewport: Viewport;
+  /** The selection, or `null`. */
+  selection: Selection | null;
   /** The ids of hidden series. */
   hiddenSeries: readonly string[];
   /** The highlighted series id, or `null`. */
-  highlightedSeries: string | null;
+  highlight: string | null;
   /** Whether the X viewport follows the latest data. */
   following: boolean;
   /** The values under the cursor. */
@@ -152,22 +152,22 @@ export interface ChartState<Row = Record<string, any>> {
 
 /** Event payloads by event name, for `chart.on()`. */
 export interface ChartEvents<Row = Record<string, any>> {
-  /** Any state changed. */
-  'state:change': ChartState<Row>;
   /** The cursor moved or left. */
   'cursor:change': CursorSnapshot<Row>;
-  /** An axis range changed. */
-  'viewport:change': ViewportRanges;
-  /** The persistent selection changed. */
-  'selection:change': SelectionRange | null;
-  /** Series were shown or hidden. */
-  'visibility:change': readonly string[];
+  /** The pinned axes changed: the complete new viewport, `{}` on a reset. */
+  'viewport:change': Viewport;
+  /** The selection settled, or was cleared (`null`). */
+  'selection:change': SelectionChange<Row> | null;
+  /** Series were shown or hidden: the ids now hidden. */
+  'hiddenSeries:change': readonly string[];
   /** The highlighted series changed. */
   'highlight:change': string | null;
   /** Following the latest data started or stopped. */
-  'follow:change': boolean;
+  'following:change': boolean;
   /** A point was clicked. */
   'point:click': ChartPoint<Row>;
+  /** Any state changed. */
+  'state:change': ChartState<Row>;
   /** A box selection finished. */
   select: SelectionResult<Row>;
   /** Data was replaced or appended. */
@@ -344,8 +344,18 @@ export interface ThemeConfig {
 export interface ChartHandle<Row = Record<string, any>> {
   /** The element the chart was created in. */
   readonly container: HTMLElement;
-  /** Apply a partial update. */
+  /**
+   * Apply a partial update. Every key the patch names counts as changed, and the state options
+   * it names always apply: `update({ viewport: {} })` resets the viewport.
+   */
   update(patch: ChartPatch<Row>): void;
+  /**
+   * Replace every option, as a framework does on each render. Each option is compared with the
+   * value last applied, so an unchanged one costs nothing, and a state option (`viewport`,
+   * `selection`, `hiddenSeries`, `highlight`) applies only when it differs from the value last
+   * given; an option left out returns to its default.
+   */
+  setOptions(options: ChartOptions<Row>): void;
   /** Append rows or columns to the chart's data, or to one series' own source. */
   appendData(data: DataSource<Row>, options?: AppendOptions): void;
   /** The options as last applied. */
@@ -361,7 +371,10 @@ export interface ChartHandle<Row = Record<string, any>> {
   ): () => void;
   /** Set axis ranges by key. */
   setViewport(viewport: ViewportRanges): void;
-  /** Return every axis to its automatic range. */
+  /**
+   * Return every axis to its automatic range, as `update({ viewport: {} })` does, and report
+   * the reset as `viewport:change` with `{}`.
+   */
   resetViewport(): void;
   /** Follow the latest data again. */
   resumeFollow(): void;

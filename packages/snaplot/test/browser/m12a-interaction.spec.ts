@@ -119,7 +119,7 @@ test.describe('brush selection', () => {
     const selection = await page.evaluate(
       () => window.harness.chart('chart-0').getState().selection,
     );
-    expect(selection?.x?.min).toBeGreaterThanOrEqual(0);
+    expect(selection?.x?.[0]).toBeGreaterThanOrEqual(0);
   });
 });
 

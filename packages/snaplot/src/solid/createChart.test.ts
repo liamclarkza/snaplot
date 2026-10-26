@@ -10,7 +10,7 @@ vi.mock('../public/chart', () => ({
       container,
       options,
       destroy: vi.fn(),
-      state: { highlightedSeries: null },
+      state: { highlight: null },
       getState() {
         return this.state;
       },
@@ -78,8 +78,8 @@ describe('Solid chart ownership', () => {
       highlight = createHighlight(chart);
     });
     const first = mock.instances[0];
-    first.publish({ highlightedSeries: 'y' });
-    expect(state()?.highlightedSeries).toBe('y');
+    first.publish({ highlight: 'y' });
+    expect(state()?.highlight).toBe('y');
     expect(highlight[0]()).toBe('y');
     highlight[1](null);
     expect(first.setHighlight).toHaveBeenCalledWith(null);

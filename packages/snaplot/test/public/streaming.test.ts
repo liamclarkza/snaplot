@@ -106,7 +106,7 @@ describe('[dataapi-02][dataapi-04] appended rows survive updates', () => {
 });
 
 describe('[dxtrial-19] the follow window', () => {
-  it.fails('[dxtrial-19] the follow window has its full width from the first sample', () => {
+  it('[dxtrial-19] the follow window has its full width from the first sample', () => {
     const chart = mount<Sample>(fakes, {
       data: [{ time: 100, value: 1 }],
       x: 'time',

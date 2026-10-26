@@ -26,7 +26,7 @@ export function useCursorSnapshot<Row>(
 export function useHighlight<Row>(chart: ChartHandle<Row> | null | undefined) {
   const state = useChartState(chart);
   const set = useCallback((id: string | null) => chart?.setHighlight(id), [chart]);
-  return [state?.highlightedSeries ?? null, set] as const;
+  return [state?.highlight ?? null, set] as const;
 }
 /** Options are fixed for this group's lifetime. Create a new owner to change them. */
 export function useChartGroup(options?: ChartGroupOptions) {

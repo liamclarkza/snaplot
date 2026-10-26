@@ -41,6 +41,37 @@ to [Semantic Versioning](https://semver.org/).
   that is not a category and on a string a numeric axis cannot read, and reads an ISO-8601 date
   on a time axis.
 
+### Updates and state (1.0)
+
+- Option changes cost only what they change: a title, axis bounds, a style, the theme, a format,
+  the tooltip, reference lines, the accessible name or a callback re-renders without reading the
+  data again; a new `data` array, a field name, `x` or `rowId` reads it again. `update(patch)`
+  counts every key it names as changed (so `update({ data })` re-reads an array you edited in
+  place); `setOptions(options)` replaces every option and compares each with the last applied
+  one: functions by identity, `data` by reference (two empty arrays are equal), the rest deeply.
+  Callback options and render functions (`format`, `tooltip.render`, colour functions) are read
+  when called, so a new inline function costs nothing.
+- `setOptions(options)` is public (`chart.setOptions` replaces the framework-only reconcile).
+- The state options `viewport`, `selection`, `hiddenSeries` and `highlight` behave the same in
+  vanilla, React and Solid: a gesture changes the chart at once; `setOptions` applies a state
+  option only when it differs from the value last given, so an inline `viewport: {}` never
+  snaps a zoom back; `update` always applies the state options it names, so
+  `update({ viewport: {} })` resets. Applying an option never emits its event; gestures,
+  `resetViewport()`, `resumeFollow()`, group sync and data changes do, once per action, with the
+  complete new value.
+- The viewport names only the axes it pins: `getState().viewport` and `viewport:change` are
+  `{ x: [from, to] }` after an X zoom and `{}` after a reset, so echoing them back keeps Y
+  automatic. `update({ viewport: { x } })` pauses following; `resumeFollow()` follows again.
+  `getState().selection` is `{ x: [from, to] }`, and `highlightedSeries` is `highlight`.
+- New data that does not reach a pinned X range unpins it. A selection that new data clears
+  emits `selection:change` with `null`. The follow window has its full width from the first
+  sample.
+- Replacing the data of a source that `appendData()` extended warns once with the number of
+  rows discarded, and re-reading a source of 10,000 rows or more over ten times a second warns
+  once.
+- Events: `follow:change` is `following:change` and `visibility:change` is
+  `hiddenSeries:change`; an event name that does not exist throws.
+
 ### Removed options (1.0)
 
 The 0.12 options below left the public types. Passing one warns once per page with its path and

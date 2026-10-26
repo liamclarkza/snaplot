@@ -110,12 +110,12 @@ describe('public chart transactions', () => {
     chart.update({ series: [{ y: 'b' }, { y: 'a' }] });
     expect(chart.getState()).toMatchObject({
       hiddenSeries: ['a'],
-      highlightedSeries: 'b',
-      viewport: { x: { min: 2, max: 8 } },
+      highlight: 'b',
+      viewport: { x: [2, 8] },
     });
     const current = chart.getOptions();
     reconcileChart(chart, { ...current, series: [...current.series] });
-    expect(chart.getState().viewport.x).toEqual({ min: 2, max: 8 });
+    expect(chart.getState().viewport.x).toEqual([2, 8]);
   });
 
   it('resets explicitly undefined optional options and removes omitted declarative props', () => {
@@ -250,7 +250,7 @@ describe('public chart transactions', () => {
     });
     chart.setViewport({ x: { min: 2, max: 8 } });
     chart.setSeriesVisible('y', false);
-    expect(chart.getState().viewport.x).toEqual(viewport.x);
+    expect(chart.getState().viewport.x).toEqual([viewport.x.min, viewport.x.max]);
     expect(chart.getState().hiddenSeries).toEqual([]);
     expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ x: { min: 2, max: 8 } }));
     expect(hidden).toHaveBeenLastCalledWith(['y']);
@@ -274,10 +274,10 @@ describe('public chart transactions', () => {
     const first = make({ data, x: 'x', group, series: [{ y: 'a' }, { y: 'b' }] });
     const second = make({ data, x: 'x', group, series: [{ y: 'b' }, { y: 'a' }] });
     first.setHighlight('b');
-    expect(second.getState().highlightedSeries).toBe('b');
+    expect(second.getState().highlight).toBe('b');
     group.destroy();
     first.setHighlight('a');
-    expect(second.getState().highlightedSeries).toBe('b');
+    expect(second.getState().highlight).toBe('b');
   });
 
   it('rejects incompatible group categories before installing the second chart', () => {
@@ -439,7 +439,7 @@ describe('public chart transactions', () => {
       /min < max/,
     );
     chart.setViewport({ x: { min: 0, max: 5 } });
-    expect(chart.getState().viewport.x).toEqual({ min: 0, max: 5 });
+    expect(chart.getState().viewport.x).toEqual([0, 5]);
   });
 
   it('freezes cached cursor snapshots without freezing caller-owned rows', () => {

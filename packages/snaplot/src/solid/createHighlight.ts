@@ -5,7 +5,7 @@ import { createChartState } from './createChartState';
 export function createHighlight<Row>(chart: Accessor<ChartHandle<Row> | undefined | null>) {
   const state = createChartState(chart);
   return [
-    createMemo(() => state()?.highlightedSeries ?? null),
+    createMemo(() => state()?.highlight ?? null),
     (id: string | null) => chart()?.setHighlight(id),
   ] as const;
 }

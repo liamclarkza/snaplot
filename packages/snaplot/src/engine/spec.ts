@@ -1080,6 +1080,8 @@ export interface ChartEventMap {
   select: (selection: SelectionResult) => void;
   /** Persistent brush selection changed (`null` when cleared). Mirror of `selection.onBrush`. */
   'selection:change': (selection: SelectionRange | null) => void;
+  /** A gesture action starts (`true`) or ends (`false`): its changes are one user action. */
+  action: (start: boolean) => void;
 }
 
 // ============================================================

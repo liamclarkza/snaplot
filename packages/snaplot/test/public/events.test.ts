@@ -44,7 +44,7 @@ function linked(chart: FinalHandle<Row>) {
 }
 
 describe('[research-14] seven events, one name per concept', () => {
-  it.fails('[research-14] each on<Key>Change option is called 1:1 with its event', () => {
+  it('[research-14] each on<Key>Change option is called 1:1 with its event', () => {
     const callbacks = {
       onViewportChange: vi.fn(),
       onHighlightChange: vi.fn(),
@@ -164,7 +164,7 @@ describe('[backlog-02][dataapi-21] events are queued until the call commits', ()
     expect(seen).toEqual([[null, null, 500]]);
   });
 
-  it.fails('[dataapi-21] one call emits at most one event per kind, carrying the complete value', () => {
+  it('[dataapi-21] one call emits at most one event per kind, carrying the complete value', () => {
     const chart = mount<Row>(fakes, {
       ...base,
       axes: { y: { min: 0, max: 40 } },

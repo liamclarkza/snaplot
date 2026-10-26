@@ -16,7 +16,7 @@ vi.mock('../public/chart', () => ({
     const chart = {
       container,
       destroy: vi.fn(),
-      state: { highlightedSeries: null, hiddenSeries: [], cursor: { source: 'none', points: [] } },
+      state: { highlight: null, hiddenSeries: [], cursor: { source: 'none', points: [] } },
       getState() {
         return this.state;
       },
@@ -162,11 +162,11 @@ describe('React chart lifecycle', () => {
     const chart = mock.instances[0];
     function State() {
       const state = useChartState(chart);
-      return h('span', null, state?.highlightedSeries);
+      return h('span', null, state?.highlight);
     }
     await act(async () => root!.render(h(State)));
     expect(chart.listeners.size).toBe(1);
-    await act(async () => chart.publish({ ...chart.state, highlightedSeries: 'y' }));
+    await act(async () => chart.publish({ ...chart.state, highlight: 'y' }));
     expect(document.body.textContent).toBe('y');
     await act(async () => root!.unmount());
     root = undefined;

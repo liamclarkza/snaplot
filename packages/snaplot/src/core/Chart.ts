@@ -492,8 +492,16 @@ export class ChartCore implements EngineHost {
     this.seriesSources = sources.seriesSources.slice();
     this.debugCounters.ingestCount++;
 
-    // 5. Create EventBus
-    this.eventBus = new EventBus();
+    // 5. Create EventBus. Each gesture action is one user action: the owner hears where it
+    // starts and ends, so it can report the action's changes once (plan D3).
+    this.eventBus = new EventBus((run) => {
+      this.emitEvent('action', true);
+      try {
+        run();
+      } finally {
+        this.emitEvent('action', false);
+      }
+    });
 
     // 6. Create scales
     this.initAxes();
@@ -588,6 +596,7 @@ export class ChartCore implements EngineHost {
     this.sourceStores = stores;
     this.seriesSources = seriesSources.slice();
     this.invalidateRangeCache();
+    this.unpinMissedAxes(resolved);
     this.stats.dataVersion++;
     this.stats.setDataCount++;
     this.debugCounters.ingestCount++;
@@ -595,6 +604,33 @@ export class ChartCore implements EngineHost {
     this.reconcileSelectionForDataChange();
     this.refreshCursor();
     this.dispatchDataUpdate();
+  }
+
+  /**
+   * Replaced data that does not reach a pinned horizontal range unpins that axis (plan D23,
+   * dataapi-14): a viewport kept from the old data would show nothing.
+   */
+  private unpinMissedAxes(config: ChartSpec): void {
+    let unpinned = false;
+    for (const key of [...this.userZoomedAxes]) {
+      const scale = this.scales.get(key);
+      const position = inferPosition(key, config.axes?.[key]?.position);
+      if (!scale || (position !== 'bottom' && position !== 'top')) continue;
+      let min = Infinity;
+      let max = -Infinity;
+      config.series.forEach((series, si) => {
+        const store = this.sourceStores[this.seriesSources[si] ?? 0];
+        if ((series.xAxis ?? 'x') !== key || !store?.length) return;
+        min = Math.min(min, store.xAt(0));
+        max = Math.max(max, store.xAt(store.length - 1));
+      });
+      if (min === Infinity || max < scale.min || min > scale.max) {
+        this.userZoomedAxes.delete(key);
+        unpinned = true;
+      }
+    }
+    if (unpinned && ![...this.userZoomedAxes].some((key) => this.isHorizontalAxis(key)))
+      this.setFollowing(true);
   }
 
   getSourceData(sourceIndex: number): ColumnarData {
@@ -743,10 +779,10 @@ export class ChartCore implements EngineHost {
       if (pos !== 'bottom' && pos !== 'top') continue;
       const extent = this.sourceExtent(key);
       if (!extent) continue;
-      const [dataMin, lastX] = extent;
-      const rawMin = Math.max(dataMin, lastX - window);
-      const min = rawMin === lastX ? lastX - 1 : rawMin;
-      const max = rawMin === lastX ? lastX + 1 : lastX;
+      // The window has its full width from the first sample (dxtrial-19).
+      const lastX = extent[1];
+      const min = lastX - window;
+      const max = lastX;
       if (this.interactionGuards.viewport?.(key, { min, max }) === false) return false;
       proposals.push({ key, scale, min, max });
     }
@@ -840,6 +876,49 @@ export class ChartCore implements EngineHost {
 
   getAxis(key: string): Scale | undefined {
     return this.scales.get(key);
+  }
+
+  /** Whether an axis is drawn along the bottom or top edge. */
+  isHorizontalAxis(key: string): boolean {
+    const position = inferPosition(key, this.config.axes?.[key]?.position);
+    return position === 'bottom' || position === 'top';
+  }
+
+  /** The pinned axes and their ranges: the viewport state (plan D3). */
+  pinnedAxes(): Record<string, ScaleRange> {
+    const pinned: Record<string, ScaleRange> = {};
+    for (const key of this.userZoomedAxes) {
+      const scale = this.scales.get(key);
+      if (scale) pinned[key] = { min: scale.min, max: scale.max };
+    }
+    return pinned;
+  }
+
+  /**
+   * Pin exactly the axes `viewport` names, at its ranges, and return every other axis to its
+   * automatic range (plan D3: a viewport names only the axes it pins, and `{}` pins none).
+   * Pinning a horizontal axis pauses following; a viewport without one follows again.
+   */
+  applyViewport(viewport: Readonly<Record<string, ScaleRange>>): void {
+    if (this.destroyed) return;
+    const previous = new Map(
+      [...this.scales].map(([key, scale]) => [key, [scale.min, scale.max] as const]),
+    );
+    const keys = Object.keys(viewport).filter((key) => this.scales.has(key));
+    this.userZoomedAxes = new Set(keys);
+    for (const key of keys) {
+      const scale = this.scales.get(key)!;
+      scale.min = viewport[key].min;
+      scale.max = viewport[key].max;
+    }
+    const horizontal = keys.some((key) => this.isHorizontalAxis(key));
+    this.setFollowing(!horizontal);
+    this.autoRangeHorizontal();
+    if (!horizontal) this.applyFollowWindow();
+    this.autoRangeVertical(horizontal);
+    this.refreshCursor();
+    this.scheduler.markDirty(DirtyFlag.ALL);
+    this.publishResetViewport(previous);
   }
 
   setOptions(partial: DeepPartial<ChartSpec>): void {

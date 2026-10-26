@@ -140,7 +140,7 @@ describe('layers and update classes', () => {
     expect(debug(chart).ingestCount).toBe(before);
   });
 
-  it.fails('[perf:state-coalesce] 50 appends in one frame notify a subscriber once', () => {
+  it('[perf:state-coalesce] 50 appends in one frame notify a subscriber once', () => {
     const chart = fakes.mount({
       data: columns(100, (i) => i % 9),
       x: 'x',

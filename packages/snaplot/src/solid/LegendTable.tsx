@@ -70,7 +70,7 @@ export function LegendTable<Row>(props: LegendTableProps<Row>): JSX.Element {
   const snapshot = createCursorSnapshot(props.chart, () => ({
     fallback: fallback() === 'series-only' ? 'latest' : (fallback() as 'hide' | 'first' | 'latest'),
   }));
-  const highlighted = createMemo(() => state()?.highlightedSeries ?? null);
+  const highlighted = createMemo(() => state()?.highlight ?? null);
   const setHighlight = (id: string | null) => props.chart()?.setHighlight(id);
   const [items, setItems] = createSignal<LegendItem[]>([]);
   createEffect(() => {

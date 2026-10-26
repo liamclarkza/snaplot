@@ -132,12 +132,28 @@ export function mount<Row = Record<string, any>>(
   return final(fakes.mount<Row>(options as unknown as ChartOptions<Row>, size));
 }
 
+/** The 0.12 axis and layout reads, for the commits before `scale()` lands. */
+type Legacy = {
+  getAxis?(key: string): { min: number; max: number } | undefined;
+  getLayout?(): { plot: FinalPlot };
+};
+
 /** Client coordinates of a data point, through `scale()` (boxes sit at the origin). */
 export function at(
   chart: FinalHandle<any>,
   x: number,
   y: number,
 ): { clientX: number; clientY: number } {
+  if (typeof chart.scale !== 'function') {
+    const legacy = chart as unknown as Required<Legacy>;
+    const { plot } = legacy.getLayout();
+    const xs = legacy.getAxis('x')!;
+    const ys = legacy.getAxis('y')!;
+    return {
+      clientX: plot.left + ((x - xs.min) / (xs.max - xs.min)) * plot.width,
+      clientY: plot.top + (1 - (y - ys.min) / (ys.max - ys.min)) * plot.height,
+    };
+  }
   const xs = chart.scale('x');
   const ys = chart.scale('y');
   if (!xs || !ys) throw new Error('at(): the chart has no x or y axis');
@@ -185,6 +201,9 @@ export function hoverAt(chart: FinalHandle<any>, x: number, y: number): void {
 
 /** The `[min, max]` of a scale, or undefined. */
 export function range(chart: FinalHandle<any>, key: string): [number, number] | undefined {
-  const scale = chart.scale(key);
+  const scale =
+    typeof chart.scale === 'function'
+      ? chart.scale(key)
+      : (chart as unknown as Required<Legacy>).getAxis(key);
   return scale ? [scale.min, scale.max] : undefined;
 }

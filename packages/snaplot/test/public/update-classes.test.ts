@@ -99,7 +99,7 @@ describe('[arch-03][dataapi-10] presentation changes never ingest (P6)', () => {
     expect(chart.getState().series[0].color).toBe('#ff0000');
   });
 
-  it.fails('[dataapi-10] setOptions with an equal complete snapshot does no work at all', () => {
+  it('[dataapi-10] setOptions with an equal complete snapshot does no work at all', () => {
     const chart = mount<Row>(fakes, base);
     const work = measure(chart, () => {
       for (let i = 0; i < 5; i++)
@@ -108,7 +108,7 @@ describe('[arch-03][dataapi-10] presentation changes never ingest (P6)', () => {
     expect(work).toEqual({ ingests: 0, grid: 0, data: 0, overlay: 0 });
   });
 
-  it.fails('[dataapi-10] setOptions compares data by reference: a new array re-ingests once', () => {
+  it('[dataapi-10] setOptions compares data by reference: a new array re-ingests once', () => {
     const chart = mount<Row>(fakes, base);
     expect(measure(chart, () => chart.setOptions({ ...base, data: rows.slice() })).ingests).toBe(1);
   });
@@ -121,7 +121,7 @@ describe('[arch-03][dataapi-10] presentation changes never ingest (P6)', () => {
     expect(chart.getCursor({ fallback: 'latest' }).points[0].y).toBe(99);
   });
 
-  it.fails('[dxtrial-11:data] two empty data arrays count as equal: 0 ingests', () => {
+  it('[dxtrial-11:data] two empty data arrays count as equal: 0 ingests', () => {
     const chart = mount<Row>(fakes, { ...base, data: [] });
     expect(measure(chart, () => chart.setOptions({ ...base, data: [] })).ingests).toBe(0);
   });
@@ -145,7 +145,7 @@ describe('[arch-04][frameworks-02][research-01] functions are read through lates
     expect(work).toEqual({ ingests: 0, grid: 0, data: 0, overlay: 0 });
   });
 
-  it.fails('[frameworks-02][research-01] a new on<Key>Change identity costs nothing and the latest one is called', () => {
+  it('[frameworks-02][research-01] a new on<Key>Change identity costs nothing and the latest one is called', () => {
     const chart = mount<Row>(fakes, base);
     const seen: string[] = [];
     const work = measure(chart, () => {
@@ -213,7 +213,7 @@ describe('[gap-annotations-extensibility-05][gap-annotations-extensibility-06] a
     expect(work.data).toBeGreaterThan(0);
   });
 
-  it.fails('[gap-annotations-extensibility-06] setOptions sees an in-place push into the array it was given', () => {
+  it('[gap-annotations-extensibility-06] setOptions sees an in-place push into the array it was given', () => {
     const lines = [{ axis: 'y', value: 45, label: 'Deploy A' }];
     const chart = mount<Row>(fakes, { ...base, referenceLines: lines });
     fakes.frames.flush();

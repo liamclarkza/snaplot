@@ -41,7 +41,7 @@ function events<Row>(chart: FinalHandle<Row>) {
 }
 
 describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
-  it.fails('[frameworks-04] update({ viewport: {} }) resets a chart created with {}', () => {
+  it('[frameworks-04] update({ viewport: {} }) resets a chart created with {}', () => {
     const chart = mount<Row>(fakes, { ...base, viewport: {} });
     fakes.frames.flush();
     const full = range(chart, 'x');
@@ -52,7 +52,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     expect(chart.getState().viewport).toEqual({});
   });
 
-  it.fails('[frameworks-05] an un-echoed inline viewport never snaps a zoom back', () => {
+  it('[frameworks-05] an un-echoed inline viewport never snaps a zoom back', () => {
     const chart = mount<Row>(fakes, { ...base, viewport: {} });
     fakes.frames.flush();
     wheelZoom(chart, 50, 24);
@@ -61,7 +61,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     expect(range(chart, 'x')).toEqual(zoomed);
   });
 
-  it.fails('[frameworks-05] setOptions with an equal viewport neither repaints nor pins again', () => {
+  it('[frameworks-05] setOptions with an equal viewport neither repaints nor pins again', () => {
     const options = { ...base, viewport: { x: [10, 40] } };
     const chart = mount<Row>(fakes, options);
     fakes.frames.flush();
@@ -72,7 +72,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     expect(range(chart, 'x')).toEqual([10, 40]);
   });
 
-  it.fails('[frameworks-05] a changed viewport option applies, and removing the option resets', () => {
+  it('[frameworks-05] a changed viewport option applies, and removing the option resets', () => {
     const chart = mount<Row>(fakes, { ...base, viewport: { x: [10, 40] } });
     chart.setOptions({ ...base, viewport: { x: [20, 30] } });
     expect(range(chart, 'x')).toEqual([20, 30]);
@@ -81,7 +81,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     expect(range(chart, 'x')).toEqual([0, 100]);
   });
 
-  it.fails('[dxtrial-04][frameworks-05] an X zoom reports only the X axis, once', () => {
+  it('[dxtrial-04][frameworks-05] an X zoom reports only the X axis, once', () => {
     const chart = mount<Row>(fakes, base);
     const seen = events(chart);
     wheelZoom(chart, 50, 24);
@@ -91,7 +91,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     expect(chart.getState().viewport).toEqual(viewports[0][1]);
   });
 
-  it.fails('[dxtrial-04] echoing the reported viewport keeps Y automatic', () => {
+  it('[dxtrial-04] echoing the reported viewport keeps Y automatic', () => {
     const chart = mount<Row>(fakes, base);
     let reported: object | null = null;
     chart.on('viewport:change', (viewport) => {
@@ -108,7 +108,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     expect(range(chart, 'y')![1]).toBeGreaterThanOrEqual(280);
   });
 
-  it.fails('[frameworks-04] a reset emits {} exactly once, from resetViewport() and from a double-click', () => {
+  it('[frameworks-04] a reset emits {} exactly once, from resetViewport() and from a double-click', () => {
     const chart = mount<Row>(fakes, base);
     wheelZoom(chart, 50, 24);
     const seen = events(chart);
@@ -124,7 +124,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     ]);
   });
 
-  it.fails('[frameworks-04] applying a viewport option never emits; the callback option mirrors the event', () => {
+  it('[frameworks-04] applying a viewport option never emits; the callback option mirrors the event', () => {
     const onViewportChange = vi.fn();
     const chart = mount<Row>(fakes, { ...base, onViewportChange });
     const seen = events(chart);
@@ -136,7 +136,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     expect(onViewportChange.mock.calls).toEqual([[{}]]);
   });
 
-  it.fails('[dxtrial-19] update({ viewport: { x } }) pauses following and resumeFollow() resumes', () => {
+  it('[dxtrial-19] update({ viewport: { x } }) pauses following and resumeFollow() resumes', () => {
     const chart = mount<Row>(fakes, { ...base, streaming: { followWindow: 20 } });
     const seen = events(chart);
     expect(chart.getState().following).toBe(true);
@@ -153,7 +153,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     ]);
   });
 
-  it.fails('[dataapi-14] replacing data outside a pinned X range unpins that axis', () => {
+  it('[dataapi-14] replacing data outside a pinned X range unpins that axis', () => {
     const chart = mount<Row>(fakes, base);
     chart.update({ viewport: { x: [10, 20] } });
     chart.update({ data: Array.from({ length: 101 }, (_, i) => ({ t: 1000 + i, v: 5, w: 1 })) });
@@ -161,7 +161,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     expect(chart.getState().viewport).toEqual({});
   });
 
-  it.fails('[dataapi-14] replacing data that overlaps a pinned X range keeps it', () => {
+  it('[dataapi-14] replacing data that overlaps a pinned X range keeps it', () => {
     const chart = mount<Row>(fakes, base);
     chart.update({ viewport: { x: [10, 20] } });
     chart.update({ data: rows.map((row) => ({ ...row, v: row.v + 1 })) });
@@ -178,7 +178,7 @@ describe('[dataapi-16][backlog-02] selection', () => {
     expect(chart.getState().selection).toBeNull();
   });
 
-  it.fails('[backlog-02] a selection option applies silently; a data change that clears it emits null', () => {
+  it('[backlog-02] a selection option applies silently; a data change that clears it emits null', () => {
     const chart = mount<Row>(fakes, brush);
     const seen = events(chart);
     chart.update({ selection: { x: [40, 60] } });
@@ -213,7 +213,7 @@ describe('hiddenSeries and highlight', () => {
     expect(chart.getState().series.map((s) => s.id)).toEqual(['v']);
   });
 
-  it.fails('[frameworks-04] highlight is a state option: applied silently, compared with the last applied value', () => {
+  it('[frameworks-04] highlight is a state option: applied silently, compared with the last applied value', () => {
     const onHighlightChange = vi.fn();
     const chart = mount<Row>(fakes, { ...base, onHighlightChange });
     const seen = events(chart);

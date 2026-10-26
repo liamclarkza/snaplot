@@ -25,8 +25,8 @@ describe('engine live-follow viewport', () => {
   it('starts following and pins the X window to the trailing follow width', () => {
     const chart = fakes.engine(streamConfig, [f([0, 1, 2]), f([5, 6, 7])]);
     expect(chart.isFollowing()).toBe(true);
-    // window 10, lastX 2, dataMin 0 -> [0, 2] (clamped to data start)
-    expect(chart.getAxis('x')?.min).toBe(0);
+    // window 10, lastX 2: the window has its full width from the first sample (dxtrial-19).
+    expect(chart.getAxis('x')?.min).toBe(-8);
     expect(chart.getAxis('x')?.max).toBe(2);
 
     // Append past the window: X should scroll to [lastX - 10, lastX].
@@ -55,11 +55,10 @@ describe('engine live-follow viewport', () => {
   it('does not collapse to a zero-span X range with a single point', () => {
     const chart = fakes.engine(streamConfig, [f([42]), f([7])]);
     const x = chart.getAxis('x')!;
-    // window 10, lastX 42, dataMin 42: rawMin === lastX, so expand to a unit
-    // window rather than [42, 42].
+    // window 10, lastX 42: the full window, not [42, 42] (dxtrial-19).
     expect(x.min).toBeLessThan(x.max);
-    expect(x.min).toBe(41);
-    expect(x.max).toBe(43);
+    expect(x.min).toBe(32);
+    expect(x.max).toBe(42);
   });
 
   it('setAxis (sync-peer entry) pauses following on a horizontal viewport', () => {

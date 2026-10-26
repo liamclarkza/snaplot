@@ -38,8 +38,8 @@ describe('[arch-10] the removed engine sync is unreachable through untyped optio
 
     a.setHighlight('v');
 
-    expect(a.getState().highlightedSeries).toBe('v');
-    expect(b.getState().highlightedSeries).toBeNull();
+    expect(a.getState().highlight).toBe('v');
+    expect(b.getState().highlight).toBeNull();
   });
 
   it('[arch-10] an untyped zoom.syncKey does not link two charts', () => {

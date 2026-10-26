@@ -56,7 +56,7 @@ describe('[dataapi-01][frameworks-06][interact-01] the final group model', () =>
     expect(b.getState().viewport).toEqual({});
   });
 
-  it.fails('[dataapi-01] a yRange group emits one viewport event per action on the driver', () => {
+  it('[dataapi-01] a yRange group emits one viewport event per action on the driver', () => {
     const group = createChartGroup({ yRange: true });
     const a = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group });
     mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'disk' }], group });
@@ -92,7 +92,7 @@ describe('[dataapi-01][frameworks-06][interact-01] the final group model', () =>
     expect(Object.keys(group).sort()).toEqual(['setCursor', 'setHighlight']);
   });
 
-  it.fails('[dataapi-01] viewport: false links no viewport, and a peer without the axis is left alone', () => {
+  it('[dataapi-01] viewport: false links no viewport, and a peer without the axis is left alone', () => {
     const group = createChartGroup({ viewport: false });
     const a = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group });
     const b = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }], group });

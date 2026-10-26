@@ -1,7 +1,6 @@
 /**
- * The createChart facade: normalize → ingest → the engine, with today's
- * handle (plan §3.1, §12 M7). It still re-ingests on every option change other
- * than the state options; the diff classifier and the final handle are M8.
+ * The createChart facade: normalize → classify → ingest or describe → the engine (plan §3.1,
+ * D3, D16). State options and every notification go through one dispatcher (`./state.ts`).
  */
 import { ChartCore } from '../core/Chart';
 import { inferPosition } from '../core/Layout';
@@ -17,6 +16,8 @@ import type {
 } from '../engine/spec';
 import { createReferenceLinesPlugin } from '../plugins/builtins/referenceLinesPlugin';
 import { createReferenceRegionsPlugin } from '../plugins/builtins/referenceRegionsPlugin';
+import { categoryLabels, commitAppend, planAppend, refreshCategoryAxis } from './append';
+import { classify, sameData, STATE_KEYS, type StateKey, type Work } from './classify';
 import {
   broadcast,
   coordinate,
@@ -26,19 +27,18 @@ import {
   groups,
   validateGroup,
 } from './group';
-import { categoryLabels, commitAppend, planAppend, refreshCategoryAxis } from './append';
-import { classify, sameData, STATE_KEYS, type StateKey, type Work } from './classify';
 import { describeOptions, ingest } from './ingest';
+import { type NormalizedOptions, type NormalizedState, normalize } from './normalize';
+import { equivalent, patchOptions } from './options';
 import {
   type Ingested,
   type IngestContext,
-  type Retained,
   parseIso,
+  type Retained,
   type SourceState,
   sourceKey,
 } from './sources';
-import { type NormalizedOptions, type NormalizedState, normalize } from './normalize';
-import { equivalent, patchOptions } from './options';
+import { Dispatcher, type ReportedKey } from './state';
 import type {
   AppendOptions,
   AxisState,
@@ -52,6 +52,7 @@ import type {
   ChartState,
   CursorSnapshot,
   DataSource,
+  Selection,
   Viewport,
   ViewportRanges,
 } from './types';
@@ -71,12 +72,44 @@ export interface ChartControls {
 /** Sources of at least this many rows warn about accessor churn and re-ingest churn (plan D16). */
 const CHURN_ROWS = 10_000;
 
-/** Axis ranges as the `[from, to]` viewport `onViewportChange` reports. */
-function toViewport(ranges: ViewportRanges): Viewport {
-  return Object.fromEntries(
-    Object.entries(ranges).map(([key, range]) => [key, [range.min, range.max] as const]),
-  );
-}
+/** The events, in plan §4.4's order, then the 0.12 events the final handle removes. */
+const EVENTS: readonly (keyof ChartEvents)[] = [
+  'cursor:change',
+  'viewport:change',
+  'selection:change',
+  'hiddenSeries:change',
+  'highlight:change',
+  'following:change',
+  'point:click',
+  'state:change',
+  'select',
+  'data:update',
+  'options:update',
+  'theme:update',
+  'resize',
+];
+
+/** The on<Key>Change option of each event (plan §4.5: a 1:1 alias). */
+const OPTION_OF = {
+  'cursor:change': 'onCursorChange',
+  'viewport:change': 'onViewportChange',
+  'selection:change': 'onSelectionChange',
+  'hiddenSeries:change': 'onHiddenSeriesChange',
+  'highlight:change': 'onHighlightChange',
+  'following:change': 'onFollowingChange',
+  'point:click': 'onPointClick',
+} as const;
+
+/** Each state option's value when it is not given (plan D3). */
+const DEFAULTS: { [K in StateKey]-?: NonNullable<NormalizedState[K]> | null } = {
+  viewport: {},
+  selection: null,
+  hiddenSeries: [],
+  highlight: null,
+};
+
+type Interval = readonly [number, number];
+const interval = (range: ScaleRange): Interval => Object.freeze([range.min, range.max] as const);
 
 class Controller<Row> implements ChartHandle<Row>, GroupMember {
   readonly container: HTMLElement;
@@ -94,7 +127,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   private hidden = new Set<string>();
   private state!: ChartState<Row>;
   private subscribers = new Set<() => void>();
-  private events = new Map<keyof ChartEvents<Row>, Set<(value: never) => void>>();
+  private events: Dispatcher<ChartEvents<Row>>;
   private off: Array<() => void> = [];
   private controls: ChartControls = {};
   private applyingControls = false;
@@ -112,11 +145,14 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.ingested = ingest(normalized, this.context(normalized, false));
     validateGroup(normalized.group, this.candidate(this.ingested));
     this.validateState(normalized.state, this.ingested);
-    if (normalized.state.hiddenSeries) {
-      this.hidden = new Set(normalized.state.hiddenSeries);
-      this.appliedState.hiddenSeries = normalized.state.hiddenSeries;
-    }
+    if (normalized.state.hiddenSeries) this.hidden = new Set(normalized.state.hiddenSeries);
     const config = this.configFor(this.ingested, normalized);
+    this.events = new Dispatcher<ChartEvents<Row>>(
+      EVENTS,
+      (key) => this.read(key),
+      (event, value) => this.callback(event, value),
+      () => this.publish(),
+    );
     // User plugin install hooks need the completed public handle, not a half-built engine,
     // so plugins are installed below, and the engine's first paint waits for them.
     this.engine = new ChartCore(
@@ -148,13 +184,19 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.lines.setLines(this.ingested.referenceLines);
       this.regions.setRegions(this.ingested.referenceRegions);
       for (const plugin of config.plugins ?? []) this.engine.use(plugin);
-      this.applyState(normalized.state, ['viewport', 'selection', 'highlight']);
+      this.mutating = true;
+      try {
+        this.applyState(this.stateChanges(normalized));
+      } finally {
+        this.mutating = false;
+      }
       // The mount paint: nothing repaints an unchanged box after it, so it must
       // draw the annotations and plugins (gap-annotations-extensibility-06:mount).
       this.engine.paint();
       groups.get(normalized.group!)?.members.add(this);
       coordinate(normalized.group);
       this.state = this.readState();
+      this.events.reset();
     } catch (error) {
       // Every option is checked before the engine exists. Should anything here throw anyway,
       // the caller gets no handle to destroy, so leave the container as it was.
@@ -197,6 +239,15 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         return at < 0 ? undefined : this.retained(previous.sources[at], at);
       },
     };
+  }
+
+  /** The axis types to keep for inferred axes that hold no data (as ingest keeps them). */
+  private previousTypes(normalized: NormalizedOptions<Row>) {
+    return new Map(
+      Object.entries(this.ingested.spec.axes ?? {})
+        .filter(([key]) => normalized.axes[key]?.type === undefined)
+        .map(([key, axis]) => [key, axis.type ?? 'linear'] as const),
+    );
   }
 
   /** What a streamed source retains, to ingest again instead of its declared input. */
@@ -250,43 +301,56 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   /**
-   * Apply state options (plan D3) without emitting: `keys` are applied when
-   * present in `state`; a value equal to the one last applied is skipped unless
-   * `always` (an update() names the key, so it always applies). validateState()
-   * has checked `state` against the engine's axes, so nothing here throws.
+   * The state options to apply (plan D3): every state key an update() names, even with the
+   * value it already has (`undefined` is the default); for complete options, each one that
+   * differs from the value last applied from options (an absent key is its default).
    */
-  private applyState(state: NormalizedState, keys: readonly StateKey[], always = true): void {
-    const wasMutating = this.mutating;
-    this.mutating = true;
-    try {
-      for (const key of keys) {
-        if (!Object.hasOwn(state, key)) continue;
-        if (!always && equivalent(state[key], this.appliedState[key])) continue;
-        if (key === 'viewport') {
-          for (const [axis, range] of Object.entries(state.viewport ?? {}))
-            this.engine.setAxis(axis, range);
-        } else if (key === 'selection') {
-          this.engine.setSelection(state.selection ?? null);
-        } else if (key === 'hiddenSeries') {
-          const hidden = new Set(state.hiddenSeries ?? []);
-          if (!equivalent([...hidden], [...this.hidden])) {
-            this.hidden = hidden;
-            this.engine.setOptions({
-              series: this.engine.getOptions().series.map((series, si) => ({
-                ...series,
-                visible: !hidden.has(this.ingested.seriesIds[si]),
-              })),
-            });
-          }
-        } else {
-          const index = state.highlight ? this.ingested.seriesIds.indexOf(state.highlight) : -1;
-          this.engine.setHighlight(index < 0 ? null : index);
-        }
-        (this.appliedState as Record<string, unknown>)[key] = state[key];
-      }
-    } finally {
-      this.mutating = wasMutating;
+  private stateChanges(
+    normalized: NormalizedOptions<Row>,
+    named?: ReadonlySet<string>,
+  ): Array<[StateKey, NormalizedState[StateKey]]> {
+    const changes: Array<[StateKey, NormalizedState[StateKey]]> = [];
+    for (const key of STATE_KEYS) {
+      const value = normalized.state[key];
+      if (named ? named.has(key) : !equivalent(value, this.appliedState[key]))
+        changes.push([key, value]);
     }
+    return changes;
+  }
+
+  /**
+   * Apply state options (plan D3). They change the chart at once and silently: the value is
+   * the caller's, so no event reports it. validateState() has checked them.
+   */
+  private applyState(changes: Array<[StateKey, NormalizedState[StateKey]]>): void {
+    for (const [key, given] of changes) {
+      (this.appliedState as Record<string, unknown>)[key] = given;
+      const value = given ?? DEFAULTS[key];
+      this.events.quiet(key);
+      if (key === 'viewport') {
+        this.engine.applyViewport(value as Record<string, ScaleRange>);
+      } else if (key === 'selection') {
+        this.engine.setSelection(value as SelectionRange | null);
+      } else if (key === 'hiddenSeries') {
+        this.setHidden(new Set(value as string[]));
+      } else {
+        const index = value ? this.ingested.seriesIds.indexOf(value as string) : -1;
+        this.engine.setHighlight(index < 0 ? null : index);
+      }
+    }
+  }
+
+  /** Show and hide series (hidden ids the chart does not have are dropped). */
+  private setHidden(hidden: Set<string>): void {
+    if (equivalent([...hidden], [...this.hidden])) return;
+    this.hidden = hidden;
+    this.engine.setOptions({
+      series: this.engine.getOptions().series.map((series, si) => ({
+        ...series,
+        visible: !hidden.has(this.ingested.seriesIds[si]),
+      })),
+    });
+    this.events.mark('hiddenSeries');
   }
 
   private configFor(ingested: Ingested<Row>, normalized: NormalizedOptions<Row>) {
@@ -367,67 +431,61 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   update(patch: ChartPatch<Row>): void {
-    this.reconcile(
-      patchOptions(this.options, patch),
-      new Set(Object.keys(patch)),
-      undefined,
-      STATE_KEYS.filter((key) => Object.hasOwn(patch, key)),
-    );
+    // State options apply once; a later update() carries only the ones it names (plan D3).
+    const current = { ...this.options };
+    for (const key of STATE_KEYS) delete current[key];
+    this.apply(patchOptions(current, patch), new Set(Object.keys(patch)));
+  }
+
+  setOptions(options: ChartOptions<Row>): void {
+    this.apply(options);
+  }
+
+  /** Framework reconciliation: complete options plus the 0.12 controlled props. */
+  reconcile(input: ChartOptions<Row>, named?: ReadonlySet<string>, controls?: ChartControls): void {
+    this.apply(input, named, controls);
   }
 
   /**
-   * Apply complete options through the diff classifier (plan D16). `named` lists the keys an
-   * update() patch names, each of which counts as changed; without it every key is compared
-   * with the last applied options (setOptions). `stateKeys` are the state options an update()
-   * named, which always apply; any other state option applies when it differs from the value
-   * last applied (plan D3).
+   * Apply options through the diff classifier (plan D16). `named` lists the keys an update()
+   * patch names, each of which counts as changed; without it every key is compared with the
+   * last applied options (setOptions). State options follow plan D3 (stateChanges()).
    */
-  reconcile(
-    input: ChartOptions<Row>,
-    named?: ReadonlySet<string>,
-    controls?: ChartControls,
-    stateKeys?: readonly StateKey[],
-  ): void {
+  private apply(input: ChartOptions<Row>, named?: ReadonlySet<string>, controls?: ChartControls) {
     if (this.destroyed) return;
-    const normalized = normalize(input);
-    const work = classify(this.normalized, normalized, named);
-    const applyState = () => {
-      if (stateKeys) this.applyState(normalized.state, stateKeys);
-      this.applyState(
-        normalized.state,
-        STATE_KEYS.filter((key) => !stateKeys?.includes(key)),
-        false,
-      );
-    };
-    if (work.data || work.accessor) {
-      this.noteChurn(normalized, work);
-      const ingested = ingest(normalized, this.context(normalized, named?.has('data') ?? false));
-      this.validateState(normalized.state, ingested);
-      if (controls) this.validateControls(controls, ingested);
-      validateGroup(normalized.group, this.candidate(ingested), this);
-      this.noteReplacedStreams(ingested);
-      this.commit(normalized, ingested, () => {
-        applyState();
+    this.events.batch(() => {
+      const normalized = normalize(input);
+      const work = classify(this.normalized, normalized, named);
+      const state = this.stateChanges(normalized, named);
+      const applyState = () => {
+        this.applyState(state);
         if (controls) this.setControls(controls);
-      });
-      return;
-    }
-    this.churn.streak = 0;
-    // Presentation only: describe the new options over the data the chart holds, check
-    // everything, then apply; a rejected call leaves the chart and its options as they were.
-    const ingested =
-      work.engine || work.annotations
-        ? {
-            ...this.ingested,
-            ...describeOptions(normalized, this.ingested, this.previousTypes(normalized)),
-          }
-        : this.ingested;
-    this.validateState(normalized.state, ingested);
-    if (controls) this.validateControls(controls);
-    if (work.group) validateGroup(normalized.group, this.candidate(ingested), this);
-    this.present(normalized, ingested, work, () => {
-      applyState();
-      if (controls) this.setControls(controls);
+      };
+      const checked = Object.fromEntries(state) as NormalizedState;
+      if (work.data || work.accessor) {
+        this.noteChurn(normalized, work);
+        const ingested = ingest(normalized, this.context(normalized, named?.has('data') ?? false));
+        this.validateState(checked, ingested);
+        if (controls) this.validateControls(controls, ingested);
+        validateGroup(normalized.group, this.candidate(ingested), this);
+        this.noteReplacedStreams(ingested);
+        this.commit(normalized, ingested, applyState);
+        return;
+      }
+      this.churn.streak = 0;
+      // Presentation only: describe the new options over the data the chart holds, check
+      // everything, then apply; a rejected call leaves the chart and its options as they were.
+      const ingested =
+        work.engine || work.annotations
+          ? {
+              ...this.ingested,
+              ...describeOptions(normalized, this.ingested, this.previousTypes(normalized)),
+            }
+          : this.ingested;
+      this.validateState(checked, ingested);
+      if (controls) this.validateControls(controls);
+      if (work.group) validateGroup(normalized.group, this.candidate(ingested), this);
+      this.present(normalized, ingested, work, applyState);
     });
   }
 
@@ -443,20 +501,15 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.options = normalized.options;
     this.normalized = normalized;
     this.optionsSnapshot = undefined;
-    this.mutating = true;
-    try {
-      if (work.engine || work.plugins)
-        this.engine.replaceOptions(this.configFor(ingested, normalized));
-      if (work.annotations) {
-        this.lines.setLines(ingested.referenceLines);
-        this.regions.setRegions(ingested.referenceRegions);
-      }
-      if (work.aria) this.applyAccessibleName();
-      after();
-      if (work.group) this.moveGroup(previous.group, normalized.options.group);
-    } finally {
-      this.mutating = false;
+    if (work.engine || work.plugins)
+      this.engine.replaceOptions(this.configFor(ingested, normalized));
+    if (work.annotations) {
+      this.lines.setLines(ingested.referenceLines);
+      this.regions.setRegions(ingested.referenceRegions);
     }
+    if (work.aria) this.applyAccessibleName();
+    after();
+    if (work.group) this.moveGroup(previous.group, normalized.options.group);
     this.publish();
     if (work.engine || work.plugins) this.emit('options:update', this.options);
     if (work.group) coordinate(previous.group);
@@ -468,15 +521,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (from) this.detachGroup(from);
     groups.get(from!)?.members.delete(this);
     groups.get(to!)?.members.add(this);
-  }
-
-  /** The axis types to keep for inferred axes that hold no data (as ingest keeps them). */
-  private previousTypes(normalized: NormalizedOptions<Row>) {
-    return new Map(
-      Object.entries(this.ingested.spec.axes ?? {})
-        .filter(([key]) => normalized.axes[key]?.type === undefined)
-        .map(([key, axis]) => [key, axis.type ?? 'linear'] as const),
-    );
   }
 
   /**
@@ -499,9 +543,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       optionsSnapshot: this.optionsSnapshot,
     };
     const next = normalized.options;
-    const highlighted = this.state.highlightedSeries;
+    const highlighted = this.read('highlight') as string | null;
     this.hidden = new Set([...this.hidden].filter((id) => ingested.seriesIds.includes(id)));
-    this.mutating = true;
     let replaced = false;
     try {
       this.ingested = ingested;
@@ -533,10 +576,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         this.hidden = previous.hidden;
       }
       throw error;
-    } finally {
-      this.mutating = false;
     }
     if (quiet) return;
+    this.events.mark('hiddenSeries');
     this.publish();
     this.emit('options:update', this.options);
     this.emit('data:update', undefined);
@@ -631,6 +673,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
 
   appendData(data: DataSource<Row>, options: AppendOptions = {}): void {
     if (this.destroyed) return;
+    this.events.batch(() => this.append(data, options));
+  }
+
+  private append(data: DataSource<Row>, options: AppendOptions): void {
     const { seriesIds, seriesSources, sources } = this.ingested;
     const id = options.seriesId;
     const si = id === undefined ? -1 : seriesIds.indexOf(id);
@@ -700,46 +746,41 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     const maxPoints = this.normalized.engine.streaming?.maxPoints;
     const changedAxes = new Set<string>();
     this.optionsSnapshot = undefined;
-    this.mutating = true;
-    try {
-      for (const plan of plans) {
-        const source = this.ingested.sources[plan.source];
-        const count = plan.columns[0].length;
-        if (!count) continue;
-        const length = this.engine.getSourceLength(plan.source);
-        // updateLast replaces the latest row if there is one; on empty data it appends.
-        const replace = options.updateLast && length > 0 ? 1 : 0;
-        const evicted =
-          maxPoints === undefined ? 0 : Math.max(0, length + count - replace - maxPoints);
-        const evictedCodes: number[] = [];
-        if (source.xKind === 'category') {
-          const xi = source.sortedX ? 0 : source.fields.findIndex((field) => field.kind === 'x');
-          for (let i = 0; i < Math.min(evicted, length - replace); i++)
-            evictedCodes.push(this.engine.getSourceValue(plan.source, xi, i));
-          if (replace) evictedCodes.push(this.engine.getSourceValue(plan.source, xi, length - 1));
-          const fromBatch = evicted - Math.min(evicted, length - replace);
-          for (let i = 0; i < fromBatch; i++) evictedCodes.push(plan.codes![i]);
-        }
-        this.engine.appendToSource(plan.source, plan.columns, options, /* trusted */ true);
-        if (commitAppend(this.ingested, plan, replace > 0, evicted, evictedCodes))
-          changedAxes.add(source.axis);
+    for (const plan of plans) {
+      const source = this.ingested.sources[plan.source];
+      const count = plan.columns[0].length;
+      if (!count) continue;
+      const length = this.engine.getSourceLength(plan.source);
+      // updateLast replaces the latest row if there is one; on empty data it appends.
+      const replace = options.updateLast && length > 0 ? 1 : 0;
+      const evicted =
+        maxPoints === undefined ? 0 : Math.max(0, length + count - replace - maxPoints);
+      const evictedCodes: number[] = [];
+      if (source.xKind === 'category') {
+        const xi = source.sortedX ? 0 : source.fields.findIndex((field) => field.kind === 'x');
+        for (let i = 0; i < Math.min(evicted, length - replace); i++)
+          evictedCodes.push(this.engine.getSourceValue(plan.source, xi, i));
+        if (replace) evictedCodes.push(this.engine.getSourceValue(plan.source, xi, length - 1));
+        const fromBatch = evicted - Math.min(evicted, length - replace);
+        for (let i = 0; i < fromBatch; i++) evictedCodes.push(plan.codes![i]);
       }
-      if (newEncodingLabels) {
-        // New colorBy or tooltip labels: the series specs list them now (refreshColorCodes).
-        // Known labels change no series, so the append repaints only the data layer.
-        this.engine.setOptions({ series: this.configFor(this.ingested, this.normalized).series });
-      }
-      if (changedAxes.size) {
-        const axes = Object.fromEntries(
-          [...changedAxes].map((key) => [
-            key,
-            refreshCategoryAxis(this.ingested, this.normalized, key),
-          ]),
-        );
-        this.engine.setOptions({ axes });
-      }
-    } finally {
-      this.mutating = false;
+      this.engine.appendToSource(plan.source, plan.columns, options, /* trusted */ true);
+      if (commitAppend(this.ingested, plan, replace > 0, evicted, evictedCodes))
+        changedAxes.add(source.axis);
+    }
+    if (newEncodingLabels) {
+      // New colorBy or tooltip labels: the series specs list them now (refreshColorCodes).
+      // Known labels change no series, so the append repaints only the data layer.
+      this.engine.setOptions({ series: this.configFor(this.ingested, this.normalized).series });
+    }
+    if (changedAxes.size) {
+      const axes = Object.fromEntries(
+        [...changedAxes].map((key) => [
+          key,
+          refreshCategoryAxis(this.ingested, this.normalized, key),
+        ]),
+      );
+      this.engine.setOptions({ axes });
     }
     this.publish();
     this.emit('data:update', undefined);
@@ -761,17 +802,62 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     event: K,
     listener: (value: ChartEvents<Row>[K]) => void,
   ): () => void {
-    let listeners = this.events.get(event);
-    if (!listeners) {
-      listeners = new Set();
-      this.events.set(event, listeners);
-    }
-    listeners.add(listener as (value: never) => void);
-    return () => listeners.delete(listener as (value: never) => void);
+    return this.events.on(event, listener);
   }
   private emit<K extends keyof ChartEvents<Row>>(event: K, value: ChartEvents<Row>[K]): void {
-    if (this.mutating || this.destroyed) return;
-    for (const listener of this.events.get(event) ?? []) listener(value as never);
+    if (this.destroyed) return;
+    this.events.emit(event, value);
+  }
+
+  /** Call the on<Key>Change option of an event, through the latest options (plan D16). */
+  private callback(event: keyof ChartEvents<Row>, value: unknown): void {
+    const name = OPTION_OF[event as keyof typeof OPTION_OF];
+    if (name) (this.normalized.callbacks[name] as ((value: unknown) => void) | undefined)?.(value);
+  }
+
+  /** The current value of a reported state key. */
+  private read(key: ReportedKey): unknown {
+    switch (key) {
+      case 'viewport':
+        return this.viewport();
+      case 'selection':
+        return this.selection();
+      case 'hiddenSeries':
+        return Object.freeze([...this.hidden]);
+      case 'highlight':
+        return this.ingested.seriesIds[this.engine.getHighlight() ?? -1] ?? null;
+      default:
+        return this.engine.isFollowing();
+    }
+  }
+
+  /** The pinned axes, as `[from, to]` (plan D3). */
+  private viewport(): Viewport {
+    return Object.freeze(
+      Object.fromEntries(
+        Object.entries(this.engine.pinnedAxes()).map(([key, range]) => [key, interval(range)]),
+      ),
+    );
+  }
+
+  private selection(): (Selection & { readonly x: Interval }) | null {
+    const selection = this.engine.getSelection();
+    return selection
+      ? Object.freeze({
+          x: interval(selection.x),
+          ...(selection.y ? { y: interval(selection.y) } : {}),
+        })
+      : null;
+  }
+
+  /** Every axis' current range (the 0.12 controlled viewport). */
+  private ranges(): ViewportRanges {
+    const ranges: Record<string, ScaleRange> = {};
+    for (const key of Object.keys(this.engine.getOptions().axes ?? {})) {
+      const axis = this.engine.getAxis(key);
+      if (axis) ranges[key] = Object.freeze({ min: axis.min, max: axis.max });
+    }
+    return Object.freeze(ranges);
   }
 
   setViewport(viewport: ViewportRanges): void {
@@ -788,15 +874,17 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       }
     }
     if (!this.applyingControls && Object.hasOwn(this.controls, 'viewport')) {
-      this.controls.onViewportChange?.({ ...this.state.viewport, ...viewport });
+      this.controls.onViewportChange?.({ ...this.ranges(), ...viewport });
       return;
     }
-    for (const [key, range] of Object.entries(viewport)) this.engine.setAxis(key, range);
-    this.publish();
+    this.events.batch(() => {
+      for (const [key, range] of Object.entries(viewport)) this.engine.setAxis(key, range);
+    });
   }
+  /** Return every axis to its automatic range; reports `{}` once if anything was pinned. */
   resetViewport(): void {
-    this.engine.resetZoom();
-    this.publish();
+    if (this.destroyed) return;
+    this.events.batch(() => this.engine.resetZoom());
   }
   syncViewport(key: string, range: ScaleRange, reset: boolean): void {
     if (reset) this.resetViewport();
@@ -807,11 +895,13 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     return position === 'bottom' || position === 'top';
   }
   resumeFollow(): void {
-    this.engine.scrollToLatest();
-    this.publish();
+    if (this.destroyed) return;
+    this.events.batch(() => this.engine.scrollToLatest());
   }
   setSelection(selection: SelectionRange | null): void {
-    this.engine.setSelection(selection);
+    if (selection && (!Number.isFinite(selection.x.min) || !Number.isFinite(selection.x.max)))
+      fail('a selection needs finite bounds.');
+    this.events.batch(() => this.engine.setSelection(selection));
   }
   setSeriesVisible(id: string, visible: boolean): void {
     const ids = this.ingested.seriesIds;
@@ -824,19 +914,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.controls.onHiddenSeriesChange?.([...hidden]);
       return;
     }
-    this.hidden = hidden;
-    this.engine.setOptions({
-      series: this.engine.getOptions().series.map((series, si) => ({
-        ...series,
-        visible: !hidden.has(this.ingested.seriesIds[si]),
-      })),
+    this.events.batch(() => {
+      this.setHidden(hidden);
+      if (!this.applyingControls) this.controls.onHiddenSeriesChange?.([...hidden]);
     });
-    this.publish();
-    this.emit('visibility:change', this.state.hiddenSeries);
-    if (!this.applyingControls) {
-      this.controls.onHiddenSeriesChange?.(this.state.hiddenSeries);
-      this.callback('onHiddenSeriesChange', this.state.hiddenSeries);
-    }
     coordinate(this.options.group);
   }
   setHighlight(id: string | null): void {
@@ -847,7 +928,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   /** A group's highlight: a series this chart lacks clears its highlight. */
   syncHighlight(id: string | null): void {
     const index = id === null ? -1 : this.ingested.seriesIds.indexOf(id);
-    this.engine.setHighlight(index < 0 ? null : index);
+    this.events.batch(() => this.engine.setHighlight(index < 0 ? null : index));
   }
   seriesIds(): readonly string[] {
     return this.ingested.seriesIds;
@@ -1039,21 +1120,11 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.engine.setOptions({ padding: { left: left ?? 56, right: right ?? 24 } });
   }
   private readState(): ChartState<Row> {
-    const viewport: Record<string, ScaleRange> = {};
-    for (const key of Object.keys(this.engine.getOptions().axes ?? {})) {
-      const axis = this.engine.getAxis(key);
-      if (axis) viewport[key] = Object.freeze({ min: axis.min, max: axis.max });
-    }
-    const selection = this.engine.getSelection();
-    if (selection) {
-      Object.freeze(selection.x);
-      Object.freeze(selection);
-    }
     return Object.freeze({
-      viewport: Object.freeze(viewport),
-      selection,
+      viewport: this.viewport(),
+      selection: this.selection(),
       hiddenSeries: Object.freeze([...this.hidden]),
-      highlightedSeries: this.ingested.seriesIds[this.engine.getHighlight() ?? -1] ?? null,
+      highlight: this.read('highlight') as string | null,
       following: this.engine.isFollowing(),
       cursor: this.getCursorSnapshot(),
     });
@@ -1068,22 +1139,17 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
   private bindEngine(): void {
     this.off.push(
+      this.engine.on('action', (start) => this.events.bracket(start)),
       this.engine.on('cursor:move', () => {
         if (this.mutating) return;
         this.publish();
         this.emit('cursor:change', this.state.cursor);
-        this.callback('onCursorChange', this.state.cursor);
         if (this.options.group?.options.cursor)
           broadcast(this.options.group, (member) => member.syncCursor(this.state.cursor.x), this);
       }),
       this.engine.on('viewport:change', (key, range) => {
-        if (this.mutating) return;
-        this.publish();
-        this.emit('viewport:change', this.state.viewport);
-        if (!this.applyingControls) {
-          this.controls.onViewportChange?.(this.state.viewport);
-          this.callback('onViewportChange', toViewport(this.state.viewport));
-        }
+        if (!this.applyingControls) this.controls.onViewportChange?.(this.ranges());
+        this.events.mark('viewport');
         const group = this.options.group;
         if (!group?.options.viewport || !this.isHorizontal(key)) return;
         // Plan D17: link horizontal axes only, and only axes a peer has, so a
@@ -1095,31 +1161,17 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         if (group.options.yRange) coordinate(group, 'shareY');
       }),
       this.engine.on('highlight:change', () => {
-        if (this.mutating) return;
-        this.publish();
-        this.emit('highlight:change', this.state.highlightedSeries);
-        this.callback('onHighlightChange', this.state.highlightedSeries);
+        this.events.mark('highlight');
         if (this.options.group?.options.highlight)
           broadcast(
             this.options.group,
-            (member) => member.syncHighlight(this.state.highlightedSeries),
+            (member) => member.syncHighlight(this.read('highlight') as string | null),
             this,
           );
       }),
       this.engine.on('selection:change', (selection) => {
-        if (this.mutating) return;
-        this.publish();
-        this.emit('selection:change', selection);
-        if (!this.applyingControls) {
-          this.controls.onSelectionChange?.(selection);
-          this.callback(
-            'onSelectionChange',
-            selection && {
-              x: [selection.x.min, selection.x.max] as const,
-              ...(selection.y ? { y: [selection.y.min, selection.y.max] as const } : {}),
-            },
-          );
-        }
+        if (!this.applyingControls) this.controls.onSelectionChange?.(selection);
+        this.events.mark('selection');
       }),
       this.engine.on('select', (selection) => {
         const result = {
@@ -1130,11 +1182,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         };
         this.emit('select', result);
       }),
-      this.engine.on('follow:change', (following) => {
-        this.publish();
-        this.emit('follow:change', following);
-        this.callback('onFollowingChange', following);
-      }),
+      this.engine.on('follow:change', () => this.events.mark('following')),
       this.engine.on('theme:update', (theme) => {
         this.publish();
         this.emit('theme:update', theme);
@@ -1147,16 +1195,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     );
     // The internal engine emits a hit-tested point only after a non-drag click.
     const onPoint = (point: TooltipPoint) => {
-      const result = this.point(point.seriesIndex, point.dataIndex, point);
-      this.callback('onPointClick', result);
-      this.emit('point:click', result);
+      this.emit('point:click', this.point(point.seriesIndex, point.dataIndex, point));
     };
     this.off.push(this.engine.on('point:click', onPoint));
-  }
-
-  /** Call an on<Key>Change option with the current options' function. */
-  private callback(name: keyof NormalizedOptions<Row>['callbacks'], value: unknown): void {
-    (this.normalized.callbacks[name] as ((value: unknown) => void) | undefined)?.(value);
   }
 
   private installGuards(): void {
@@ -1164,7 +1205,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       viewport: (key, range) => {
         if (this.mutating || this.applyingControls || !Object.hasOwn(this.controls, 'viewport'))
           return true;
-        this.controls.onViewportChange?.({ ...this.state.viewport, [key]: range });
+        this.controls.onViewportChange?.({ ...this.ranges(), [key]: range });
         return false;
       },
       selection: (selection) => {
@@ -1221,10 +1262,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (this.destroyed) return;
     groups.get(this.options.group!)?.members.delete(this);
     for (const off of this.off) off();
-    this.engine.destroy();
+    this.engine?.destroy();
     this.destroyed = true;
     this.subscribers.clear();
-    this.events.clear();
+    this.events?.clear();
     coordinate(this.options.group);
   }
 }

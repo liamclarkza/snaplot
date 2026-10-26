@@ -33,7 +33,7 @@ function wheelZoom(chart: ChartHandle<Row>, x: number, y: number, deltaY = -120)
 }
 
 describe('[dxtrial-04][frameworks-04][frameworks-05] the viewport names only pinned axes', () => {
-  it.fails('[dxtrial-04][frameworks-05] an X zoom reports only the X axis', () => {
+  it('[dxtrial-04][frameworks-05] an X zoom reports only the X axis', () => {
     const chart = mountLine();
     const reported: object[] = [];
     chart.on('viewport:change', (viewport) => reported.push(viewport));
@@ -42,7 +42,7 @@ describe('[dxtrial-04][frameworks-04][frameworks-05] the viewport names only pin
     expect(Object.keys(reported.at(-1) ?? {})).toEqual(['x']);
   });
 
-  it.fails('[frameworks-04] a reset emits {} exactly once', () => {
+  it('[frameworks-04] a reset emits {} exactly once', () => {
     const chart = mountLine();
     wheelZoom(chart, 50, 24);
     const reported: object[] = [];
@@ -53,7 +53,7 @@ describe('[dxtrial-04][frameworks-04][frameworks-05] the viewport names only pin
   });
 
   // D3: update() always applies a state key it names, so an empty viewport is a reset.
-  it.fails('[frameworks-04] update({ viewport: {} }) resets a zoomed chart', () => {
+  it('[frameworks-04] update({ viewport: {} }) resets a zoomed chart', () => {
     const chart = mountLine();
     fakes.frames.flush();
     const full = { ...chart.getAxis('x') };
@@ -86,7 +86,7 @@ describe('[dxtrial-04][frameworks-04][frameworks-05] the viewport names only pin
     expect(chart.getAxis('y')?.max ?? 0).toBeGreaterThanOrEqual(280);
   });
 
-  it.fails('[frameworks-05] setOptions with an equal viewport neither repaints nor pins', () => {
+  it('[frameworks-05] setOptions with an equal viewport neither repaints nor pins', () => {
     const options = {
       data: rows,
       x: 't',
@@ -105,7 +105,7 @@ describe('[dxtrial-04][frameworks-04][frameworks-05] the viewport names only pin
 });
 
 describe('[dataapi-14][dataapi-16][backlog-02] state survives data changes correctly', () => {
-  it.fails('[dataapi-14] replacing data outside a pinned X range unpins that axis', () => {
+  it('[dataapi-14] replacing data outside a pinned X range unpins that axis', () => {
     const chart = mountLine();
     chart.setViewport({ x: { min: 10, max: 20 } });
     chart.update({ data: Array.from({ length: 101 }, (_, i) => ({ t: 1000 + i, v: 5 })) });
@@ -113,13 +113,13 @@ describe('[dataapi-14][dataapi-16][backlog-02] state survives data changes corre
     expect(chart.getAxis('x')).toMatchObject({ min: 1000, max: 1100 });
   });
 
-  it.fails('[dataapi-16] a non-finite selection is rejected', () => {
+  it('[dataapi-16] a non-finite selection is rejected', () => {
     const chart = mountLine({ selection: { mode: 'brush' } });
     expect(() => chart.setSelection({ x: { min: Number.NaN, max: 10 } })).toThrow(/selection/i);
     expect(chart.getState().selection).toBeNull();
   });
 
-  it.fails('[backlog-02] a selection cleared by a data change emits selection:change(null)', () => {
+  it('[backlog-02] a selection cleared by a data change emits selection:change(null)', () => {
     const chart = mountLine({ selection: { mode: 'brush' } });
     chart.setSelection({ x: { min: 40, max: 60 } });
     const events: unknown[] = [];

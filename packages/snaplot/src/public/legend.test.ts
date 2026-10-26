@@ -56,7 +56,7 @@ function chartFixture() {
     }),
     getLegendItems: () => items,
     getCursorSnapshot: () => snapshot,
-    getState: () => ({ highlightedSeries: highlighted }),
+    getState: () => ({ highlight: highlighted }),
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
