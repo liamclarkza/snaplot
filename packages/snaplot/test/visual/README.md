@@ -187,6 +187,15 @@ A check that today's code fails is listed in `expected/m<N>.ts` for its owning m
   title as the finding's lock.
 - A fixture may skip a check that does not apply (`skip: { minLabels: 'reason' }`).
 
+## Interaction probe (M9b)
+
+`probe.spec.ts` (project `probe`, not part of `npm run test:visual`) moves a real pointer over a
+12 × 8 grid on every fixture and records the cursor snapshot, the tooltip's text and swatch colours,
+and the `point:click` payloads of a click at each point, plus `getCursor()` with each fallback before
+and after. `__probe__/m9a.json` is that record at `ovh-m9a-done`; the M9b refactors must reproduce it.
+`PORT=<port> npx playwright test --project probe` compares; `SNAPLOT_PROBE_UPDATE=1` plus
+`node test/visual/probe-merge.mjs` rewrites it. Only platform-independent facts are stored.
+
 ## The in-page contract
 
 `page-api.ts`: the app publishes `window.__snaplotFixture` with `status`, `chart`, `plotPoint(fx, fy)`,

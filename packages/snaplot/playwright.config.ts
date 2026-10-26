@@ -4,6 +4,8 @@
  * Projects:
  * - `visual`: one screenshot per fixture shot (test/visual/visual.spec.ts).
  * - `geometry`: platform-independent label and ink checks (test/visual/geometry.spec.ts).
+ * - `probe`: the M9b interaction probe (test/visual/probe.spec.ts), run on its own with
+ *   `npx playwright test --project probe`.
  *
  * Run through `npm run test:visual` (test/visual/run.mjs), which sets the environment below.
  * Environment (the contract every ref from M3a on honours, so `--against <ref>` can drive it):
@@ -63,6 +65,9 @@ export default defineConfig({
   projects: [
     { name: 'visual', testMatch: 'visual/visual.spec.ts' },
     { name: 'geometry', testMatch: 'visual/geometry.spec.ts' },
+    // The M9b interaction probe (hit, cursor and click on a 12 × 8 grid); not part of
+    // `npm run test:visual`, which runs `visual` and `geometry` only.
+    { name: 'probe', testMatch: 'visual/probe.spec.ts' },
   ],
   webServer: {
     command:
