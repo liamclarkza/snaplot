@@ -948,6 +948,10 @@ export class ChartCore implements EngineHost {
       [...this.scales].map(([key, scale]) => [key, [scale.min, scale.max] as const]),
     );
     const keys = Object.keys(viewport).filter((key) => this.scales.has(key));
+    // A horizontal axis this viewport no longer pins returns to its automatic range.
+    const released = [...this.userZoomedAxes].some(
+      (key) => !keys.includes(key) && this.isHorizontalAxis(key),
+    );
     this.userZoomedAxes = new Set(keys);
     for (const key of keys) {
       const scale = this.scales.get(key)!;
@@ -956,7 +960,9 @@ export class ChartCore implements EngineHost {
     }
     const horizontal = keys.some((key) => this.isHorizontalAxis(key));
     this.setFollowing(!horizontal);
-    this.autoRangeHorizontal();
+    // A pan (the same horizontal axes pinned at a new range) changes no natural extent, so it
+    // skips the horizontal auto-range and its pass over every X, as a gesture does.
+    if (released || !horizontal) this.autoRangeHorizontal();
     if (!horizontal) this.applyFollowWindow();
     this.autoRangeVertical(horizontal);
     // A pinned axis that moved is a view in motion as far as drawing goes: an app that drives the
