@@ -78,8 +78,10 @@ to [Semantic Versioning](https://semver.org/).
   a table of each series' value at the cursor (or the latest data), keyed by series id and
   refreshed on every data commit. Columns are data only: `'swatch'`, `'name'`, `'value'` or
   `{ header, value(point, series), align }`; it returns `{ update(options), destroy() }`.
-- The built-in legend replaces `createLegendPlugin()`: `legend: true` or
-  `{ position: 'top' | 'bottom' }` shows one button per series above (or below) the plot; a click
+- The built-in legend replaces `createLegendPlugin()`. `legend: 'auto'`, the default, shows it for
+  two or more series (in a container at least 160 px tall, until the legend reserves its own space
+  in the layout); `legend: true` or `{ position: 'top' | 'bottom' }` always shows it, one button
+  per series above (or below) the plot; `legend: false` hides it (visual V20). A click
   shows or hides the series (`hiddenSeries:change`) and a hover highlights it
   (`highlight:change`).
 - The legend styles are injected once per document: `import 'snaplot/legend-table.css'` is no

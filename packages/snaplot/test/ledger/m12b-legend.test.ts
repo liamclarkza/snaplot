@@ -56,7 +56,7 @@ const createLegendTable = (snaplot as unknown as { createLegendTable?: LegendTab
   .createLegendTable;
 
 describe('[dxtrial-06][demos-13] an automatic, styled legend', () => {
-  it.fails('[dxtrial-06][demos-13] two series show a legend with one button per series', () => {
+  it('[dxtrial-06][demos-13] two series show a legend with one button per series', () => {
     const chart = mountTwo();
     expect(legendButtons(chart).map((button) => button.textContent?.trim())).toEqual([
       'CPU',

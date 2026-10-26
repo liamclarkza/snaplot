@@ -74,6 +74,9 @@ export interface ChartControls {
 /** Sources of at least this many rows warn about accessor churn and re-ingest churn (plan D16). */
 const CHURN_ROWS = 10_000;
 
+/** The container height from which `legend: 'auto'` shows the legend (CSS pixels). */
+const LEGEND_MIN_HEIGHT = 160;
+
 /** The events, in plan §4.4's order, then the 0.12 events the final handle removes. */
 const EVENTS: readonly (keyof ChartEvents)[] = [
   'cursor:change',
@@ -882,7 +885,14 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   private syncLegend(): void {
     if (this.destroyed) return;
     const option = this.normalized.engine.legend ?? 'auto';
-    const show = option === true || typeof option === 'object';
+    // Until M12b reserves its space in the layout, 'auto' gives way in a container too short to
+    // keep a usable plot below it (a 200 × 120 box shows only the chart).
+    const show =
+      option === true ||
+      typeof option === 'object' ||
+      (option === 'auto' &&
+        this.ingested.seriesIds.length >= 2 &&
+        this.container.clientHeight >= LEGEND_MIN_HEIGHT);
     const position = typeof option === 'object' ? (option.position ?? 'top') : 'top';
     if (this.legend && (!show || this.legend.position !== position)) {
       this.legend.unmount();

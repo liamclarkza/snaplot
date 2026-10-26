@@ -1,9 +1,10 @@
 /**
  * The fixture registry. Areas follow the W5 ownership split (plan §12): `axes` (M10), `marks`,
- * `theme` and `layout` (M11), `overlay` (M12a); `legend` arrives with M8 and moves to M12b.
+ * `theme` and `layout` (M11), `overlay` (M12a), `legend` (M8's interim legend, then M12b).
  */
 import { fixtures as axes } from './axes';
 import { fixtures as layout } from './layout';
+import { fixtures as legend } from './legend';
 import { fixtures as marks } from './marks';
 import { fixtures as overlay } from './overlay';
 import { fixtures as theme } from './theme';
@@ -32,6 +33,7 @@ export const FIXTURES: readonly Fixture[] = validate([
   ...theme,
   ...layout,
   ...overlay,
+  ...legend,
 ]);
 
 export function findFixture(id: string): Fixture | undefined {

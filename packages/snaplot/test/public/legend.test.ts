@@ -42,8 +42,11 @@ function table(chart: FinalHandle<Row>, options: Record<string, unknown> = {}) {
 }
 
 describe('the built-in legend (plan D6)', () => {
-  it.fails("[frameworks-11] 'auto' shows one button per series from two series, none for one", () => {
+  it("[frameworks-11] 'auto' shows one button per series from two series, none for one", () => {
     expect(names(mount<Row>(fakes, two))).toEqual(['CPU', 'Memory']);
+    // A container too short for a plot below the legend shows only the chart.
+    expect(names(mount<Row>(fakes, two, { height: 120 }))).toEqual([]);
+    expect(names(mount<Row>(fakes, shown, { height: 120 }))).toEqual(['CPU', 'Memory']);
     expect(names(mount<Row>(fakes, { ...two, series: [two.series[0]] }))).toEqual([]);
     expect(names(mount<Row>(fakes, { ...two, legend: false }))).toEqual([]);
     expect(names(mount<Row>(fakes, { ...two, series: [two.series[0]], legend: true }))).toEqual([
