@@ -1,0 +1,272 @@
+/*
+ * find-the-clipping: the look of an Audacity / iZotope RX waveform editor (SOURCE.md, design
+ * reference). Graphite surfaces, a green waveform, amber clip marks, a compact toolbar with keycap
+ * hints, the system UI stack and system monospace timecodes. No webfont.
+ */
+:root {
+  color-scheme: dark;
+  --bg: #1b1d1f;
+  --track: #16181a;
+  --panel: #222528;
+  --rule: #34383c;
+  --ink: #e3e5e7;
+  --ink-dim: #a1a7ad;
+  --wave: #5fd08a;
+  --clip: #f5b041;
+  --focus: #e3e5e7;
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 13px / 1.45 var(--ui);
+}
+
+main {
+  padding: 0 16px;
+}
+
+a {
+  color: var(--ink);
+}
+
+a:hover {
+  color: var(--wave);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The toolbar: file name, transport with keycaps, playhead clock, format, open. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.toolbar .file {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1 1 280px;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+button,
+.open {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button:hover:not(:disabled),
+.open:hover {
+  background: #2c3034;
+  border-color: #4a5056;
+}
+
+button:disabled {
+  color: var(--ink-dim);
+  cursor: default;
+}
+
+.play[aria-pressed="true"] {
+  border-color: var(--wave);
+}
+
+kbd {
+  font: 11px / 1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+  border: 1px solid #4a5056;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-left: 4px;
+}
+
+.clock {
+  font-size: 17px;
+  min-width: 10ch;
+  padding: 0 8px;
+  color: var(--wave);
+}
+
+.format {
+  margin: 0;
+  color: var(--ink-dim);
+}
+
+.open input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.open:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.status {
+  margin: 0;
+  min-height: 1.45em;
+  color: var(--ink-dim);
+}
+
+/* The overview strip and the channel lanes: tracks on a darker ground, like an editor's lanes. */
+.overview,
+.lane {
+  background: var(--track);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+.overview .plot {
+  height: 104px;
+}
+
+.hint {
+  margin: 0;
+  padding: 2px 8px 4px;
+  color: var(--ink-dim);
+}
+
+.lane {
+  position: relative;
+  margin-top: 6px;
+}
+
+.lane .plot {
+  height: 160px;
+}
+
+.lane-name {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  z-index: 1;
+  font-size: 11px;
+  color: var(--ink-dim);
+  pointer-events: none;
+}
+
+/* The clip list beside the spectrum at desktop widths, stacked on a phone. */
+.analysis {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.analysis h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.answer {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--ink);
+  border-left: 3px solid var(--clip);
+  padding-left: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 12px;
+}
+
+caption {
+  text-align: left;
+  color: var(--ink-dim);
+  padding: 4px 0;
+}
+
+th,
+td {
+  text-align: left;
+  font-weight: 400;
+  padding: 2px 8px 2px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+th {
+  color: var(--ink-dim);
+}
+
+td button {
+  font-family: var(--mono);
+  padding: 0 6px;
+}
+
+tr[aria-current="true"] td {
+  background: #2a2618;
+}
+
+tr[data-run] td:first-child button {
+  border-color: #6b5226;
+}
+
+.spectrum .plot {
+  height: 220px;
+}
+
+.caption {
+  margin: 0 0 4px;
+  color: var(--ink-dim);
+}
+
+.demo-footer {
+  margin: 24px 16px 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .analysis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lane .plot {
+    height: 120px;
+  }
+
+  .toolbar .file {
+    flex-basis: 100%;
+  }
+}

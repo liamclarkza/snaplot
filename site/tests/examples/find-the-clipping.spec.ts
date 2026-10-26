@@ -29,9 +29,6 @@ function watch(page: Page): string[] {
   return problems;
 }
 
-// The page lands in the next commit (feat(demos): find-the-clipping), which removes this.
-test.beforeEach(() => test.fail(true, 'the find-the-clipping page is not built yet'));
-
 async function open(page: Page) {
   await page.goto(ROUTE);
   await page.locator('html[data-demo-ready]').waitFor({ timeout: 20_000 });

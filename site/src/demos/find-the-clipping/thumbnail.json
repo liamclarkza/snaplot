@@ -1,0 +1,7 @@
+{
+  "slug": "find-the-clipping",
+  "path": "examples/find-the-clipping/",
+  "ready": "html[data-demo-ready]",
+  "viewport": { "width": 1280, "height": 800 },
+  "query": ""
+}

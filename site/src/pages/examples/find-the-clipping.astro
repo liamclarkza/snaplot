@@ -1,0 +1,44 @@
+---
+/**
+ * S1 "Where does this recording clip?" (plan §10.2): a Solid waveform editor with its own layout
+ * and no Starlight chrome. The data is one public-domain recording, decoded in the browser; the
+ * footer's attribution line is read from its SOURCE.md.
+ */
+import Editor from '../../demos/find-the-clipping/main.solid';
+import '../../demos/find-the-clipping/editor.css';
+import source from '../../../public/data/find-the-clipping/SOURCE.md?raw';
+
+const section = (name: string) =>
+  new RegExp(`^## ${name}\\n+(.+)$`, 'm').exec(source)?.[1]?.trim() ?? '';
+const attribution = section('Attribution');
+// "U.S. Government work (public domain)" reads "U.S. Government work, public domain" inside the
+// footer's own parentheses.
+const licence = section('Licence').replace(/\s*\(([^)]+)\)$/, ', $1');
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const SOURCE_URL =
+  'https://github.com/liamclarkza/snaplot/tree/main/site/src/demos/find-the-clipping';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Where does this recording clip? · snaplot examples</title>
+    <meta
+      name="description"
+      content="A waveform editor that finds clipped samples and long silences in a NASA recording, in Solid with snaplot."
+    />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+  </head>
+  <body>
+    <main id="main">
+      <Editor client:only="solid-js" />
+    </main>
+    <footer class="demo-footer">
+      <a href={`${base}examples/`}>← Examples</a> · <a href={SOURCE_URL}>Source</a> · <span
+        >Data: <span data-attribution>{attribution}</span> ({licence})</span>
+    </footer>
+  </body>
+</html>
