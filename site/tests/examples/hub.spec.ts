@@ -69,11 +69,8 @@ test.describe('the examples hub', () => {
       page.locator(`.examples > li[data-framework="${framework}"]`).getByRole('link', {
         name: 'Open',
       });
-    // M16a's two pages now; a framework's pages arrive together when its track merges (M16b
-    // React, M16c Solid). The M16 finalisation, with all six built, requires two of each.
-    await expect(open('Vanilla JS')).toHaveCount(2);
-    for (const framework of ['React', 'Solid']) {
-      expect([0, 2], framework).toContain(await open(framework).count());
+    for (const framework of ['Vanilla JS', 'React', 'Solid']) {
+      await expect(open(framework), framework).toHaveCount(2);
     }
     for (const link of await page.getByRole('link', { name: 'Open' }).all()) {
       const response = await request.get((await link.getAttribute('href')) ?? '');
