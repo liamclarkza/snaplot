@@ -6,6 +6,8 @@ import {
   type EpochRow,
   decide,
   headline,
+  // @ts-expect-error M16b adds otherPick with the accuracy criterion (tests first).
+  otherPick,
   parseTrain,
   parseVal,
   smooth,
@@ -35,6 +37,38 @@ describe('[pick-a-checkpoint] answer', () => {
     expect(ship.epoch).toBe(Number(best[iEpoch]));
     expect(ship.valLoss).toBe(Number(best[iLoss]));
     expect(ship.valAcc).toBe(Number(best[iAcc]));
+  });
+
+  // Tests first: the accuracy criterion lands with the page (M16b); until then these fail.
+  it.fails('oracle: an independent argmax of accuracy over the committed CSV (no answer.ts)', () => {
+    const lines = valCsv.trim().split('\n');
+    const header = lines[0].split(',');
+    const [iRun, iEpoch, iAcc] = ['run', 'epoch', 'valAcc'].map((k) => header.indexOf(k));
+    const runOrder = [...new Set(lines.slice(1).map((l) => l.split(',')[iRun]))];
+    // Highest accuracy; ties go to the earlier epoch, then to the first run.
+    const [best] = lines
+      .slice(1)
+      .map((l) => l.split(','))
+      .sort(
+        (a, b) =>
+          Number(b[iAcc]) - Number(a[iAcc]) ||
+          Number(a[iEpoch]) - Number(b[iEpoch]) ||
+          runOrder.indexOf(a[iRun]) - runOrder.indexOf(b[iRun]),
+      );
+    // @ts-expect-error M16b adds the criterion argument.
+    const { ship } = decide(val, 'valAcc');
+    expect(ship.run).toBe(best[iRun]);
+    expect(ship.epoch).toBe(Number(best[iEpoch]));
+    expect(ship.valAcc).toBe(Number(best[iAcc]));
+  });
+
+  it.fails('says which checkpoint the other criterion would ship', () => {
+    expect(otherPick(val, 'valLoss')).toBe(
+      'By highest accuracy instead, it would be run B at epoch 29 (accuracy 97.7%).',
+    );
+    expect(otherPick(val, 'valAcc')).toBe(
+      'By lowest validation loss instead, it would be run A at epoch 11 (validation loss 0.1241).',
+    );
   });
 
   it('states the answer', () => {
