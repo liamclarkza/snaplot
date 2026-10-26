@@ -669,8 +669,18 @@ export class ChartCore implements EngineHost {
       config.series.forEach((series, si) => {
         const store = this.sourceStores[this.seriesSources[si] ?? 0];
         if ((series.xAxis ?? 'x') !== key || !store?.length) return;
-        min = Math.min(min, store.xAt(0));
-        max = Math.max(max, store.xAt(store.length - 1));
+        const xColumn = scatterXColumn(series);
+        if (xColumn === 0) {
+          min = Math.min(min, store.xAt(0));
+          max = Math.max(max, store.xAt(store.length - 1));
+          return;
+        }
+        // An unsorted scatter source keeps X in its own column, in row order.
+        for (let i = 0; i < store.length; i++) {
+          const x = store.valueAt(xColumn, i);
+          if (x < min) min = x;
+          if (x > max) max = x;
+        }
       });
       if (min === Infinity || max < scale.min || min > scale.max) {
         this.userZoomedAxes.delete(key);
