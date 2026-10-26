@@ -95,6 +95,16 @@ function paintedPixels(page: Page, panelId: string): Promise<number> {
 }
 
 async function seriousViolations(page: Page): Promise<string[]> {
+  // Expressive Code makes a code block that scrolls sideways focusable (tabindex="0") from a
+  // ResizeObserver, 250 ms after layout. Measure the page once it has, not before.
+  await page.waitForFunction(
+    () =>
+      Array.from(document.querySelectorAll('.expressive-code pre')).every(
+        (pre) => pre.scrollWidth <= pre.clientWidth || pre.hasAttribute('tabindex'),
+      ),
+    undefined,
+    { timeout: 5_000 },
+  );
   const { violations } = await new AxeBuilder({ page }).analyze();
   return violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
