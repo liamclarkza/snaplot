@@ -6,26 +6,69 @@ description: Mount a chart in vanilla JS, React or Solid, and see what you get b
 import Example from '../../components/Example.astro';
 import Install from '../../components/Install.astro';
 
-{/* Outline only: plan §8.1 drafts this page in M15a. */}
-
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
-
 ## Install
 
 <Install />
 
+## Size the container first
+
+A chart fills the element it is mounted in, so that element needs a height. Set one in CSS
+(`height`, `aspect-ratio`, or a flex or grid track), or pass the `height` option, which takes a
+number of pixels or any CSS length. In React and Solid, `height` sets the height of the element
+the component renders.
+
+A container with no height gets 300 pixels and one console warning, so a missing height shows
+as a chart of the wrong size rather than an empty page. {/* verify-after: M11 */}
+
 ## Mount a chart
 
-Give `createChart` an element and the options: the rows, the field for the x axis, and one series per y field. The React and Solid `<Chart>` components take the same options as props.
+Give `createChart` an element and the options: the rows, the field for the x axis, and one series
+per field to plot. The React and Solid `<Chart>` components take the same options as props.
 
-<Example name="start/minimal" />
+<Example name="start/first-chart" />
 
-## Size the container
+Three things in the options do the work:
 
-The chart fills its container. Give the container a height, or pass `height`.
+- `data` is an array of plain objects. They do not need to be sorted.
+- `x: 'date'` names the field for the x axis. Its values are ISO dates, so the axis is a time axis.
+- `series` lists what to draw. Each `y` names a field; `label` is the name in the legend and the
+  tooltip.
+
+`axes.y.format` writes the values as `66 °F` on the ticks and in the tooltip, and `ariaLabel` is
+the name a screen reader announces.
+
+TypeScript checks the field names against the rows: `y: 'hgih'` is a compile error, and at run
+time a field that no row has throws an error that names the closest field.
 
 ## What you get by default
 
-The theme follows the page, axes and ticks come from the data, and the tooltip follows the pointer.
+Without setting anything else:
+
+- **Axes from the data.** Dates and ISO strings give a time axis, other strings give categories,
+  and numbers a linear axis. The value axis rounds out to whole tick steps; the x axis of a line
+  ends at the data.
+- **A legend** above the plot when there are two or more series. Click an entry to hide its
+  series; hover it to highlight the series.
+- **A tooltip and crosshair** that list every series at the x under the pointer.
+- **Zoom and pan.** Drag across the plot to zoom to that range, hold Shift and drag to pan, and
+  double-click to reset. Ctrl or ⌘ with the wheel, or a pinch, zooms too.
+- **Colours and text from the page.** The theme follows the light or dark page the chart sits on,
+  the background stays transparent, the text uses the page's font, and the series take a palette
+  that stays distinct for colour-blind readers. {/* verify-after: M11 */}
+- **Keyboard and screen readers.** The chart takes focus with Tab; ← and → move the cursor from
+  point to point, and Shift with ← or → pans. Without `ariaLabel`, the accessible name is a
+  summary such as "Line chart, 2 series: High, Low". {/* verify-after: M12a */}
+
+Each of these is one option to change: `legend`, `tooltip`, `interaction`, `theme`, `cursor` and
+`ariaLabel`. The [guides](/snaplot/guides/data/) cover them one topic at a time.
+
+## The same chart in each framework
+
+The tabs above show the only differences:
+
+- **Vanilla:** `createChart(element, options)` returns a handle. Call `chart.destroy()` when you
+  remove the element. See [Vanilla JS](/snaplot/frameworks/vanilla/).
+- **React:** `<Chart {...options} />` from `snaplot/react`, React 18.3 or 19. See
+  [React](/snaplot/frameworks/react/).
+- **Solid:** `<Chart {...options} />` from `snaplot/solid`, Solid 1.9. See
+  [Solid](/snaplot/frameworks/solid/).

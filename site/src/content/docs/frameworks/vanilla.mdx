@@ -1,38 +1,116 @@
 ---
 title: Vanilla JS
-description: createChart, its lifecycle, events, groups, the legend table and the no-build path.
+description: createChart, the handle, update and setOptions, events, groups, the legend table, cleanup and the no-build path.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15a. */}
+import { Code } from '@astrojs/starlight/components';
+import Example from '../../../components/Example.astro';
+import { version } from '../../../lib/version';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+export const noBuild = `<div id="chart"></div>
+<script type="module">
+  import { createChart } from 'https://cdn.jsdelivr.net/npm/snaplot@${version}/+esm';
+
+  const highs = [66, 71, 79, 83, 87, 84, 76, 76, 64, 73, 81, 87, 78, 68, 64];
+  createChart(document.getElementById('chart'), {
+    data: highs.map((high, i) => ({ day: i + 1, high })),
+    x: 'day',
+    series: [{ y: 'high' }],
+    height: 280,
+    ariaLabel: 'Daily high temperature in Central Park, June 2025',
+  });
+</script>`;
+
+The `snaplot` entry has no framework code. Everything the React and Solid components do goes
+through the same handle that `createChart` returns.
 
 ## Lifecycle
 
-Create a chart with `createChart(el, options)` and remove it with `destroy()`.
+`createChart(element, options)` mounts a chart in an element and returns its handle. The chart
+fills the element and follows its size, so give the element a height in CSS or pass `height`.
+
+```ts
+import { createChart } from 'snaplot';
+
+const chart = createChart(document.getElementById('temps')!, {
+  data: rows,
+  x: 'date',
+  series: [{ y: 'high', label: 'High' }],
+  ariaLabel: 'Daily high in Central Park',
+});
+// later, when the element goes away:
+chart.destroy();
+```
+
+`destroy()` removes the canvases and listeners and leaves the chart's group.
 
 ## update or setOptions
 
-`update` applies a patch; `setOptions` replaces the options and changes only what differs.
+- `chart.update(patch)` merges a patch: `chart.update({ axes: { y: { type: 'log' } } })`.
+- `chart.setOptions(options)` replaces every option and applies what differs from the last set.
+- `chart.appendData(rows)` adds rows without reading the existing ones again.
+
+<Example name="frameworks/solid-viewport" />
+
+The month buttons above call `chart.update({ viewport })`. `update` always applies the state
+options it names, so `update({ viewport: {} })` resets a zoom. [Updating and live data](/snaplot/guides/updating/)
+covers the three calls in full.
 
 ## Events and on options
 
-Listen with `chart.on(name, fn)` or pass the matching `on*` option.
+Listen with `chart.on('event', listener)`, which returns the function that removes the listener,
+or pass the matching `on…` option:
+
+| Event | Option | Value |
+| --- | --- | --- |
+| `cursor:change` | `onCursorChange` | The cursor: its x and the points under it. |
+| `viewport:change` | `onViewportChange` | `{ x: [from, to] }` after a zoom, `{}` after a reset. |
+| `selection:change` | `onSelectionChange` | The selected range and its points, or `null`. |
+| `hiddenSeries:change` | `onHiddenSeriesChange` | The ids of the hidden series. |
+| `highlight:change` | `onHighlightChange` | The highlighted series id, or `null`. |
+| `following:change` | `onFollowingChange` | Whether the chart follows a stream. |
+| `point:click` | `onPointClick` | The point clicked. |
+
+<Example name="frameworks/vanilla-readout" />
+
+Events fire for what the reader does (a gesture, a legend click) and for `resetViewport()`,
+`resumeFollow()` and group sync, once per action. Setting an option never fires its own event.
+`chart.subscribe(listener)` calls back at most once per frame after any change to
+`chart.getState()`, which holds the viewport, selection, hidden series, highlight, following and
+the series list.
 
 ## Groups
 
-Link charts with `createChartGroup()`.
+`createChartGroup()` links charts: pass the same group as each chart's `group` option, and they
+share the cursor, the highlighted series, the x range and the plot edges. See
+[Linked charts](/snaplot/guides/linked-charts/).
+
+```ts
+import { createChart, createChartGroup } from 'snaplot';
+
+const group = createChartGroup();
+createChart(lossElement, { ...lossOptions, group });
+createChart(accuracyElement, { ...accuracyOptions, group });
+```
 
 ## Legend table
 
-Show values for the cursor position with `createLegendTable`.
+`createLegendTable(element, { chart, columns, fallback })` renders a table of each series' value
+at the cursor, or at the latest data when there is no cursor (`fallback: 'latest'`). Columns are
+`'swatch'`, `'name'`, `'value'`, or `{ header, value(point, series), align }`.
+
+<Example name="frameworks/react-legend-table" />
 
 ## Cleanup
 
-What `destroy()` removes, and what stays on the host element.
+Destroy what you created, in reverse order: the legend table's `destroy()`, then the chart's.
+Remove `on` listeners by calling the function `on` returned, or leave them: `destroy()` drops them.
+A group needs no cleanup.
 
 ## Without a bundler
 
-Load snaplot from a CDN with `<script type="module">` and an import.
+snaplot is an ES module with no dependencies, so a page can import it from a CDN:
+
+<Code code={noBuild} lang="html" title="index.html" />
+
+Pin the version in the URL, as above, so an update cannot change the page under you.

@@ -19,7 +19,9 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // The generated tab files import the data slices as their source does (`../data/…`).
+    "rootDirs": ["src/examples", ".generated/examples"]
   },
   "include": [
     "src/examples/**/*.ts",

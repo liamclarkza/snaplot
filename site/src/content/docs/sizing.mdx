@@ -3,32 +3,58 @@ title: Sizing and layout
 description: How a chart takes its size from its container or from the height option.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
-
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+A chart fills the element it is mounted in and follows that element's size. It has no `width`
+option: the width is always the element's.
 
 ## The height contract
 
-An explicit `height` always sets the chart height. Without it, the chart fills the height of its container.
+- With `height`, the chart is that tall. It takes a number of pixels or any CSS length
+  (`'20rem'`, `'50vh'`), and sets the height of the element: the element you pass to
+  `createChart`, or the element `<Chart>` renders in React and Solid.
+- Without `height`, the chart is as tall as its element. Give the element a height in CSS:
+  `height`, `aspect-ratio`, or a flex or grid track that sizes it.
+
+```css
+#chart {
+  height: 280px;
+}
+```
 
 ## The 300 px fallback
 
-A container with no height gets a 300 px chart and one warning.
+An element with no height of its own (an empty `<div>` is 0 pixels tall) gets a 300 pixel chart
+and one console warning that says so. A missing height shows as a chart of the wrong size, never
+as an empty page. {/* verify-after: M11 */}
 
 ## Aspect ratio with CSS
 
-Use CSS `aspect-ratio` on the container to keep a chart in proportion.
+To keep a chart in proportion as its column narrows, set `aspect-ratio` on the element and leave
+`height` out:
+
+```css
+.chart {
+  aspect-ratio: 16 / 9;
+  max-height: 60vh;
+}
+```
 
 ## Flex and grid pitfalls
 
-Stretched flex items and grid cells, and the minimum sizes that stop a chart from shrinking.
+- **A flex item that should fill the rest of a column** needs `flex: 1` and `min-height: 0`.
+  Without `min-height: 0`, a flex item will not shrink below its content, so a chart in it can
+  grow but never shrink.
+- **A grid cell** sizes the chart when its row has a size (`grid-template-rows: 1fr` in a grid
+  with a height). In an `auto` row, give the chart a height.
+- **A chart in a row of cards** needs `min-width: 0` on its flex item for the same reason, or the
+  card will not narrow.
 
 ## Device pixel ratio
 
-Canvases render at the device pixel ratio and follow it when a window moves between screens.
+The canvases draw at the screen's device pixel ratio, so lines stay sharp on high-density
+screens, and they redraw at the new ratio when a window moves to another screen or the page is
+zoomed.
 
 ## Printing
 
-Charts repaint for print at the printed size.
+A chart prints as it was last drawn on screen. For a print layout, give the element a fixed
+height in a print stylesheet. {/* verify-after: M11 */}

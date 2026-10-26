@@ -161,6 +161,12 @@ const tabs = FRAMEWORKS.map((framework) => ({
     display: block;
     height: var(--chartHeight);
   }
+  /* The legend table's default muted text is a translucent grey that fails AA on the page
+     surface (a library default, M12a); examples read it in the page's secondary ink. */
+  .example :global(.snaplot-legend-table-root) {
+    --snaplot-legend-muted: var(--snaplot-ink-secondary);
+    --snaplot-legend-step-color: var(--snaplot-ink-secondary);
+  }
   /* An option-level example mounts <Chart {...options} height={280} />. The adapters do not size
      their host from height yet (frameworks-15, D26), so the island's wrapper gives the host's
      height: 100% something to fill. Remove once the adapters set the host height themselves. */

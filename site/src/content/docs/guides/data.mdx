@@ -3,48 +3,99 @@ title: Data
 description: Rows or columns, fields or accessors, axis inference, gaps and per-series data.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15a. */}
+import Example from '../../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+A chart reads one data source, `data`, and every series names the fields it plots. A series can
+also bring its own data. This page covers the shapes the chart accepts and how it reads them.
 
 ## Rows or columns
 
-Pass an array of rows, or typed columns for large and streaming data.
+**Rows** are an array of plain objects, one per x value. `x` and each series' `y` name fields of
+the rows, and TypeScript checks the names: `y: 'hgih'` does not compile, and at run time a field
+that no row has throws an error that names the closest field.
+
+<Example name="data-guide/rows" />
+
+Rows do not need to be sorted: the chart sorts them by x, stably, so rows with the same x keep
+their order. The chart copies what it needs when you pass the options, so changing the array
+afterwards changes nothing until you pass it again (see [Updating and live data](/snaplot/guides/updating/)).
+
+**Columns** are one `Float64Array` per field, passed as `{ columns: { … } }`. The chart uses them
+in place, with no copy, which suits large data and streams. Columns for line, area, band and bar
+series must already be sorted by x.
+
+<Example name="data-guide/columns" />
+
+Pass `rowIds` next to `columns` (`{ columns, rowIds }`) when points need stable ids, or set
+`rowId` to a field of the rows.
 
 ## Fields or accessors
 
-Name a field, or pass a function that reads the value from a row.
+A field name is the cheapest way to read a value. When the value is not a field, pass a function
+of the row and its index:
 
-## Row order
+<Example name="data-guide/accessors" />
 
-Rows are sorted by x; typed columns must already be sorted.
+A function's identity is part of the options. Define it once, outside a component, or memoise it
+(`useMemo` in React); a new function on every render makes the chart read the data again. On
+10,000 rows or more, that warns once.
 
 ## Axis inference
 
-Dates and ISO strings give a time axis, strings a category axis, and numbers a linear axis.
+Without `axes.x.type`, the x values decide the axis:
+
+| X values | Axis |
+| --- | --- |
+| `Date` objects, or ISO 8601 strings such as `'2025-06-01'` or `'2025-06-01T09:30:00Z'` | time |
+| Other strings | category, in the order of the rows |
+| Numbers | linear |
+
+A date-only string, or one without an offset, is a wall time in the chart's `timeZone` (`'local'`
+by default, or `'UTC'`); a string with `Z` or an offset is an instant. Numbers that look like
+epoch milliseconds warn once and suggest `axes.x: { type: 'time' }`.
+
+<Example name="data-guide/categories" />
+
+The y axis is linear unless you set `type: 'log'`. Set `type` on any axis to override the
+inference.
 
 ## Gaps
 
-A missing or null value breaks the line.
+A `null`, `undefined` or `NaN` value breaks a line or an area at that x. To draw straight across
+the missing points instead, set `spanGaps: true` on the series:
+
+```ts
+series: [{ y: 'reading', spanGaps: true }];
+```
+
+A missing value does not count towards the y range.
 
 ## Per-series data
 
-A series can bring its own data and x field.
+A series with its own `data` reads it instead of the chart's, and names its own `x`. Use it to
+plot datasets of different shapes or lengths on one chart. A series on its own data names its
+fields as plain strings or functions, so series of different row types compile together.
 
-## Row ids
+<Example name="data-guide/per-series" />
 
-Give rows a `rowId` to keep track of them in events and callbacks.
+Here the daily counts are bars on the left axis and the large quakes are points on a second axis,
+`mag`, on the right. Any key in `axes` other than `x` is a value axis that series pick with
+`yAxis`.
 
 ## Histograms
 
-`histogram()` bins values into counts for a histogram series.
+`histogram(values, { bins })` bins an array of numbers, and its result is the `data` of a
+`type: 'histogram'` series. It is the only aggregation snaplot does; group or resample other data
+before you pass it.
 
-## Pivoting long rows
+```ts
+import { histogram } from 'snaplot';
 
-Turn long rows with a series column into one field per series.
+const bins = histogram(latencies, { bins: 'freedman-diaconis' });
+// series: [{ type: 'histogram', id: 'latency', data: bins, label: 'Requests' }]
+```
 
-## Memoising derived data
+## Next
 
-Keep derived data stable in React (`useMemo`) and Solid (`createMemo`).
+[Updating and live data](/snaplot/guides/updating/) covers new data: replacing it, appending rows
+and following a stream.

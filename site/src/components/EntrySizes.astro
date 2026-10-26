@@ -1,0 +1,46 @@
+---
+/**
+ * The gzip size each import costs an app, measured at build time by `scripts/size.mjs --json`
+ * (G6): the Introduction's bundle-size table. size.mjs exits 1 when an import is over its budget
+ * after printing every size, so the page still shows what was measured; `npm run check:size` is
+ * the gate that fails.
+ */
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
+
+type Size = { label: string; from: string; import: string; gzipBytes: number };
+
+const repo = join(process.cwd(), '..');
+let printed: string | undefined;
+try {
+  printed = execFileSync(process.execPath, [join(repo, 'scripts/size.mjs'), '--json'], {
+    encoding: 'utf8',
+  });
+} catch (error) {
+  printed = (error as { stdout?: string }).stdout;
+}
+let sizes: Size[];
+try {
+  sizes = JSON.parse(printed ?? '') as Size[];
+} catch (error) {
+  throw new Error('EntrySizes: `node scripts/size.mjs --json` printed no sizes', { cause: error });
+}
+const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
+---
+
+<table>
+  <thead>
+    <tr><th>Import</th><th>From</th><th class="num">Gzipped</th></tr>
+  </thead>
+  <tbody>
+    {
+      sizes.map((size) => (
+        <tr>
+          <td><code>{size.import}</code></td>
+          <td><code>{size.from}</code></td>
+          <td class="num">{kb(size.gzipBytes)}</td>
+        </tr>
+      ))
+    }
+  </tbody>
+</table>

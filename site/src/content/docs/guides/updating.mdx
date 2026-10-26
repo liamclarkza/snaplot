@@ -1,34 +1,86 @@
 ---
 title: Updating and live data
-description: update, setOptions and appendData, streaming, and the follow window.
+description: update, setOptions and appendData; streaming with a follow window; patterns per framework.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15a. */}
+import Example from '../../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+A chart changes in three ways: a patch of some options, a full set of options, or rows appended
+to its data. Each costs only what it changes: a new axis title or colour repaints without reading
+the data again, and a new `data` array, field, `x` or `rowId` reads it again.
 
 ## update, setOptions and appendData
 
-Which call to use for a patch, a full set of options, or new rows.
+| Call | What it does | Use it for |
+| --- | --- | --- |
+| `chart.update(patch)` | Merges the patch into the current options. Every key it names counts as changed. | A change you make in response to an event: a checkbox, a button. |
+| `chart.setOptions(options)` | Replaces every option, and compares each with the last one applied. | Applying the whole options object again, as the React and Solid components do on every render. |
+| `chart.appendData(rows)` | Adds rows (or `{ columns }`) after the existing data, without reading it again. | Streams and replays. |
+
+<Example name="updating/switch-scale" />
+
+`update` merges objects key by key, so `update({ axes: { y: { type: 'log' } } })` keeps the y
+axis title. Arrays, such as `series`, are replaced whole.
+
+`setOptions` compares functions by identity, `data` by reference and everything else by value.
+Pass the same `data` array and the chart does not read it again; pass an edited copy and it does.
+If you edit an array in place, call `update({ data })`: `update` always applies what it names.
+
+Options are copied when you pass them, so mutating an object you passed changes nothing until you
+pass it again.
+
+## Appending rows
+
+`appendData` checks a batch before it changes anything. Rows and `{ columns }` cannot be mixed
+in one source, and an x before the last one already on the chart throws. Rows within one batch
+are sorted for you.
+
+<Example name="updating/replay" />
+
+To append to a series that has its own `data`, name it: `appendData(rows, { seriesId: 'p99' })`.
 
 ## Streaming
 
-`streaming.maxPoints` bounds the retained data.
+For a stream, start with the rows you have (or `[]`) and set `streaming`:
+
+- `maxPoints` keeps at most that many rows: older ones leave as new ones arrive.
+- `followWindow` shows the last stretch of x of that width (milliseconds on a time axis), and moves
+  with each append.
+
+<Example name="updating/stream" />
 
 ## The follow window
 
-`streaming.followWindow` keeps the latest data in view.
+A chart with `followWindow` follows the stream: each append moves the view to the newest data. A
+zoom or pan stops following, so the reader can look at the past while new rows keep arriving
+off screen. `onFollowingChange` (or the `following:change` event) reports each change, and
+`getState().following` holds the current value.
 
 ## Pausing and resuming follow
 
-Zooming or `update({ viewport })` pauses following; `resumeFollow()` resumes it.
+`chart.resumeFollow()` goes back to the newest data and follows again; a double-click on the plot
+does too. {/* verify-after: M12b */} To stop following from code, set a viewport: `update({ viewport: { x: [from, to] } })`
+pins that range and pauses following.
 
 ## Updating the last point
 
-`updateLast` replaces the newest row in place.
+When the newest bucket is still filling, such as the current minute of a per-minute count, append
+the replacement row with `updateLast`: it replaces the last row instead of adding one.
+
+```ts
+chart.appendData([{ minute: now, requests: countSoFar }], { updateLast: true });
+```
 
 ## Patterns per framework
 
-Streaming through the handle in vanilla JS, React and Solid.
+- **Vanilla:** keep the handle `createChart` returns and call `update`, `appendData` and
+  `resumeFollow` on it.
+- **React:** pass options as props; the component applies them with `setOptions` after each
+  render. Stream through the ref (`chart.current.appendData(rows)`) in an effect, not by
+  rebuilding the `data` prop: a new array reads every row again. Keep `data` stable with
+  `useMemo`. See [React](/snaplot/frameworks/react/).
+- **Solid:** props are read in one effect, so a signal that changes an option applies it. Stream
+  through the ref. See [Solid](/snaplot/frameworks/solid/).
+
+Replacing the data of a source that `appendData` extended discards the appended rows, and warns
+once with how many.

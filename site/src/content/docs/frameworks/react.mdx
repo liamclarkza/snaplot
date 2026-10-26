@@ -3,48 +3,150 @@ title: React
 description: The Chart component, refs, hooks, state options and LegendTable in React 18 and 19.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15a. */}
+import Example from '../../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+`snaplot/react` works with React 18.3 and React 19. It adds a `<Chart>` component, a
+`<LegendTable>` and two hooks to the core, and re-exports `createChartGroup`, `histogram` and every
+type, so a component file needs one import.
 
 ## The Chart component
 
-`<Chart>` from `snaplot/react` takes the chart options as props.
+`<Chart>` takes exactly the options `createChart` takes, as props. After every render it applies
+them with `setOptions`, which compares each option with the last one applied, so a re-render with
+the same values costs nothing.
+
+```tsx
+import { Chart } from 'snaplot/react';
+
+export function Temperatures({ days }: { days: Day[] }) {
+  return (
+    <Chart
+      data={days}
+      x="date"
+      series={[{ y: 'high', label: 'High' }]}
+      height={280}
+      ariaLabel="Daily high in Central Park"
+    />
+  );
+}
+```
+
+The component renders one `<div role="figure">`, named by `ariaLabel` or by a summary of its
+series. Props that are not options go to that element: `id`, `className`, `style`, `tabIndex`,
+`data-*` and `aria-*` attributes, and DOM event handlers. `height` sets the element's
+`style.height`; without it, give the element a height with `className` or `style`.
 
 ## Refs
 
-A plain `useRef` gives you the chart handle.
+A plain `useRef` gives you the handle, for calls such as `appendData` and `resumeFollow`:
+
+```tsx
+const chart = useRef<ChartHandle<Day>>(null);
+// …
+<Chart ref={chart} {...options} />;
+// in an effect or a handler: chart.current?.appendData(rows)
+```
+
+`chart.current` is set before your effects run and is `null` again after unmount. The hooks and
+`<LegendTable>` below take the ref itself, not `chart.current`: they follow it and re-render once
+its chart mounts. You do not need a callback ref or a state variable for the handle.
+
+<Example name="frameworks/react-legend-table" />
+
+The table under the chart is `<LegendTable chart={chart} />`, given the same ref as `<Chart>`.
 
 ## Hooks with selectors
 
-`useChartState` and `useCursor` re-render only when the value they select changes.
+- `useCursor(chart, { fallback })` returns the cursor: its x and the points under it. It updates
+  as the pointer moves, and returns `undefined` before the chart mounts.
+- `useChartState(chart, selector, isEqual)` returns a slice of `chart.getState()` and re-renders
+  only when that slice changes: `useChartState(chart, (s) => s.following)` re-renders when
+  following starts or stops, not on every append.
+
+<Example name="frameworks/vanilla-readout" />
+
+The readout under the chart is `useCursor(chart)` in the React tab.
 
 ## State options
 
-`viewport`, `selection`, `hiddenSeries` and `highlight` are props, with an `on*Change` callback each.
+`viewport`, `selection`, `hiddenSeries` and `highlight` are props with an `on…Change` callback
+each: `onViewportChange`, `onSelectionChange`, `onHiddenSeriesChange` and `onHighlightChange`. A
+gesture changes the chart at once and calls the callback; the chart applies a prop only when it
+differs from the value last passed. Store the callback's value in state, as below, and a button
+can set the viewport again after a zoom.
+
+<Example name="frameworks/solid-viewport" />
 
 ## LegendTable
 
-`<LegendTable chart={ref} columns={…} />` shows a table of series values.
+`<LegendTable chart={chart} columns={…} fallback="latest" />` renders a table of each series'
+value at the cursor. Columns are `'swatch'`, `'name'`, `'value'`, or
+`{ header, value(point, series), align }`, as in the example under [Refs](#refs). `fallback`
+picks what the table shows when there is no cursor: the `'latest'` values, the `'first'`, or
+nothing (`'hide'`).
 
 ## Streaming through the ref
 
-Call `appendData` on the handle instead of rebuilding the data prop.
+Append rows through the handle in an effect, and keep the `data` prop the same array. A new
+`data` array reads every row again, and replacing data that `appendData` extended discards the
+appended rows.
+
+```tsx
+const chart = useRef<ChartHandle<Latency>>(null);
+useEffect(() => {
+  const socket = new WebSocket(url);
+  socket.onmessage = (e) => chart.current?.appendData(JSON.parse(e.data));
+  return () => socket.close();
+}, []);
+```
+
+[Updating and live data](/snaplot/guides/updating/) has a running example with a follow window
+and a "Back to live" button.
 
 ## Derived data with useMemo
 
-Memoise derived rows so a re-render does not re-ingest them.
+The chart compares `data` by reference, and accessor functions by identity. Wrap derived rows in
+`useMemo` and define accessor functions outside the component (or in `useMemo` or `useCallback`),
+so a re-render does not read the data again:
+
+```tsx
+const rows = useMemo(() => runs.map((r) => ({ epoch: r.epoch, error: 1 - r.accuracy })), [runs]);
+```
+
+Callback props (`onViewportChange` and the rest) and render functions (`format`, `tooltip.render`)
+are read when they are called, so inline functions there cost nothing.
+
+## Groups
+
+Create a group once per component with `useState`, or at module scope:
+
+```tsx
+import { Chart, createChartGroup } from 'snaplot/react';
+
+const [group] = useState(() => createChartGroup());
+// <Chart group={group} … /> <Chart group={group} … />
+```
+
+A component never destroys a group. See [Linked charts](/snaplot/guides/linked-charts/).
 
 ## React 18 and 19
 
-The adapter supports React 18.3 and React 19.
+The peer range is `^18.3.0 || ^19.0.0`, and the same build serves both. `<Chart>` is a
+`forwardRef` component, so `ref` works in React 18 too. It mounts in a layout effect in the
+browser and a plain effect on the server, so React 18's server renderer prints no warning.
+StrictMode's double mount creates and destroys the chart once more in development.
 
 ## Next.js
 
-Charts are client components; `snaplot/react` carries `'use client'`.
+A chart needs the browser, so it renders in a client component. `snaplot/react` starts with
+`'use client'`, so you can render `<Chart>` from a server component in the App Router: the server
+sends the `<div role="figure">` with its name and height, and the chart mounts on hydration.
+Pass the data as serialisable props (rows, not `Float64Array` columns), or load it in the client
+component.
 
 ## Testing in jsdom
 
-What to stub to render a chart in jsdom.
+jsdom has no canvas and no `ResizeObserver`. To render a chart in a component test, stub
+`ResizeObserver` with a class whose methods do nothing, and give `HTMLCanvasElement.prototype.getContext`
+an object that accepts every call. Assert on the host element (its role and accessible name) and
+on your own markup rather than on pixels. {/* verify-after: M11 */}

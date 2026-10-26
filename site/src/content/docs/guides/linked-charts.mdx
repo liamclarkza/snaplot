@@ -1,34 +1,63 @@
 ---
 title: Linked charts
-description: Groups that share the cursor, the x viewport and highlights across charts.
+description: Groups that share the cursor, highlight, x range, y range and plot edges between charts.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15a. */}
+import Example from '../../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+A group links charts that show the same x: point at one and every member shows the cursor at that
+x; zoom one and every member zooms.
 
 ## Groups
 
-Create a group with `createChartGroup()` and pass it to each chart.
+Create a group with `createChartGroup()` and pass it to each chart as the `group` option. It works
+the same in vanilla JS, React and Solid; the React and Solid entries re-export it.
+
+<Example name="linked/loss-accuracy" />
+
+In React, create the group once: `const [group] = useState(() => createChartGroup())`, or at
+module scope. In Solid, a component body runs once, so `const group = createChartGroup()` there is
+enough. A component never destroys a group; an empty group is garbage collected.
 
 ## What a group shares
 
-The cursor, the x viewport and the highlighted series.
+| Option | Default | Shares |
+| --- | --- | --- |
+| `cursor` | `true` | The cursor's x, so every tooltip and readout follows one pointer. |
+| `highlight` | `true` | The highlighted series, by series id. |
+| `viewport` | `true` | The horizontal range after a zoom, a pan or a reset. Only horizontal axes, and only those a member has. |
+| `alignPlots` | `true` | The plot's left and right edges: every member gets the widest member's gutters. |
+| `yRange` | `false` | The `y` axis range: each member's y spans every member's data. |
+
+A series id gets the same palette colour in every member, so give the same series the same `id`
+on each chart. An explicit `color` still wins.
+
+The group handle has two methods for controls outside the charts: `group.setCursor(x)` and
+`group.setHighlight(seriesId)`, for example from a list of runs beside the charts.
 
 ## Sharing the y range
 
-`yRange: true` gives every chart in the group the same y range.
+Charts compare best on one scale. `createChartGroup({ yRange: true })` gives every
+member the same y range:
+
+<Example name="linked/shared-y" />
 
 ## Aligning plots
 
-`alignPlots` lines up the plot edges.
+With `alignPlots`, members stacked in a column line up on x even when their tick labels differ in
+width. An append to one member repaints no other unless a gutter changed.
 
 ## Leaving a group
 
-Remove a chart with `update({ group: undefined })` or `destroy()`.
+A chart leaves its group with `update({ group: undefined })` or `destroy()`. In React and Solid,
+unmounting the chart or changing its `group` prop does the same.
 
 ## Shared options
 
-Spread one options object into every chart in a group.
+A group does not share options. To give several charts the same axes, theme or interaction, build
+the options once and spread them:
+
+```ts
+const shared = { x: 'epoch', group, legend: false } as const;
+createChart(top, { ...shared, data: validation, series: lossSeries, ariaLabel: 'Validation loss' });
+```

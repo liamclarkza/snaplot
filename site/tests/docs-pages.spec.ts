@@ -23,7 +23,6 @@ async function tabCode(page: Page, index: number, framework: keyof typeof IMPORT
 test('[docs-01] each framework page shows vanilla, React and Solid code in its tabs', async ({
   page,
 }) => {
-  test.fail(true, '[docs-01] the framework pages are outlines with no examples');
   for (const slug of ['vanilla', 'react', 'solid']) {
     await page.goto(`${BASE}frameworks/${slug}/`);
     const count = await page.locator('[data-example]').count();
@@ -41,7 +40,6 @@ test('[docs-01] each framework page shows vanilla, React and Solid code in its t
 test('[dxtrial-16] the React page runs its hooks and legend table beside the chart', async ({
   page,
 }) => {
-  test.fail(true, '[dxtrial-16] the React page is an outline with no examples');
   await page.goto(`${BASE}frameworks/react/`);
   await page.locator('[data-example] [role="tab"][data-framework="react"]').first().click();
   const table = page.locator('[role="tabpanel"][data-framework="react"]:visible table').first();

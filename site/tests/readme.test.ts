@@ -31,7 +31,7 @@ function block(text: string, name: string): string | undefined {
 const fenced = (text = '') => /```[a-z]*\n([\s\S]*?)\n```/.exec(text)?.[1];
 
 describe('README.md', () => {
-  it.fails('[docs-09] matches what sync-readme generates (sync-readme --check)', () => {
+  it('[docs-09] matches what sync-readme generates (sync-readme --check)', () => {
     const run = spawnSync(process.execPath, [join(repo, 'scripts/sync-readme.mjs'), '--check'], {
       encoding: 'utf8',
     });
@@ -39,7 +39,7 @@ describe('README.md', () => {
     expect(run.status).toBe(0);
   });
 
-  it.fails('[docs-09] shows the install string and three quick starts that the docs run', () => {
+  it('[docs-09] shows the install string and three quick starts that the docs run', () => {
     const text = readme();
     const install = pkg.version.includes('-') ? 'npm i snaplot@next' : 'npm i snaplot';
     expect(fenced(block(text, 'install'))).toBe(install);
@@ -51,7 +51,7 @@ describe('README.md', () => {
     expect(noBuild).toContain(`https://cdn.jsdelivr.net/npm/snaplot@${pkg.version}/+esm`);
   });
 
-  it.fails('[docs-09] works on npm: absolute links, no working notes, a browser floor and non-goals', () => {
+  it('[docs-09] works on npm: absolute links, no working notes, a browser floor and non-goals', () => {
     const text = readme();
     const links = [...text.matchAll(/\]\(([^)]+)\)/g)].map((m) => m[1] ?? '');
     expect(links.length).toBeGreaterThan(3);
@@ -62,7 +62,7 @@ describe('README.md', () => {
     expect(text).toMatch(/^## Not yet supported$/m);
   });
 
-  it.fails('[research-10] opens with the package description: one framework-neutral sentence', () => {
+  it('[research-10] opens with the package description: one framework-neutral sentence', () => {
     expect(pkg.description).toBe(
       'Canvas charts for live data. One options object for vanilla JS, React and Solid.',
     );

@@ -46,7 +46,7 @@ const ownedFiles = OWNED.flatMap((folder) => walk(join(examples, folder))).map((
 }));
 
 describe('the M15a pages', () => {
-  it.fails('[frameworks-18] every page is written, not an outline, and runs its examples', () => {
+  it('[frameworks-18] every page is written, not an outline, and runs its examples', () => {
     const files = walk(examples).map((file) => relative(examples, file));
     for (const [slug, least] of Object.entries(PAGES)) {
       const text = page(slug);
@@ -64,7 +64,7 @@ describe('the M15a pages', () => {
     }
   });
 
-  it.fails('[docs-01] each framework page mounts examples from its own folder', () => {
+  it('[docs-01] each framework page mounts examples from its own folder', () => {
     for (const framework of ['vanilla', 'react', 'solid']) {
       const names = examplesOn(page(`frameworks/${framework}`));
       expect(
@@ -76,7 +76,7 @@ describe('the M15a pages', () => {
 });
 
 describe('[dxtrial-16] the examples behind them', () => {
-  it.fails('[dxtrial-16] exist in every owned folder', () => {
+  it('[dxtrial-16] exist in every owned folder', () => {
     for (const folder of OWNED) {
       expect(walk(join(examples, folder)).length, folder).toBeGreaterThan(0);
     }
@@ -118,7 +118,7 @@ describe('[dxtrial-16] the examples behind them', () => {
 });
 
 describe('[docs-01][dxtrial-16] what each framework page teaches', () => {
-  it.fails('[dxtrial-16] React: useRef, the hooks, state options, LegendTable, useMemo, React 18 and 19, Next.js, jsdom', () => {
+  it('[dxtrial-16] React: useRef, the hooks, state options, LegendTable, useMemo, React 18 and 19, Next.js, jsdom', () => {
     const text = page('frameworks/react');
     for (const term of [
       'useRef',
@@ -137,7 +137,7 @@ describe('[docs-01][dxtrial-16] what each framework page teaches', () => {
     }
   });
 
-  it.fails('[docs-01] Solid: refs (function and variable), the primitives with accessors, LegendTable, createMemo, SSR and the solid condition', () => {
+  it('[docs-01] Solid: refs (function and variable), the primitives with accessors, LegendTable, createMemo, SSR and the solid condition', () => {
     const text = page('frameworks/solid');
     for (const term of [
       'ref={chart}',
@@ -154,7 +154,7 @@ describe('[docs-01][dxtrial-16] what each framework page teaches', () => {
     }
   });
 
-  it.fails('[docs-01] Vanilla: lifecycle, update and setOptions, events, groups, the legend table, cleanup and the no-build path', () => {
+  it('[docs-01] Vanilla: lifecycle, update and setOptions, events, groups, the legend table, cleanup and the no-build path', () => {
     const text = page('frameworks/vanilla');
     for (const term of [
       'createChart',

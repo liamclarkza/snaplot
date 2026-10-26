@@ -3,24 +3,114 @@ title: Migrating from 0.12
 description: Every change from snaplot 0.12 to 1.0, with before and after code.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15a. */}
+import Example from '../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+{/* Draft for 1.0: re-check each table against the CHANGELOG before the release. */}
+
+1.0 replaces the 0.12 API: there are no compatibility aliases. Most charts need the ten edits in
+the first section. An option 0.12 had and 1.0 does not warns once per page with its path and what
+to use instead, and the chart keeps its default, so a page keeps rendering while you migrate.
 
 ## In 10 minutes
 
-The ten most common edits, as before and after pairs.
+1. **Rows instead of positional columns.** `data: [xs, ys1, ys2]` with `dataIndex` becomes rows
+   (or named columns) and field names.
+
+   ```ts
+   // 0.12
+   { data: [new Float64Array(t), new Float64Array(cpu)], config: { series: [{ dataIndex: 1, label: 'CPU' }] } }
+   // 1.0
+   { data: rows, x: 'time', series: [{ y: 'cpu', label: 'CPU' }] }
+   // or columns: { data: { columns: { time, cpu } }, x: 'time', series: [{ y: 'cpu' }] }
+   ```
+
+2. **No `config` wrapper.** The options are one flat object, in `createChart` and as props.
+3. **`stroke` is `color`, `lineDash` is `dash`.** Bars, scatter and histograms take `color`
+   instead of `fill`; `fill` stays the area and band fill.
+4. **`streaming.maxLen` is `streaming.maxPoints`.** A follow window is `streaming.followWindow`.
+5. **`setData(data)` is `update({ data })`.** `appendData` stays.
+6. **Themes are `theme: 'light' | 'dark'` or ten tokens.** The fourteen theme objects and
+   `createTheme` are gone. Without `theme`, the chart follows the page. {/* verify-after: M11 */}
+7. **Legends are built in.** Remove `createLegendPlugin()`; set `legend: false` to hide it.
+   `createLegendTablePlugin()` is `createLegendTable(element, { chart, columns })`.
+8. **Zoom and pan are `interaction`.** `zoom`, `pan` and `touch` become
+   `interaction: { zoom, drag, bounds }`; `'analytical'` is `interaction: { zoom: 'xy' }`.
+9. **Size the container.** `width`, `autoResize` and `padding` are gone: the chart fills its
+   element, which needs a height (or pass `height`). See [Sizing and layout](/snaplot/sizing/).
+10. **Controlled props are state options.** In React and Solid, `viewport`, `selection`,
+    `hiddenSeries` and `highlight` are props with `on…Change` callbacks; `onReady` is `ref`.
 
 ## Renamed and removed
 
-Tables of renamed and removed exports, handle members, events and options.
+### Handle members
+
+| 0.12 | 1.0 |
+| --- | --- |
+| `setViewport`, `setSelection`, `setSeriesVisible`, `setHighlight` | `update({ viewport \| selection \| hiddenSeries \| highlight })` |
+| `getCursorSnapshot()` | `getCursor({ fallback })` |
+| `getLegendItems()` | `getState().series` |
+| `getAxis()`, `getLayout()` | `scale(key)` |
+| `refreshTheme()` | `redraw('all')` |
+| `getOptions()` | keep the options you pass |
+| `getTheme()`, `getStats()`, `resize()` | removed: the chart follows its container |
+
+### Events
+
+| 0.12 | 1.0 |
+| --- | --- |
+| `follow:change` | `following:change` |
+| `visibility:change` | `hiddenSeries:change` |
+| `select` | `selection:change` |
+| `state:change` | `chart.subscribe(listener)` |
+| `data:update`, `options:update`, `theme:update`, `resize` | removed |
+
+### Exports
+
+| 0.12 | 1.0 |
+| --- | --- |
+| `snaplot/core` | `snaplot` |
+| `lightTheme`, `darkTheme` and the other theme objects, `createTheme`, `resolveTheme` | `theme: 'light' \| 'dark'` or `ThemeTokens` |
+| `lttb`, `m4`, `lowerBound`, `upperBound`, `nearestIndex`, `viewportIndices` | removed |
+| `createLegendPlugin`, `nameColumn`, `valueColumn`, `swatchColumn`, `metricColumn`, `column` | the built-in legend, and `createLegendTable` columns |
+| `LegendItem`, `CursorSnapshotOptions`, `ChartType` | `SeriesState`, `CursorOptions`, `SeriesType` |
+| React and Solid: `SeriesLegend`, `useChartGroup`, `useHighlight`, `useCursorSnapshot` | the built-in legend, `createChartGroup`, `useChartState`, `useCursor` |
+| Solid: `createChart`, `createHighlight`, `createCursorSnapshot` | `<Chart ref>`, `createChartState`, `createCursor` |
+
+### Options
+
+| 0.12 | 1.0 |
+| --- | --- |
+| `axes.<key>.roundBounds` | `nice` |
+| `axes.<key>.tickCount` | `ticks` (explicit values) |
+| `heatmap: true` on a scatter | `renderMode: 'density'` |
+| `visible: false` on a series | `hiddenSeries: ['id']` |
+| `onSelect` | `onSelectionChange` |
+| `tooltip.show`, `xFormat`, `yFormat` | `tooltip: false`, and the axis or series `format` |
+| `histogram(values, { binCount, method })` | `histogram(values, { bins })` |
+| `createChartGroup({ yAxis })` | `createChartGroup({ yRange: true })` |
 
 ## Behaviour changes you will notice
 
-Each change with its one-line opt-out.
+- **ISO date strings make a time axis.** 0.12 drew them as categories. To keep categories, set
+  `axes: { x: { type: 'category' } }`.
+- **The value axis rounds to whole tick steps.** Set `nice: false` on the axis for tight bounds.
+- **Invalid options throw** with what is wrong and how to fix it, in every build. An unknown key
+  warns once with the option it is closest to.
+- **Options are copied when passed.** Mutating an array after passing it changes nothing; pass it
+  again or call `update({ data })`.
+- **The host element is `role="figure"`**, named by `ariaLabel` or a summary of the series. 0.12
+  rendered `role="group"` named "Chart". Set `ariaLabel` on every chart.
+- **React 18.3 is supported** alongside React 19.
+- **A plain `useRef` works** with `useChartState`, `useCursor` and `<LegendTable>`.
 
 ## Recipe: a custom-column legend
 
-Rebuild a custom legend with `useCursor` or `createCursor`.
+0.12's column helpers (`metricColumn`, `column`) become plain column objects,
+`{ header, value(point, series), align }`. This table adds the lowest validation loss so far:
+
+<Example name="frameworks/react-legend-table" />
+
+For a legend that is not a table, read the cursor with `useCursor(chart)` in React or
+`createCursor(chart)` in Solid and render your own markup from `cursor.points`. See
+[React](/snaplot/frameworks/react/#hooks-with-selectors) and
+[Solid](/snaplot/frameworks/solid/#primitives-with-accessors).

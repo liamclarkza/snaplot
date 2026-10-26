@@ -1,38 +1,118 @@
 ---
 title: Solid
-description: The Chart component, refs, primitives, LegendTable and server rendering in Solid.
+description: The Chart component, refs, primitives with accessors, LegendTable, createMemo and SolidStart.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15a. */}
+import Example from '../../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+`snaplot/solid` works with Solid 1.9. It adds a `<Chart>` component, a `<LegendTable>` and two
+primitives to the core, and re-exports `createChartGroup`, `histogram` and every type.
 
 ## The Chart component
 
-`<Chart>` from `snaplot/solid` takes the chart options as props.
+`<Chart>` takes exactly the options `createChart` takes, as props. It creates the chart on mount,
+reads every option in one effect and applies changes with `setOptions`, and destroys the chart on
+cleanup. A signal you read in a prop updates the chart when it changes:
+
+```tsx
+import { createSignal } from 'solid-js';
+import { Chart } from 'snaplot/solid';
+
+const [log, setLog] = createSignal(false);
+<Chart
+  data={days}
+  x="date"
+  series={[{ y: 'high', label: 'High' }]}
+  axes={{ y: { type: log() ? 'log' : 'linear' } }}
+  height={280}
+  ariaLabel="Daily high in Central Park"
+/>;
+```
+
+The component renders one `<div role="figure">`, named by `ariaLabel` or by a summary of its
+series. Props that are not options go to that element: `id`, `class`, `style`, `data-*` and
+`aria-*` attributes, and DOM event handlers. `height` sets the element's height.
 
 ## Refs
 
-Pass a setter as `ref` to receive the chart handle.
+`ref` is Solid's `Ref`, so both forms work. A variable ref is set when the chart mounts:
+
+```tsx
+let chart: ChartHandle<Day> | undefined;
+<Chart ref={chart} {...options} />;
+// in a handler: chart?.appendData(rows)
+```
+
+A function ref is called with the handle on mount. Pass a signal's setter to make the handle
+reactive, which the primitives below can follow:
+
+```tsx
+const [chart, setChart] = createSignal<ChartHandle<Day>>();
+<Chart ref={setChart} {...options} />;
+```
 
 ## Primitives with accessors
 
-`createChartState` and `createCursor` take the handle or an accessor for it.
+- `createCursor(chart, { fallback })` returns an accessor of the cursor: its x and the points
+  under it, `undefined` before the chart mounts.
+- `createChartState(chart, selector, isEqual)` returns an accessor of a slice of
+  `chart.getState()` that changes only when the slice does:
+  `createChartState(chart, (s) => s.following)`.
+
+Both take a handle, an accessor of one (such as the `chart` signal above), or `undefined`.
+
+<Example name="frameworks/vanilla-readout" />
+
+## State options
+
+`viewport`, `selection`, `hiddenSeries` and `highlight` are props with an `on…Change` callback
+each. Keep the value in a signal and pass its setter as the callback, and a button can set the
+viewport again after a zoom:
+
+<Example name="frameworks/solid-viewport" />
 
 ## LegendTable
 
-`<LegendTable chart={chart} columns={…} />` shows a table of series values.
+`<LegendTable chart={chart} columns={…} fallback="latest" />` renders a table of each series'
+value at the cursor. `chart` is a handle, an accessor or `undefined`.
+
+<Example name="frameworks/react-legend-table" />
 
 ## Derived data with createMemo
 
-Memoise derived rows so a change elsewhere does not re-ingest them.
+The chart compares `data` by reference. Derive rows with `createMemo`, so the chart reads them
+again only when their inputs change:
+
+```tsx
+const rows = createMemo(() => runs().map((r) => ({ epoch: r.epoch, error: 1 - r.accuracy })));
+<Chart data={rows()} x="epoch" series={[{ y: 'error' }]} ariaLabel="Validation error" />;
+```
+
+For a stream, append through the ref instead of building a new array. See
+[Updating and live data](/snaplot/guides/updating/).
+
+## Groups
+
+A component body runs once, so create the group there, or at module scope:
+
+```tsx
+import { Chart, createChartGroup } from 'snaplot/solid';
+
+const group = createChartGroup();
+// <Chart group={group} … /> <Chart group={group} … />
+```
+
+A component never destroys a group. See [Linked charts](/snaplot/guides/linked-charts/).
 
 ## SolidStart and SSR
 
-Server rendering emits the host element; the chart mounts on hydration.
+`snaplot/solid` has a server build for the `node`, `deno` and `worker` export conditions. On the
+server, `<Chart>` renders the host element with its role, name, attributes and height, and the
+browser build hydrates it and mounts the chart. In SolidStart, render `<Chart>` in any route; no
+`clientOnly` wrapper is needed.
 
 ## The solid export condition
 
-Solid tooling compiles snaplot's JSX source through the `solid` condition.
+The `solid` condition points at `dist/solid.jsx`, the components as preserved JSX, so a bundler
+with Solid's compiler (`vite-plugin-solid`, which SolidStart uses) compiles them with your app's
+settings. Bundlers without the condition get the compiled `dist/solid.js`.
