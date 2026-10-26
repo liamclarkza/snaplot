@@ -4,7 +4,7 @@
 // delivered after it commits; the cold state carries a revision and notifies subscribers at most
 // once per frame; the cursor is a separate hot channel.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createChartGroup } from '../../src/index';
+import { type ChartOptions, createChart, createChartGroup } from '../../src/index';
 import { type Fakes, installFakes } from '../fakes';
 import { type FinalHandle, hoverAt, mount, wheelZoom } from './contract';
 
@@ -187,16 +187,64 @@ describe('[backlog-02][dataapi-21] events are queued until the call commits', ()
     expect(chart.getState()).not.toBe(state);
     expect(state.hiddenSeries).toEqual([]);
   });
+});
 
-  it('[dataapi-21] destroy() removes only the attributes the chart added to its container', () => {
-    const host = document.createElement('div');
-    host.setAttribute('data-keep', 'yes');
-    fakes.layout.setSize(host, 400, 200);
-    document.body.append(host);
-    const before = [...host.attributes].map((a) => `${a.name}=${a.value}`).sort();
-    const chart = mount<Row>(fakes, { ...base, ariaLabel: 'Load' });
+/**
+ * dataapi-21's accessibility clean-up is the D20 host-attribute rule, which M12a owns
+ * (interact-23): core records the host's attributes before mount, never overwrites or removes
+ * them, and `destroy()` removes only what it added (the name, the role and the theme variables).
+ * The browser lock is `m12a-a11y.spec.ts › [interact-23]`.
+ */
+describe('[interact-23] the host keeps its own attributes (M12a, plan D20)', () => {
+  /** A sized host in the document, with an attribute of its own. */
+  function host(): HTMLElement {
+    const element = document.createElement('div');
+    element.setAttribute('data-keep', 'yes');
+    fakes.layout.setSize(element, 400, 200);
+    document.body.append(element);
+    return element;
+  }
+  const attributes = (element: Element) =>
+    [...element.attributes].map((attribute) => `${attribute.name}=${attribute.value}`).sort();
+  const named = { ...base, ariaLabel: 'Load' } as ChartOptions<Row>;
+
+  it('the clean-up locks mount the chart in their own host', () => {
+    const element = host();
+    const chart = createChart(element, named);
+    expect(element.getAttribute('aria-label')).toBe('Load');
+    expect(element.querySelector('canvas')).not.toBeNull();
     chart.destroy();
-    expect([...host.attributes].map((a) => `${a.name}=${a.value}`).sort()).toEqual(before);
+    expect(element.querySelector('canvas')).toBeNull();
+  });
+
+  it.fails('[interact-23] destroy restores the host attributes', () => {
+    const element = host();
+    const before = attributes(element);
+    createChart(element, named).destroy();
+    expect(attributes(element)).toEqual(before);
+  });
+
+  it.fails('[interact-23] removing ariaLabel removes the role the chart added', () => {
+    const element = host();
+    const chart = createChart(element, named);
+    try {
+      chart.setOptions(base as ChartOptions<Row>);
+      expect(element.hasAttribute('aria-label')).toBe(false);
+      expect(element.hasAttribute('role')).toBe(false);
+    } finally {
+      chart.destroy();
+    }
+  });
+
+  it.fails("[interact-23] a host's own aria-label stays while the chart lives", () => {
+    const element = host();
+    element.setAttribute('aria-label', 'Mine');
+    const chart = createChart(element, base as ChartOptions<Row>);
+    try {
+      expect(element.getAttribute('aria-label')).toBe('Mine');
+    } finally {
+      chart.destroy();
+    }
   });
 });
 
