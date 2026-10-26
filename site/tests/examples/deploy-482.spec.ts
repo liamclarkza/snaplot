@@ -29,9 +29,6 @@ function watch(page: Page): string[] {
   return problems;
 }
 
-// The page lands in the next commit (feat(demos): deploy-482), which removes this.
-test.beforeEach(() => test.fail(true, 'the deploy-482 page is not built yet'));
-
 async function open(page: Page, query = '') {
   await page.goto(ROUTE + query);
   await page.locator('html[data-demo-ready]').waitFor({ timeout: 20_000 });

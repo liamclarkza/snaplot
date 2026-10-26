@@ -1,0 +1,292 @@
+/*
+ * deploy-482: the look of a Grafana incident dashboard (SOURCE.md, design reference). Dark
+ * #111217 ground with panels in a dense three-column grid, greys for p50 and p95, amber only for
+ * p99, red only for SLO breaches, a strip of deploy annotations across the top. Inter.
+ */
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-500.css";
+
+:root {
+  color-scheme: dark;
+  --bg: #111217;
+  --panel: #181b1f;
+  --border: #2a2e35;
+  --text: #ccccdc;
+  --text-dim: #a2a3b0;
+  --p99: #f2a33a;
+  --breach: #f2495c;
+  --deploy: #8ab8ff;
+  --focus: #8ab8ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    13px / 1.45 Inter,
+    system-ui,
+    sans-serif;
+}
+
+main {
+  padding: 0 16px;
+}
+
+a {
+  color: var(--text);
+}
+
+a:hover {
+  color: var(--deploy);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2 {
+  font-weight: 500;
+  margin: 0;
+}
+
+button,
+select {
+  font: inherit;
+  color: var(--text);
+  background: #22252b;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+button:hover,
+select:hover {
+  border-color: #464c55;
+  background: #2a2e35;
+}
+
+/* The top bar: dashboard name, the simulated label, variables, replay controls, clock, follow. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 8px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar h1 {
+  font-size: 15px;
+}
+
+.tag {
+  color: var(--bg);
+  background: var(--text-dim);
+  border-radius: 2px;
+  padding: 0 6px;
+  font-weight: 500;
+}
+
+.paged {
+  color: var(--text-dim);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+}
+
+.clock {
+  margin-left: auto;
+  font-weight: 500;
+}
+
+.live {
+  color: var(--text-dim);
+}
+
+.live::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 4px;
+  background: #73bf69;
+}
+
+.back {
+  border-color: var(--deploy);
+}
+
+/* The deploy annotations, in time order, across the top. */
+.deploys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.deploys button {
+  border-left: 3px solid var(--deploy);
+  color: var(--text-dim);
+}
+
+.deploys button[aria-pressed="true"] {
+  color: var(--text);
+  background: #262a31;
+}
+
+.deploys b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* The verdict banner. */
+.verdict {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-dim);
+  border-radius: 2px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.verdict[data-state="roll-back"] {
+  border-left-color: var(--breach);
+}
+
+.verdict[data-state="rolled-back"] {
+  border-left-color: var(--deploy);
+}
+
+.verdict h2 {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.answer {
+  font-size: 16px;
+  margin: 2px 0 6px;
+}
+
+.rollback {
+  background: #4a1d24;
+  border-color: var(--breach);
+}
+
+.recovery {
+  margin: 0;
+}
+
+/* The panel grid: time panels in two columns, the deploy panels beside them. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    "latency latency change"
+    "errors errors distribution"
+    "traffic traffic table";
+  gap: 8px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 6px 8px 4px;
+  min-width: 0;
+}
+
+.panel h2 {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.plot {
+  height: 220px;
+}
+
+.area-latency {
+  grid-area: latency;
+}
+
+.area-errors {
+  grid-area: errors;
+}
+
+.area-traffic {
+  grid-area: traffic;
+}
+
+.area-change {
+  grid-area: change;
+}
+
+.area-distribution {
+  grid-area: distribution;
+}
+
+.area-table {
+  grid-area: table;
+}
+
+/* The legend table in the dashboard's own greys. */
+.values {
+  --snaplot-legend-muted: var(--text-dim);
+  --snaplot-legend-step-color: var(--text-dim);
+  --snaplot-legend-border: var(--border);
+}
+
+.values table {
+  width: 100%;
+}
+
+.hint {
+  color: var(--text-dim);
+  margin: 8px 0 0;
+}
+
+.demo-footer {
+  margin: 24px 16px 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "latency" "errors" "traffic" "change" "distribution" "table";
+  }
+
+  .plot {
+    height: 180px;
+  }
+
+  .clock {
+    margin-left: 0;
+  }
+}
