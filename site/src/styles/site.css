@@ -42,11 +42,12 @@ a:hover {
   border-width: 0;
 }
 
-/* One left edge for nav, page and footer (uisite-12). */
+/* One left edge for nav, page and footer (uisite-12): the docs header's 24px gutter, so the brand
+   sits at the same x in both layouts. The 72rem measure is the content's, plus the gutters. */
 .container {
   width: 100%;
-  max-width: var(--snaplot-container);
-  margin-inline: auto;
+  max-width: calc(var(--snaplot-container) + 2 * var(--snaplot-gutter));
+  margin-inline: 0;
   padding-inline: var(--snaplot-gutter);
 }
 
@@ -68,46 +69,16 @@ a:hover {
 .site-header {
   border-bottom: 1px solid var(--snaplot-rule);
 }
-.site-header-row {
+/* Full width, like Starlight's bar, so the toggle sits at the same right edge in both layouts. */
+.site-header-bar {
+  padding-inline: var(--snaplot-gutter);
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 1.5rem;
   min-height: 4rem;
   padding-block: 0.75rem;
 }
-.brand {
-  font-weight: 600;
-  font-size: 1.125rem;
-  color: var(--snaplot-ink);
-  text-decoration: none;
-}
-.brand:hover {
-  color: var(--snaplot-accent);
-}
-.site-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.site-nav a,
-.site-footer-links a {
-  color: var(--snaplot-ink-secondary);
-  text-decoration: none;
-}
-.site-nav a:hover,
-.site-footer-links a:hover {
-  color: var(--snaplot-ink);
-  text-decoration: underline;
-}
-.site-nav a[aria-current="page"] {
-  color: var(--snaplot-accent);
-}
-.site-header snaplot-theme-select {
-  margin-inline-start: auto;
+.site-header-bar > * {
+  flex: 1;
 }
 
 main {
@@ -150,6 +121,7 @@ p {
 }
 
 .facts {
+  max-width: none;
   color: var(--snaplot-ink-secondary);
   font-size: 0.875rem;
 }
@@ -176,14 +148,4 @@ p {
 .site-footer {
   border-top: 1px solid var(--snaplot-rule);
   padding-block: 1.5rem;
-  font-size: 0.875rem;
-}
-.site-footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1.25rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--snaplot-ink-secondary);
 }

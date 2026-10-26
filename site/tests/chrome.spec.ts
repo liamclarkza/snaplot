@@ -51,7 +51,6 @@ test.describe('[m16s] fonts', () => {
 test.describe('[uisite-12][m16s] one header and footer on every page', () => {
   for (const width of [1280, 390]) {
     test(`at ${width}px the brand, nav and footer match across both layouts`, async ({ page }) => {
-      test.fail(true, '[uisite-12] two different headers');
       await page.setViewportSize({ width, height: 900 });
       const seen: { route: string; brand: number; nav: string[]; footer: string[] }[] = [];
       for (const route of ROUTES) {
@@ -81,7 +80,6 @@ test.describe('[uisite-12][m16s] one header and footer on every page', () => {
   }
 
   test('the current section is marked in the nav', async ({ page }) => {
-    test.fail(true, '[uisite-12] the docs header has no site nav');
     await page.goto(`${BASE}examples/`);
     await expect(page.locator('.site-nav a[aria-current]')).toHaveText('Examples');
     await page.goto(DOCS);
@@ -96,7 +94,6 @@ test.describe('[m16s] the theme toggle and tokens', () => {
   const codeSurfaces = { light: 'rgb(246, 247, 249)', dark: 'rgb(26, 26, 29)' };
 
   test('the header toggle sets the same theme and surfaces on every page', async ({ page }) => {
-    test.fail(true, '[m16s] the docs header has no site header');
     await page.setViewportSize({ width: 1280, height: 900 });
     for (const route of ROUTES) {
       await page.goto(route);
@@ -117,7 +114,6 @@ test.describe('[m16s] the theme toggle and tokens', () => {
 
   for (const theme of ['light', 'dark'] as const) {
     test(`${theme}: code blocks and asides sit on the surface token`, async ({ page }) => {
-      test.fail(true, '[m16s] Starlight and Expressive Code colours, not the tokens');
       await page.emulateMedia({ colorScheme: theme });
       await page.goto(DOCS);
       const aside = page.locator('.starlight-aside').first();

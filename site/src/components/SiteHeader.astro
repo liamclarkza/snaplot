@@ -1,0 +1,136 @@
+---
+/**
+ * The one site header (plan §9, uisite-12), used by the custom layout (Site.astro) and, through
+ * the Header override, by every Starlight docs page: the name and documented version (docs-16),
+ * the nav, the docs search where there is one, and the three-state theme toggle. The brand sits
+ * at the same 24px gutter in both layouts. On a narrow screen the nav takes a second row; in the
+ * docs the theme toggle then lives in Starlight's menu, beside the menu button.
+ */
+import { version } from '../lib/version';
+import ThemeSelect from './ThemeSelect.astro';
+
+export type Section = 'home' | 'docs' | 'examples' | 'api';
+
+interface Props {
+  /** The section the page belongs to, marked in the nav. */
+  current?: Section;
+  /** Starlight's layout: the menu button shares the first row on a narrow screen. */
+  docs?: boolean;
+}
+
+const { current, docs = false } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const GITHUB = 'https://github.com/liamclarkza/snaplot';
+const links: { label: string; href: string; section?: Section }[] = [
+  { label: 'Docs', href: `${base}introduction/`, section: 'docs' },
+  { label: 'Examples', href: `${base}examples/`, section: 'examples' },
+  { label: 'API', href: `${base}reference/api/`, section: 'api' },
+  { label: 'GitHub', href: GITHUB },
+];
+// A link to this very page is "page"; a link to the section this page is in is "true".
+const here = Astro.url.pathname.replace(/\/?$/, '/');
+const mark = (link: { href: string; section?: Section }) =>
+  link.href === here ? 'page' : link.section && link.section === current ? 'true' : undefined;
+---
+
+<div class:list={['site-header-row', { 'is-docs': docs }]} data-site-header>
+  <a
+    class="brand"
+    data-site-brand
+    href={base}
+    aria-current={current === 'home' ? 'page' : undefined}
+  >
+    <span translate="no">snaplot</span>
+    <span class="site-version num" data-version={version}>v{version}</span>
+  </a>
+  <nav class="site-header-nav" aria-label="Site">
+    <ul class="site-nav">
+      {
+        links.map((link) => (
+          <li>
+            <a href={link.href} aria-current={mark(link)}>
+              {link.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+  <div class="site-header-tools">
+    <slot name="search" />
+    <div class="site-header-theme"><ThemeSelect /></div>
+  </div>
+</div>
+
+<style>
+  .site-header-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 2rem;
+    min-height: 100%;
+    font-size: 0.9375rem;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    color: var(--snaplot-ink);
+    font-size: 1.125rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .brand:hover {
+    color: var(--snaplot-accent);
+  }
+  .site-version {
+    color: var(--snaplot-ink-secondary);
+    font-size: 0.875rem;
+    font-weight: 400;
+  }
+
+  .site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .site-nav a {
+    color: var(--snaplot-ink-secondary);
+    text-decoration: none;
+    text-underline-offset: 0.3em;
+  }
+  .site-nav a:hover {
+    color: var(--snaplot-ink);
+    text-decoration: underline;
+  }
+  .site-nav a[aria-current] {
+    color: var(--snaplot-accent);
+  }
+
+  .site-header-tools {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-inline-start: auto;
+  }
+
+  /* Narrow screens: the brand and tools, then the nav on its own row. */
+  @media (max-width: 49.99rem) {
+    .site-header-row {
+      column-gap: 1rem;
+    }
+    .site-header-nav {
+      order: 3;
+      flex-basis: 100%;
+    }
+    /* In the docs, Starlight's menu (which holds the toggle) opens from the button on this row. */
+    .is-docs .site-header-theme {
+      display: none;
+    }
+  }
+</style>

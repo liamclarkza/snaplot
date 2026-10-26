@@ -69,6 +69,9 @@
   --sl-color-hairline: var(--snaplot-rule);
   --sl-color-hairline-shade: var(--snaplot-rule);
 
+  /* The docs header keeps the custom pages' 24px gutter at every width (uisite-12). */
+  --sl-nav-pad-x: var(--snaplot-gutter);
+
   /* No shadows, glows or gradients anywhere (plan §9). */
   --sl-shadow-sm: none;
   --sl-shadow-md: none;

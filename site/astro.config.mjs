@@ -48,8 +48,16 @@ export default defineConfig({
           codeFontFamily: 'var(--snaplot-font-mono)',
           uiFontFamily: 'var(--snaplot-font)',
           borderRadius: '6px',
+          // Code sits on the surface token in both themes, as asides do (D35).
+          codeBackground: 'var(--snaplot-surface)',
+          borderColor: 'var(--snaplot-rule)',
           frames: {
             frameBoxShadowCssValue: 'none',
+            editorBackground: 'var(--snaplot-surface)',
+            terminalBackground: 'var(--snaplot-surface)',
+            editorActiveTabBackground: 'var(--snaplot-surface)',
+            terminalTitlebarBackground: 'var(--snaplot-surface)',
+            editorTabBarBackground: 'var(--snaplot-background)',
             tooltipSuccessBackground: 'var(--snaplot-ink)',
             tooltipSuccessForeground: 'var(--snaplot-background)',
           },
@@ -68,8 +76,10 @@ export default defineConfig({
         ThemeSelect: './src/components/ThemeSelect.astro',
         // The prerelease banner (D1).
         Banner: './src/components/Banner.astro',
-        // The version beside the name (docs-16).
-        SiteTitle: './src/components/SiteTitle.astro',
+        // One header and footer for the docs and the custom pages (uisite-12): the name and
+        // version (docs-16), the nav, search and the theme toggle; then the site's footer links.
+        Header: './src/components/Header.astro',
+        Footer: './src/components/Footer.astro',
         // Full-text search as an ARIA combobox (uisite-14, docs-11).
         Search: './src/components/Search.astro',
       },

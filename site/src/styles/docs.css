@@ -56,3 +56,20 @@ mobile-starlight-toc a:hover {
 .pagination-links a {
   border-radius: var(--snaplot-radius);
 }
+
+/* The shared header (SiteHeader.astro) fills Starlight's fixed bar. On a narrow screen its nav
+   takes a second row, so the bar is taller and the menu button stays on the first row. */
+@media (max-width: 49.99rem) {
+  :root,
+  :root[data-theme="light"] {
+    --sl-nav-height: 6rem;
+  }
+  .sl-menu-button {
+    top: calc((3.75rem - var(--sl-menu-button-size)) / 2);
+  }
+}
+
+/* Asides sit on the surface token, like code; the variant keeps its coloured left rule (D35). */
+.starlight-aside {
+  background-color: var(--snaplot-surface);
+}

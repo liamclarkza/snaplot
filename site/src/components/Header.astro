@@ -1,0 +1,15 @@
+---
+/**
+ * Replaces Starlight's Header with the one site header (SiteHeader.astro), so the docs and the
+ * custom pages share the brand, nav and theme toggle (uisite-12). The docs add their search.
+ */
+import Search from './Search.astro';
+import SiteHeader from './SiteHeader.astro';
+
+const { id } = Astro.locals.starlightRoute;
+const current = id.startsWith('reference/api') ? 'api' : 'docs';
+---
+
+<SiteHeader docs current={current}>
+  <Search slot="search" />
+</SiteHeader>

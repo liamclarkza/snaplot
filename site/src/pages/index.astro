@@ -178,8 +178,17 @@ const examples = DEMOS.map((demo) => ({
       gap: 1.5rem;
       align-items: start;
     }
+    /* The chart stays beside the code while the code scrolls past, so the two read together. */
     .hero :global(.example-output) {
       order: 2;
+      position: sticky;
+      top: 1.5rem;
+    }
+    /* Two rows of examples side by side: the list uses the width instead of a ragged right edge. */
+    ul.home-examples {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 2rem;
     }
   }
 
@@ -224,7 +233,7 @@ const examples = DEMOS.map((demo) => ({
 
   /* ul.home-examples outranks site.css's .demo-list > li, whose gap would otherwise win. */
   ul.home-examples > li {
-    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-columns: 200px minmax(0, 1fr);
     align-items: start;
     gap: 0.5rem 1.25rem;
   }
@@ -240,7 +249,7 @@ const examples = DEMOS.map((demo) => ({
 
   .demo-thumb {
     display: block;
-    width: 240px;
+    width: 200px;
     height: auto;
     border: 1px solid var(--snaplot-rule);
     border-radius: 2px;

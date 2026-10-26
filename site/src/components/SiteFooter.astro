@@ -1,0 +1,45 @@
+---
+/**
+ * The one site footer (plan §9 item 6), on the homepage, the examples hub and under every docs
+ * page: Docs · Examples · API · Changelog · GitHub · licence · version.
+ */
+import { version } from '../lib/version';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const GITHUB = 'https://github.com/liamclarkza/snaplot';
+---
+
+<div class="site-footer-row">
+  <ul class="site-footer-links">
+    <li><a href={`${base}introduction/`}>Docs</a></li>
+    <li><a href={`${base}examples/`}>Examples</a></li>
+    <li><a href={`${base}reference/api/`}>API</a></li>
+    <li><a href={`${GITHUB}/blob/main/CHANGELOG.md`}>Changelog</a></li>
+    <li><a href={GITHUB}>GitHub</a></li>
+    <li><a href={`${GITHUB}/blob/main/LICENSE`}>MIT licence</a></li>
+    <li class="num">v{version}</li>
+  </ul>
+</div>
+
+<style>
+  .site-footer-row {
+    font-size: 0.875rem;
+  }
+  .site-footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--snaplot-ink-secondary);
+  }
+  .site-footer-links a {
+    color: var(--snaplot-ink-secondary);
+    text-decoration: none;
+  }
+  .site-footer-links a:hover {
+    color: var(--snaplot-ink);
+    text-decoration: underline;
+  }
+</style>

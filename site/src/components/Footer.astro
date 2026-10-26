@@ -1,0 +1,21 @@
+---
+/**
+ * Replaces Starlight's Footer: its edit link and pagination, then the one site footer
+ * (SiteFooter.astro) that the homepage and the examples hub end with.
+ */
+import Default from '@astrojs/starlight/components/Footer.astro';
+import SiteFooter from './SiteFooter.astro';
+---
+
+<Default />
+<div class="site-footer docs-site-footer">
+  <SiteFooter />
+</div>
+
+<style>
+  .docs-site-footer {
+    margin-top: 1rem;
+    padding-block: 1.5rem;
+    border-top: 1px solid var(--snaplot-rule);
+  }
+</style>
