@@ -26,7 +26,8 @@
 // - the hash of the top three levels of their DOM skeleton.
 // It also fails on the banned patterns of plan §10.1 #8 found in a demo's DOM or source: an eyebrow
 // over the h1, a slogan h1, a row of KPI tiles, cards with shadows, gradient or glow backgrounds,
-// fake window chrome, letter logos, an app switcher, and hard-coded deltas.
+// fake window chrome, letter logos, an app switcher, and hard-coded deltas (a change such as
+// "+8.4% this hour" whose number is written in the demo's source, not computed from its data).
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -296,8 +297,10 @@ function probe() {
   if (shadows.length >= 3) banned.push(`${shadows.length} elements with shadows (a card grid)`);
   const body = text(document.body);
   if (/●\s*●\s*●/.test(body)) banned.push('fake window chrome (● ● ●)');
-  const delta = /[+−-]\d+(?:\.\d+)?\s?%\s+(?:vs|this|from|since)\b/i.exec(body);
-  if (delta) banned.push(`a hard-coded delta: "${delta[0]}"`);
+  // A delta is banned when it is typed into the page, not computed: see hardCoded().
+  const deltas = [...body.matchAll(/[+−-]\d+(?:\.\d+)?\s?%\s+(?:vs|this|from|since)\b/gi)].map(
+    (match) => match[0],
+  );
   const demoLinks = new Set(
     [...document.querySelectorAll('a[href*="/examples/"]')]
       .map((a) => /\/examples\/([^/#?]+)\/?(?:[#?].*)?$/.exec(a.getAttribute('href') ?? '')?.[1])
@@ -311,11 +314,25 @@ function probe() {
     columns: lefts.length,
     skeleton: skeleton(document.body, 3),
     banned,
+    deltas,
   };
 }
 
+/**
+ * The deltas a page shows whose number is written in its source ("+8.4% this hour" in the markup)
+ * rather than computed from its data (R1's "+37.1% from its minimum" comes from `pct(rise)`).
+ */
+function hardCoded(deltas, sources) {
+  return deltas.filter((delta) => {
+    const number = /\d+(?:\.\d+)?/.exec(delta)?.[0] ?? '';
+    const literal = new RegExp(`(?<![\\d.])${number.replace('.', '\\.')}\\s?%`);
+    return sources.some((source) => literal.test(source));
+  });
+}
+
 /** Banned patterns in a demo's own source: its page, its CSS and its modules. */
-function sourceLint(slug) {
+/** A demo's page and its modules and styles (not its tests or data), comments removed. */
+function demoSources(slug) {
   const files = [join(site, 'src/pages/examples', `${slug}.astro`)];
   const dir = join(site, 'src/demos', slug);
   if (existsSync(dir)) {
@@ -323,9 +340,14 @@ function sourceLint(slug) {
       if (/\.(css|ts|tsx)$/.test(name) && !/\.test\.ts$/.test(name)) files.push(join(dir, name));
     }
   }
+  return files
+    .filter((file) => existsSync(file))
+    .map((file) => ({ file, source: readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '') }));
+}
+
+function sourceLint(slug) {
   const found = [];
-  for (const file of files.filter((f) => existsSync(f))) {
-    const source = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const { file, source } of demoSources(slug)) {
     for (const pattern of [
       /box-shadow\s*:/,
       /(?:linear|radial|conic)-gradient\(/,
@@ -352,12 +374,25 @@ const TEMPLATE_PAGE = `<!doctype html><html><head><style>
   <div class="kpi"><b>0.41%</b> Budget</div><div class="kpi"><b>+8.4%</b> this hour</div></div>
   <p>Traffic is +8.4% vs last week.</p></main></body></html>`;
 
+/** R1's answer, as its page writes it from the data: a delta, but not a hard-coded one. */
+const COMPUTED_PAGE = `<!doctype html><html><body><main><h1>Which checkpoint?</h1><p id="a"></p>
+  <script>const rise = 0.3714; document.getElementById('a').textContent =
+  'Run B overfits after epoch 12 (+' + (rise * 100).toFixed(1) + '% from its minimum).';</script>
+  </main></body></html>`;
+
 if (has('--self-test')) {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: VIEWPORT });
+  await page.setContent(COMPUTED_PAGE);
+  const computed = await page.evaluate(probe);
   await page.setContent(TEMPLATE_PAGE);
   const fact = await page.evaluate(probe);
   await browser.close();
+  for (const delta of hardCoded(fact.deltas, [TEMPLATE_PAGE])) {
+    fact.banned.push(`a hard-coded delta: "${delta}"`);
+  }
+  const passed =
+    computed.deltas.length > 0 && hardCoded(computed.deltas, [COMPUTED_PAGE]).length === 0;
   const expected = [
     /eyebrow/,
     /slogan h1/,
@@ -376,11 +411,14 @@ if (has('--self-test')) {
     deltaE2000(white, toLab([251, 248, 241])) >= 2,
   ];
   console.log(fact.banned.map((found) => `- found ${found}`).join('\n'));
-  if (missed.length > 0 || colours.includes(false)) {
+  if (!passed) console.error('thumbs: the self-test flagged a delta its page computes');
+  if (missed.length > 0 || colours.includes(false) || !passed) {
     console.error(`thumbs: the self-test missed ${missed.join(', ')} ${colours}`);
     process.exit(1);
   }
-  console.log('thumbs: the self-test found every banned pattern; ΔE00 tells white from cream.');
+  console.log(
+    'thumbs: the self-test found every banned pattern and passed a computed delta; ΔE00 tells white from cream.',
+  );
   process.exit(0);
 }
 
@@ -490,6 +528,10 @@ try {
       `| ${slug} | rgb(${fact.background.join(', ')}) | ${fact.font} | ${fact.columns} | ${hash} |`,
     );
     for (const pattern of fact.banned) problems.push(`${slug}: ${pattern}`);
+    const sources = demoSources(slug).map(({ source }) => source);
+    for (const delta of hardCoded(fact.deltas, sources)) {
+      problems.push(`${slug}: a hard-coded delta: "${delta}"`);
+    }
     for (const found of sourceLint(slug)) problems.push(`${slug}: ${found}`);
   }
   const entries = [...facts];
