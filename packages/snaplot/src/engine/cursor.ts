@@ -20,6 +20,7 @@ import {
   histogramBinIndexForDataX,
   histogramBinRange,
 } from './hit';
+import { isInPlotArea } from './layout';
 
 export function setCursorDataX(
   engine: ChartCore,
@@ -115,7 +116,7 @@ export function updateLocalCursorFromPoint(
   }
 
   const xScale = engine.scales.get('x');
-  if (xScale && engine.isInPlotArea(x, y)) {
+  if (xScale && isInPlotArea(engine, x, y)) {
     const pointerDataX = xScale.pixelToData(x);
     const hasOnlyHistograms = hasOnlyVisibleHistograms(engine);
     if (hasOnlyHistograms) {

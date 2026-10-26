@@ -12,7 +12,7 @@ import {
   type ZoomBoundsSpec,
 } from './spec';
 import { scaleSignature, autoRangeVertical, autoRangeHorizontal, columnRange } from './ranging';
-import { inferPosition } from './layout';
+import { inferPosition, isInPlotArea } from './layout';
 import { scatterXColumn, seriesYColumn } from './marks/scatterEncoding';
 import { INTERACTION_REFINE_MS } from '../constants';
 import { refreshCursor } from './cursor';
@@ -295,7 +295,7 @@ export function canZoomFromAnchor(
 ): boolean {
   if (axisControlsEnabled) return true;
   const { plot } = engine.layout;
-  if (axis === 'xy') return engine.isInPlotArea(anchorX, anchorY);
+  if (axis === 'xy') return isInPlotArea(engine, anchorX, anchorY);
 
   const ac = axisConfigs[axis];
   const pos = inferPosition(axis, ac?.position);

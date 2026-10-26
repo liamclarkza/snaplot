@@ -7,6 +7,9 @@ import {
   DEFAULT_TICK_COUNT,
   EDGE_MARGIN,
 } from '../constants';
+import type { ChartCore } from './Engine';
+import { refreshCursor } from './cursor';
+import { DirtyFlag } from './spec';
 
 /**
  * Computes layout regions using the outside-in algorithm:
@@ -272,4 +275,156 @@ export function computeLayout(
     axes,
     dpr,
   };
+}
+
+// ─── The chart's layout ───────────────────────────────────────
+// The engine's cached layout over computeLayout (keyed by the box, the fonts, a group's plot
+// insets and each axis' domain, ticks and format), the gutters a group aligns, the scales' pixel
+// ranges and the input layer's rectangle.
+
+// Stable identity for user tickFormat functions in the layout cache key.
+// Stringifying the function body per frame allocated the whole source text
+// on every render; a WeakMap id is O(1) and never retains the function.
+const tickFormatIds = new WeakMap<(value: number) => string, number>();
+let nextTickFormatId = 1;
+
+function tickFormatId(fn: ((value: number) => string) | undefined): number {
+  if (!fn) return 0;
+  let id = tickFormatIds.get(fn);
+  if (id === undefined) {
+    id = nextTickFormatId++;
+    tickFormatIds.set(fn, id);
+  }
+  return id;
+}
+
+/**
+ * The side gutters a chart group's `alignPlots` asks for (plan D17): the widest of its
+ * members'. Applied only when they change, as a relayout: no options pass, no ingest.
+ */
+export function setPlotInsets(engine: ChartCore, insets: PlotInsets): void {
+  if (engine.destroyed) return;
+  if (insets.left === engine.plotInsets.left && insets.right === engine.plotInsets.right) return;
+  engine.plotInsets = { ...insets };
+  updateLayout(engine);
+  updateScalePixelRanges(engine);
+  refreshCursor(engine);
+  engine.scheduler.markDirty(DirtyFlag.ALL);
+}
+
+/**
+ * The side gutters this chart needs on its own, without any group's insets: what its
+ * measured axes take. Cached with the layout inputs.
+ */
+export function naturalGutters(engine: ChartCore): { left: number; right: number } {
+  const width = engine.canvasManager.cssWidth || 600;
+  const height = engine.canvasManager.cssHeight || 400;
+  const key = `${createLayoutCacheKey(engine, width, height)}|natural`;
+  if (engine.natural?.key !== key) {
+    const layout = computeLayout(
+      width,
+      height,
+      engine.config,
+      engine.scales,
+      engine.canvasManager.dpr,
+      engine.theme.fontFamily,
+      engine.theme.fontSize,
+    );
+    engine.natural = {
+      key,
+      left: layout.plot.left,
+      right: layout.width - layout.plot.left - layout.plot.width,
+    };
+  }
+  return { left: engine.natural.left, right: engine.natural.right };
+}
+
+/** Whether the layout was computed for another box, options or scales than the current ones. */
+export function layoutIsStale(engine: ChartCore): boolean {
+  const w = engine.canvasManager.cssWidth || 600;
+  const h = engine.canvasManager.cssHeight || 400;
+  return !engine.layout || createLayoutCacheKey(engine, w, h) !== engine.layoutCacheKey;
+}
+
+export function updateLayout(engine: ChartCore): void {
+  const w = engine.canvasManager.cssWidth || 600;
+  const h = engine.canvasManager.cssHeight || 400;
+  const cacheKey = createLayoutCacheKey(engine, w, h);
+  if (engine.layout && cacheKey === engine.layoutCacheKey) {
+    updateInteractionLayer(engine);
+    return;
+  }
+
+  engine.layout = computeLayout(
+    w,
+    h,
+    engine.config,
+    engine.scales,
+    engine.canvasManager.dpr,
+    engine.theme.fontFamily,
+    engine.theme.fontSize,
+    engine.plotInsets,
+  );
+  engine.layoutCacheKey = cacheKey;
+  updateInteractionLayer(engine);
+}
+
+export function updateInteractionLayer(engine: ChartCore): void {
+  const axisControls = engine.config.pan?.axis === true || engine.config.zoom?.axis === true;
+  engine.canvasManager.setInteractionRect(
+    axisControls
+      ? { left: 0, top: 0, width: engine.layout.width, height: engine.layout.height }
+      : engine.layout.plot,
+  );
+}
+
+export function createLayoutCacheKey(engine: ChartCore, width: number, height: number): string {
+  const axes = Array.from(engine.scales, ([key, scale]) => {
+    const ac = engine.config.axes?.[key];
+    return [
+      key,
+      inferPosition(key, ac?.position),
+      scale.type,
+      scale.min,
+      scale.max,
+      tickFormatId(ac?.format),
+      ac?.title ?? '',
+      // Tick config changes what layout measures for the gutter.
+      ac?.tickCount ?? '',
+      ac?.ticks ? ac.ticks.join(',') : '',
+    ].join(':');
+  }).join('|');
+  return [
+    width,
+    height,
+    engine.canvasManager.dpr,
+    engine.theme.fontFamily,
+    engine.theme.fontSize,
+    engine.plotInsets.left,
+    engine.plotInsets.right,
+    axes,
+  ].join('|');
+}
+
+export function updateScalePixelRanges(engine: ChartCore): void {
+  const { plot } = engine.layout;
+  const axisConfigs = engine.config.axes ?? {};
+
+  for (const [key, scale] of engine.scales) {
+    const ac = axisConfigs[key];
+    const pos = inferPosition(key, ac?.position);
+    if (pos === 'bottom' || pos === 'top') {
+      scale.setPixelRange(plot.left, plot.left + plot.width);
+    } else {
+      // left/right: pixel range is inverted (top = max, bottom = min)
+      scale.setPixelRange(plot.top + plot.height, plot.top);
+    }
+  }
+}
+
+export function isInPlotArea(engine: ChartCore, x: number, y: number): boolean {
+  const { plot } = engine.layout;
+  return (
+    x >= plot.left && x <= plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height
+  );
 }

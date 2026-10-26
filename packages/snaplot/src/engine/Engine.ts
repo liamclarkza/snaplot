@@ -24,7 +24,16 @@ import { DirtyFlag } from './spec';
 import { CanvasManager } from './render/surface';
 import { RenderScheduler } from './render/scheduler';
 import { EventBus } from './interaction/bus';
-import { computeLayout, inferPosition, type PlotInsets } from './layout';
+import {
+  inferPosition,
+  type PlotInsets,
+  setPlotInsets,
+  naturalGutters,
+  layoutIsStale,
+  updateLayout,
+  updateScalePixelRanges,
+  isInPlotArea,
+} from './layout';
 
 import type { ColumnarSegment, DataStore } from './data/DataStore';
 import { validateMaxLen } from './data/DataStore';
@@ -119,22 +128,6 @@ import {
 } from './cursor';
 import { setHighlight, clearProximityHighlight } from './highlight';
 import { computeCustomXTicks } from './axes/ticks';
-
-// Stable identity for user tickFormat functions in the layout cache key.
-// Stringifying the function body per frame allocated the whole source text
-// on every render; a WeakMap id is O(1) and never retains the function.
-const tickFormatIds = new WeakMap<(value: number) => string, number>();
-let nextTickFormatId = 1;
-
-function tickFormatId(fn: ((value: number) => string) | undefined): number {
-  if (!fn) return 0;
-  let id = tickFormatIds.get(fn);
-  if (id === undefined) {
-    id = nextTickFormatId++;
-    tickFormatIds.set(fn, id);
-  }
-  return id;
-}
 
 // ─── Debug counters (plan D31) ──────────────────────────────
 // Tests and the bench read these through `chart[Symbol.for('snaplot.debug')]`
@@ -271,15 +264,15 @@ export class ChartCore implements EngineHost {
   readonly container: HTMLElement;
 
   // Internal modules
-  private canvasManager: CanvasManager;
+  canvasManager: CanvasManager;
   scheduler: RenderScheduler;
   private eventBus: EventBus;
   sourceStores: DataStore[] = [];
   seriesSources: readonly number[] = [];
   scales: Map<string, Scale> = new Map();
   layout!: Layout;
-  private layoutCacheKey = '';
-  private theme!: ThemeConfig;
+  layoutCacheKey = '';
+  theme!: ThemeConfig;
   /**
    * Block-aggregate range indexes for viewport-driven vertical auto-range,
    * built lazily on the first pan/zoom query after a data change. Keyed by
@@ -430,9 +423,9 @@ export class ChartCore implements EngineHost {
   naturalExtent = new Map<string, [number, number]>();
   barXAxisPlans = new Map<string, BarXAxisPlan>();
   /** A chart group's minimum side gutters (`setPlotInsets`). */
-  private plotInsets: PlotInsets = {};
+  plotInsets: PlotInsets = {};
   /** naturalGutters()'s cache, keyed by the layout inputs. */
-  private natural?: { key: string; left: number; right: number };
+  natural?: { key: string; left: number; right: number };
 
   constructor(
     parent: HTMLElement,
@@ -474,7 +467,7 @@ export class ChartCore implements EngineHost {
     // shown again at its old size) needs work only when the layout was made
     // for another box, such as the fallback size while display: none.
     this.canvasManager = new CanvasManager(parent, (w, h, reallocated) => {
-      if (!reallocated && !this.layoutIsStale()) return;
+      if (!reallocated && !layoutIsStale(this)) return;
       this.onResize(w, h);
       this.scheduler.flush();
     });
@@ -514,7 +507,7 @@ export class ChartCore implements EngineHost {
     this.initAxes();
 
     // 7. Compute initial layout
-    this.updateLayout();
+    updateLayout(this);
 
     // 8. Create interaction handlers
     // If the user pinned a hitRadius via `touch.hitRadius`, that becomes
@@ -556,51 +549,18 @@ export class ChartCore implements EngineHost {
       this.canvasManager.cssWidth || parent.clientWidth || 600,
       this.canvasManager.cssHeight || parent.clientHeight || 400,
     );
-    this.updateLayout();
-    this.updateScalePixelRanges();
+    updateLayout(this);
+    updateScalePixelRanges(this);
     this.scheduler.markDirty(DirtyFlag.ALL);
     if (!deferFirstPaint) this.scheduler.flush();
   }
 
-  /**
-   * The side gutters a chart group's `alignPlots` asks for (plan D17): the widest of its
-   * members'. Applied only when they change, as a relayout: no options pass, no ingest.
-   */
   setPlotInsets(insets: PlotInsets): void {
-    if (this.destroyed) return;
-    if (insets.left === this.plotInsets.left && insets.right === this.plotInsets.right) return;
-    this.plotInsets = { ...insets };
-    this.updateLayout();
-    this.updateScalePixelRanges();
-    refreshCursor(this);
-    this.scheduler.markDirty(DirtyFlag.ALL);
+    setPlotInsets(this, insets);
   }
 
-  /**
-   * The side gutters this chart needs on its own, without any group's insets: what its
-   * measured axes take. Cached with the layout inputs.
-   */
   naturalGutters(): { left: number; right: number } {
-    const width = this.canvasManager.cssWidth || 600;
-    const height = this.canvasManager.cssHeight || 400;
-    const key = `${this.createLayoutCacheKey(width, height)}|natural`;
-    if (this.natural?.key !== key) {
-      const layout = computeLayout(
-        width,
-        height,
-        this.config,
-        this.scales,
-        this.canvasManager.dpr,
-        this.theme.fontFamily,
-        this.theme.fontSize,
-      );
-      this.natural = {
-        key,
-        left: layout.plot.left,
-        right: layout.width - layout.plot.left - layout.plot.width,
-      };
-    }
-    return { left: this.natural.left, right: this.natural.right };
+    return naturalGutters(this);
   }
 
   /** The element that holds the canvases and the label layer. */
@@ -831,8 +791,8 @@ export class ChartCore implements EngineHost {
 
     this.ensureStoreMatchesStreaming();
     this.initAxes();
-    this.updateLayout();
-    this.updateScalePixelRanges();
+    updateLayout(this);
+    updateScalePixelRanges(this);
     autoRange(this);
     // Reapply the follow window that autoRange just overwrote with the full
     // extent, so a config update does not knock a following chart off its
@@ -1277,89 +1237,6 @@ export class ChartCore implements EngineHost {
     return entry;
   }
 
-  /** Whether the layout was computed for another box, options or scales than the current ones. */
-  private layoutIsStale(): boolean {
-    const w = this.canvasManager.cssWidth || 600;
-    const h = this.canvasManager.cssHeight || 400;
-    return !this.layout || this.createLayoutCacheKey(w, h) !== this.layoutCacheKey;
-  }
-
-  private updateLayout(): void {
-    const w = this.canvasManager.cssWidth || 600;
-    const h = this.canvasManager.cssHeight || 400;
-    const cacheKey = this.createLayoutCacheKey(w, h);
-    if (this.layout && cacheKey === this.layoutCacheKey) {
-      this.updateInteractionLayer();
-      return;
-    }
-
-    this.layout = computeLayout(
-      w,
-      h,
-      this.config,
-      this.scales,
-      this.canvasManager.dpr,
-      this.theme.fontFamily,
-      this.theme.fontSize,
-      this.plotInsets,
-    );
-    this.layoutCacheKey = cacheKey;
-    this.updateInteractionLayer();
-  }
-
-  private updateInteractionLayer(): void {
-    const axisControls = this.config.pan?.axis === true || this.config.zoom?.axis === true;
-    this.canvasManager.setInteractionRect(
-      axisControls
-        ? { left: 0, top: 0, width: this.layout.width, height: this.layout.height }
-        : this.layout.plot,
-    );
-  }
-
-  private createLayoutCacheKey(width: number, height: number): string {
-    const axes = Array.from(this.scales, ([key, scale]) => {
-      const ac = this.config.axes?.[key];
-      return [
-        key,
-        inferPosition(key, ac?.position),
-        scale.type,
-        scale.min,
-        scale.max,
-        tickFormatId(ac?.format),
-        ac?.title ?? '',
-        // Tick config changes what layout measures for the gutter.
-        ac?.tickCount ?? '',
-        ac?.ticks ? ac.ticks.join(',') : '',
-      ].join(':');
-    }).join('|');
-    return [
-      width,
-      height,
-      this.canvasManager.dpr,
-      this.theme.fontFamily,
-      this.theme.fontSize,
-      this.plotInsets.left,
-      this.plotInsets.right,
-      axes,
-    ].join('|');
-  }
-
-  private updateScalePixelRanges(): void {
-    const { plot } = this.layout;
-    const axisConfigs = this.config.axes ?? {};
-
-    for (const [key, scale] of this.scales) {
-      const ac = axisConfigs[key];
-      const pos = inferPosition(key, ac?.position);
-      if (pos === 'bottom' || pos === 'top') {
-        scale.setPixelRange(plot.left, plot.left + plot.width);
-      } else {
-        // left/right: pixel range is inverted (top = max, bottom = min)
-        scale.setPixelRange(plot.top + plot.height, plot.top);
-      }
-    }
-  }
-
   // ─── Private: Event wiring ──────────────────────────────────
 
   private wireEvents(): void {
@@ -1580,7 +1457,7 @@ export class ChartCore implements EngineHost {
     // ── Tap (touch: show/persist tooltip) ──
     this.eventBus.on('action:tap', ({ x, y, pointerType }) => {
       cancelPendingTouchCursor(this);
-      const inPlot = this.isInPlotArea(x, y);
+      const inPlot = isInPlotArea(this, x, y);
       updateLocalCursorFromPoint(this, x, y, pointerType);
       if (inPlot) emitPointClick(this, x, y);
       if (inPlot && pointerType !== 'mouse') {
@@ -1602,8 +1479,8 @@ export class ChartCore implements EngineHost {
     // Overlay-only frames are the cursor hot path. Layout/tick measurement is
     // only needed when grid or data layers redraw (resize/config/data/viewport).
     if (flags & (DirtyFlag.GRID | DirtyFlag.DATA)) {
-      this.updateLayout();
-      this.updateScalePixelRanges();
+      updateLayout(this);
+      updateScalePixelRanges(this);
     }
 
     // Step 4a: Grid layer (axes, gridlines)
@@ -2230,16 +2107,9 @@ export class ChartCore implements EngineHost {
     return `${formattedMin} \u2013 ${formattedMax}`;
   }
 
-  isInPlotArea(x: number, y: number): boolean {
-    const { plot } = this.layout;
-    return (
-      x >= plot.left && x <= plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height
-    );
-  }
-
   private onResize(width: number, height: number): void {
-    this.updateLayout();
-    this.updateScalePixelRanges();
+    updateLayout(this);
+    updateScalePixelRanges(this);
     this.scheduler.markDirty(DirtyFlag.ALL);
     this.emitEvent('resize', width, height);
   }
