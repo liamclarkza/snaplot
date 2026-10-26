@@ -1,0 +1,93 @@
+---
+/**
+ * R2 "Would a 5 kWh battery have paid for itself in this house?" (plan §10.2): an explainer in
+ * one 640 px column, its headline stating the answer. The text is computed here, at build time,
+ * from the same readings and answer.ts the charts use; the React island draws the figures.
+ * Source Serif 4 is the one webfont. No Starlight chrome; only the examples footer is shared.
+ */
+import '@fontsource/source-serif-4/latin-400.css';
+import '@fontsource/source-serif-4/latin-600.css';
+import '../../demos/battery-payback/style.css';
+import hourlyCsv from '../../../public/data/battery-payback/hourly.csv?raw';
+import metaJson from '../../../public/data/battery-payback/meta.json?raw';
+import {
+  battery,
+  headline,
+  parseHourly,
+  simulate,
+  TARIFF,
+} from '../../demos/battery-payback/answer';
+import { euro, kwh, share, yearFacts } from '../../demos/battery-payback/facts';
+import BatteryPayback from '../../demos/battery-payback/main.react';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const source = 'https://github.com/liamclarkza/snaplot/tree/main/site/src/demos/battery-payback';
+const question = 'Would a 5 kWh battery have paid for itself in this house?';
+
+const meta = JSON.parse(metaJson) as {
+  year: number;
+  household: string;
+  model: { capacityKWh: number; powerKW: number; roundTrip: number };
+};
+const hours = parseHourly(hourlyCsv);
+const answer = headline(simulate(hours, battery(5)), meta.year);
+const year = yearFacts(hours);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>{question} · snaplot examples</title>
+    <meta name="description" content={answer} />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+  </head>
+  <body class="r2">
+    <main class="r2-article">
+      <article>
+        <h1>{question}</h1>
+        <p class="r2-standfirst">{answer}</p>
+        <p class="r2-byline">
+          One house with solar panels in Konstanz, Germany. Hourly meter readings for {meta.year}, published by Open Power System Data.
+        </p>
+
+        <p class="r2-facts">
+          In {meta.year} the panels on this house produced {kwh(year.pvKWh)} of electricity. The
+          household used {share(year.pvUsedShare)} of it as it was generated and sold the other
+          {' '}{kwh(year.exportKWh)} to the grid for {euro(TARIFF.feedInEurPerKWh, true)} a kWh. It still
+          bought {kwh(year.importKWh)} at {euro(TARIFF.importEurPerKWh, true)} a kWh,
+          {' '}{share(year.importInDarkShare)} of it in hours when the panels produced nothing.
+        </p>
+
+        <BatteryPayback client:only="react">
+          <p slot="fallback">The charts need JavaScript; the numbers in the text do not.</p>
+        </BatteryPayback>
+
+        <h2>How the numbers were worked out</h2>
+        <p>
+          The battery is simulated hour by hour over the household's real readings: in each hour
+          it first covers what the house would have bought, then stores what it would have sold.
+          The assumptions:
+        </p>
+        <ul class="r2-assumptions">
+          <li>{meta.model.capacityKWh} kWh of usable storage in the question (the slider tries other sizes), empty on 1 January.</li>
+          <li>It charges and discharges at up to half its capacity per hour ({meta.model.powerKW} kW for 5 kWh).</li>
+          <li>It charges only from solar surplus and loses {share(1 - meta.model.roundTrip)} of what it stores.</li>
+          <li>Electricity costs {euro(TARIFF.importEurPerKWh, true)} a kWh to buy and earns {euro(TARIFF.feedInEurPerKWh, true)} a kWh to sell.</li>
+          <li>The installed battery costs {euro(TARIFF.installedEurPerKWh)} per kWh of capacity.</li>
+        </ul>
+        <p>
+          The model assumes the household would have used electricity exactly as it did in
+          {' '}{meta.year}, at fixed prices, and that the battery never wears. Battery wear,
+          financing and the value of money over a decade all lengthen the payback, and one year
+          of readings cannot say whether {meta.year} was typical for this house.
+        </p>
+      </article>
+    </main>
+    <footer class="r2-footer">
+      <a href={`${base}examples/`}>← Examples</a> · <a href={source}>Source</a> · Data: Open Power System Data. 2020. Data Package Household Data. Version 2020-04-15. https://data.open-power-system-data.org/household_data/2020-04-15/. (Primary data from various sources, for a complete list see URL). (CC BY 4.0)
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "slug": "battery-payback",
+  "path": "examples/battery-payback/",
+  "ready": "html[data-demo-ready]",
+  "viewport": { "width": 1280, "height": 800 },
+  "query": ""
+}

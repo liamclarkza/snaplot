@@ -1,0 +1,212 @@
+/*
+ * R2's identity (plan §10.2), from an Our World in Data or Carbon Brief explainer: a white
+ * 640 px article column, a Source Serif 4 headline that states the answer, charts interleaved
+ * with short prose, each with a title, a one-line note and a source line. Source Serif 4 is the
+ * one webfont; chart labels, controls and captions use the system sans.
+ */
+:root {
+  color-scheme: light;
+  --r2-ink: #1d1d1f;
+  --r2-ink-2: #4f5359;
+  --r2-rule: #e2e3e5;
+  --r2-link: #0b5a91;
+  --r2-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body.r2 {
+  margin: 0;
+  background: #ffffff;
+  color: var(--r2-ink);
+  font:
+    18px / 1.6 "Source Serif 4",
+    Georgia,
+    serif;
+}
+
+.r2 a {
+  color: var(--r2-link);
+  text-underline-offset: 2px;
+}
+.r2 a:hover {
+  color: var(--r2-ink);
+}
+.r2 :focus-visible {
+  outline: 2px solid var(--r2-link);
+  outline-offset: 2px;
+}
+
+.r2-article {
+  box-sizing: border-box;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px 20px 24px;
+}
+
+.r2-article h1 {
+  margin: 0 0 16px;
+  font-size: 2.1rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.r2-standfirst {
+  margin: 0 0 16px;
+  font-size: 1.3rem;
+  line-height: 1.45;
+}
+.r2-byline {
+  margin: 0 0 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--r2-rule);
+  color: var(--r2-ink-2);
+  font: 14px / 1.5 var(--r2-sans);
+}
+
+.r2-article h2 {
+  margin: 40px 0 8px;
+  font-size: 1.35rem;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.r2-article p {
+  margin: 0 0 16px;
+}
+
+.r2-assumptions {
+  margin: 0 0 24px;
+  padding-left: 1.2em;
+}
+.r2-assumptions li {
+  margin-bottom: 4px;
+}
+
+.r2-figure {
+  margin: 32px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--r2-rule);
+}
+.r2-figure h3 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+.r2-figure h4 {
+  margin: 8px 0 0;
+  font: 600 14px / 1.4 var(--r2-sans);
+}
+.r2-article .r2-note {
+  margin: 0 0 8px;
+  color: var(--r2-ink-2);
+  font: 14px / 1.45 var(--r2-sans);
+}
+.r2-article .r2-source,
+.r2-article .r2-help {
+  margin: 6px 0 0;
+  color: var(--r2-ink-2);
+  font: 12px / 1.45 var(--r2-sans);
+}
+
+.r2-chart--day {
+  height: 280px;
+}
+.r2-chart--bought {
+  height: 220px;
+}
+.r2-chart--sold {
+  height: 190px;
+}
+.r2-chart--cost {
+  height: 300px;
+}
+
+.r2-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 24px 0 8px;
+  padding: 12px 16px;
+  background: #f4f5f6;
+  border-radius: 4px;
+  font: 15px / 1.4 var(--r2-sans);
+}
+.r2-control label {
+  font-weight: 600;
+}
+.r2-control input {
+  flex: 1 1 200px;
+  accent-color: #0e6e73;
+}
+.r2-control output {
+  min-width: 4.5em;
+  text-align: right;
+}
+
+.r2-article .r2-live {
+  flex: 1 1 100%;
+  margin: 0;
+  font:
+    17px / 1.45 "Source Serif 4",
+    Georgia,
+    serif;
+}
+
+.r2-article .r2-zoom {
+  margin: 0 0 6px;
+  font: 14px / 1.4 var(--r2-sans);
+}
+.r2-zoom button {
+  margin-left: 4px;
+  font: inherit;
+  padding: 2px 10px;
+  border: 1px solid #b9bcc1;
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--r2-ink);
+  cursor: pointer;
+}
+.r2-zoom button:hover {
+  background: #f4f5f6;
+}
+
+.r2-payback p {
+  margin-bottom: 8px;
+}
+
+.r2-footer {
+  box-sizing: border-box;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 20px 32px;
+  border-top: 1px solid var(--r2-rule);
+  color: var(--r2-ink-2);
+  font: 13px / 1.5 var(--r2-sans);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .r2-article {
+    padding: 24px 16px 16px;
+  }
+  .r2-article h1 {
+    font-size: 1.7rem;
+  }
+  .r2-standfirst {
+    font-size: 1.15rem;
+  }
+  body.r2 {
+    font-size: 17px;
+  }
+  .r2-chart--day,
+  .r2-chart--cost {
+    height: 240px;
+  }
+  .r2-footer {
+    padding: 16px;
+  }
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
