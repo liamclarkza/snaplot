@@ -207,8 +207,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   /**
-   * The ingest context: streamed sources are re-read from what the chart
-   * retains, unless `forceData` replaces the chart data.
+   * The ingest context: streamed sources are re-read from what the chart retains, and sources
+   * whose input and readers are unchanged are reused (plan D16), unless `forceData` replaces
+   * the chart data.
    */
   private context(normalized: NormalizedOptions<Row>, forceData: boolean): IngestContext<Row> {
     const previous = this.ingested as Ingested<Row> | undefined;
@@ -218,6 +219,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       previousEncodings: previous?.encodings,
       previousCategories: previous?.categories,
       previousTypes,
+      ...(previous ? { previous: { sources: previous.sources, options: this.normalized } } : {}),
+      ...(forceData ? { replace: normalized.data } : {}),
       retained: (input, axis, x) => {
         if (!previous || (forceData && input === normalized.data)) return undefined;
         const exact = previous.sources.findIndex(

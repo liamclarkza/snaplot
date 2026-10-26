@@ -61,8 +61,9 @@ describe('[arch-05] typed columns are zero-copy', () => {
       series: [{ y: 'y' }, { y: 'z' }, { id: 'own', data: { columns: columns(50) }, y: 'y' }],
     });
     expect(counters(two).xValidations).toBe(2);
+    // The update replaces the chart data; the series with its own data keeps it (plan D16).
     two.update({ data: { columns: { ...columns(100), z: new Float64Array(100) } } });
-    expect(counters(two).xValidations).toBe(4);
+    expect(counters(two).xValidations).toBe(3);
   });
 
   it('[arch-05] an append validates only the appended X values', () => {

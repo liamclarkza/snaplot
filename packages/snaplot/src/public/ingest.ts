@@ -19,10 +19,15 @@
  * - String X builds a category registry per axis, and labels leave it with
  *   their last row. An axis whose streamed data is read again from what the
  *   chart retains keeps its codes; replaced data builds them from 0.
+ * - An update reads only what it changes (D16): a source whose input, X, axis
+ *   and ingest options are unchanged is reused with its X, rows and ids, and
+ *   only the series columns it lacks are read (a new field or accessor). A
+ *   category axis with a changed source reads all of its sources again.
  */
 import { fail, hint, warnOnce } from '../engine/errors';
 import type { AxisSpec, ChartSpec, ColumnarData, SeriesSpec } from '../engine/spec';
 import type { AccessorLike, NormalizedOptions, NormalizedSeries } from './normalize';
+import { equivalent } from './options';
 import {
   CategoryAxis,
   type ColumnField,
@@ -194,9 +199,22 @@ function ingestData<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>): In
   const retained = plans.map((plan) =>
     isBins(plan.input) ? undefined : ctx.retained?.(plan.input, plan.axis, plan.x),
   );
+  // A source whose input and ingest options are unchanged is not read again (plan D16): it keeps
+  // its X, rows and ids, and only the series columns it lacks are read.
+  const reused = plans.map((plan, i) => (retained[i] ? undefined : reusable(plan, i, n, ctx)));
+  // Category codes follow every source of an axis in series order, so an axis with a source read
+  // afresh reads all of its sources afresh: its labels are the ones a new chart gives them.
+  for (const [i, plan] of plans.entries()) {
+    if (reused[i]?.xKind !== 'category') continue;
+    const on = (other: Plan) => other.axis === plan.axis;
+    if (plans.some((other, j) => on(other) && !retained[j] && !reused[j]))
+      plans.forEach((other, j) => {
+        if (on(other)) reused[j] = undefined;
+      });
+  }
   // An axis with retained data keeps its category codes (D23): cursors, pinned and controlled
   // viewports and a group's X range hold codes. Its codes start from 0 only on replacement.
-  const kept = new Set(plans.flatMap((plan, i) => (retained[i] ? [plan.axis] : [])));
+  const kept = new Set(plans.flatMap((plan, i) => (retained[i] || reused[i] ? [plan.axis] : [])));
   const categories = new Map<string, CategoryAxis>();
   const categoryAxis = (key: string, explicit?: readonly string[]) => {
     let registry = categories.get(key);
@@ -214,9 +232,12 @@ function ingestData<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>): In
     }
   }
 
-  const sources = plans.map((plan, index) =>
-    ingestSource(plan, index, n, ctx, retained[index], categoryAxis, kinds, encodings),
-  );
+  const sources = plans.map((plan, index) => {
+    const previous = reused[index];
+    return previous
+      ? reuseSource(previous, plan, n, categoryAxis, kinds, encodings)
+      : ingestSource(plan, index, n, ctx, retained[index], categoryAxis, kinds, encodings);
+  });
   // Count category references now that every source is read; kept labels no row holds leave.
   for (const source of sources) {
     const registry = categories.get(source.axis);
@@ -247,6 +268,88 @@ function xColumnOf(source: SourceState<unknown>): number {
 
 function requestedType(n: NormalizedOptions<any>, axis: string) {
   return n.axes[axis]?.type;
+}
+
+/**
+ * The previous source this ingest reuses for `plan` (plan D16): one that received no appends,
+ * with the same input, X, axis and order, while nothing else ingest reads for it changed (the
+ * axis type and categories, the time zone, the window, the row-id column of typed columns).
+ * None for bins, for empty data, for the input `update({ data })` names, or for a scatter source
+ * an append is about to store unsorted.
+ */
+function reusable<Row>(
+  plan: Plan,
+  index: number,
+  n: NormalizedOptions<Row>,
+  ctx: IngestContext<Row>,
+): SourceState<Row> | undefined {
+  const previous = ctx.previous;
+  if (!previous || isBins(plan.input)) return undefined;
+  if (ctx.replace !== undefined && plan.input === ctx.replace) return undefined;
+  if (ctx.unsorted?.has(sourceKey(index, plan.axis))) return undefined;
+  const before = previous.options;
+  const axisBefore = before.axes[plan.axis];
+  const axis = n.axes[plan.axis];
+  if (
+    before.engine.timeZone !== n.engine.timeZone ||
+    before.engine.streaming?.maxPoints !== n.engine.streaming?.maxPoints ||
+    axisBefore?.type !== axis?.type ||
+    !equivalent(axisBefore?.categories, axis?.categories)
+  )
+    return undefined;
+  const rowId = n.series[plan.series[0]].rowId ?? n.rowId;
+  const ownIds = isColumns(plan.input) && plan.input.rowIds !== undefined;
+  return previous.sources.find(
+    (source) =>
+      !source.streamed &&
+      source.kind !== 'bins' &&
+      source.declared === plan.input &&
+      source.x === plan.x &&
+      source.axis === plan.axis &&
+      source.ordered === plan.ordered &&
+      source.columns[0].length > 0 &&
+      (source.kind === 'rows' || ownIds || source.rowIdColumn === rowId),
+  );
+}
+
+/**
+ * A previous source for this ingest: the same X, rows and columns, its row ids read again if the
+ * rowId accessor changed, the series columns it lacks read, and the ones no series reads dropped.
+ */
+function reuseSource<Row>(
+  previous: SourceState<Row>,
+  plan: Plan,
+  n: NormalizedOptions<Row>,
+  categoryAxis: (key: string) => CategoryAxis,
+  kinds: Map<string, XKind>,
+  encodings: Map<string, string[]>,
+): SourceState<Row> {
+  const path = `series "${n.series[plan.series[0]].id}"`;
+  noteKind(kinds, plan.axis, previous.xKind, path);
+  // The axis registry keeps the codes this source's X holds (the axis is kept, see above).
+  if (previous.xKind === 'category') categoryAxis(plan.axis);
+  const state: SourceState<Row> = {
+    ...previous,
+    series: plan.series,
+    columns: [...previous.columns] as unknown as ColumnarData,
+    fields: [...previous.fields],
+  };
+  if (state.kind === 'rows') {
+    const rowId = n.series[plan.series[0]].rowId ?? n.rowId;
+    if (rowId !== previous.rowIdField) readRowIds(state, rowId, path);
+  }
+  const used = addValueColumns(state, plan, n, encodings);
+  if (state.kind === 'rows') {
+    // Typed columns keep every named column; rows drop what an old field or accessor read.
+    const keep = state.fields.map(
+      (field, i) => field.kind === 'x' || field.kind === 'index' || used.has(i),
+    );
+    if (!keep.every(Boolean)) {
+      state.columns = state.columns.filter((_, i) => keep[i]) as unknown as ColumnarData;
+      state.fields = state.fields.filter((_, i) => keep[i]);
+    }
+  }
+  return state;
 }
 
 function ingestSource<Row>(
@@ -302,26 +405,40 @@ function ingestSource<Row>(
     state.streamed = true;
     state.appended = retained.appended;
   }
-  // Row ids, read with the current rowId in storage order (retained rows too: rowId is an
-  // accessor, D16), and checked for duplicates before anything commits.
-  const rowIdField = n.series[plan.series[0]].rowId ?? n.rowId;
-  if (rowIdField !== undefined) {
-    const ids = new Array<RowId>(state.rows!.length);
-    const idPath = `${path} rowId`;
-    for (let i = 0; i < ids.length; i++) {
-      const value = read(rowIdField, state.rows![i], state.index![i], idPath);
-      if (!isRowId(value))
-        fail(
-          `${path}: the rowId of row ${state.index![i]} is ${describe(value)}; row ids must be strings or finite numbers.`,
-        );
-      ids[i] = value;
-    }
-    state.rowIds = ids;
-  }
-  if (rowIdField !== undefined) state.rowIdField = rowIdField;
-  finishRowIds(state, path);
+  // Row ids are read with the current rowId (retained rows too: rowId is an accessor, D16).
+  readRowIds(state, n.series[plan.series[0]].rowId ?? n.rowId, path);
   addValueColumns(state, plan, n, encodings);
   return state;
+}
+
+/**
+ * The row ids of a row source, read with `field` in storage order and checked for duplicates
+ * before anything commits; without a field, the source has none.
+ */
+function readRowIds(
+  state: SourceState<unknown>,
+  field: AccessorLike | undefined,
+  path: string,
+): void {
+  delete state.rowIds;
+  delete state.idSet;
+  delete state.rowIdField;
+  if (field === undefined) return;
+  const rows = state.rows!;
+  const index = state.index!;
+  const ids = new Array<RowId>(rows.length);
+  const idPath = `${path} rowId`;
+  for (let i = 0; i < ids.length; i++) {
+    const value = read(field, rows[i], index[i], idPath);
+    if (!isRowId(value))
+      fail(
+        `${path}: the rowId of row ${index[i]} is ${describe(value)}; row ids must be strings or finite numbers.`,
+      );
+    ids[i] = value;
+  }
+  state.rowIds = ids;
+  state.rowIdField = field;
+  finishRowIds(state, path);
 }
 
 function finishRowIds(state: SourceState<unknown>, path: string): void {
@@ -650,25 +767,28 @@ function rowKeys(rows: readonly unknown[]): string[] {
   return first ? Object.keys(first) : [];
 }
 
-/** Add the value columns every series of the source reads. */
+/** Add the value columns every series of the source reads; returns the columns they read. */
 function addValueColumns<Row>(
   state: SourceState<Row>,
   plan: Plan,
   n: NormalizedOptions<Row>,
   encodings: Map<string, string[]>,
-): void {
+): Set<number> {
+  const used = new Set<number>();
   for (const si of plan.series) {
     const s = n.series[si];
     for (const field of [s.y, s.lower, s.upper])
-      if (field !== undefined) column(state, field, s, null);
+      if (field !== undefined) used.add(column(state, field, s, null));
     for (const [role, encoding] of [
       ['color', s.colorBy],
       ['size', s.sizeBy],
       ...(s.tooltipFields ?? []).map((field, i) => [`tooltip:${i}`, field] as const),
     ] as const) {
-      if (encoding) column(state, encoding.field, s, { role, encodings, text: role !== 'size' });
+      if (encoding)
+        used.add(column(state, encoding.field, s, { role, encodings, text: role !== 'size' }));
     }
   }
+  return used;
 }
 
 /** The engine column of a field, adding it on first use. */
@@ -681,7 +801,10 @@ export function column<Row>(
   const path = `series "${s.id}"`;
   if (encoding?.text && state.kind === 'rows') {
     const key = typeof field === 'string' ? `field:${field}` : `series:${s.id}:${encoding.role}`;
-    const existing = state.fields.findIndex((f) => f.kind === 'encoding' && f.key === key);
+    // A function's column is its own: a new identity is read again (a reused source, D16).
+    const existing = state.fields.findIndex(
+      (f) => f.kind === 'encoding' && f.key === key && f.read === field,
+    );
     if (existing >= 0) return existing;
     const values = state.rows!.map((row, i) => read(field, row, state.index![i], path));
     if (encoding.encodings.has(key) || values.some((value) => typeof value === 'string')) {

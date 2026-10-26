@@ -148,7 +148,7 @@ describe('[arch-03] a data or accessor change reads only what it changes (D16, R
   type Own = { t: number; v: number; c?: string };
   const own = (k: number): Own[] => Array.from({ length: 50 }, (_, t) => ({ t, v: (t * k) % 13 }));
 
-  it.fails("[arch-03] replacing one series' own data reads that source only", () => {
+  it("[arch-03] replacing one series' own data reads that source only", () => {
     const b = own(3);
     let reads = 0;
     const y = (row: Own) => {
@@ -171,7 +171,7 @@ describe('[arch-03] a data or accessor change reads only what it changes (D16, R
     expect(latest(chart)).toEqual([(49 * 5) % 13, (49 * 3) % 13]);
   });
 
-  it.fails('[arch-03] a new accessor identity re-extracts only that series, without an X pass', () => {
+  it('[arch-03] a new accessor identity re-extracts only that series, without an X pass', () => {
     let others = 0;
     const mem = (row: Row) => {
       others++;
@@ -205,7 +205,7 @@ describe('[arch-03] a data or accessor change reads only what it changes (D16, R
     expect(latest(chart)).toEqual([rows[199].cpu * 2, rows[199].mem]);
   });
 
-  it.fails('[arch-03] a new field name reads that series column, not the X', () => {
+  it('[arch-03] a new field name reads that series column, not the X', () => {
     const chart = mount<Row>(fakes, base);
     const before = xPasses(chart);
     chart.update({ series: [{ id: 'cpu', y: 'mem', label: 'CPU' }, base.series[1]] });
@@ -213,7 +213,7 @@ describe('[arch-03] a data or accessor change reads only what it changes (D16, R
     expect(latest(chart)).toEqual([rows[199].mem, rows[199].mem]);
   });
 
-  it.fails('[arch-03] a new rowId function reads the ids again, not the X', () => {
+  it('[arch-03] a new rowId function reads the ids again, not the X', () => {
     const chart = mount<Row>(fakes, { ...base, rowId: (row: Row) => `a${row.t}` });
     const before = xPasses(chart);
     chart.update({ rowId: (row: Row) => `b${row.t}` });

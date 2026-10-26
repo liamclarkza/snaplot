@@ -588,7 +588,7 @@ describe('[arch-03] ingest reads again only the sources and columns that changed
   const yColumn = (ingested: ReturnType<typeof run>, si: number) =>
     ingested.sources[ingested.seriesSources[si]].columns[ingested.spec.series[si].yColumn!];
 
-  it.fails('[arch-03] a new accessor identity keeps the X and the other columns, and replaces its own', () => {
+  it('[arch-03] a new accessor identity keeps the X and the other columns, and replaces its own', () => {
     const b = (row: R) => row.b;
     const { previous, result, passes } = again<R>(
       {
@@ -615,7 +615,7 @@ describe('[arch-03] ingest reads again only the sources and columns that changed
     expect(yColumn(result, 1)).toBe(yColumn(previous, 1));
   });
 
-  it.fails('[arch-03] reads only the source whose input changed, rows or typed columns', () => {
+  it('[arch-03] reads only the source whose input changed, rows or typed columns', () => {
     const columns = { columns: { t: Float64Array.of(0, 1, 2), v: Float64Array.of(1, 2, 3) } };
     const options = (rows: R[]): ChartOptions<any> => ({
       data: rows,
@@ -631,7 +631,7 @@ describe('[arch-03] ingest reads again only the sources and columns that changed
     expect(result.sources[0].columns[0]).not.toBe(previous.sources[0].columns[0]);
   });
 
-  it.fails('[arch-03] keeps a category axis whose sources are all unchanged', () => {
+  it('[arch-03] keeps a category axis whose sources are all unchanged', () => {
     type C = { c: string; v: number };
     const rows: C[] = [
       { c: 'x', v: 1 },

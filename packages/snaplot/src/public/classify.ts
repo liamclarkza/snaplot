@@ -2,9 +2,10 @@
  * The diff classifier (plan D16): which work an option change needs. Each class decides it:
  *
  * - data: a `data` reference (two empty arrays are equal), a field name, `x` or `rowId` →
- *   re-ingest;
- * - accessor: a function of a row with a new identity → read the data again, with the churn
- *   warning;
+ *   ingest, which reads again only the sources whose input, X or axis changed and, in the
+ *   others, only the columns of new field names (`./ingest.ts`);
+ * - accessor: a function of a row with a new identity → re-extract that series' column from the
+ *   retained rows, without an X pass, with the churn warning;
  * - layout and paint: axes, legend, height, style, theme, formats, render functions → the
  *   engine's options, relaid out and repainted, without reading data;
  * - annotations: reference lines and regions → re-resolved and repainted;
@@ -202,7 +203,7 @@ export function classify<Row>(
         work.engine = true;
     }
   }
-  // A data change re-reads every function too: no separate accessor pass.
+  // A data change runs the same ingest, which re-extracts new accessors too: no separate pass.
   if (work.data) work.accessor = undefined;
   return work;
 }
