@@ -27,6 +27,8 @@
 //   `npm run test:browser`;
 // - `visual`: Playwright markers in packages/snaplot/test/visual/** and the
 //   geometry entries, `npm run test:visual` (geometry project);
+// - `conformance`: Playwright markers in packages/snaplot/test/conformance/**,
+//   `npm run test:conformance` (M13);
 // - `site`: site/tests/**.
 //
 // `--json` prints the markers as a JSON array, one entry per marker, so its
@@ -59,7 +61,7 @@ const GEOMETRY = {
   entries: /^packages\/snaplot\/test\/visual\/expected\/m\d+[a-c]?\.[cm]?[jt]s$/,
 };
 
-export const SUITES = ['vitest', 'consumers', 'browser', 'visual', 'site'];
+export const SUITES = ['vitest', 'consumers', 'browser', 'visual', 'conformance', 'site'];
 
 /**
  * The suite that executes a marker of `runner` in `file` (a path relative to
@@ -71,6 +73,7 @@ export function suiteOf(file, runner) {
   if (runner === 'vitest')
     return file.startsWith('packages/snaplot/test/consumers/') ? 'consumers' : 'vitest';
   if (file.startsWith('packages/snaplot/test/visual/')) return 'visual';
+  if (file.startsWith('packages/snaplot/test/conformance/')) return 'conformance';
   return 'browser';
 }
 

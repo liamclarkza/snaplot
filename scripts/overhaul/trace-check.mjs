@@ -46,7 +46,8 @@
 //   expected, because an unexpected pass is reported as failed);
 // - browser: browser.json (test/browser/playwright.config.ts);
 // - visual: visual/report.json (M3a's packages/snaplot/playwright.config.ts,
-//   geometry project).
+//   geometry project);
+// - conformance: conformance.json (M13's test/conformance/playwright.config.ts).
 // By default every suite that exists is run first (`npm run build` precedes the
 // consumers). `--run <suites>` runs only those, `--no-run` (= `--run none`)
 // reads the last reports. `--skip <suites>` neither runs nor verifies a suite
@@ -72,12 +73,14 @@ const REPORTS = {
   consumers: path.join(results, 'consumers.json'),
   browser: path.join(results, 'browser.json'),
   visual: path.join(results, 'visual', 'report.json'),
+  conformance: path.join(results, 'conformance.json'),
 };
 const COMMANDS = {
   vitest: 'npm run trace-check (vitest with scripts/overhaul/vitest-ledger-reporter.mjs)',
   consumers: 'npm run build && npm run check:package',
   browser: 'npm run test:browser',
   visual: 'npm run test:visual -- --project geometry',
+  conformance: 'npm run build && npm run conformance:install && npm run test:conformance',
   site: '(no reader yet: extend trace-check.mjs)',
 };
 
@@ -169,6 +172,14 @@ const RUNNERS = {
     available: () => existsSync(path.join(pkg, 'test/visual/run.mjs')),
     // run.mjs waits for the bench lock itself.
     run: () => spawn('node', ['test/visual/run.mjs', '--project', 'geometry']),
+  },
+  conformance: {
+    available: () => existsSync(path.join(pkg, 'test/conformance/run.mjs')),
+    // install.mjs and run.mjs wait for the bench lock themselves.
+    run: () =>
+      spawn('npm', ['run', 'build']) ||
+      spawn('node', ['test/conformance/install.mjs']) ||
+      spawn('node', ['test/conformance/run.mjs']),
   },
 };
 
@@ -349,6 +360,7 @@ function main(args) {
     consumers: flag(args, '--consumers-report') ?? REPORTS.consumers,
     browser: flag(args, '--browser-report') ?? REPORTS.browser,
     visual: flag(args, '--visual-report') ?? REPORTS.visual,
+    conformance: flag(args, '--conformance-report') ?? REPORTS.conformance,
   };
   const mtime = (file) => (existsSync(file) ? statSync(file).mtimeMs : 0);
   for (const suite of toRun) {
@@ -367,6 +379,7 @@ function main(args) {
     consumers: (report) => consumerTests(report, markerKeys('consumers')),
     browser: (report) => playwrightTests(report, 'browser'),
     visual: (report) => playwrightTests(report, 'visual'),
+    conformance: (report) => playwrightTests(report, 'conformance'),
   };
   const tests = [];
   const verified = new Set();
