@@ -12,6 +12,7 @@ import {
   type CursorSnapshot,
 } from './spec';
 import { seriesYColumn, scatterXColumn } from './marks/scatterEncoding';
+import { applyProximityHighlight, clearProximityHighlight } from './highlight';
 
 export function setCursorDataX(
   engine: ChartCore,
@@ -135,7 +136,7 @@ export function updateLocalCursorFromPoint(
 
     engine.updateTooltipPoints();
     applyNearestScatterCursor(engine);
-    engine.applyProximityHighlight();
+    applyProximityHighlight(engine);
   } else {
     engine.cursorX = null;
     engine.cursorY = null;
@@ -143,7 +144,7 @@ export function updateLocalCursorFromPoint(
     engine.cursorDataIdx = null;
     engine.tooltipPoints = [];
     engine.tooltipManager.hide();
-    engine.clearProximityHighlight();
+    clearProximityHighlight(engine);
   }
 
   engine.scheduler.markDirty(DirtyFlag.OVERLAY);

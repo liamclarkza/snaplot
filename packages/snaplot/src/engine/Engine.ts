@@ -116,6 +116,7 @@ import {
   cancelPendingTouchCursor,
   getCursorSnapshot,
 } from './cursor';
+import { setHighlight, clearProximityHighlight } from './highlight';
 
 // Stable identity for user tickFormat functions in the layout cache key.
 // Stringifying the function body per frame allocated the whole source text
@@ -402,7 +403,7 @@ export class ChartCore implements EngineHost {
   destroyed = false;
 
   // Highlight state
-  private highlightedSeries: number | null = null;
+  highlightedSeries: number | null = null;
 
   /** Bumped by every data change: the range index and the hit and density caches key on it. */
   dataVersion = 0;
@@ -1006,19 +1007,8 @@ export class ChartCore implements EngineHost {
 
   // ─── Highlight (series highlight + dim) ─────────────────────
 
-  /**
-   * Set the highlighted series (`null` clears). Non-highlighted series dim
-   * per `highlight.dimOpacity`. No-op when the value is unchanged.
-   */
   setHighlight(seriesIndex: number | null): void {
-    const normalized = this.normalizeHighlightIndex(seriesIndex);
-
-    // Equality guard: prevents redundant redraws and breaks group sync loops.
-    if (this.highlightedSeries === normalized) return;
-
-    this.highlightedSeries = normalized;
-    this.scheduler.markDirty(DirtyFlag.DATA);
-    this.emitEvent('highlight:change', normalized);
+    setHighlight(this, seriesIndex);
   }
 
   getHighlight(): number | null {
@@ -1107,14 +1097,6 @@ export class ChartCore implements EngineHost {
       this.config.zoom = { enabled: false };
       this.config.pan = { enabled: false };
     }
-  }
-
-  private normalizeHighlightIndex(seriesIndex: number | null): number | null {
-    if (seriesIndex === null) return null;
-    if (!Number.isInteger(seriesIndex)) return null;
-    if (seriesIndex < 0 || seriesIndex >= this.config.series.length) return null;
-    if (this.config.series[seriesIndex]?.visible === false) return null;
-    return seriesIndex;
   }
 
   private createDataStore(data: ColumnarData, trusted = false): DataStore {
@@ -1406,7 +1388,7 @@ export class ChartCore implements EngineHost {
       this.cursorDataIdx = null;
       this.tooltipPoints = [];
       this.tooltipManager.hide();
-      this.clearProximityHighlight();
+      clearProximityHighlight(this);
       this.scheduler.markDirty(DirtyFlag.OVERLAY);
 
       // Notify listeners that the cursor is gone, without this, a fast
@@ -2226,42 +2208,6 @@ export class ChartCore implements EngineHost {
     }
 
     ctx.restore();
-  }
-
-  /**
-   * highlight.proximity: auto-focus the series whose hit-tested point is
-   * vertically closest to the pointer, clear when none is within range.
-   * setHighlight() no-ops on unchanged values, so steady hover costs
-   * nothing, and sync propagation rides the normal highlight path.
-   */
-  applyProximityHighlight(): void {
-    const proximity = this.config.highlight?.proximity;
-    if (proximity === undefined || this.config.highlight?.enabled === false) return;
-    if (this.mouseY === null) return;
-
-    let best: number | null = null;
-    let bestDist = Infinity;
-    for (const point of this.tooltipPoints) {
-      const sc = this.config.series[point.seriesIndex];
-      if (!sc) continue;
-      const yScale = this.scales.get(sc.yAxis ?? 'y');
-      if (!yScale) continue;
-      const py = yScale.dataToPixel(point.y);
-      if (!Number.isFinite(py)) continue;
-      const dist = Math.abs(py - this.mouseY);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = point.seriesIndex;
-      }
-    }
-
-    this.setHighlight(bestDist <= proximity ? best : null);
-  }
-
-  clearProximityHighlight(): void {
-    if (this.config.highlight?.proximity === undefined) return;
-    if (this.config.highlight?.enabled === false) return;
-    this.setHighlight(null);
   }
 
   updateTooltipPoints(): void {
