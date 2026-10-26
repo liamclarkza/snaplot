@@ -2,6 +2,7 @@ import type { InteractionMode, Layout, PanConfig, TouchConfig, ZoomConfig } from
 import type { EventBus } from './bus';
 import type { ActivePressState, AreaResult, GestureState, PointerState } from './gesture-state';
 import { handleChartKey } from './keyboard';
+import { PanMomentum } from './momentum';
 import {
   MIN_DRAG_DISTANCE,
   DEFAULT_WHEEL_STEP,
@@ -45,7 +46,7 @@ export class GestureManager {
   private lastTapY = 0;
 
   // Touch pan momentum, started only from a completed pan gesture.
-  private momentumFrame: number | null = null;
+  private momentum: PanMomentum;
 
   // Bound handlers
   private boundPointerDown: (e: PointerEvent) => void;
@@ -70,6 +71,7 @@ export class GestureManager {
     private getTouchConfig: () => TouchConfig,
     private coordinateTarget: HTMLElement = target,
   ) {
+    this.momentum = new PanMomentum(eventBus);
     this.boundPointerDown = this.onPointerDown.bind(this);
     this.boundPointerMove = this.onPointerMove.bind(this);
     this.boundPointerUp = this.onPointerUp.bind(this);
@@ -124,7 +126,7 @@ export class GestureManager {
     this.keyboardTarget?.removeEventListener('keydown', this.boundKeyDown);
     this.keyboardTarget = null;
     this.clearLongPress();
-    this.cancelMomentum();
+    this.momentum.cancel();
     if (this.scrollResetTimer) clearTimeout(this.scrollResetTimer);
   }
 
@@ -304,7 +306,7 @@ export class GestureManager {
       return;
     }
 
-    this.cancelMomentum();
+    this.momentum.cancel();
 
     // Capture is helpful for uninterrupted drags, but browsers can reject it
     // during fast synthetic or multi-touch transitions.
@@ -619,7 +621,7 @@ export class GestureManager {
 
     if (state.kind === 'pan' && state.pointerId === e.pointerId) {
       if (ptr.pointerType === 'touch' && this.pointers.size === 0) {
-        this.startMomentum(state.velocityX, state.velocityY, state.axis);
+        this.momentum.start(state.velocityX, state.velocityY, state.axis);
       }
       this.resetState();
       return;
@@ -690,7 +692,7 @@ export class GestureManager {
       this.target.releasePointerCapture(e.pointerId);
     } catch {}
     this.clearLongPress();
-    this.cancelMomentum();
+    this.momentum.cancel();
 
     // Cancel is terminal: drop every stranded pointer so the next touch starts
     // from a clean single-pointer state rather than being read as a pinch.
@@ -707,55 +709,6 @@ export class GestureManager {
   private resetState(): void {
     if (this.pointers.size === 0) {
       this.state = { kind: 'idle' };
-    }
-  }
-
-  // ─── Pan momentum (touch only) ────────────────────────────
-
-  private startMomentum(velocityX: number, velocityY: number, axis: string | undefined): void {
-    if (typeof requestAnimationFrame === 'undefined') return;
-
-    // Threshold of 0.1 px/ms ≈ 100 px/s, below this it's just a static release.
-    const vMag = Math.hypot(velocityX, velocityY);
-    if (vMag < 0.1) return;
-
-    // Cap peak velocity so a jittery last sample can't launch the chart.
-    const MAX_V = 2.5; // px/ms ≈ 2500 px/s
-    let vx = velocityX;
-    let vy = velocityY;
-    if (vMag > MAX_V) {
-      const s = MAX_V / vMag;
-      vx *= s;
-      vy *= s;
-    }
-
-    let lastT = performance.now();
-    const step = (now: number) => {
-      const dt = Math.min(32, now - lastT); // clamp frame to avoid teleporting after tab blur
-      lastT = now;
-
-      const dx = vx * dt;
-      const dy = vy * dt;
-      this.eventBus.emit('action:pan', { dx, dy, axis });
-
-      // Exponential decay, halves roughly every ~130ms.
-      const decay = Math.exp(-dt / 180);
-      vx *= decay;
-      vy *= decay;
-
-      if (Math.hypot(vx, vy) < 0.02) {
-        this.momentumFrame = null;
-        return;
-      }
-      this.momentumFrame = requestAnimationFrame(step);
-    };
-    this.momentumFrame = requestAnimationFrame(step);
-  }
-
-  private cancelMomentum(): void {
-    if (this.momentumFrame !== null) {
-      if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(this.momentumFrame);
-      this.momentumFrame = null;
     }
   }
 
