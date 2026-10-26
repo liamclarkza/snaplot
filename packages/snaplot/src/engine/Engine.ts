@@ -33,7 +33,6 @@ import type { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRan
 import { RingColumnarStore } from './data/RingColumnarStore';
 import { createScale } from './scales/createScale';
 import {
-  BRUSH_EDGE_GRAB_PX,
   DEFAULT_INTERACTION_SAMPLING,
   MIN_TOUCH_INTERACTION_SAMPLING,
   MIN_DRAG_DISTANCE,
@@ -98,6 +97,17 @@ import {
   pannedScaleRange,
   applyViewportChange,
 } from './viewport';
+import {
+  getSelection,
+  setSelection,
+  reconcileSelectionForDataChange,
+  isBrushMode,
+  brushPixelRange,
+  brushStart,
+  brushUpdate,
+  brushEnd,
+  scatterPointsInSelection,
+} from './selection';
 
 // Stable identity for user tickFormat functions in the layout cache key.
 // Stringifying the function body per frame allocated the whole source text
@@ -350,11 +360,11 @@ export class ChartCore implements EngineHost {
   /** Active selection box (shift+drag) */
   private selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
   /** Persistent brush selection in data space (selection.mode: 'brush'). */
-  private selection: SelectionRange | null = null;
+  selection: SelectionRange | null = null;
   /** Selection value at the last emitted selection:change, to skip no-op emits. */
-  private lastEmittedSelection: SelectionRange | null = null;
+  lastEmittedSelection: SelectionRange | null = null;
   /** In-progress brush drag interaction. */
-  private brushDrag: {
+  brushDrag: {
     mode: 'create' | 'move' | 'resize-min' | 'resize-max';
     anchorDataX: number;
     orig: ScaleRange;
@@ -646,7 +656,7 @@ export class ChartCore implements EngineHost {
     this.dataVersion++;
     this.debugCounters.ingestCount++;
     this.replaceOptions(config);
-    this.reconcileSelectionForDataChange();
+    reconcileSelectionForDataChange(this);
     this.refreshCursor();
   }
 
@@ -746,7 +756,7 @@ export class ChartCore implements EngineHost {
 
     this.dataVersion++;
     const gridDirty = rangeForDataChange(this);
-    this.reconcileSelectionForDataChange();
+    reconcileSelectionForDataChange(this);
     this.refreshCursor();
     this.scheduler.markDirty(gridDirty ? DirtyFlag.DATA | DirtyFlag.GRID : DirtyFlag.DATA);
   }
@@ -913,136 +923,11 @@ export class ChartCore implements EngineHost {
   }
 
   getSelection(): SelectionRange | null {
-    // Return a copy so callers cannot mutate internal state.
-    if (!this.selection) return null;
-    return {
-      x: { min: this.selection.x.min, max: this.selection.x.max },
-      ...(this.selection.y ? { y: { min: this.selection.y.min, max: this.selection.y.max } } : {}),
-    };
+    return getSelection(this);
   }
 
   setSelection(selection: SelectionRange | null): void {
-    if (this.destroyed) return;
-    if (selection === null) {
-      if (this.selection === null) return;
-      this.selection = null;
-    } else {
-      const min = Math.min(selection.x.min, selection.x.max);
-      const max = Math.max(selection.x.min, selection.x.max);
-      this.selection = { x: { min, max } };
-    }
-    this.scheduler.markDirty(DirtyFlag.OVERLAY);
-    this.emitSelectionChange();
-  }
-
-  private reconcileSelectionForDataChange(): void {
-    if (!this.selection) return;
-    const policy = this.config.selection?.dataChange ?? 'clear-if-outside';
-    if (policy === 'preserve') return;
-    if (policy === 'clear' || !this.hasData()) {
-      this.setSelection(null);
-      return;
-    }
-
-    const [first, last] = this.sourceExtent()!;
-    const dataMin = Math.min(first, last);
-    const dataMax = Math.max(first, last);
-    const { min, max } = this.selection.x;
-    if (max < dataMin || min > dataMax) {
-      this.setSelection(null);
-    } else if (policy === 'clamp') {
-      this.setSelection({ x: { min: Math.max(min, dataMin), max: Math.min(max, dataMax) } });
-    }
-  }
-
-  private isBrushMode(): boolean {
-    return this.config.selection?.mode === 'brush';
-  }
-
-  /** Fire selection:change / onBrush only when the selection actually changed. */
-  private emitSelectionChange(): void {
-    const cur = this.selection;
-    const prev = this.lastEmittedSelection;
-    const same =
-      (cur === null && prev === null) ||
-      (cur !== null && prev !== null && cur.x.min === prev.x.min && cur.x.max === prev.x.max);
-    if (same) return;
-    this.lastEmittedSelection = this.getSelection();
-    const payload = this.getSelection();
-    this.emitEvent('selection:change', payload);
-    this.config.selection?.onBrush?.(payload);
-  }
-
-  /** Pixel x of a data-space X value on the default axis, or null. */
-  private brushPixelRange(): { min: number; max: number } | null {
-    if (!this.selection) return null;
-    const xScale = this.scales.get('x');
-    if (!xScale) return null;
-    return {
-      min: xScale.dataToPixel(this.selection.x.min),
-      max: xScale.dataToPixel(this.selection.x.max),
-    };
-  }
-
-  private brushStart(px: number): void {
-    const xScale = this.scales.get('x');
-    if (!xScale) return;
-    const dataX = xScale.pixelToData(px);
-    const rect = this.brushPixelRange();
-    // Decide the interaction from where the drag begins relative to the
-    // existing band: near an edge resizes it, inside moves it, elsewhere
-    // starts a fresh selection.
-    if (this.selection && rect) {
-      const lo = Math.min(rect.min, rect.max);
-      const hi = Math.max(rect.min, rect.max);
-      if (Math.abs(px - lo) <= BRUSH_EDGE_GRAB_PX) {
-        this.brushDrag = { mode: 'resize-min', anchorDataX: dataX, orig: { ...this.selection.x } };
-        return;
-      }
-      if (Math.abs(px - hi) <= BRUSH_EDGE_GRAB_PX) {
-        this.brushDrag = { mode: 'resize-max', anchorDataX: dataX, orig: { ...this.selection.x } };
-        return;
-      }
-      if (px > lo && px < hi) {
-        this.brushDrag = { mode: 'move', anchorDataX: dataX, orig: { ...this.selection.x } };
-        return;
-      }
-    }
-    this.brushDrag = { mode: 'create', anchorDataX: dataX, orig: { min: dataX, max: dataX } };
-    const proposed = { x: { min: dataX, max: dataX } };
-    this.selection = proposed;
-  }
-
-  private brushUpdate(px: number): void {
-    const xScale = this.scales.get('x');
-    if (!xScale || !this.brushDrag) return;
-    const dataX = xScale.pixelToData(px);
-    const { mode, anchorDataX, orig } = this.brushDrag;
-
-    let proposed: SelectionRange;
-    if (mode === 'create') {
-      proposed = { x: { min: Math.min(anchorDataX, dataX), max: Math.max(anchorDataX, dataX) } };
-    } else if (mode === 'move') {
-      const delta = dataX - anchorDataX;
-      proposed = { x: { min: orig.min + delta, max: orig.max + delta } };
-    } else if (mode === 'resize-min') {
-      proposed = { x: { min: Math.min(dataX, orig.max), max: Math.max(dataX, orig.max) } };
-    } else {
-      proposed = { x: { min: Math.min(orig.min, dataX), max: Math.max(orig.min, dataX) } };
-    }
-    this.selection = proposed;
-  }
-
-  private brushEnd(): void {
-    if (!this.brushDrag) return;
-    const wasCreate = this.brushDrag.mode === 'create';
-    this.brushDrag = null;
-    // A create gesture that never moved (a click) clears the selection
-    // rather than leaving a zero-width band.
-    if (wasCreate && this.selection && this.selection.x.min === this.selection.x.max) {
-      this.selection = null;
-    }
-    this.emitSelectionChange();
+    setSelection(this, selection);
   }
 
   resize(width: number, height: number): void {
@@ -1441,7 +1326,7 @@ export class ChartCore implements EngineHost {
     return out;
   }
 
-  private scatterResolvers(si: number, series: SeriesSpec, fallbackColor: string) {
+  scatterResolvers(si: number, series: SeriesSpec, fallbackColor: string) {
     const store = this.storeForSeries(si);
     const cached = this.scatterEncodingCache.get(si);
     if (
@@ -1706,8 +1591,8 @@ export class ChartCore implements EngineHost {
 
     // ── Box selection (start/update/end) ──
     this.eventBus.on('action:box-start', ({ x, y }) => {
-      if (this.isBrushMode()) {
-        this.brushStart(x);
+      if (isBrushMode(this)) {
+        brushStart(this, x);
         this.scheduler.markDirty(DirtyFlag.OVERLAY);
         return;
       }
@@ -1717,8 +1602,8 @@ export class ChartCore implements EngineHost {
     });
 
     this.eventBus.on('action:box-update', ({ x, y }) => {
-      if (this.isBrushMode()) {
-        this.brushUpdate(x);
+      if (isBrushMode(this)) {
+        brushUpdate(this, x);
         this.scheduler.markDirty(DirtyFlag.OVERLAY);
         return;
       }
@@ -1744,8 +1629,8 @@ export class ChartCore implements EngineHost {
     });
 
     this.eventBus.on('action:box-end', ({ x1, y1, x2, y2 }) => {
-      if (this.isBrushMode()) {
-        this.brushEnd();
+      if (isBrushMode(this)) {
+        brushEnd(this);
         this.scheduler.markDirty(DirtyFlag.OVERLAY);
         return;
       }
@@ -1794,7 +1679,7 @@ export class ChartCore implements EngineHost {
         const selection = {
           x: selectionX,
           ...(selectionY ? { y: selectionY } : {}),
-          points: selectionY ? this.scatterPointsInSelection(selectionX, selectionY) : undefined,
+          points: selectionY ? scatterPointsInSelection(this, selectionX, selectionY) : undefined,
         };
         this.emitEvent('select', selection);
         this.config.selection?.onSelect?.(selection);
@@ -2276,7 +2161,7 @@ export class ChartCore implements EngineHost {
     // Draw the persistent brush selection band (anchored in data space, so it
     // stays put as the viewport pans/zooms), then edge handles.
     if (this.selection) {
-      const rect = this.brushPixelRange();
+      const rect = brushPixelRange(this);
       if (rect) {
         renderBrushSelection(ctx, rect.min, rect.max, this.layout, this.theme.crosshairColor);
       }
@@ -2916,7 +2801,7 @@ export class ChartCore implements EngineHost {
 
   // ─── Private: Helpers ───────────────────────────────────────
 
-  private categoricalPalette(): string[] {
+  categoricalPalette(): string[] {
     return this.theme.categoricalPalette ?? this.theme.palette;
   }
 
@@ -2952,51 +2837,6 @@ export class ChartCore implements EngineHost {
 
     this.cursorDataX = point.x;
     this.cursorDataIdx = point.dataIndex;
-  }
-
-  private scatterPointsInSelection(xRange: ScaleRange, yRange: ScaleRange) {
-    const points = [];
-    const palette = this.categoricalPalette();
-
-    for (let si = 0; si < this.config.series.length; si++) {
-      const series = this.config.series[si];
-      const store = this.storeForSeries(si);
-      if (store.length === 0) continue;
-      if (series.visible === false || series.type !== 'scatter') continue;
-      const xColumnIdx = scatterXColumn(series);
-      const yColumnIdx = seriesYColumn(series);
-      if (!this.isValidColumn(xColumnIdx, store) || !this.isValidColumn(yColumnIdx, store))
-        continue;
-
-      const fallbackColor = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
-      const style = this.scatterResolvers(si, series, fallbackColor).logicalResolver;
-
-      for (let i = 0; i < store.length; i++) {
-        const x = store.valueAt(xColumnIdx, i);
-        const y = store.valueAt(yColumnIdx, i);
-        if (
-          !Number.isFinite(x) ||
-          !Number.isFinite(y) ||
-          x < xRange.min ||
-          x > xRange.max ||
-          y < yRange.min ||
-          y > yRange.max
-        ) {
-          continue;
-        }
-        points.push({
-          seriesIndex: si,
-          dataIndex: i,
-          label: series.label,
-          x,
-          y,
-          color: style.colorAt(i),
-          meta: series.meta,
-        });
-      }
-    }
-
-    return points;
   }
 
   /** Re-run tooltip hit-test at current cursor position (called on data change) */
