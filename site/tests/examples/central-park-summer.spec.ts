@@ -8,6 +8,7 @@ import {
   dataFile,
   demoPageChecks,
   openDemo,
+  PHONE,
   paintedPixels,
 } from './page-checks';
 
@@ -183,6 +184,30 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       await expect.poll(() => paintedPixels(page, '[data-part="chart"]')).toBeGreaterThan(50_000);
       const pdf = await page.pdf({ format: 'Letter', landscape: true });
       expect(pdf.length).toBeGreaterThan(20_000);
+    });
+  });
+
+  test.describe('on a phone', () => {
+    test.use(PHONE);
+
+    test('tapping a day reads its numbers, as the touch help text says', async ({ page }) => {
+      await openDemo(page, SLUG);
+      await expect(page.locator('.hint-touch')).toHaveText('Tap a day to read its numbers.');
+      await expect(page.locator('.hint-touch')).toBeVisible();
+      const june24 = days.find((d) => d.date === '2025-06-24');
+      if (!june24) throw new Error('no June 24');
+      await page.locator('[data-part="chart"]').scrollIntoViewIfNeeded();
+      const point = await at(page, june24.date, june24.c.normalMedian);
+      // A finger rests on the glass for a moment. Playwright's tap lifts at once, and a contact
+      // that short shows no reading (one of 50 ms or more does, and keeps it after the lift).
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+      await page.waitForTimeout(80);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      // The reading stays after the finger lifts.
+      await page.waitForTimeout(300);
+      await expect(page.locator('.weather-tip')).toBeVisible();
+      await expect(page.locator('.weather-tip')).toContainText('June 24');
     });
   });
 });
