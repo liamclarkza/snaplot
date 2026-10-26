@@ -28,7 +28,6 @@ test.describe('[m16s] fonts', () => {
     test(`${route}: body and h1 are set in IBM Plex Sans and the Plex faces load`, async ({
       page,
     }) => {
-      test.fail(CUSTOM.includes(route), '[m16s] the custom layout falls back to Times');
       await page.goto(route);
       if (CUSTOM.includes(route)) {
         // The dev server serves the custom layout without Starlight's stylesheet; the build only

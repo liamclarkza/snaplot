@@ -7,6 +7,13 @@ body {
   font-family: var(--snaplot-font);
 }
 
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--snaplot-font-mono);
+}
+
 /* Focus: one visible ring everywhere, and the system highlight in forced colours (uisite-04). */
 :focus-visible {
   outline: 2px solid var(--snaplot-accent);

@@ -33,8 +33,16 @@
   --snaplot-container: 72rem;
   --snaplot-gutter: 24px;
   --snaplot-radius: 6px;
-  --snaplot-font: "IBM Plex Sans", var(--sl-font-system);
-  --snaplot-font-mono: "IBM Plex Mono", var(--sl-font-system-mono);
+  /* The fallback stacks are the site's own: the custom layout loads no Starlight stylesheet in dev,
+     so a var(--sl-font-system) here left its body in the browser's default serif. */
+  --snaplot-font-system:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial,
+    sans-serif;
+  --snaplot-font-system-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  --snaplot-font: "IBM Plex Sans", var(--snaplot-font-system);
+  --snaplot-font-mono: "IBM Plex Mono", var(--snaplot-font-system-mono);
 
   /* Colours. Starlight's "white" is the highest-contrast ink and "black" the background. */
   --sl-color-white: var(--snaplot-ink);

@@ -44,6 +44,9 @@ export default defineConfig({
       // background, which passes contrast in both themes (uisite-06).
       expressiveCode: {
         styleOverrides: {
+          // The site's own stacks, so code is set in Plex Mono in both layouts (D35).
+          codeFontFamily: 'var(--snaplot-font-mono)',
+          uiFontFamily: 'var(--snaplot-font)',
           borderRadius: '6px',
           frames: {
             frameBoxShadowCssValue: 'none',
