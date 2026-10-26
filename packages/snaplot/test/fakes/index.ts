@@ -129,9 +129,9 @@ export function pointerTarget(chart: ChartHandle<any>): Element {
 
 /**
  * A gesture at the current view: a small Ctrl+wheel zoom at the plot centre. It marks the
- * viewport as moving, so the next paint is the reduced-fidelity gesture pass. An applied
- * `viewport` option is a settled view, not a gesture (plan D3), so tests that measure the
- * gesture pass set the range first and then call this. Run `fakes.frames.flush()` after it.
+ * viewport as moving, so the next paint is the reduced-fidelity gesture pass. Tests that measure
+ * the gesture pass set the range with the `viewport` option and then call this, so they measure
+ * a real gesture whatever a programmatic viewport draws. Run `fakes.frames.flush()` after it.
  */
 export function wheelGesture(chart: ChartHandle<any>, deltaY = -1): void {
   const { plot } = debug(chart);

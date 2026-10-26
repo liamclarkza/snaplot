@@ -153,6 +153,38 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     ]);
   });
 
+  it('a viewport option that moves the view draws the gesture pass, then every point once it settles', () => {
+    // An app that pans from a slider or an overview chart pays what a pan gesture pays.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1_000);
+    try {
+      const n = 20_000;
+      const chart = mount(fakes, {
+        data: {
+          columns: {
+            t: Float64Array.from({ length: n }, (_, i) => i),
+            v: Float64Array.from({ length: n }, (_, i) => Math.sin(i / 20)),
+          },
+        },
+        x: 't',
+        series: [{ y: 'v' }],
+      });
+      fakes.frames.flush();
+      chart.update({ viewport: { x: [0, n / 2] } });
+      fakes.frames.flush();
+      const during = debug(chart);
+      expect(during.drawnPoints).toBeLessThan(during.inViewPoints);
+      now.mockReturnValue(1_000 + 151);
+      vi.advanceTimersByTime(150);
+      fakes.frames.flush();
+      const settled = debug(chart);
+      expect(settled.drawnPoints).toBe(settled.inViewPoints);
+      expect(settled.inViewPoints).toBe(during.inViewPoints);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('[dataapi-14] replacing data outside a pinned X range unpins that axis', () => {
     const chart = mount<Row>(fakes, base);
     chart.update({ viewport: { x: [10, 20] } });

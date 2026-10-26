@@ -959,6 +959,15 @@ export class ChartCore implements EngineHost {
     this.autoRangeHorizontal();
     if (!horizontal) this.applyFollowWindow();
     this.autoRangeVertical(horizontal);
+    // A pinned axis that moved is a view in motion as far as drawing goes: an app that drives the
+    // viewport from a slider or another chart gets the gesture pass, refined once it settles, as
+    // a pan or a group sync does.
+    const moved = keys.some((key) => {
+      const before = previous.get(key);
+      const scale = this.scales.get(key)!;
+      return !before || before[0] !== scale.min || before[1] !== scale.max;
+    });
+    if (moved) this.markViewportActive();
     this.refreshCursor();
     this.scheduler.markDirty(DirtyFlag.ALL);
     this.publishResetViewport(previous);
