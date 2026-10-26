@@ -76,9 +76,10 @@ export function mountLegend<Row>(
   else plot.after(root);
 
   const control = companion(chart);
+  /** Each series' button and what it last showed: a commit that changes no series writes nothing. */
   const buttons = new Map<
     string,
-    { button: HTMLButtonElement; dot: HTMLElement; label: HTMLElement }
+    { button: HTMLButtonElement; dot: HTMLElement; label: HTMLElement; shows?: string }
   >();
   const refresh = () => {
     const list = control.series();
@@ -110,6 +111,17 @@ export function mountLegend<Row>(
       }
       const { button, dot, label } = entry;
       if (root.children[index] !== button) root.insertBefore(button, root.children[index] ?? null);
+      const shows = [
+        item.visible,
+        item.label,
+        item.color,
+        item.fill ?? '',
+        item.opacity,
+        item.type ?? 'line',
+        item.dash.length > 0,
+      ].join('\u0000');
+      if (entry.shows === shows) return;
+      entry.shows = shows;
       setFlag(button, 'hidden', !item.visible);
       button.setAttribute('aria-label', `Toggle ${item.label} ${item.visible ? 'off' : 'on'}`);
       button.setAttribute('aria-pressed', String(item.visible));

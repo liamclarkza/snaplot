@@ -98,7 +98,7 @@ describe('the built-in legend (plan D6)', () => {
     expect(container.style.display).toBe('');
   });
 
-  it.fails('[frameworks-11] an append that changes no series leaves the legend DOM alone', () => {
+  it('[frameworks-11] an append that changes no series leaves the legend DOM alone', () => {
     const chart = mount<Row>(fakes, shown);
     const legend = buttons(chart)[0].parentElement!;
     const observer = new MutationObserver(() => {});
