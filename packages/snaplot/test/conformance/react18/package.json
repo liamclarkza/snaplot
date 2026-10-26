@@ -1,0 +1,10 @@
+{
+  "name": "snaplot-conformance-react18",
+  "private": true,
+  "description": "The React 18.3 runtime of the conformance suite (plan D2): not a workspace; snaplot is the packed tarball, installed by npm run conformance:install.",
+  "type": "module",
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}
