@@ -125,6 +125,24 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       await expect(page.locator('[data-part="key"] [data-series="record-high"]')).toHaveCount(1);
     });
 
+    test('the palette is greys plus one red and one blue (§10.2)', async ({ page }) => {
+      test.fail(true, '[demos-02] the ranges are tan, not grey');
+      await openDemo(page, SLUG);
+      const { series } = await demo(page);
+      const channels = (css: string) =>
+        css.startsWith('#')
+          ? [1, 3, 5].map((i) => Number.parseInt(css.slice(i, i + 2), 16))
+          : (css.match(/\d+(\.\d+)?/g) ?? []).slice(0, 3).map(Number);
+      const colour = (id: string) => series.find((s) => s.id === id)?.color.toLowerCase();
+      for (const s of series.filter((s) => !s.id.startsWith('record-'))) {
+        // A grey: its channels differ by no more than the page's own warm greys do.
+        const [r = 0, g = 0, b = 0] = channels(s.fill ?? s.color);
+        expect(Math.max(r, g, b) - Math.min(r, g, b), s.id).toBeLessThanOrEqual(16);
+      }
+      expect(colour('record-high')).toBe('#c0392b');
+      expect(colour('record-low')).toBe('#2e6db4');
+    });
+
     test('a day reads like a weather table, and the chart stays read-only', async ({ page }) => {
       await openDemo(page, SLUG);
       const june24 = days.find((d) => d.date === '2025-06-24');

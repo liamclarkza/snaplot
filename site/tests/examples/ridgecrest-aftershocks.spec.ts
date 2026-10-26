@@ -237,6 +237,35 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       await expect(answer(page)).toContainText("the window's");
     });
 
+    test('tapping a point opens its USGS event page, as the touch help text says', async ({
+      page,
+    }) => {
+      await page.addInitScript(() => {
+        const opened: string[] = [];
+        Object.assign(window, { opened });
+        window.open = (url?: string | URL) => {
+          opened.push(String(url));
+          return null;
+        };
+      });
+      await openDemo(page, SLUG);
+      await expect(page.locator('.hint-touch').filter({ hasText: 'Tap a point' })).toBeVisible();
+      const scatter = page.locator('[data-part="scatter"]');
+      await scatter.scrollIntoViewIfNeeded();
+      const at = await page.evaluate((m71) => {
+        const { scatter } = (window as unknown as { demo: Demo }).demo;
+        const box = scatter.container.getBoundingClientRect();
+        return {
+          x: box.left + (scatter.scale('x')?.toPixel(m71.time) ?? 0),
+          y: box.top + (scatter.scale('y')?.toPixel(7.1) ?? 0),
+        };
+      }, M71);
+      await page.touchscreen.tap(at.x, at.y);
+      await expect
+        .poll(() => page.evaluate(() => (window as unknown as { opened: string[] }).opened))
+        .toEqual([`https://earthquake.usgs.gov/earthquakes/eventpage/${M71.id}`]);
+    });
+
     test('the catalogue date stays visible', async ({ page }) => {
       await openDemo(page, SLUG);
       await expect(page.locator('.event-meta')).toContainText('catalogue retrieved');

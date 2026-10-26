@@ -63,6 +63,24 @@ test.describe('the examples hub', () => {
     }
   });
 
+  test('[demos-01] each framework has two built example pages', async ({ page, request }) => {
+    await page.goto(`${BASE}examples/`);
+    const open = (framework: string) =>
+      page.locator(`.examples > li[data-framework="${framework}"]`).getByRole('link', {
+        name: 'Open',
+      });
+    // M16a's two pages now; a framework's pages arrive together when its track merges (M16b
+    // React, M16c Solid). The M16 finalisation, with all six built, requires two of each.
+    await expect(open('Vanilla JS')).toHaveCount(2);
+    for (const framework of ['React', 'Solid']) {
+      expect([0, 2], framework).toContain(await open(framework).count());
+    }
+    for (const link of await page.getByRole('link', { name: 'Open' }).all()) {
+      const response = await request.get((await link.getAttribute('href')) ?? '');
+      expect(response.status()).toBe(200);
+    }
+  });
+
   test('[uisite-09] an index, not a landing page: one heading, one sentence, the rows', async ({
     page,
   }) => {
