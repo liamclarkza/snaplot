@@ -451,13 +451,55 @@ export function scatterResolvers(
     return column[index] ?? Number.NaN;
   };
 
+  let renderResolver = resolverFromEncodingState(state, physicalValueAt);
+  let logicalResolver = resolverFromEncodingState(state, logicalValueAt);
+  // A per-point colour function (the public `color: (value, row, index) => …`) runs once per data
+  // change; its distinct colours become the bins the render loop stamps with.
+  const pointColor = typeof series.fill === 'function' ? series.fill : null;
+  if (pointColor && !state.colorBy && store.length > 0) {
+    const palette: string[] = [];
+    const binOf = new Map<string, number>();
+    const logicalBins = new Int32Array(store.length);
+    const physicalBins = new Int32Array(store.getPhysicalColumn(0).length);
+    for (const segment of store.getSegments(0, store.length - 1)) {
+      for (let k = 0; k <= segment.logicalEnd - segment.logicalStart; k++) {
+        const logical = segment.logicalStart + k;
+        const color = pointColor(store.valueAt(series.yColumn ?? 1, logical), logical);
+        let bin = binOf.get(color);
+        if (bin === undefined) {
+          bin = palette.push(color) - 1;
+          binOf.set(color, bin);
+        }
+        logicalBins[logical] = bin;
+        physicalBins[segment.physicalStart + k] = bin;
+      }
+    }
+    renderResolver = withPointColors(renderResolver, physicalBins, palette);
+    logicalResolver = withPointColors(logicalResolver, logicalBins, palette);
+  }
+
   const entry = {
     series,
     theme: engine.theme,
     version: engine.dataVersion,
-    renderResolver: resolverFromEncodingState(state, physicalValueAt),
-    logicalResolver: resolverFromEncodingState(state, logicalValueAt),
+    renderResolver,
+    logicalResolver,
   };
   engine.scatterEncodingCache.set(si, entry);
   return entry;
+}
+
+/** A resolver whose colours come from precomputed per-point bins over `palette`. */
+function withPointColors(
+  resolver: ScatterStyleResolver,
+  bins: Int32Array,
+  palette: string[],
+): ScatterStyleResolver {
+  return {
+    ...resolver,
+    variableColor: true,
+    colorBinAt: (index) => bins[index] ?? 0,
+    colorForBin: (bin) => palette[bin] ?? palette[0],
+    colorAt: (index) => palette[bins[index] ?? 0] ?? palette[0],
+  };
 }

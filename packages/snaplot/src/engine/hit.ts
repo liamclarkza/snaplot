@@ -129,6 +129,7 @@ export class HitTester {
         seriesConfigs,
         pixelX,
         pixelY,
+        mode,
         palette,
         proximity,
         formatters,
@@ -158,6 +159,7 @@ export class HitTester {
     seriesConfigs: SeriesSpec[],
     pixelX: number,
     pixelY: number,
+    mode: 'index' | 'x',
     palette: string[],
     proximity: number,
     formatters?: TooltipFormatters,
@@ -218,8 +220,8 @@ export class HitTester {
       });
     }
 
-    // Only show tooltip if cursor is near a series line
-    if (closestYDist > proximity) return [];
+    // Only show tooltip if cursor is near a series line (`x` lists every series at the X).
+    if (mode !== 'x' && closestYDist > proximity) return [];
 
     return points;
   }
@@ -584,35 +586,68 @@ export function updateTooltipPoints(engine: ChartCore): void {
   }
 
   // Slot marks (bars, histograms) answer from their geometry; the shared HitTester answers for
-  // lines, areas, bands and scatter.
+  // lines, areas, bands and scatter. When slot marks lead, the other marks still join: lines at
+  // the cursor's X, and the scatter point under the pointer.
   const rank = leadingTooltipRank(engine);
   if (rank > 0) {
-    engine.tooltipPoints = slotTooltipPoints(engine, rank);
+    const slots = slotTooltipPoints(engine, rank);
+    const series = engine.config.series;
+    const isSlot = (s: SeriesSpec) => markOf(s).hit.tooltipRank === rank;
+    const lines = hitPoints(engine, 'x', (s) => !isSlot(s) && !markOf(s).draw.cloud);
+    const clouds = hitPoints(engine, 'nearest', (s) => !isSlot(s) && markOf(s).draw.cloud);
+    engine.tooltipPoints =
+      series.length === slots.length
+        ? slots
+        : [...slots, ...lines, ...clouds].sort((a, b) => a.seriesIndex - b.seriesIndex);
   } else {
     const mode = engine.config.tooltip?.mode ?? 'index';
-    const hitX = mode === 'nearest' && engine.mouseX !== null ? engine.mouseX : engine.cursorX;
-    const hitY = mode === 'nearest' && engine.mouseY !== null ? engine.mouseY : engine.cursorY;
-    const palette = engine.categoricalPalette();
-    engine.tooltipPoints = engine.hitTester.findPoints(
-      engine.sourceStores[0],
-      engine.scales,
-      engine.config.series,
-      hitX,
-      hitY,
-      mode,
-      palette,
-      engine.lastPointerType,
-      engine.scatterPalettes(),
-      engine.dataVersion,
-      (si) => {
-        const series = engine.config.series[si];
-        const fallback = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
-        return scatterResolvers(engine, si, series, fallback).logicalResolver;
-      },
-      tooltipReadouts(engine),
-      (si) => engine.storeForSeries(si),
-    );
+    // A point cloud answers with the point nearest the pointer, never the nearest X: in a dense
+    // cloud the nearest X is rarely the point the reader is on.
+    engine.tooltipPoints =
+      mode === 'nearest'
+        ? hitPoints(engine, 'nearest')
+        : [
+            ...hitPoints(engine, mode, (s) => !markOf(s).draw.cloud),
+            ...hitPoints(engine, 'nearest', (s) => markOf(s).draw.cloud),
+          ].sort((a, b) => a.seriesIndex - b.seriesIndex);
   }
+}
+
+/**
+ * The HitTester's points for the series `include` keeps (all by default). `nearest` hits the
+ * pointer; `index` the cursor's X near a series; `x` every series at the cursor's X.
+ */
+function hitPoints(
+  engine: ChartCore,
+  mode: 'nearest' | 'index' | 'x',
+  include?: (series: SeriesSpec) => boolean,
+): TooltipPoint[] {
+  const hitX = mode === 'nearest' && engine.mouseX !== null ? engine.mouseX : engine.cursorX!;
+  const hitY = mode === 'nearest' && engine.mouseY !== null ? engine.mouseY : engine.cursorY!;
+  const palette = engine.categoricalPalette();
+  const series = include
+    ? engine.config.series.map((s) => (include(s) ? s : { ...s, visible: false }))
+    : engine.config.series;
+  if (include && series.every((s) => s.visible === false)) return [];
+  return engine.hitTester.findPoints(
+    engine.sourceStores[0],
+    engine.scales,
+    series,
+    hitX,
+    hitY,
+    mode,
+    palette,
+    engine.lastPointerType,
+    engine.scatterPalettes(),
+    engine.dataVersion,
+    (si) => {
+      const s = engine.config.series[si];
+      const fallback = s.color ?? palette[(s.paletteIndex ?? si) % palette.length];
+      return scatterResolvers(engine, si, s, fallback).logicalResolver;
+    },
+    tooltipReadouts(engine),
+    (si) => engine.storeForSeries(si),
+  );
 }
 
 export function emitPointClick(engine: ChartCore, pixelX: number, pixelY: number): void {

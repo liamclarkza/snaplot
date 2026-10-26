@@ -623,7 +623,8 @@ test('[D39] the no-build page runs snaplot from dist through an import map', asy
     let most = 0;
     for (const canvas of document.querySelectorAll('#chart canvas')) {
       const ctx = (canvas as HTMLCanvasElement).getContext('2d');
-      if (!ctx) continue;
+      // The overlay has no backing store until it first shows something.
+      if (!ctx || (canvas as HTMLCanvasElement).width === 0) continue;
       const { data } = ctx.getImageData(
         0,
         0,

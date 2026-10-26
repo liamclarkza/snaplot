@@ -4,7 +4,6 @@ import { expect, hoverData, test, tooltipText } from './fixtures';
 
 test.describe('tooltip rows', () => {
   test('[interact-03] a bar and line chart lists every series', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-03]');
     await page.evaluate(() => {
       window.harness.mount({
         data: [
@@ -29,7 +28,6 @@ test.describe('tooltip rows', () => {
   test('[interact-03] a histogram with a fitted line lists the line', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-03]');
     await page.evaluate(() => {
       const { histogram } = window.harness;
       const values = Array.from({ length: 400 }, (_, i) => 5 + Math.sin(i * 12.9898) * 3);

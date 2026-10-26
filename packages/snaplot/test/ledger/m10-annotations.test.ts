@@ -100,7 +100,7 @@ describe('[gap-annotations-extensibility-04] open and log regions', () => {
 });
 
 describe('[gap-annotations-extensibility-02] annotation labels stay readable', () => {
-  it.fails('[gap-annotations-extensibility-02] the newest streaming marker keeps its label inside the plot', () => {
+  it('[gap-annotations-extensibility-02] the newest streaming marker keeps its label inside the plot', () => {
     const chart = fakes.mount(
       {
         data: Array.from({ length: 60 }, (_, t) => ({ t, v: 10 + (t % 5) })),
@@ -117,7 +117,7 @@ describe('[gap-annotations-extensibility-02] annotation labels stay readable', (
     expect(label.x + 'Deploy #482'.length * 7).toBeLessThanOrEqual(plot.left + plot.width);
   });
 
-  it.fails('[gap-annotations-extensibility-02] two close reference line labels do not overlap', () => {
+  it('[gap-annotations-extensibility-02] two close reference line labels do not overlap', () => {
     const chart = fakes.mount({
       data: Array.from({ length: 30 }, (_, t) => ({ t, v: 100 + (t % 9) * 10 })),
       x: 't',

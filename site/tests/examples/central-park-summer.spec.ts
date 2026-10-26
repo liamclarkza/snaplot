@@ -109,6 +109,8 @@ test.describe(`[demos-03] ${SLUG}`, () => {
           const box = chart.container.getBoundingClientRect();
           let darkest = 255;
           for (const canvas of chart.container.querySelectorAll('canvas')) {
+            // The overlay has no backing store until it first shows something.
+            if (canvas.width === 0) continue;
             const scale = canvas.width / canvas.getBoundingClientRect().width;
             const ctx = canvas.getContext('2d');
             if (!ctx) continue;

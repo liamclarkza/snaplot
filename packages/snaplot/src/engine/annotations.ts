@@ -75,6 +75,7 @@ export function createReferenceLinesPlugin(options: {
       ctx.rect(left, top, width, height);
       ctx.clip();
 
+      const labels: Array<{ line: ReferenceLine; px: number; color: string }> = [];
       for (const line of lines) {
         const axisKey = line.axisKey ?? line.axis;
         const scale = chart.getAxis(axisKey);
@@ -82,48 +83,61 @@ export function createReferenceLinesPlugin(options: {
 
         const px = scale.dataToPixel(line.value);
         const color = chart.resolveColor(line.color ?? theme.tickColor);
-        const lw = line.lineWidth ?? 1;
+        if (line.axis === 'y' ? px < top || px > top + height : px < left || px > left + width)
+          continue; // off-screen
 
         ctx.strokeStyle = color;
-        ctx.lineWidth = lw;
+        ctx.lineWidth = line.lineWidth ?? 1;
         ctx.setLineDash(line.dash ?? []);
         ctx.globalAlpha = 1;
-
         ctx.beginPath();
         if (line.axis === 'y') {
-          // Horizontal line at Y value
-          if (px < top || px > top + height) continue; // off-screen
           ctx.moveTo(left, px);
           ctx.lineTo(left + width, px);
         } else {
-          // Vertical line at X value
-          if (px < left || px > left + width) continue; // off-screen
           ctx.moveTo(px, top);
           ctx.lineTo(px, top + height);
         }
         ctx.stroke();
+        if (line.label) labels.push({ line, px, color });
+      }
 
-        // Label
-        if (line.label) {
-          ctx.font = `11px ${theme.fontFamily}`;
-          ctx.fillStyle = color;
-          ctx.globalAlpha = 0.9;
-
-          if (line.axis === 'y') {
-            // Label at the right edge of the plot area
-            const textWidth = ctx.measureText(line.label).width;
-            const labelX = left + width - textWidth - 6;
-            const labelY = px - 4;
-            // Clamp label within plot area
-            const clampedY = Math.max(top + 12, Math.min(top + height - 4, labelY));
-            ctx.fillText(line.label, labelX, clampedY);
-          } else {
-            // Label at the top of the plot area, rotated or horizontal
-            const labelX = px + 4;
-            const labelY = top + 12;
-            ctx.fillText(line.label, labelX, labelY);
-          }
-        }
+      // Labels after every line, so none is crossed by a later line, each on a halo of the
+      // surface. A vertical line's label sits at the top, right of the line (left of it at the
+      // right edge), on the first row free of the labels before it; a horizontal line's sits at
+      // the right edge, pushed down clear of the one above it.
+      ctx.font = `11px ${theme.fontFamily}`;
+      ctx.setLineDash([]);
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = theme.surfaceColor ?? theme.backgroundColor;
+      const ROW = 13;
+      const rowEnds: number[] = [];
+      let lastY = -Infinity;
+      const vertical = labels.filter(({ line }) => line.axis !== 'y').sort((p, q) => p.px - q.px);
+      const horizontal = labels.filter(({ line }) => line.axis === 'y').sort((p, q) => p.px - q.px);
+      const draw = (text: string, x: number, y: number, color: string) => {
+        ctx.globalAlpha = 1;
+        ctx.strokeText(text, x, y);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.9;
+        ctx.fillText(text, x, y);
+      };
+      for (const { line, px, color } of vertical) {
+        const text = line.label!;
+        const textWidth = ctx.measureText(text).width;
+        const x = px + 4 + textWidth > left + width ? px - 4 - textWidth : px + 4;
+        let row = rowEnds.findIndex((end) => end + 4 <= x);
+        if (row < 0) row = rowEnds.length;
+        rowEnds[row] = x + textWidth;
+        draw(text, x, top + 12 + row * ROW, color);
+      }
+      for (const { line, px, color } of horizontal) {
+        const text = line.label!;
+        const textWidth = ctx.measureText(text).width;
+        const y = Math.max(lastY + ROW, Math.max(top + 12, Math.min(top + height - 4, px - 4)));
+        lastY = y;
+        draw(text, left + width - textWidth - 6, y, color);
       }
 
       ctx.restore();
