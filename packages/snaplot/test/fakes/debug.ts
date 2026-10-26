@@ -27,6 +27,8 @@ export interface DebugSnapshot {
   readonly inViewPoints: number;
   /** Ring-store logical materializations. */
   readonly materializeCount: number;
+  /** The plot rectangle in CSS pixels, relative to the chart container (M8). */
+  readonly plot: { left: number; top: number; width: number; height: number };
   /** Axis labels of the last grid paint, in paint order. */
   labelBoxes(): DebugLabelBox[];
 }
