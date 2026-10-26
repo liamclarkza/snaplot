@@ -2,6 +2,30 @@ import type { TooltipPoint, TooltipConfig, ThemeConfig } from '../engine/spec';
 import { TOOLTIP_OFFSET } from '../constants';
 import { isDarkColor } from '../engine/theme/color';
 import { prefersReducedMotion } from '../utils/motion';
+import { adoptStyles } from './styles';
+
+/**
+ * The tooltip's presentational styles, adopted once per document (dom/styles.ts). Its placement
+ * (fixed at the origin, above the page, inert to the pointer), visibility, fade (off under reduced
+ * motion), theme colours and position stay inline per element: they are its behaviour, and inline
+ * styles set through the CSSOM survive a CSP that blocks the stylesheet.
+ */
+export const TOOLTIP_CSS = `.snaplot-tooltip{padding:7px 10px;border-radius:6px;font-size:12px;font-variant-numeric:tabular-nums;line-height:1.45;max-width:280px;white-space:nowrap;contain:layout style paint;will-change:transform}
+.snaplot-tooltip-dot{display:inline-block;flex-shrink:0;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.snaplot-tooltip-title{display:flex;align-items:center;margin-bottom:5px}
+.snaplot-tooltip-strong{font-weight:600}
+.snaplot-tooltip-grid{display:grid;grid-template-columns:auto auto;gap:2px 12px;font-variant-numeric:tabular-nums}
+.snaplot-tooltip-fields{display:grid;grid-template-columns:auto auto;gap:2px 12px;margin-top:6px;font-variant-numeric:tabular-nums}
+.snaplot-tooltip-key{opacity:0.7}
+.snaplot-tooltip-value{font-weight:600;text-align:right}
+.snaplot-tooltip-point{display:flex;align-items:center;gap:8px}
+.snaplot-tooltip-coords{font-variant-numeric:tabular-nums}
+.snaplot-tooltip-header{margin-bottom:4px;opacity:0.7;font-size:11px}
+.snaplot-tooltip-row{display:flex;align-items:center;gap:12px}
+.snaplot-tooltip-name{display:flex;align-items:center;min-width:0;flex:1}
+.snaplot-tooltip-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snaplot-tooltip-amount{font-weight:600;flex-shrink:0}
+.snaplot-tooltip-more{opacity:0.6;font-size:11px;margin-top:2px}`;
 
 /**
  * Cap on rows in the default multi-series tooltip. Beyond this the list is
@@ -91,29 +115,14 @@ export class TooltipManager {
   private lastMeasurementKey: string | null = null;
 
   constructor(theme: ThemeConfig) {
+    adoptStyles(document, 'tooltip', TOOLTIP_CSS);
     this.el = document.createElement('div');
+    this.el.className = 'snaplot-tooltip';
     // Reduced motion: drop the fade so the tooltip appears instantly rather
     // than transitioning opacity. Read once at construction from the cached
     // query, never per show().
     const transition = prefersReducedMotion() ? 'none' : 'opacity 0.1s ease';
-    this.el.style.cssText = `
-      position: fixed;
-      left: 0;
-      top: 0;
-      z-index: 10000;
-      pointer-events: none;
-      opacity: 0;
-      transition: ${transition};
-      padding: 7px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-variant-numeric: tabular-nums;
-      line-height: 1.45;
-      max-width: 280px;
-      white-space: nowrap;
-      contain: layout style paint;
-      will-change: transform;
-    `;
+    this.el.style.cssText = `position:fixed;left:0;top:0;z-index:10000;pointer-events:none;opacity:0;transition:${transition};`;
     this.applyTheme(theme);
     document.body.appendChild(this.el);
   }
@@ -242,15 +251,15 @@ export class TooltipManager {
    */
   private defaultRender(points: TooltipPoint[]): string {
     const dot = (color: string) =>
-      `<span style="display:inline-block;flex-shrink:0;width:8px;height:8px;border-radius:50%;background:${escapeHtml(color)};margin-right:6px;vertical-align:middle"></span>`;
+      `<span class="snaplot-tooltip-dot" style="background:${escapeHtml(color)}"></span>`;
 
     // A histogram point represents an interval, not an arbitrary coordinate.
     if (points.length === 1 && points[0].xRange) {
       const p = points[0];
-      return `<div style="display:flex;align-items:center;margin-bottom:5px">${dot(p.color)}<span style="font-weight:600">${escapeHtml(p.label)}</span></div>
-        <div style="display:grid;grid-template-columns:auto auto;gap:2px 12px;font-variant-numeric:tabular-nums">
-          <span style="opacity:0.7">Range</span><span style="font-weight:600;text-align:right">${escapeHtml(p.formattedX)}</span>
-          <span style="opacity:0.7">Count</span><span style="font-weight:600;text-align:right">${escapeHtml(p.formattedY)}</span>
+      return `<div class="snaplot-tooltip-title">${dot(p.color)}<span class="snaplot-tooltip-strong">${escapeHtml(p.label)}</span></div>
+        <div class="snaplot-tooltip-grid">
+          <span class="snaplot-tooltip-key">Range</span><span class="snaplot-tooltip-value">${escapeHtml(p.formattedX)}</span>
+          <span class="snaplot-tooltip-key">Count</span><span class="snaplot-tooltip-value">${escapeHtml(p.formattedY)}</span>
         </div>`;
     }
 
@@ -259,20 +268,20 @@ export class TooltipManager {
       const p = points[0];
       const fields =
         p.fields && p.fields.length > 0
-          ? `<div style="display:grid;grid-template-columns:auto auto;gap:2px 12px;margin-top:6px;font-variant-numeric:tabular-nums">${p.fields
+          ? `<div class="snaplot-tooltip-fields">${p.fields
               .map(
                 (field) => `
-          <span style="opacity:0.7">${escapeHtml(field.label)}</span>
-          <span style="font-weight:600;text-align:right">${escapeHtml(field.formatted)}</span>
+          <span class="snaplot-tooltip-key">${escapeHtml(field.label)}</span>
+          <span class="snaplot-tooltip-value">${escapeHtml(field.formatted)}</span>
         `,
               )
               .join('')}</div>`
           : '';
-      return `<div style="display:flex;align-items:center;gap:8px">${dot(p.color)}<span style="font-variant-numeric:tabular-nums"><b>x</b> ${escapeHtml(p.formattedX)}&nbsp;&nbsp;<b>y</b> ${escapeHtml(p.formattedY)}</span></div>${fields}`;
+      return `<div class="snaplot-tooltip-point">${dot(p.color)}<span class="snaplot-tooltip-coords"><b>x</b> ${escapeHtml(p.formattedX)}&nbsp;&nbsp;<b>y</b> ${escapeHtml(p.formattedY)}</span></div>${fields}`;
     }
 
     // Multiple points (index mode, e.g. time series): header + rows
-    const header = `<div style="margin-bottom:4px;opacity:0.7;font-size:11px">${escapeHtml(points[0].formattedX)}</div>`;
+    const header = `<div class="snaplot-tooltip-header">${escapeHtml(points[0].formattedX)}</div>`;
 
     // Truncate long series lists so the box cannot outgrow the viewport. The
     // label ellipsizes (flex child with min-width:0) while the value stays
@@ -281,13 +290,13 @@ export class TooltipManager {
     let rows = '';
     for (let i = 0; i < shown; i++) {
       const p = points[i];
-      rows += `<div style="display:flex;align-items:center;gap:12px">
-        <span style="display:flex;align-items:center;min-width:0;flex:1">${dot(p.color)}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.label)}</span></span>
-        <span style="font-weight:600;flex-shrink:0">${escapeHtml(p.formattedY)}</span>
+      rows += `<div class="snaplot-tooltip-row">
+        <span class="snaplot-tooltip-name">${dot(p.color)}<span class="snaplot-tooltip-label">${escapeHtml(p.label)}</span></span>
+        <span class="snaplot-tooltip-amount">${escapeHtml(p.formattedY)}</span>
       </div>`;
     }
     if (points.length > shown) {
-      rows += `<div style="opacity:0.6;font-size:11px;margin-top:2px">+${points.length - shown} more</div>`;
+      rows += `<div class="snaplot-tooltip-more">+${points.length - shown} more</div>`;
     }
 
     return header + rows;
