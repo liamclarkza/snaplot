@@ -4,13 +4,14 @@ import type { ChartSpec, Layout, Scale, ThemeConfig } from '../spec';
 import { crisp } from './crisp';
 
 describe('crisp (render/crisp.ts, the W5 snapping contract)', () => {
-  it("rounds to the CSS pixel grid, plus half a pixel at DPR 1 (today's rule)", () => {
+  it('snaps to a device-pixel centre at odd DPRs and a device-pixel boundary at even ones', () => {
     expect(crisp(10.4, 1)).toBe(10.5);
     expect(crisp(10.6, 1)).toBe(11.5);
     expect(crisp(10, 1)).toBe(10.5);
-    expect(crisp(10.4, 2)).toBe(10);
-    expect(crisp(10.5, 2)).toBe(11);
-    expect(crisp(10.4, 1.25)).toBe(10);
+    expect(crisp(10.4, 2)).toBe(10.5);
+    expect(crisp(10.5, 2)).toBe(10.5);
+    expect(crisp(10.4, 3)).toBeCloseTo(31.5 / 3);
+    expect(crisp(10.4, 1.25)).toBe(13.5 / 1.25);
     expect(crisp(-0.4, 1)).toBe(0.5);
   });
 
@@ -78,7 +79,9 @@ describe('crisp (render/crisp.ts, the W5 snapping contract)', () => {
       );
       expect(strokes.length).toBeGreaterThan(10);
       for (const line of strokes) {
-        const snapped = line.some((v) => v === crisp(v - (dpr === 1 ? 0.5 : 0), dpr));
+        // A crisp coordinate sits on a device-pixel centre (odd DPR) or boundary (even DPR).
+        const phase = dpr % 2 === 1 ? 0.5 : 0;
+        const snapped = line.some((v) => Math.abs(((((v * dpr) % 1) + 1) % 1) - phase) < 1e-9);
         expect(snapped, `${line} at dpr ${dpr}`).toBe(true);
       }
     }

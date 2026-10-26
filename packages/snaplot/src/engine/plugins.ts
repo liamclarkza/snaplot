@@ -113,6 +113,18 @@ export class PluginHost<Chart> {
     );
   }
 
+  /** Whether any plugin draws in `slot`. */
+  drawsIn(slot: DrawSlot): boolean {
+    const builtin = BUILTIN_HOOK[slot];
+    const hook = USER_HOOK[slot];
+    return (
+      this.builtins.some((plugin) => typeof plugin[builtin] === 'function') ||
+      [...this.entries.values()].some(
+        (entry) => !entry.disabled && typeof entry.plugin[hook] === 'function',
+      )
+    );
+  }
+
   /** Run one draw slot: the built-ins, then each user plugin in order. */
   draw(
     slot: DrawSlot,

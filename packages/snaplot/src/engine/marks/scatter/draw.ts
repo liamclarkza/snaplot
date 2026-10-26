@@ -6,6 +6,7 @@
  */
 import type { ChartCore } from '../../Engine';
 import type { Scale, Layout, SeriesSpec } from '../../spec';
+import { context2d } from '../../render/surface';
 import { affineParams } from '../../scales/affine';
 import { NO_COLUMNS, seriesYColumn } from '../columns';
 import type { MarkDraw } from '../index';
@@ -86,7 +87,7 @@ function getStamp(
     canvas.height = size;
   }
 
-  const ctx = canvas.getContext('2d')! as CanvasRenderingContext2D;
+  const ctx = context2d(canvas);
   ctx.scale(dpr, dpr);
 
   const center = roundedRadius + 1;
@@ -608,7 +609,7 @@ function drawHeatmapSegments(
     tmpCanvas.width = w;
     tmpCanvas.height = h;
   }
-  const tmpCtx = tmpCanvas.getContext('2d')! as CanvasRenderingContext2D;
+  const tmpCtx = context2d(tmpCanvas);
   const imageData = tmpCtx.createImageData(w, h);
   const data = imageData.data;
 

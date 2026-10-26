@@ -430,7 +430,7 @@ describe('groups, visibility and theme', () => {
     expect(debug(b).renderCount.grid).toBe(grid);
   });
 
-  it.fails('[perf:group-offscreen][gap-scale-longevity-07] a 20-member group with 18 offscreen paints 2 overlays per move', () => {
+  it('[perf:group-offscreen][gap-scale-longevity-07] a 20-member group with 18 offscreen paints 2 overlays per move', () => {
     const group = createChartGroup({ cursor: true });
     const members = Array.from({ length: 20 }, () =>
       fakes.mount({ data: columns(200, (i) => i % 9), x: 'x', series: [{ y: 'y' }], group }),
@@ -448,7 +448,7 @@ describe('groups, visibility and theme', () => {
     expect(overlays() - before).toBeLessThanOrEqual(2 * 10);
   });
 
-  it.fails('[perf:offscreen] an offscreen chart paints 0 frames', () => {
+  it('[perf:offscreen] an offscreen chart paints 0 frames', () => {
     const chart = fakes.mount({
       data: columns(200, (i) => i % 9),
       x: 'x',

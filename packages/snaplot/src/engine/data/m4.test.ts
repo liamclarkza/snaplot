@@ -4,10 +4,21 @@ import { m4 } from './m4';
 const f = (xs: number[]) => Float64Array.from(xs);
 
 describe('downsampling gaps', () => {
-  it('preserves NaN separators in M4 output', () => {
-    const [, y] = m4(f([0, 1, 2, 3, 4, 5, 6, 7, 8]), f([1, 2, 3, NaN, 4, 5, 6, NaN, 7]), 1, 0, 8);
+  it('keeps a gap that leaves a pixel column empty', () => {
+    // 3 columns over 0..9: the gap at 3..5 empties the middle column.
+    const xs = f([0, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 6.5, 7, 7.5, 8, 8.5]);
+    const ys = f([1, 2, 3, 2, 1, NaN, NaN, NaN, 4, 5, 6, 5, 4, 5]);
+    const [, y] = m4(xs, ys, 3, 0, 9);
+    expect(Array.from(y).filter((value) => Number.isNaN(value))).toHaveLength(1);
+  });
 
-    expect(Array.from(y).filter((value) => Number.isNaN(value))).toHaveLength(2);
+  it('bridges a gap narrower than a pixel column, within the budget (dataapi-17)', () => {
+    const n = 300;
+    const xs = Float64Array.from({ length: n }, (_, i) => i);
+    const ys = Float64Array.from({ length: n }, (_, i) => (i % 3 === 2 ? NaN : i % 50));
+    const [x, y] = m4(xs, ys, 10, 0, n - 1);
+    expect(Array.from(y).some((value) => Number.isNaN(value))).toBe(false);
+    expect(x.length).toBeLessThanOrEqual(40);
   });
 });
 

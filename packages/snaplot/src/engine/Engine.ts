@@ -21,7 +21,7 @@ import { DirtyFlag } from './spec';
 
 // The canvases, the frame loop and the input.
 import { CanvasManager } from './render/surface';
-import { RenderScheduler, watchTheme } from './render/scheduler';
+import { RenderScheduler, watchPrint, watchTheme, watchVisibility } from './render/scheduler';
 import { EventBus } from './interaction/bus';
 import { GestureManager } from './interaction/gestures';
 import { TooltipManager } from '../dom/tooltip';
@@ -173,6 +173,8 @@ export class ChartCore implements EngineHost {
    * outside real theme flips.
    */
   private unwatchTheme: () => void;
+  private unwatchVisibility: () => void;
+  private unwatchPrint: () => void;
   /** Active selection box (shift+drag) */
   selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
   /** Persistent brush selection in data space (selection.mode: 'brush'). */
@@ -279,6 +281,7 @@ export class ChartCore implements EngineHost {
       this.onResize(w, h);
       this.scheduler.flush();
     });
+    this.canvasManager.setHeight(this.config.height);
 
     // 3. Resolve theme, and keep it live: token-driven apps flip themes by
     // swapping an attribute on <html>/<body> or via the OS color scheme,
@@ -336,15 +339,25 @@ export class ChartCore implements EngineHost {
     // 11. Attach gesture manager
     this.gestureManager.attach();
 
-    // 12. Create render scheduler and schedule initial draw
+    // 12. Create render scheduler and schedule initial draw. Frames wait while the chart is
+    // offscreen (plan D37); printing paints every chart now, and hides the tooltip.
     this.scheduler = new RenderScheduler((flags) => this.render(flags));
+    this.unwatchVisibility = watchVisibility(parent, (visible) =>
+      this.scheduler.setVisible(visible),
+    );
+    this.unwatchPrint = watchPrint(() => {
+      this.scheduler.setVisible(true);
+      this.scheduler.flush();
+      this.tooltipManager.hide();
+    });
 
     // 13. Auto-resize
     if (this.config.autoResize !== false) {
       this.canvasManager.enableAutoResize();
     }
 
-    // 14. Initial render
+    // 14. Initial render, at the 300 px fallback in a host that gives the chart no height.
+    this.canvasManager.sizeToHost();
     this.canvasManager.resize(
       this.canvasManager.cssWidth || parent.clientWidth || 600,
       this.canvasManager.cssHeight || parent.clientHeight || 400,
@@ -495,6 +508,11 @@ export class ChartCore implements EngineHost {
       this.gestureManager.updateTouchAction();
     }
 
+    if (fullReplace || 'height' in partial) {
+      this.canvasManager.setHeight(this.config.height);
+      this.fitToRoot();
+    }
+
     if (fullReplace || partial.theme) {
       const previousTheme = this.theme;
       this.theme = resolveTheme(this.container, this.config.theme);
@@ -615,6 +633,8 @@ export class ChartCore implements EngineHost {
       this.refineTimer = null;
     }
     this.unwatchTheme();
+    this.unwatchVisibility();
+    this.unwatchPrint();
 
     this.scheduler.destroy();
     this.gestureManager.detach();
@@ -722,6 +742,15 @@ export class ChartCore implements EngineHost {
 
     // Step 4c: Overlay layer (crosshair, tooltip)
     if (flags & DirtyFlag.OVERLAY) {
+      // The overlay's backing store is allocated the first time it has something to show.
+      if (
+        this.cursorX !== null ||
+        this.selection ||
+        this.selectionBox ||
+        this.tapFeedback ||
+        this.plugins.drawsIn('overlay')
+      )
+        this.canvasManager.activateOverlay();
       this.canvasManager.clear('overlay');
       renderOverlay(this);
       this.plugins.draw('overlay', this.canvasManager.overlayCtx, this, this.layout.plot);

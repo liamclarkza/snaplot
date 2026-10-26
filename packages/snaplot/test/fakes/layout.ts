@@ -3,7 +3,8 @@
  *
  * `setSize(el, w, h)` gives an element a CSS box. An element without a size
  * whose inline style is `width: 100%` (or `height: 100%`) takes its parent's
- * size on that axis, which is how the chart's own container fills its host.
+ * size on that axis, which is how the chart's own container fills its host;
+ * an inline `Npx` is N on that axis.
  * Every box sits at the viewport origin, so client coordinates equal local
  * ones.
  */
@@ -23,7 +24,8 @@ export function installLayout(restorers: Array<() => void>): LayoutFake {
     if (own) return own[key];
     const style = (element as HTMLElement).style;
     if (style?.[key] === '100%') return axis(element.parentElement, key);
-    return 0;
+    const px = /^([\d.]+)px$/.exec(style?.[key] ?? '');
+    return px ? Number(px[1]) : 0;
   };
   const sizeOf = (element: Element) => ({
     width: axis(element, 'width'),

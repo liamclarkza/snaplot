@@ -73,6 +73,6 @@ describe('rendering in jsdom', () => {
     stubBrowserApis();
     await react();
   });
-  it.fails('[repo-04] vanilla createChart mounts in plain jsdom', () => vanilla());
-  it.fails('[repo-04] React <Chart> mounts in plain jsdom', () => react());
+  it('[repo-04] vanilla createChart mounts in plain jsdom', () => vanilla());
+  it('[repo-04] React <Chart> mounts in plain jsdom', () => react());
 });

@@ -51,7 +51,6 @@ test(
   run(scenario.cursorFallback),
 );
 test('#13 a zero-height host gets 300 px and exactly one warning', async ({ page }) => {
-  test.fail(true, '[frameworks-15]');
   await run(scenario.zeroHeight)({ page });
 });
 test(

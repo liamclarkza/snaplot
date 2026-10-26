@@ -1,5 +1,100 @@
+import { warnOnce } from '../errors';
+import { shared } from './scheduler';
+
 /** A side of the chart's root that chrome (the built-in legend) can take space from. */
 export type ChromeSide = 'top' | 'bottom';
+
+/**
+ * Detect a devicePixelRatio change that leaves the CSS size unchanged, e.g. dragging the window
+ * between monitors with different scale factors. The ResizeObserver never fires in that case (the
+ * contentRect is identical), so the backing store would stay at the old resolution and render
+ * blurry until an unrelated resize. A `(resolution: Ndppx)` media query matches only the current
+ * dpr, so its `change` event fires when dpr moves off N; the watcher then re-arms for the new
+ * dpr. One query serves every chart on the page.
+ *
+ * The query also fires without a dpr change: Blink flips it when entering and leaving print
+ * media, with no animation frame before the snapshot. Resizing then would clear every canvas into
+ * the printout (gap-environments-01), so listeners resize only on a real dpr change.
+ */
+const watchDpr = shared((notify) => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
+  let query: MediaQueryList;
+  const onChange = () => {
+    query.removeEventListener('change', onChange);
+    arm();
+    notify();
+  };
+  const arm = () => {
+    query = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    query.addEventListener('change', onChange);
+  };
+  arm();
+  return () => query.removeEventListener('change', onChange);
+});
+
+/** The height a chart takes in a host that gives it none (plan D26). */
+const FALLBACK_HEIGHT = 300;
+
+/**
+ * The layout size, made exact from the bounding box when the two agree (the bounding box is
+ * fractional; under a CSS transform it is scaled, and the layout size is the one to keep).
+ */
+function exactSize(layout: number, box: number): number {
+  return Math.abs(box - layout) < 1 ? box : layout;
+}
+
+/**
+ * The canvas's 2D context, or one that draws nothing where there is none (jsdom without a canvas
+ * package, a blocked context), so the chart mounts, updates and destroys without throwing.
+ */
+export function context2d(canvas: HTMLCanvasElement | OffscreenCanvas): CanvasRenderingContext2D {
+  const context = canvas.getContext('2d') as CanvasRenderingContext2D | null;
+  if (context) return context;
+  warnOnce(
+    'environment',
+    'The canvas has no 2D context here (jsdom without the canvas package?), so the chart draws nothing.',
+  );
+  const state: Record<string | symbol, unknown> = { canvas };
+  const results: Record<string, unknown> = {
+    createLinearGradient: { addColorStop() {} },
+    createRadialGradient: { addColorStop() {} },
+    createPattern: null,
+    getLineDash: [],
+    isPointInPath: false,
+    isPointInStroke: false,
+    measureText: { width: 0, actualBoundingBoxAscent: 0, actualBoundingBoxDescent: 0 },
+  };
+  return new Proxy(state, {
+    get(target, key) {
+      if (key in target) return target[key];
+      if (key === 'getImageData' || key === 'createImageData')
+        return (...args: number[]) => {
+          const [w, h] = key === 'getImageData' ? args.slice(2) : args;
+          return {
+            width: w,
+            height: h,
+            data: new Uint8ClampedArray(Math.max(0, 4 * w * h)),
+          };
+        };
+      return () => results[key as string];
+    },
+    set(target, key, value) {
+      target[key] = value;
+      return true;
+    },
+  }) as unknown as CanvasRenderingContext2D;
+}
+
+/** An element's content-box height: its client height less vertical padding. */
+function contentHeight(element: HTMLElement): number {
+  if (typeof getComputedStyle === 'undefined') return element.clientHeight;
+  const style = getComputedStyle(element);
+  return (
+    element.clientHeight -
+    (parseFloat(style.paddingTop) || 0) -
+    (parseFloat(style.paddingBottom) || 0)
+  );
+}
 
 /**
  * Creates and manages the 3-layer canvas stack + DOM overlay, and the space chrome reserves at
@@ -29,10 +124,15 @@ export class CanvasManager {
   private _dpr = 1;
   /** The CSS size and dpr the backing stores were last allocated for. */
   private allocated: { width: number; height: number; dpr: number } | null = null;
-  private dprMediaQuery: MediaQueryList | null = null;
-  private boundDprChange: (() => void) | null = null;
+  private unwatchDprChange: (() => void) | null = null;
   /** CSS pixels reserved for chrome at each side of the root. */
   private chrome: Record<ChromeSide, number> = { top: 0, bottom: 0 };
+  /** The explicit CSS height of the root, or null to fill the host (plan D26). */
+  private explicitHeight: string | null = null;
+  /** Whether the root holds the 300 px fallback height for a host that gives it none. */
+  private fallback = false;
+  /** Whether the overlay has a backing store: only once it first shows something. */
+  private overlayActive = false;
 
   constructor(
     parent: HTMLElement,
@@ -44,14 +144,16 @@ export class CanvasManager {
   ) {
     this._dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 
-    // Container. `tabindex="0"` makes the chart keyboard-focusable,    // arrow-key pan / +/- zoom / 0-reset get wired up by GestureManager.
+    // Container. `isolation: isolate` keeps the layers' z-indices inside the chart, so page
+    // content above it is never painted under a canvas; `break-inside: avoid` keeps a printed
+    // chart on one page. `tabindex="0"` makes the chart keyboard-focusable,    // arrow-key pan / +/- zoom / 0-reset get wired up by GestureManager.
     // We don't set `:focus-visible` styling here; consumers can target
     // the container with their own CSS.
     this.container = document.createElement('div');
     this.container.tabIndex = 0;
     this.container.setAttribute('role', 'application');
     this.container.style.cssText =
-      'position:relative;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:auto;border-radius:6px;outline:none;';
+      'position:relative;isolation:isolate;break-inside:avoid;max-width:100%;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:auto;border-radius:6px;outline:none;';
     parent.appendChild(this.container);
 
     // Create canvases
@@ -59,10 +161,12 @@ export class CanvasManager {
     this.dataCanvas = this.createCanvas(1);
     this.overlayCanvas = this.createCanvas(2);
 
-    // Grid canvas is opaque (no transparency compositing needed)
-    this.gridCtx = this.gridCanvas.getContext('2d')!;
-    this.dataCtx = this.dataCanvas.getContext('2d')!;
-    this.overlayCtx = this.overlayCanvas.getContext('2d')!;
+    this.gridCtx = context2d(this.gridCanvas);
+    this.dataCtx = context2d(this.dataCanvas);
+    this.overlayCtx = context2d(this.overlayCanvas);
+    // A new canvas is 300 × 150; the overlay holds no backing store until `activateOverlay`.
+    this.overlayCanvas.width = 0;
+    this.overlayCanvas.height = 0;
 
     // DOM overlay for text (P2: hybrid rendering)
     this.domLayer = document.createElement('div');
@@ -83,12 +187,57 @@ export class CanvasManager {
     return this._dpr;
   }
 
+  /** The root's exact CSS width: fractional, as a ResizeObserver reports it. */
   get cssWidth(): number {
-    return this.container.clientWidth;
+    return exactSize(this.container.clientWidth, this.container.getBoundingClientRect().width);
   }
 
+  /** The root's exact CSS height: fractional, as a ResizeObserver reports it. */
   get cssHeight(): number {
-    return this.container.clientHeight;
+    return exactSize(this.container.clientHeight, this.container.getBoundingClientRect().height);
+  }
+
+  /**
+   * Apply the chart's height (plan D26). An explicit `height` (pixels or a CSS length) always sets
+   * the root's height. Without one the root fills its host; when the host gives it no height (an
+   * auto-height block), `sizeToHost` gives the root an in-flow 300 px and warns once. The
+   * fallback ends when the host is sized by other means.
+   */
+  setHeight(height: number | string | undefined): void {
+    this.explicitHeight =
+      height === undefined ? null : typeof height === 'number' ? `${height}px` : height;
+    if (this.explicitHeight !== null) this.fallback = false;
+    this.applyHeight();
+  }
+
+  /** Switch the 300 px fallback on or off for the host's current size (see `setHeight`). */
+  sizeToHost(): void {
+    if (this.explicitHeight !== null) return;
+    const host = this.container.parentElement;
+    if (!host) return;
+    if (this.fallback) {
+      // Sized by the fallback, the host's content box is exactly 300 px; anything else is the
+      // author's own height.
+      const content = contentHeight(host);
+      if (content > 0 && Math.abs(content - FALLBACK_HEIGHT) > 0.5) {
+        this.fallback = false;
+        this.applyHeight();
+      }
+      return;
+    }
+    // A host with no width is hidden (display: none), not unsized.
+    if (this.container.clientHeight > 0 || this.container.clientWidth === 0) return;
+    this.fallback = true;
+    this.applyHeight();
+    warnOnce(
+      'zero-height',
+      `The chart's container has no height, so the chart is ${FALLBACK_HEIGHT} px tall. Give the container a height, or pass height.`,
+    );
+  }
+
+  private applyHeight(): void {
+    this.container.style.height =
+      this.explicitHeight ?? (this.fallback ? `${FALLBACK_HEIGHT}px` : '100%');
   }
 
   /**
@@ -99,8 +248,17 @@ export class CanvasManager {
    */
   enableAutoResize(): void {
     if (this.resizeObserver) return;
+    if (typeof ResizeObserver === 'undefined') {
+      warnOnce(
+        'environment',
+        'ResizeObserver is not available here, so the chart keeps its first size.',
+      );
+      return;
+    }
     this.resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
+      // The host is observed for the height fallback; its own size changes reach the root.
+      if (entries.some((entry) => entry.target !== this.container)) this.sizeToHost();
+      const entry = entries.find((candidate) => candidate.target === this.container);
       if (!entry) return;
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) {
@@ -108,48 +266,29 @@ export class CanvasManager {
       }
     });
     this.resizeObserver.observe(this.container);
+    if (this.container.parentElement) this.resizeObserver.observe(this.container.parentElement);
     this.watchDpr();
   }
 
   /**
-   * Detect a devicePixelRatio change that leaves the CSS size unchanged, e.g.
-   * dragging the window between monitors with different scale factors. The
-   * ResizeObserver never fires in that case (the contentRect is identical), so
-   * the backing store would stay at the old resolution and render blurry until
-   * an unrelated resize. A `(resolution: Ndppx)` media query matches only the
-   * current dpr, so its `change` event fires when dpr moves off N; we then
-   * re-size and re-arm for the new dpr.
-   *
-   * The query also fires without a dpr change: Blink flips it when entering
-   * and leaving print media, with no animation frame before the snapshot.
-   * Resizing then would clear every canvas into the printout
-   * (gap-environments-01), so only a real dpr change resizes; every change
-   * re-arms.
+   * Follow a devicePixelRatio change that leaves the CSS size unchanged (see `watchDpr`); only a
+   * real change resizes.
    */
   private watchDpr(): void {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     this.unwatchDpr();
-    const dpr = window.devicePixelRatio || 1;
-    this.dprMediaQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
-    this.boundDprChange = () => {
+    this.unwatchDprChange = watchDpr(() => {
       if (
         (window.devicePixelRatio || 1) !== this._dpr &&
         this.resize(this.cssWidth, this.cssHeight)
       ) {
         this.onResize?.(this.cssWidth, this.cssHeight, true);
       }
-      // The query is pinned to the dpr it was armed with; re-arm for the current one.
-      this.watchDpr();
-    };
-    this.dprMediaQuery.addEventListener('change', this.boundDprChange);
+    });
   }
 
   private unwatchDpr(): void {
-    if (this.dprMediaQuery && this.boundDprChange) {
-      this.dprMediaQuery.removeEventListener('change', this.boundDprChange);
-    }
-    this.dprMediaQuery = null;
-    this.boundDprChange = null;
+    this.unwatchDprChange?.();
+    this.unwatchDprChange = null;
   }
 
   /**
@@ -168,18 +307,30 @@ export class CanvasManager {
     this._dpr = dpr;
     this.allocated = { width, height, dpr };
 
-    for (const canvas of [this.gridCanvas, this.dataCanvas, this.overlayCanvas]) {
-      canvas.width = width * this._dpr;
-      canvas.height = height * this._dpr;
-      canvas.style.width = width + 'px';
-      canvas.style.height = height + 'px';
-    }
-
-    // Reset transforms after resize (canvas resize clears context state)
-    this.gridCtx.scale(this._dpr, this._dpr);
-    this.dataCtx.scale(this._dpr, this._dpr);
-    this.overlayCtx.scale(this._dpr, this._dpr);
+    this.allocate(this.gridCanvas, this.gridCtx);
+    this.allocate(this.dataCanvas, this.dataCtx);
+    if (this.overlayActive) this.allocate(this.overlayCanvas, this.overlayCtx);
     return true;
+  }
+
+  /** Give the overlay its backing store, at the current size (a no-op once it has one). */
+  activateOverlay(): void {
+    if (this.overlayActive) return;
+    this.overlayActive = true;
+    if (this.allocated) this.allocate(this.overlayCanvas, this.overlayCtx);
+  }
+
+  /**
+   * Size one layer to the allocation: whole device pixels for the backing store, the exact
+   * (fractional) box for the CSS size, and the DPR transform the resize cleared.
+   */
+  private allocate(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): void {
+    const { width, height } = this.allocated!;
+    canvas.width = Math.round(width * this._dpr);
+    canvas.height = Math.round(height * this._dpr);
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    ctx.scale(this._dpr, this._dpr);
   }
 
   /**
@@ -227,6 +378,11 @@ export class CanvasManager {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.unwatchDpr();
+    // Release the backing stores now: a detached canvas keeps its memory until collected.
+    for (const canvas of [this.gridCanvas, this.dataCanvas, this.overlayCanvas]) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
     this.container.remove();
   }
 

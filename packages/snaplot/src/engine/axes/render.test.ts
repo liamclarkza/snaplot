@@ -1,3 +1,4 @@
+import { crisp } from '../render/crisp';
 import { describe, expect, it, vi } from 'vitest';
 import { renderAxes } from './render';
 import type { ChartSpec, Layout, Scale, ThemeConfig } from '../spec';
@@ -219,10 +220,11 @@ describe('plot furniture', () => {
       series: [],
       axes: { y: { position: 'left', grid: false } },
     });
-    const offset = dpr === 1 ? 0.5 : 0;
-    expect(ctx.rect).toHaveBeenLastCalledWith(20 + offset, offset, 100, 100);
-    expect(ctx.moveTo).toHaveBeenCalledWith(20 + offset, offset);
-    expect(ctx.moveTo).toHaveBeenCalledWith(20 + offset, 100 + offset);
+    // Each edge snaps on its own: 20.5, 0.5 … 120.5 at DPR 1; 20, 0 … 119.5 at DPR 2.
+    const [left, top, right, bottom] = [20.2, 0.2, 119.6, 99.6].map((v) => crisp(v, dpr));
+    expect(ctx.rect).toHaveBeenLastCalledWith(left, top, right - left, bottom - top);
+    expect(ctx.moveTo).toHaveBeenCalledWith(left, top);
+    expect(ctx.moveTo).toHaveBeenCalledWith(left, bottom);
   });
 
   it('uses theme opacity directly and gives tick marks the axis hue, preserving explicit overrides', () => {

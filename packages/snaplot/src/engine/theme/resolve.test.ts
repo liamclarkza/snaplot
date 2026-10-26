@@ -1,24 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PALETTE_SEQUENTIAL_DARK, PALETTE_SEQUENTIAL_LIGHT } from '../../constants';
 import type { ThemeConfig } from '../spec';
-import {
-  resolveTheme,
-  lightTheme,
-  darkTheme,
-  studioTheme,
-  tokyoTheme,
-  oceanTheme,
-  forestTheme,
-  violetTheme,
-  fogTheme,
-  ivoryTheme,
-  mintTheme,
-  sunsetTheme,
-  midnightTheme,
-  marsTheme,
-  refinedDarkTheme,
-  createTheme,
-} from './resolve';
+import { resolveTheme, lightTheme, darkTheme, createTheme } from './resolve';
 
 describe('resolveTheme palette roles', () => {
   it('fills heatmap roles from the light defaults', () => {
@@ -71,7 +54,7 @@ describe('resolveTheme palette roles', () => {
 describe('createTheme semantic tokens', () => {
   it('maps product tokens onto the detailed theme roles', () => {
     const theme = createTheme({
-      base: ivoryTheme,
+      base: lightTheme,
       surface: 'container',
       text: 'var(--product-text)',
       muted: 'var(--product-muted)',
@@ -109,25 +92,13 @@ describe('createTheme semantic tokens', () => {
 });
 
 /**
- * Guard for the shipped named themes. Every one is hand-tuned, so this asserts
+ * Guard for the two shipped themes. Each is hand-tuned, so this asserts
  * the two properties a machine can check that a human eye cannot guarantee at
  * review time: WCAG AA text/tick contrast, and presence of the role palettes.
  */
 const NAMED_THEMES: Record<string, ThemeConfig> = {
   lightTheme,
   darkTheme,
-  studioTheme,
-  tokyoTheme,
-  oceanTheme,
-  forestTheme,
-  violetTheme,
-  fogTheme,
-  ivoryTheme,
-  mintTheme,
-  sunsetTheme,
-  midnightTheme,
-  marsTheme,
-  refinedDarkTheme,
 };
 
 function hexToRgb(hex: string): [number, number, number] {

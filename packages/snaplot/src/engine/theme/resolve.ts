@@ -2,18 +2,6 @@ import type { ThemeConfig } from '../spec';
 import {
   DEFAULT_THEME,
   DARK_THEME,
-  OCEAN_THEME,
-  MIDNIGHT_THEME,
-  REFINED_DARK_THEME,
-  MARS_THEME,
-  FOREST_THEME,
-  SUNSET_THEME,
-  VIOLET_THEME,
-  FOG_THEME,
-  IVORY_THEME,
-  MINT_THEME,
-  STUDIO_THEME,
-  TOKYO_THEME,
   PALETTE_CATEGORICAL_LIGHT,
   PALETTE_CATEGORICAL_DARK,
   PALETTE_SEQUENTIAL_LIGHT,
@@ -24,22 +12,7 @@ import {
 import { deepMerge } from '../merge';
 import { cssColor, isDarkColor, parseColor, resolveColor, withAlpha } from './color';
 
-export {
-  DEFAULT_THEME as lightTheme,
-  DARK_THEME as darkTheme,
-  OCEAN_THEME as oceanTheme,
-  MIDNIGHT_THEME as midnightTheme,
-  REFINED_DARK_THEME as refinedDarkTheme,
-  MARS_THEME as marsTheme,
-  FOREST_THEME as forestTheme,
-  SUNSET_THEME as sunsetTheme,
-  VIOLET_THEME as violetTheme,
-  FOG_THEME as fogTheme,
-  IVORY_THEME as ivoryTheme,
-  MINT_THEME as mintTheme,
-  STUDIO_THEME as studioTheme,
-  TOKYO_THEME as tokyoTheme,
-};
+export { DEFAULT_THEME as lightTheme, DARK_THEME as darkTheme };
 
 /**
  * CSS custom properties resolveTheme reads from the chart container's

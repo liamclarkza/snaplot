@@ -51,7 +51,7 @@ describe('[visuals-18] interpolation on every line-like mark', () => {
 });
 
 describe('[dataapi-17] decimation budget', () => {
-  it.fails('[dataapi-17] gappy data respects the M4 output budget during a gesture', () => {
+  it('[dataapi-17] gappy data respects the M4 output budget during a gesture', () => {
     const n = 60_000;
     const chart = fakes.mount(
       {

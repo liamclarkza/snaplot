@@ -18,11 +18,6 @@ export function m4(
   if (len === 0 || pixelWidth <= 0) {
     return [new Float64Array(0), new Float64Array(0)];
   }
-
-  if (hasGaps(x, y)) {
-    return m4Gapped(x, y, pixelWidth, xMin, xMax);
-  }
-
   return m4FiniteRun(x, y, 0, len - 1, pixelWidth, xMin, xMax);
 }
 
@@ -50,9 +45,10 @@ function m4FiniteRun(
     return [new Float64Array([x[start]]), new Float64Array([y[start]])];
   }
 
-  // Pre-allocate max possible output (4 per pixel column)
-  const tmpX = new Float64Array(maxOut);
-  const tmpY = new Float64Array(maxOut);
+  // Pre-allocate max possible output: 4 per pixel column, plus a break per gap, and a gap needs
+  // an empty column (below).
+  const tmpX = new Float64Array(maxOut + pixelWidth);
+  const tmpY = new Float64Array(maxOut + pixelWidth);
   let out = 0;
 
   // Track state per pixel column
@@ -111,9 +107,17 @@ function m4FiniteRun(
     }
   }
 
+  // A gap (a non-finite value) breaks the path only when it leaves at least one pixel column
+  // empty: a narrower one would not show, and breaking there would emit up to four points per
+  // run in every column, past the budget (dataapi-17).
+  let gap = false;
   for (let i = start; i <= end; i++) {
     const xi = x[i];
     const yi = y[i];
+    if (!Number.isFinite(xi) || !Number.isFinite(yi)) {
+      gap = true;
+      continue;
+    }
 
     // Which pixel column does this point fall in? Clamp both edges: callers
     // pass a viewport-culled slice that deliberately includes one point just
@@ -126,6 +130,15 @@ function m4FiniteRun(
       0,
       Math.min(Math.floor(((xi - xMin) / xRange) * pixelWidth), pixelWidth - 1),
     );
+
+    if (gap && curBucket >= 0 && bucket > curBucket + 1) {
+      flushBucket();
+      tmpX[out] = xi;
+      tmpY[out] = Number.NaN;
+      out++;
+      curBucket = -1;
+    }
+    gap = false;
 
     if (bucket !== curBucket) {
       flushBucket();
@@ -163,48 +176,4 @@ function m4FiniteRun(
   // and hands back what looks like a shared buffer. m4 is opt-in and not a
   // per-frame call, so the small copy is cheap.
   return [tmpX.slice(0, out), tmpY.slice(0, out)];
-}
-
-function m4Gapped(
-  x: Float64Array,
-  y: Float64Array,
-  pixelWidth: number,
-  xMin: number,
-  xMax: number,
-): [Float64Array, Float64Array] {
-  const outX: number[] = [];
-  const outY: number[] = [];
-  let runStart = -1;
-
-  const flushRun = (end: number) => {
-    if (runStart < 0) return;
-    const [runX, runY] = m4FiniteRun(x, y, runStart, end, pixelWidth, xMin, xMax);
-    if (outX.length > 0) {
-      outX.push(x[runStart]);
-      outY.push(Number.NaN);
-    }
-    for (let i = 0; i < runX.length; i++) {
-      outX.push(runX[i]);
-      outY.push(runY[i]);
-    }
-    runStart = -1;
-  };
-
-  for (let i = 0; i < x.length; i++) {
-    if (Number.isFinite(x[i]) && Number.isFinite(y[i])) {
-      if (runStart < 0) runStart = i;
-    } else {
-      flushRun(i - 1);
-    }
-  }
-  flushRun(x.length - 1);
-
-  return [Float64Array.from(outX), Float64Array.from(outY)];
-}
-
-function hasGaps(x: Float64Array, y: Float64Array): boolean {
-  for (let i = 0; i < x.length; i++) {
-    if (!Number.isFinite(x[i]) || !Number.isFinite(y[i])) return true;
-  }
-  return false;
 }

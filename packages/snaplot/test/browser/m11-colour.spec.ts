@@ -332,13 +332,16 @@ test.describe('ramps and surfaces', () => {
     const probe = await page.evaluate(
       ([x, y]) => {
         const canvases = window.harness.canvases('chart-0');
-        return canvases.map((canvas) => {
-          const rect = canvas.getBoundingClientRect();
-          const context = canvas.getContext('2d');
-          const px = Math.floor(((x - rect.left) / rect.width) * canvas.width);
-          const py = Math.floor(((y - rect.top) / rect.height) * canvas.height);
-          return context ? [...context.getImageData(px, py, 1, 1).data] : [];
-        });
+        // The overlay has no backing store until it first shows something.
+        return canvases
+          .filter((canvas) => canvas.width > 0)
+          .map((canvas) => {
+            const rect = canvas.getBoundingClientRect();
+            const context = canvas.getContext('2d');
+            const px = Math.floor(((x - rect.left) / rect.width) * canvas.width);
+            const py = Math.floor(((y - rect.top) / rect.height) * canvas.height);
+            return context ? [...context.getImageData(px, py, 1, 1).data] : [];
+          });
       },
       [plot.left + 7, plot.top + 7] as const,
     );

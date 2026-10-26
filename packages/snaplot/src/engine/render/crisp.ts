@@ -3,13 +3,14 @@
  * the engine goes through (the grid, the plot frame, the tick marks, the crosshair, and the brush
  * and box edges). Coordinates are CSS pixels on a context scaled by `dpr`.
  *
- * Today's rule, kept by M9b: round to the CSS pixel grid, plus half a pixel at DPR 1, where a 1 px
- * line on a pixel boundary would light two device pixels at half strength. At DPR 2 the rounded
- * line covers two whole device pixels. M11 owns this module and snaps to device-pixel centres at
- * every DPR (1.25, 1.5, 3; render-16) behind the same signature.
+ * A 1 px stroke covers `round(dpr)` device pixels. An odd count is crisp centred on a device-pixel
+ * centre (DPR 1 and 3: k + 0.5 device px), an even count on a device-pixel boundary (DPR 2). The
+ * coordinate snaps to the nearest such point (render-16).
  */
 
 /** The line coordinate at which a 1 px stroke along `value` draws crisp at `dpr`. */
 export function crisp(value: number, dpr: number): number {
-  return Math.round(value) + (dpr === 1 ? 0.5 : 0);
+  const device = Math.max(1, Math.round(dpr));
+  const scaled = Math.round(value * dpr);
+  return (device % 2 === 1 ? scaled + 0.5 : scaled) / dpr;
 }

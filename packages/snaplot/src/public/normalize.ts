@@ -8,6 +8,7 @@
  * is kept by reference; ingest reads it.
  */
 import { DARK_THEME, DEFAULT_THEME } from '../constants';
+import { isCssColor } from '../engine/theme/color';
 import { createTheme } from '../engine/theme/resolve';
 import { fail, hint, unknownSeries, warnOnce } from '../engine/errors';
 import { dateFormatter, type NumberFormatSpec, numberFormatter } from '../engine/format';
@@ -263,7 +264,15 @@ function finiteOption(value: unknown, path: string, min = 0, max = Infinity): nu
 
 /** An annotation colour: a string, or a warning (whether a string is a colour is M11's parser). */
 function colorOption(value: unknown, path: string): string | undefined {
-  if (value === undefined || typeof value === 'string') return value;
+  if (value === undefined) return value;
+  if (typeof value === 'string') {
+    if (!isCssColor(value))
+      warnOnce(
+        'invalid-option',
+        `${path} "${value}" is not a CSS colour; the chart may not paint it.`,
+      );
+    return value;
+  }
   warnOnce(
     'invalid-option',
     `${path} ${describe(value)} is not valid and is ignored; it must be a CSS colour string.`,

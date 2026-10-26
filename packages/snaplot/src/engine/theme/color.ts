@@ -67,6 +67,16 @@ export function cssColor({ r, g, b, a }: RGBA): string {
   return a >= 1 ? `rgb(${rgb})` : `rgba(${rgb}, ${Math.round(a * 1000) / 1000})`;
 }
 
+/**
+ * Whether a string is a CSS colour: false only when the page can say so (`CSS.supports`), so a
+ * check without a DOM never rejects a colour it cannot read. `var()` is a colour until resolved.
+ */
+export function isCssColor(color: string): boolean {
+  if (parseFast(color.trim().toLowerCase())) return true;
+  if (typeof CSS === 'undefined' || typeof CSS.supports !== 'function') return true;
+  return CSS.supports('color', color);
+}
+
 /** The colours the canvas painted, by normalized string (null: not a colour). */
 const paintedCache = new Map<string, RGBA | null>();
 let paintProbe: CanvasRenderingContext2D | null | undefined;
@@ -75,7 +85,7 @@ let paintProbe: CanvasRenderingContext2D | null | undefined;
 function paintedColor(c: string): RGBA | null {
   const cached = paintedCache.get(c);
   if (cached !== undefined) return cached;
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || !isCssColor(c)) return null;
   paintProbe ??= document.createElement('canvas').getContext('2d', { willReadFrequently: true });
   if (!paintProbe || typeof paintProbe.getImageData !== 'function') return null;
   const ctx = paintProbe;

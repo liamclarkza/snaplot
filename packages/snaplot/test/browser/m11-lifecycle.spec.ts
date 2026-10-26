@@ -266,7 +266,8 @@ test.describe('lifecycle', () => {
       const layers = () =>
         window.harness.canvases('chart-0').map((canvas) => {
           const context = canvas.getContext('2d');
-          if (!context) return { opaque: 0, inked: 0 };
+          // The overlay has no backing store until it first shows something.
+          if (!context || canvas.width === 0) return { opaque: 0, inked: 0 };
           const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
           let opaque = 0;
           let inked = 0;
@@ -309,7 +310,8 @@ test.describe('lifecycle', () => {
   test('[gap-environments-02:print-basics] printing hides the tooltip', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[gap-environments-02:print-basics]');
+    // beforeprint hides the tooltip (M11); hovering a one-series line shows none yet (M12a).
+    test.fail(true, '[interact-04]');
     await mountLine(page);
     await hoverData(page, 'chart-0', 100, 50);
     expect(await page.evaluate(() => window.harness.tooltip())).not.toBeNull();
@@ -322,7 +324,6 @@ test.describe('lifecycle', () => {
   test('[gap-environments-02:print-basics] a printed chart does not split across pages', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[gap-environments-02:print-basics]');
     await mountLine(page);
     await page.emulateMedia({ media: 'print' });
     const breaks = await page.evaluate(() => {

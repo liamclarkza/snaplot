@@ -56,5 +56,5 @@ describe('rendering Solid in jsdom', () => {
     stubBrowserApis();
     mount();
   });
-  it.fails('[repo-04] <Chart> mounts in plain jsdom', () => mount());
+  it('[repo-04] <Chart> mounts in plain jsdom', () => mount());
 });
