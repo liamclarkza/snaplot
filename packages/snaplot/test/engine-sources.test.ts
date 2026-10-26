@@ -155,24 +155,4 @@ describe('engine independent data sources', () => {
     tapAt(chart, dataPoint(chart, 9, 30));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
-
-  it('guards controlled viewport, selection and reset before committing state or events', () => {
-    const chart = fakes.engine(config(), { sources: sources(), seriesSources: [0, 1] });
-    chart.setAxis('x', { min: 1, max: 3 });
-    const viewport = vi.fn(() => false);
-    const selection = vi.fn(() => false);
-    const changes = vi.fn();
-    chart.on('viewport:change', changes);
-    chart.setInteractionGuards({ viewport, selection });
-    chart.setAxis('x', { min: 2, max: 5 });
-    chart.setSelection({ x: { min: 1, max: 2 } });
-    chart.resetZoom();
-    expect(chart.getAxis('x')?.min).toBe(1);
-    expect(chart.getAxis('x')?.max).toBe(3);
-    expect(chart.getSelection()).toBe(null);
-    expect(chart.isFollowing()).toBe(false);
-    expect(changes).not.toHaveBeenCalled();
-    expect(viewport).toHaveBeenCalledWith('x', { min: 2, max: 5 });
-    expect(selection).toHaveBeenCalledWith({ x: { min: 1, max: 2 } });
-  });
 });

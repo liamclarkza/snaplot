@@ -89,6 +89,26 @@ to [Semantic Versioning](https://semver.org/).
   `nameColumn`, `valueColumn`, `swatchColumn`, `metricColumn` and `column` are removed.
   `LegendItem` is `SeriesState`.
 
+### React and Solid (1.0)
+
+- `<Chart>` takes exactly the options `createChart` takes, plus the host's `className`/`class`,
+  `style`, `id`, `aria-*` and `data-*`, and applies them with `chart.setOptions` on every render:
+  the state options `viewport`, `selection`, `hiddenSeries` and `highlight` with their
+  `on<Key>Change` callbacks replace the controlled props.
+- `<LegendTable chart={chart} columns={…} fallback={…} />` is `createLegendTable` as a component;
+  the Solid one takes a handle, an accessor or `undefined`.
+- React: `useChartState(chart, selector, isEqual)` re-renders only when its slice changes, and
+  `useCursor(chart, { fallback })` follows the cursor. Solid: `createChartState(chart, selector)`
+  and `createCursor(chart, { fallback })`. Both entries re-export `createChartGroup`,
+  `histogram` and every type.
+- Removed: the controlled props `viewport`/`onViewportChange` as ranges, `selectionState`,
+  `defaultViewport`, `defaultSelection`, `defaultHiddenSeries` and `onReady` (use `ref`);
+  `SeriesLegend`, the column helpers, `useChartGroup` (use
+  `useState(() => createChartGroup())[0]` or a module-scope group), `useHighlight`,
+  `useCursorSnapshot` (use `useCursor`); in Solid the `createChart` and `createChartGroup`
+  wrappers (use `<Chart ref>` and the core `createChartGroup`), `createHighlight` and
+  `createCursorSnapshot` (use `createCursor`). A group is never destroyed by a component.
+
 ### Removed options (1.0)
 
 The 0.12 options below left the public types. Passing one warns once per page with its path and

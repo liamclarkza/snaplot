@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createChart, createChartGroup, reconcileChart, setChartControls } from './chart';
+import { createChart, createChartGroup } from './chart';
 import type { ChartHandle, ChartOptions, ChartPoint } from './types';
 import { ChartCore } from '../core/Chart';
 
@@ -114,7 +114,7 @@ describe('public chart transactions', () => {
       viewport: { x: [2, 8] },
     });
     const current = chart.getOptions();
-    reconcileChart(chart, { ...current, series: [...current.series] });
+    chart.setOptions({ ...current, series: [...current.series] });
     expect(chart.getState().viewport.x).toEqual([2, 8]);
   });
 
@@ -127,7 +127,7 @@ describe('public chart transactions', () => {
     });
     chart.update({ axes: { y: { title: undefined } } });
     expect(chart.getOptions().axes?.y).toEqual({ min: 0 });
-    reconcileChart(chart, { data: [{ x: 1, y: 2 }], x: 'x', series: [{ y: 'y' }] });
+    chart.setOptions({ data: [{ x: 1, y: 2 }], x: 'x', series: [{ y: 'y' }] });
     expect(chart.getOptions().axes).toBeUndefined();
   });
 
@@ -230,32 +230,6 @@ describe('public chart transactions', () => {
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(5);
   });
 
-  it('proposes controlled changes without committing or broadcasting them', () => {
-    const chart = make({
-      data: [
-        { x: 0, y: 1 },
-        { x: 10, y: 2 },
-      ],
-      x: 'x',
-      series: [{ y: 'y' }],
-    });
-    const viewport = { x: { min: 0, max: 10 } };
-    const changed = vi.fn();
-    const hidden = vi.fn();
-    setChartControls(chart, {
-      viewport,
-      hiddenSeries: [],
-      onViewportChange: changed,
-      onHiddenSeriesChange: hidden,
-    });
-    chart.setViewport({ x: { min: 2, max: 8 } });
-    chart.setSeriesVisible('y', false);
-    expect(chart.getState().viewport.x).toEqual([viewport.x.min, viewport.x.max]);
-    expect(chart.getState().hiddenSeries).toEqual([]);
-    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ x: { min: 2, max: 8 } }));
-    expect(hidden).toHaveBeenLastCalledWith(['y']);
-  });
-
   it('retains unchanged plugin instances and gives them the public handle', () => {
     const install = vi.fn();
     const destroy = vi.fn();
@@ -314,7 +288,7 @@ describe('public chart transactions', () => {
       { x: 2, a: 2, b: 102 },
     ]);
     for (const title of ['First', 'Second']) {
-      reconcileChart(chart, { ...options, axes: { y: { title } } });
+      chart.setOptions({ ...options, axes: { y: { title } } });
       expect(
         chart
           .getCursorSnapshot({ fallback: 'latest' })
@@ -365,7 +339,7 @@ describe('public chart transactions', () => {
     } as const;
     const chart = make(options);
     chart.appendData([{ x: 3, y: 30 }], { seriesId: 'run' });
-    reconcileChart(chart, { ...options, axes: { y: { title: 'Loss' } } });
+    chart.setOptions({ ...options, axes: { y: { title: 'Loss' } } });
     expect(chart.getCursorSnapshot({ fallback: 'first' }).points[0]).toMatchObject({
       rowIndex: 0,
       x: 2,
@@ -373,7 +347,7 @@ describe('public chart transactions', () => {
     });
     expect(chart.getCursorSnapshot({ fallback: 'first' }).points[0].row).toBe(rows[0]);
     chart.appendData([{ x: 3, y: 35 }], { seriesId: 'run', updateLast: true });
-    reconcileChart(chart, { ...options, axes: { y: { title: 'Loss again' } } });
+    chart.setOptions({ ...options, axes: { y: { title: 'Loss again' } } });
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0]).toMatchObject({
       rowIndex: 2,
       x: 3,
@@ -386,8 +360,7 @@ describe('public chart transactions', () => {
     const options = { data, x: 'x', series: [{ y: 'y' }], streaming: { maxPoints: 2 } } as const;
     const chart = make(options);
     chart.appendData({ columns: { x: new Float64Array([1, 2]), y: new Float64Array([11, 12]) } });
-    for (const title of ['One', 'Two'])
-      reconcileChart(chart, { ...options, axes: { y: { title } } });
+    for (const title of ['One', 'Two']) chart.setOptions({ ...options, axes: { y: { title } } });
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0]).toMatchObject({
       rowIndex: 2,
       y: 12,
@@ -424,7 +397,7 @@ describe('public chart transactions', () => {
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].x).toBe('C');
   });
 
-  it('rejects invalid controlled snapshots before changing chart data or options', () => {
+  it('rejects invalid state options before changing chart data or options', () => {
     const options: ChartOptions<{ x: number; y: number }> = {
       data: [{ x: 0, y: 1 }],
       x: 'x',
@@ -432,13 +405,11 @@ describe('public chart transactions', () => {
     };
     const chart = make(options);
     expect(() =>
-      reconcileChart(chart, { ...options, data: [{ x: 2, y: 3 }] }, { hiddenSeries: ['missing'] }),
+      chart.setOptions({ ...options, data: [{ x: 2, y: 3 }], hiddenSeries: ['missing'] }),
     ).toThrow(/hiddenSeries names "missing"/);
     expect(chart.getCursorSnapshot({ fallback: 'latest' }).points[0].y).toBe(1);
-    expect(() => setChartControls(chart, { viewport: { x: { min: 1, max: 0 } } })).toThrow(
-      /min < max/,
-    );
-    chart.setViewport({ x: { min: 0, max: 5 } });
+    expect(() => chart.setOptions({ ...options, viewport: { x: [1, 0] } })).toThrow(/from < to/);
+    chart.update({ viewport: { x: [0, 5] } });
     expect(chart.getState().viewport.x).toEqual([0, 5]);
   });
 

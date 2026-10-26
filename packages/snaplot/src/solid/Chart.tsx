@@ -1,51 +1,41 @@
-import { onMount, onCleanup, createEffect, type JSX } from 'solid-js';
-import { createChart, reconcileChart, setChartControls } from '../public/chart';
-import type { ChartOptions, ChartHandle } from '../public/types';
-import {
-  applyDefaults,
-  chartOptions,
-  chartControls,
-  type ChartControls,
-  type ControlledOptionKeys,
-} from '../react/shared';
-export interface ChartProps<Row = Record<string, any>>
-  extends Omit<ChartOptions<Row>, ControlledOptionKeys>,
-    ChartControls {
+import { createEffect, type JSX, onCleanup, onMount } from 'solid-js';
+import { createChart } from '../public/chart';
+import type { ChartHandle, ChartOptions } from '../public/types';
+import { type HostAttributes, splitProps } from '../react/shared';
+
+/** The props of {@link Chart}: the chart's options, plus the host element's attributes. */
+export interface ChartProps<Row = Record<string, any>> extends ChartOptions<Row>, HostAttributes {
   /** Class names of the host element. @defaultValue none */
   class?: string;
   /** Inline styles of the host element. @defaultValue full width and height */
   style?: string | JSX.CSSProperties;
   /** Receives the chart handle, and `undefined` on cleanup. */
   ref?: (chart: ChartHandle<Row> | undefined) => void;
-  /** Called once with the chart handle after mount. */
-  onReady?: (chart: ChartHandle<Row>) => void;
 }
-/** A chart. Its props are the {@link ChartOptions} plus the host's attributes. */
+
+/**
+ * A chart. Its props are the same options `createChart` takes, applied with `setOptions` when
+ * they change, so inline objects and callbacks cost only what they change.
+ */
 export function Chart<Row = Record<string, any>>(props: ChartProps<Row>): JSX.Element {
   let host!: HTMLDivElement;
   onMount(() => {
-    const chart = createChart(host, chartOptions(props));
-    setChartControls(chart, chartControls(props));
-    applyDefaults(chart, props);
-    props.onReady?.(chart);
+    const chart = createChart(host, splitProps<Row>(props).options);
     createEffect(() => {
       const ref = props.ref;
       ref?.(chart);
       onCleanup(() => ref?.(undefined));
     });
-    createEffect(() => {
-      reconcileChart(chart, chartOptions(props), chartControls(props));
-    });
+    createEffect(() => chart.setOptions(splitProps<Row>(props).options));
     onCleanup(() => chart.destroy());
   });
   return (
     <div
       ref={host!}
+      {...splitProps(props).attributes}
       class={props.class}
       role="group"
       aria-label={props['aria-label'] ?? props.ariaLabel ?? 'Chart'}
-      aria-describedby={props['aria-describedby']}
-      aria-labelledby={props['aria-labelledby']}
       style={
         typeof props.style === 'string'
           ? 'width:100%;height:100%;' + props.style

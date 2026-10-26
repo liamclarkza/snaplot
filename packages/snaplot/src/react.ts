@@ -14,24 +14,16 @@
  */
 export { Chart } from './react/Chart';
 export type { ChartProps } from './react/Chart';
-export { useChartState, useCursorSnapshot, useHighlight, useChartGroup } from './react/hooks';
-export {
-  SeriesLegend,
-  LegendTable,
-  nameColumn,
-  valueColumn,
-  swatchColumn,
-  metricColumn,
-  column,
-} from './react/legends';
-export type { SeriesLegendProps, LegendTableProps, LegendTableColumn } from './react/legends';
-export type { ChartControls, LegendTableFallback } from './react/shared';
+export { LegendTable } from './react/LegendTable';
+export type { LegendTableProps } from './react/LegendTable';
+export { useChartState, useCursor } from './react/hooks';
+export type { HostAttributes } from './react/shared';
+export { createChartGroup } from './public/chart';
+export { histogram } from './public/histogram';
+export type * from './public/types';
 export type {
-  ChartOptions,
-  ChartHandle,
-  ChartState,
-  ChartPoint,
-  CursorSnapshot,
-  ChartGroup,
-  ChartGroupOptions,
-} from './public/types';
+  LegendTableColumn,
+  LegendTableHandle,
+  LegendTableOptions,
+} from './public/legend';
+export type { HistogramOptions, HistogramRule } from './public/histogram';

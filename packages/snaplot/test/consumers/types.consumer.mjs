@@ -28,15 +28,14 @@ export const notAny5: string = SolidChart;
 ${jsEntries.map((_, i) => `// @ts-expect-error a module namespace is not a string\nexport const entryProbe${i}: string = entry${i};`).join('\n')}
 
 const rows: Row[] = [{ time: 1, cpu: 2, label: 'a' }];
-// \`satisfies\`, not a \`ChartOptions<Row>\` annotation: until M8 deletes the framework's controlled
-// props, ChartOptions' viewport and on*Change types differ from the props'. M8 restores the annotation.
-const base = { data: rows, x: 'time', series: [{ y: 'cpu' }] } satisfies ChartOptions<Row>;
+// The framework props are the options: an annotated ChartOptions value spreads into them.
+const base: ChartOptions<Row> = { data: rows, x: 'time', series: [{ y: 'cpu' }] };
 export const options: ChartOptions<Row> = base;
-export const react: ReactProps<Row> = { ...base, viewport: { x: { min: 0, max: 2 } } };
+export const react: ReactProps<Row> = { ...base, viewport: { x: [0, 2] } };
 export const solid: SolidProps<Row> = {
   ...base,
   ref: (chart: ChartHandle<Row> | undefined) => {
-    chart?.setHighlight('cpu');
+    chart?.update({ highlight: 'cpu' });
   },
 };
 export const misspelled: ReactProps<Row> = {

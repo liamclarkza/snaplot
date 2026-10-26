@@ -248,18 +248,8 @@ function debugLabelBoxes(labels: AxesRenderResult['labels'] | null): DebugLabelB
  *
  * Render pipeline follows the exact order from §2.3 of the plan.
  */
-export interface InteractionGuards {
-  viewport?: (axisKey: string, range: ScaleRange) => boolean;
-  selection?: (range: SelectionRange | null) => boolean;
-}
-
 export class ChartCore implements EngineHost {
-  private interactionGuards: InteractionGuards = {};
   private coordinatingAxis = false;
-
-  setInteractionGuards(guards: InteractionGuards): void {
-    this.interactionGuards = guards;
-  }
 
   // Public
   readonly container: HTMLElement;
@@ -800,7 +790,6 @@ export class ChartCore implements EngineHost {
       const lastX = extent[1];
       const min = lastX - window;
       const max = lastX;
-      if (this.interactionGuards.viewport?.(key, { min, max }) === false) return false;
       proposals.push({ key, scale, min, max });
     }
     for (const { key, scale, min, max } of proposals) {
@@ -845,8 +834,6 @@ export class ChartCore implements EngineHost {
     const scale = this.scales.get(key);
     if (!scale) return;
 
-    const proposed = { min: range.min ?? scale.min, max: range.max ?? scale.max };
-    if (this.interactionGuards.viewport?.(key, proposed) === false) return;
     if (range.min !== undefined) scale.min = range.min;
     if (range.max !== undefined) scale.max = range.max;
 
@@ -1091,7 +1078,7 @@ export class ChartCore implements EngineHost {
 
   /** Reset zoom to full data extent (double-click handler) */
   resetZoom(): void {
-    if (this.destroyed || !this.allowResetViewport()) return;
+    if (this.destroyed) return;
     const previous = new Map(
       [...this.scales].map(([key, scale]) => [key, [scale.min, scale.max] as const]),
     );
@@ -1107,7 +1094,7 @@ export class ChartCore implements EngineHost {
   }
 
   scrollToLatest(): void {
-    if (this.destroyed || !this.allowResetViewport()) return;
+    if (this.destroyed) return;
     const previous = new Map(
       [...this.scales].map(([key, scale]) => [key, [scale.min, scale.max] as const]),
     );
@@ -1122,40 +1109,6 @@ export class ChartCore implements EngineHost {
     this.refreshCursor();
     this.scheduler.markDirty(DirtyFlag.ALL);
     this.publishResetViewport(previous);
-  }
-
-  private allowResetViewport(): boolean {
-    const guard = this.interactionGuards.viewport;
-    if (!guard) return true;
-    const current = [...this.scales].map(([key, scale]) => [key, scale.min, scale.max] as const);
-    const zoomed = new Set(this.userZoomedAxes);
-    const extents = new Map(this.naturalExtent);
-    const plans = new Map(this.barXAxisPlans);
-    const savedGuards = this.interactionGuards;
-    let proposed: Array<readonly [string, number, number]>;
-    try {
-      this.interactionGuards = {};
-      this.userZoomedAxes.clear();
-      this.autoRangeHorizontal();
-      this.applyFollowWindow();
-      this.autoRangeVertical();
-      proposed = [...this.scales].map(([key, scale]) => [key, scale.min, scale.max] as const);
-    } finally {
-      for (const [key, min, max] of current) {
-        const scale = this.scales.get(key)!;
-        scale.min = min;
-        scale.max = max;
-      }
-      this.userZoomedAxes = zoomed;
-      this.naturalExtent = extents;
-      this.barXAxisPlans = plans;
-      this.interactionGuards = savedGuards;
-    }
-    let allowed = true;
-    for (const [key, min, max] of proposed) {
-      if (guard(key, { min, max }) === false) allowed = false;
-    }
-    return allowed;
   }
 
   /** Report every scale a reset action moved. */
@@ -1183,7 +1136,6 @@ export class ChartCore implements EngineHost {
 
   setSelection(selection: SelectionRange | null): void {
     if (this.destroyed) return;
-    if (this.interactionGuards.selection?.(selection) === false) return;
     if (selection === null) {
       if (this.selection === null) return;
       this.selection = null;
@@ -1271,7 +1223,7 @@ export class ChartCore implements EngineHost {
     }
     this.brushDrag = { mode: 'create', anchorDataX: dataX, orig: { min: dataX, max: dataX } };
     const proposed = { x: { min: dataX, max: dataX } };
-    if (this.interactionGuards.selection?.(proposed) !== false) this.selection = proposed;
+    this.selection = proposed;
   }
 
   private brushUpdate(px: number): void {
@@ -1291,7 +1243,7 @@ export class ChartCore implements EngineHost {
     } else {
       proposed = { x: { min: Math.min(orig.min, dataX), max: Math.max(orig.min, dataX) } };
     }
-    if (this.interactionGuards.selection?.(proposed) !== false) this.selection = proposed;
+    this.selection = proposed;
   }
 
   private brushEnd(): void {
@@ -1301,7 +1253,7 @@ export class ChartCore implements EngineHost {
     // A create gesture that never moved (a click) clears the selection
     // rather than leaving a zero-width band.
     if (wasCreate && this.selection && this.selection.x.min === this.selection.x.max) {
-      if (this.interactionGuards.selection?.(null) !== false) this.selection = null;
+      this.selection = null;
     }
     this.emitSelectionChange();
   }
@@ -2757,7 +2709,6 @@ export class ChartCore implements EngineHost {
     // publish. Without this, dragging against the edge repaints all three
     // layers at gesture rate for zero visual change.
     if (scale.min === min && scale.max === max) return;
-    if (this.interactionGuards.viewport?.(scaleKey, { min, max }) === false) return;
 
     this.markViewportActive();
     this.userZoomedAxes.add(scaleKey);

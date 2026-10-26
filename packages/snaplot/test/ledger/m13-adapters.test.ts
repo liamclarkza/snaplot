@@ -59,7 +59,7 @@ const useChartState = hooks.useChartState as unknown as <T>(
 ) => T;
 
 describe('[frameworks-03][arch-04] React', () => {
-  it.fails('[frameworks-03] a highlight selector re-renders once over 20 cursor moves', async () => {
+  it('[frameworks-03] a highlight selector re-renders once over 20 cursor moves', async () => {
     let renders = 0;
     let handle: ChartHandle<Row> | null = null;
     function Probe({ chart }: { chart: ChartHandle<Row> | null }) {
@@ -76,7 +76,8 @@ describe('[frameworks-03][arch-04] React', () => {
           data: rows,
           x: 't',
           series: [{ y: 'cpu' }],
-          onReady: (ready: ChartHandle<Row>) => {
+          ref: (ready: ChartHandle<Row> | null) => {
+            if (!ready) return;
             handle = ready;
             setChart(ready);
           },
@@ -105,8 +106,8 @@ describe('[frameworks-03][arch-04] React', () => {
         series: [{ y: 'cpu', label: `CPU ${count > -1 ? '' : count}`.trim() }],
         axes: { y: { format: (v: number | string) => `${v}%` } },
         onPointClick: () => {},
-        onReady: (ready: ChartHandle<Row>) => {
-          handle = ready;
+        ref: (ready: ChartHandle<Row> | null) => {
+          if (ready) handle = ready;
         },
       });
     }
@@ -128,7 +129,7 @@ describe('[frameworks-03][arch-04] React', () => {
     expect(named).toContain('CPU');
   });
 
-  it.fails('[frameworks-07] two charts grouped inside a component survive an <Activity> hide and show', async () => {
+  it('[frameworks-07] two charts grouped inside a component survive an <Activity> hide and show', async () => {
     let setMode: (mode: 'visible' | 'hidden') => void = () => {};
     const errors: unknown[] = [];
     function Grouped() {
@@ -185,7 +186,7 @@ describe('[frameworks-03][arch-04] React', () => {
 });
 
 describe('[frameworks-09] Solid', () => {
-  it.fails('[frameworks-09] LegendTable accepts a plain chart handle, not only an accessor', () => {
+  it('[frameworks-09] LegendTable accepts a plain chart handle, not only an accessor', () => {
     const chart = fakes.mount<Row>({ data: rows, x: 't', series: [{ y: 'cpu', label: 'CPU' }] });
     const host = document.createElement('div');
     document.body.append(host);

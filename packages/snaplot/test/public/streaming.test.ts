@@ -22,7 +22,7 @@ const initial = (): Sample[] => [0, 1, 2, 3, 4].map((time) => ({ time, value: ti
 const warnings = () => warn.mock.calls.map((call) => String(call[0]));
 
 describe('[dataapi-02][dataapi-04] appended rows survive updates', () => {
-  it.fails('[dataapi-02] appended rows survive update({ axes }), a style change and setOptions with the same data', () => {
+  it('[dataapi-02] appended rows survive update({ axes }), a style change and setOptions with the same data', () => {
     const data = initial();
     const options = { data, x: 'time', series: [{ y: 'value' }] };
     const chart = mount<Sample>(fakes, options);
@@ -35,7 +35,7 @@ describe('[dataapi-02][dataapi-04] appended rows survive updates', () => {
     expect(warnings()).toEqual([]);
   });
 
-  it.fails('[dataapi-04] a rows source rejects a columns append with a hint, and changes nothing', () => {
+  it('[dataapi-04] a rows source rejects a columns append with a hint, and changes nothing', () => {
     const chart = mount<Sample>(fakes, { data: initial(), x: 'time', series: [{ y: 'value' }] });
     expect(() =>
       chart.appendData({ columns: { time: new Float64Array([5]), value: new Float64Array([50]) } }),
@@ -49,7 +49,7 @@ describe('[dataapi-02][dataapi-04] appended rows survive updates', () => {
     });
   });
 
-  it.fails('[dataapi-04] a columns stream keeps its appended points after an update', () => {
+  it('[dataapi-04] a columns stream keeps its appended points after an update', () => {
     const chart = mount<Sample>(fakes, {
       data: { columns: { time: new Float64Array([0, 1]), value: new Float64Array([0, 1]) } },
       x: 'time',
@@ -67,7 +67,7 @@ describe('[dataapi-02][dataapi-04] appended rows survive updates', () => {
     });
   });
 
-  it.fails('[dxtrial-11:data] an inline empty data array is the same data: appended rows remain', () => {
+  it('[dxtrial-11:data] an inline empty data array is the same data: appended rows remain', () => {
     const options = { x: 'time', series: [{ y: 'value' }] };
     const chart = mount<Sample>(fakes, { ...options, data: [] });
     for (let time = 0; time < 30; time++) chart.appendData([{ time, value: time }]);
@@ -79,7 +79,7 @@ describe('[dataapi-02][dataapi-04] appended rows survive updates', () => {
     expect(warnings()).toEqual([]);
   });
 
-  it.fails('[dxtrial-11:data] replacing data on a streamed source warns once with the discarded rows', () => {
+  it('[dxtrial-11:data] replacing data on a streamed source warns once with the discarded rows', () => {
     const options = { x: 'time', series: [{ y: 'value' }] };
     const chart = mount<Sample>(fakes, { ...options, data: initial() });
     for (const time of [5, 6, 7]) chart.appendData([{ time, value: time }]);

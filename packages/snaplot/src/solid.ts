@@ -1,5 +1,5 @@
 /**
- * The Solid components and hooks: `<Chart>` takes the same options as `createChart`.
+ * The Solid components and primitives: `<Chart>` takes the same options as `createChart`.
  *
  * @example
  * ```tsx
@@ -14,24 +14,17 @@
  */
 export { Chart } from './solid/Chart';
 export type { ChartProps } from './solid/Chart';
-export { createChart } from './solid/createChart';
-export { createChartState } from './solid/createChartState';
-export { createCursorSnapshot } from './solid/createCursorSnapshot';
-export { createHighlight } from './solid/createHighlight';
-export { createChartGroup } from './solid/createChartGroup';
 export { LegendTable } from './solid/LegendTable';
-export type { LegendTableProps, LegendTableColumn } from './solid/LegendTable';
-export { SeriesLegend } from './solid/SeriesLegend';
-export type { SeriesLegendProps } from './solid/SeriesLegend';
-export type { ChartControls, LegendTableFallback } from './react/shared';
+export type { LegendTableProps } from './solid/LegendTable';
+export { createChartState, createCursor } from './solid/primitives';
+export type { MaybeChart } from './solid/primitives';
+export type { HostAttributes } from './react/shared';
+export { createChartGroup } from './public/chart';
+export { histogram } from './public/histogram';
+export type * from './public/types';
 export type {
-  ChartOptions,
-  ChartHandle,
-  ChartState,
-  ChartPoint,
-  CursorSnapshot,
-  ChartGroup,
-  ChartGroupOptions,
-} from './public/types';
-
-export { nameColumn, valueColumn, swatchColumn, metricColumn, column } from './solid/columns';
+  LegendTableColumn,
+  LegendTableHandle,
+  LegendTableOptions,
+} from './public/legend';
+export type { HistogramOptions, HistogramRule } from './public/histogram';

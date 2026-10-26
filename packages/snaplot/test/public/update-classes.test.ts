@@ -113,7 +113,7 @@ describe('[arch-03][dataapi-10] presentation changes never ingest (P6)', () => {
     expect(measure(chart, () => chart.setOptions({ ...base, data: rows.slice() })).ingests).toBe(1);
   });
 
-  it.fails('[dataapi-10] update({ data }) re-ingests even the same array after an in-place edit', () => {
+  it('[dataapi-10] update({ data }) re-ingests even the same array after an in-place edit', () => {
     const data = rows.map((row) => ({ ...row }));
     const chart = mount<Row>(fakes, { ...base, data });
     data[data.length - 1].cpu = 99;
@@ -179,7 +179,7 @@ describe('[arch-04][frameworks-02][research-01] functions are read through lates
     expect(work.ingests).toBe(0);
   });
 
-  it.fails('[research-01] a new series.format identity costs no ingest, and the latest one formats', () => {
+  it('[research-01] a new series.format identity costs no ingest, and the latest one formats', () => {
     const chart = mount<Row>(fakes, base);
     const work = measure(chart, () => {
       for (let i = 0; i < 3; i++)
@@ -192,7 +192,7 @@ describe('[arch-04][frameworks-02][research-01] functions are read through lates
     expect(chart.getCursor().points[0].formattedY).toBe('43 f2');
   });
 
-  it.fails('[research-01] a new accessor identity re-reads the data without a warning below 10,000 rows', () => {
+  it('[research-01] a new accessor identity re-reads the data without a warning below 10,000 rows', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const chart = mount<Row>(fakes, { ...base, series: [{ id: 'cpu', y: (row: Row) => row.cpu }] });
     for (let i = 0; i < 12; i++)

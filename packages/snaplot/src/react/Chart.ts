@@ -6,28 +6,20 @@ import {
   useLayoutEffect,
   useRef,
 } from 'react';
-import { createChart, reconcileChart, setChartControls } from '../public/chart';
+import { createChart } from '../public/chart';
 import type { ChartHandle, ChartOptions } from '../public/types';
-import {
-  applyDefaults,
-  chartOptions,
-  chartControls,
-  type ChartControls,
-  type ControlledOptionKeys,
-} from './shared';
+import { type HostAttributes, splitProps } from './shared';
 
-export interface ChartProps<Row = Record<string, any>>
-  extends Omit<ChartOptions<Row>, ControlledOptionKeys>,
-    ChartControls {
+/** The props of {@link Chart}: the chart's options, plus the host element's attributes. */
+export interface ChartProps<Row = Record<string, any>> extends ChartOptions<Row>, HostAttributes {
   /** Class names of the host element. @defaultValue none */
   className?: string;
   /** Inline styles of the host element. @defaultValue full width and height */
   style?: CSSProperties;
   /** Receives the chart handle. */
   ref?: Ref<ChartHandle<Row>>;
-  /** Called once with the chart handle after mount. */
-  onReady?: (chart: ChartHandle<Row>) => void;
 }
+
 function assignRef<T>(ref: Ref<T> | undefined, value: T): (() => void) | undefined {
   if (typeof ref === 'function') {
     const cleanup = ref(value);
@@ -44,7 +36,11 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T): (() => void) | undefin
     };
   }
 }
-/** Native React 19 component. Options are direct props; the ref exposes the imperative handle. */
+
+/**
+ * A chart. Its props are the same options `createChart` takes, applied with `setOptions` on
+ * every render, so inline objects and callbacks cost only what they change.
+ */
 export function Chart<Row = Record<string, any>>(props: ChartProps<Row>): ReactElement {
   const host = useRef<HTMLDivElement>(null);
   const instance = useRef<ChartHandle<Row> | null>(null);
@@ -52,33 +48,27 @@ export function Chart<Row = Record<string, any>>(props: ChartProps<Row>): ReactE
   latest.current = props;
   useLayoutEffect(() => {
     if (!host.current) return;
-    const current = latest.current;
-    const chart = createChart(host.current, chartOptions(current));
+    const chart = createChart(host.current, splitProps<Row>(latest.current).options);
     instance.current = chart;
-    setChartControls(chart, chartControls(current));
-    applyDefaults(chart, current);
-    current.onReady?.(chart);
     return () => {
       instance.current = null;
       chart.destroy();
     };
   }, []);
   useLayoutEffect(() => {
-    if (instance.current) {
-      reconcileChart(instance.current, chartOptions(props), chartControls(props));
-    }
+    instance.current?.setOptions(splitProps<Row>(props).options);
   });
   const forwardedRef = props.ref;
   useLayoutEffect(() => {
     if (instance.current) return assignRef(forwardedRef, instance.current);
   }, [forwardedRef]);
+  const { attributes } = splitProps(props);
   return createElement('div', {
+    ...attributes,
     ref: host,
     className: props.className,
     style: { width: '100%', height: '100%', ...props.style },
     role: 'group',
     'aria-label': props['aria-label'] ?? props.ariaLabel ?? 'Chart',
-    'aria-describedby': props['aria-describedby'],
-    'aria-labelledby': props['aria-labelledby'],
   });
 }

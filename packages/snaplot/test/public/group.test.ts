@@ -100,7 +100,7 @@ describe('[dataapi-01][frameworks-06][interact-01] the final group model', () =>
     expect(range(b, 'x')).toEqual([0, 20]);
   });
 
-  it.fails('[dataapi-01] the group cursor and highlight reach every member', () => {
+  it('[dataapi-01] the group cursor and highlight reach every member', () => {
     const group = createChartGroup();
     const charts: FinalHandle<Row>[] = [0, 1].map(() =>
       mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'cpu' }, { y: 'mem' }], group }),

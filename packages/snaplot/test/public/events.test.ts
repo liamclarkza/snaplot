@@ -216,7 +216,7 @@ describe('[arch-07][frameworks-01] cold state, revision and the cursor channel',
     expect('cursor' in chart.getState()).toBe(false);
   });
 
-  it.fails('[arch-07] the cursor channel delivers one snapshot per move to on("cursor:change")', () => {
+  it('[arch-07] the cursor channel delivers one snapshot per move to on("cursor:change")', () => {
     const chart = mount<Row>(fakes, base);
     const seen: Array<number | string | null> = [];
     chart.on('cursor:change', (cursor) => seen.push(cursor.x));

@@ -391,6 +391,11 @@ export interface ChartHandle<Row = Record<string, any>> {
   setCursor(x: number | Date | string | null): void;
   /** The values under the cursor, or at a fallback position. */
   getCursorSnapshot(options?: CursorSnapshotOptions): CursorSnapshot<Row>;
+  /**
+   * The values under the cursor, or at a fallback position (`'hide'`, the default, reports
+   * none), computed when asked.
+   */
+  getCursor(options?: CursorSnapshotOptions): CursorSnapshot<Row>;
   /** One entry per series. */
   getLegendItems(): SeriesState[];
   /** The resolved theme. */

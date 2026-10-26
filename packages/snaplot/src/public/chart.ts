@@ -61,16 +61,6 @@ import type {
 
 export { createChartGroup };
 
-/** The React and Solid controlled state (veto-style; M8 replaces it with the D3 options). */
-export interface ChartControls {
-  viewport?: ViewportRanges;
-  selection?: SelectionRange | null;
-  hiddenSeries?: readonly string[];
-  onViewportChange?: (viewport: ViewportRanges) => void;
-  onSelectionChange?: (selection: SelectionRange | null) => void;
-  onHiddenSeriesChange?: (hiddenSeries: readonly string[]) => void;
-}
-
 /** Sources of at least this many rows warn about accessor churn and re-ingest churn (plan D16). */
 const CHURN_ROWS = 10_000;
 
@@ -134,8 +124,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   private subscribers = new Set<() => void>();
   private events: Dispatcher<ChartEvents<Row>>;
   private off: Array<() => void> = [];
-  private controls: ChartControls = {};
-  private applyingControls = false;
   private mutating = false;
   private destroyed = false;
   private lines = createReferenceLinesPlugin({ lines: [] });
@@ -195,7 +183,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       this.applyAccessibleName();
       this.state = this.readState();
       this.bindEngine();
-      this.installGuards();
       this.lines.setLines(this.ingested.referenceLines);
       this.regions.setRegions(this.ingested.referenceRegions);
       for (const plugin of config.plugins ?? []) this.engine.use(plugin);
@@ -297,8 +284,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   /**
-   * Check the state options against an ingest before anything changes (plan D3, D23), as
-   * validateControls() checks the framework controls. normalize() has checked the ranges and
+   * Check the state options against an ingest before anything changes (plan D3, D23).
+   * normalize() has checked the ranges and
    * the series ids; this checks what needs the axes: each viewport key names an axis the
    * engine builds (`x`, `y` or an axis of the spec), and a log axis takes bounds above 0.
    */
@@ -457,32 +444,23 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.apply(options);
   }
 
-  /** Framework reconciliation: complete options plus the 0.12 controlled props. */
-  reconcile(input: ChartOptions<Row>, named?: ReadonlySet<string>, controls?: ChartControls): void {
-    this.apply(input, named, controls);
-  }
-
   /**
    * Apply options through the diff classifier (plan D16). `named` lists the keys an update()
    * patch names, each of which counts as changed; without it every key is compared with the
    * last applied options (setOptions). State options follow plan D3 (stateChanges()).
    */
-  private apply(input: ChartOptions<Row>, named?: ReadonlySet<string>, controls?: ChartControls) {
+  private apply(input: ChartOptions<Row>, named?: ReadonlySet<string>) {
     if (this.destroyed) return;
     this.events.batch(() => {
       const normalized = normalize(input);
       const work = classify(this.normalized, normalized, named);
       const state = this.stateChanges(normalized, named);
-      const applyState = () => {
-        this.applyState(state);
-        if (controls) this.setControls(controls);
-      };
+      const applyState = () => this.applyState(state);
       const checked = Object.fromEntries(state) as NormalizedState;
       if (work.data || work.accessor) {
         this.noteChurn(normalized, work);
         const ingested = ingest(normalized, this.context(normalized, named?.has('data') ?? false));
         this.validateState(checked, ingested);
-        if (controls) this.validateControls(controls, ingested);
         validateGroup(normalized.group, this.candidate(ingested), this);
         this.noteReplacedStreams(ingested);
         this.commit(normalized, ingested, applyState);
@@ -499,7 +477,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
             }
           : this.ingested;
       this.validateState(checked, ingested);
-      if (controls) this.validateControls(controls);
       if (work.group) validateGroup(normalized.group, this.candidate(ingested), this);
       this.present(normalized, ingested, work, applyState);
     });
@@ -541,8 +518,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   /**
-   * Swap in a new ingest as one transaction. Callers check the options, the state options and
-   * the controls against `ingested` first, so nothing after replaceSources() throws; if the
+   * Swap in a new ingest as one transaction. Callers check the options and the state options
+   * against `ingested` first, so nothing after replaceSources() throws; if the
    * engine rejects the candidate, everything is restored. `quiet` re-stores the same data
    * (appendData() storing a scatter unsorted), which publishes and emits nothing.
    */
@@ -868,16 +845,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       : null;
   }
 
-  /** Every axis' current range (the 0.12 controlled viewport). */
-  private ranges(): ViewportRanges {
-    const ranges: Record<string, ScaleRange> = {};
-    for (const key of Object.keys(this.engine.getOptions().axes ?? {})) {
-      const axis = this.engine.getAxis(key);
-      if (axis) ranges[key] = Object.freeze({ min: axis.min, max: axis.max });
-    }
-    return Object.freeze(ranges);
-  }
-
   /**
    * Show or hide the built-in legend as the `legend` option asks (plan D6): `'auto'` shows it
    * for two or more series. A change of the space it takes resizes the plot before the next paint.
@@ -926,10 +893,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         fail(`the viewport of axis "${key}" needs an axis the chart has and finite min < max.`);
       }
     }
-    if (!this.applyingControls && Object.hasOwn(this.controls, 'viewport')) {
-      this.controls.onViewportChange?.({ ...this.ranges(), ...viewport });
-      return;
-    }
     this.events.batch(() => {
       for (const [key, range] of Object.entries(viewport)) this.engine.setAxis(key, range);
     });
@@ -963,14 +926,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     if (visible) hidden.delete(id);
     else hidden.add(id);
     if (equivalent([...hidden], [...this.hidden])) return;
-    if (!this.applyingControls && Object.hasOwn(this.controls, 'hiddenSeries')) {
-      this.controls.onHiddenSeriesChange?.([...hidden]);
-      return;
-    }
-    this.events.batch(() => {
-      this.setHidden(hidden);
-      if (!this.applyingControls) this.controls.onHiddenSeriesChange?.([...hidden]);
-    });
+    this.events.batch(() => this.setHidden(hidden));
     coordinate(this.options.group);
   }
   setHighlight(id: string | null): void {
@@ -1088,6 +1044,10 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       : (this.engine.getAxis(axis)?.tickFormat(value) ?? String(value));
   }
   getCursorSnapshot(options?: CursorSnapshotOptions): CursorSnapshot<Row> {
+    return this.getCursor(options);
+  }
+  /** The values under the cursor, or at a fallback position, computed when asked. */
+  getCursor(options?: CursorSnapshotOptions): CursorSnapshot<Row> {
     const snapshot = this.engine.getCursorSnapshot(options);
     return Object.freeze({
       x:
@@ -1201,7 +1161,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
           broadcast(this.options.group, (member) => member.syncCursor(this.state.cursor.x), this);
       }),
       this.engine.on('viewport:change', (key, range) => {
-        if (!this.applyingControls) this.controls.onViewportChange?.(this.ranges());
         this.events.mark('viewport');
         const group = this.options.group;
         if (!group?.options.viewport || !this.isHorizontal(key)) return;
@@ -1222,10 +1181,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
             this,
           );
       }),
-      this.engine.on('selection:change', (selection) => {
-        if (!this.applyingControls) this.controls.onSelectionChange?.(selection);
-        this.events.mark('selection');
-      }),
+      this.engine.on('selection:change', () => this.events.mark('selection')),
       this.engine.on('select', (selection) => {
         const result = {
           ...selection,
@@ -1254,58 +1210,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.off.push(this.engine.on('point:click', onPoint));
   }
 
-  private installGuards(): void {
-    this.engine.setInteractionGuards({
-      viewport: (key, range) => {
-        if (this.mutating || this.applyingControls || !Object.hasOwn(this.controls, 'viewport'))
-          return true;
-        this.controls.onViewportChange?.({ ...this.ranges(), [key]: range });
-        return false;
-      },
-      selection: (selection) => {
-        if (this.mutating || this.applyingControls || !Object.hasOwn(this.controls, 'selection'))
-          return true;
-        this.controls.onSelectionChange?.(selection);
-        return false;
-      },
-    });
-  }
-  private validateControls(controls: ChartControls, ingested = this.ingested): void {
-    for (const [key, range] of Object.entries(controls.viewport ?? {})) {
-      if (
-        (key !== 'x' && key !== 'y' && !(key in (ingested.spec.axes ?? {}))) ||
-        (ingested.spec.axes?.[key]?.type === 'log' && range.min <= 0) ||
-        !Number.isFinite(range.min) ||
-        !Number.isFinite(range.max) ||
-        range.max <= range.min
-      ) {
-        fail(`the viewport of axis "${key}" needs an axis the chart has and finite min < max.`);
-      }
-    }
-    const selection = controls.selection;
-    if (selection && (!Number.isFinite(selection.x.min) || !Number.isFinite(selection.x.max)))
-      fail('a selection needs finite bounds.');
-    for (const id of controls.hiddenSeries ?? []) {
-      if (!ingested.seriesIds.includes(id)) unknownSeries('hiddenSeries', id, ingested.seriesIds);
-    }
-  }
-
-  setControls(controls: ChartControls): void {
-    this.validateControls(controls);
-    this.controls = controls;
-    this.applyingControls = true;
-    try {
-      if (controls.viewport) this.setViewport(controls.viewport);
-      if (Object.hasOwn(controls, 'selection')) this.setSelection(controls.selection ?? null);
-      if (controls.hiddenSeries) {
-        const hidden = new Set(controls.hiddenSeries);
-        for (const id of this.ingested.seriesIds) this.setSeriesVisible(id, !hidden.has(id));
-      }
-    } finally {
-      this.applyingControls = false;
-    }
-    this.publish();
-  }
   private applyAccessibleName(): void {
     if (this.options.ariaLabel) {
       this.container.setAttribute('aria-label', this.options.ariaLabel);
@@ -1345,22 +1249,6 @@ export function createChart<Row = Record<string, any>>(
   options: ChartOptions<Row>,
 ): ChartHandle<Row> {
   return new Controller(element, options);
-}
-
-/** Framework-only complete-prop reconciliation; applications use update(). */
-export function reconcileChart<Row>(
-  chart: ChartHandle<Row>,
-  options: ChartOptions<Row>,
-  controls?: ChartControls,
-): void {
-  if (!(chart instanceof Controller)) fail('expected a chart created by createChart().');
-  chart.reconcile(options, undefined, controls);
-}
-
-/** Framework-only controlled state bridge. */
-export function setChartControls<Row>(chart: ChartHandle<Row>, controls: ChartControls): void {
-  if (!(chart instanceof Controller)) fail('expected a chart created by createChart().');
-  chart.setControls(controls);
 }
 
 // The stores only skip validation inside ColumnarStore.trusted; keep the import live.
