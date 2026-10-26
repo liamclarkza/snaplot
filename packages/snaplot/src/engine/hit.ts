@@ -12,6 +12,7 @@ import {
 } from './marks/scatterEncoding';
 import type { ChartCore } from './Engine';
 import { categoryWidthFromData, barRectForCategory } from './marks/barGeometry';
+import { scatterResolvers } from './marks/index';
 
 /**
  * Hit-testing for finding nearest data points to cursor position.
@@ -522,7 +523,7 @@ export function updateTooltipPoints(engine: ChartCore): void {
       (si) => {
         const series = engine.config.series[si];
         const fallback = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
-        return engine.scatterResolvers(si, series, fallback).logicalResolver;
+        return scatterResolvers(engine, si, series, fallback).logicalResolver;
       },
       { ...tooltipFormatters(engine), readout: engine.readoutY },
       (si) => engine.storeForSeries(si),
@@ -660,7 +661,8 @@ export function emitPointClick(engine: ChartCore, pixelX: number, pixelY: number
     engine.scatterPalettes(),
     engine.dataVersion,
     (si) =>
-      engine.scatterResolvers(
+      scatterResolvers(
+        engine,
         si,
         engine.config.series[si],
         palette[(engine.config.series[si]?.paletteIndex ?? si) % palette.length],

@@ -16,6 +16,7 @@ import { inferPosition, isInPlotArea } from './layout';
 import { scatterXColumn, seriesYColumn } from './marks/scatterEncoding';
 import { INTERACTION_REFINE_MS } from '../constants';
 import { refreshCursor } from './cursor';
+import { interactionSamplingBudget } from './marks/index';
 
 export function followWindow(engine: ChartCore): number | undefined {
   const follow = (engine.config.streaming as StreamingSpec | undefined)?.followWindow;
@@ -259,7 +260,7 @@ export function publishResetViewport(
 }
 
 export function markViewportActive(engine: ChartCore): void {
-  if (engine.interactionSamplingBudget() === null) return;
+  if (interactionSamplingBudget(engine) === null) return;
   engine.viewportActiveUntil = performance.now() + INTERACTION_REFINE_MS;
   if (engine.refineTimer !== null) clearTimeout(engine.refineTimer);
   engine.refineTimer = setTimeout(() => {

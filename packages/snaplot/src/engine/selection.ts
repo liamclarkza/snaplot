@@ -6,6 +6,7 @@ import type { ChartCore } from './Engine';
 import { type SelectionRange, DirtyFlag, type ScaleRange } from './spec';
 import { BRUSH_EDGE_GRAB_PX } from '../constants';
 import { scatterXColumn, seriesYColumn } from './marks/scatterEncoding';
+import { scatterResolvers } from './marks/index';
 
 export function getSelection(engine: ChartCore): SelectionRange | null {
   // Return a copy so callers cannot mutate internal state.
@@ -169,7 +170,7 @@ export function scatterPointsInSelection(
       continue;
 
     const fallbackColor = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
-    const style = engine.scatterResolvers(si, series, fallbackColor).logicalResolver;
+    const style = scatterResolvers(engine, si, series, fallbackColor).logicalResolver;
 
     for (let i = 0; i < store.length; i++) {
       const x = store.valueAt(xColumnIdx, i);
