@@ -10,7 +10,7 @@
     "build": "npm run build -w packages/snaplot",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
-    "verify": "biome ci . && npm run typecheck && npm test && npm run build",
+    "verify": "biome ci . && npm run typecheck && npm run build && npm test",
     "test:watch": "npm run test:watch -w packages/snaplot",
     "test:visual": "npm run test:visual -w packages/snaplot --",
     "test:browser": "npm run test:browser -w packages/snaplot --",
