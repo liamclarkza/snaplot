@@ -1,0 +1,184 @@
+/*
+ * Ridgecrest: the look of a USGS event page and a helicorder record (plan §10.2, V1). White
+ * paper, black ink, thin grey rules, the system UI stack with tabular figures, no webfont. The
+ * daily-count strip runs the full width like a helicorder trace; the scatter and the decay plot
+ * sit side by side below it on a wide screen.
+ */
+:root {
+  --paper: #ffffff;
+  --ink: #1a1a1a;
+  --ink-2: #4d4d4d;
+  --rule: #d4d4d4;
+  --link: #1d4f91;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--link);
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.sequence {
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: 0 1.5rem 2rem;
+}
+
+.event-header {
+  padding-block: 1.5rem 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.event-header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.event-meta {
+  margin: 0.375rem 0 0;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.trace {
+  padding-top: 1rem;
+}
+
+.trace-label {
+  font-size: 0.875rem;
+}
+
+.chart {
+  width: 100%;
+}
+
+.chart-strip {
+  height: 170px;
+  margin-top: 0.25rem;
+  border-block: 1px solid var(--rule);
+}
+
+.chart-pane {
+  height: 360px;
+  margin-top: 0.5rem;
+}
+
+.hint,
+.pane-note {
+  margin: 0.375rem 0 0;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}
+
+.hint-touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .hint-mouse {
+    display: none;
+  }
+
+  .hint-touch {
+    display: inline;
+  }
+}
+
+.readout {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--ink);
+  background-color: #f5f5f5;
+}
+
+.answer {
+  margin: 0.25rem 0 0;
+  font-size: 1.125rem;
+  max-width: 70ch;
+}
+
+.window {
+  margin: 0.25rem 0 0;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}
+
+.window button {
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.625rem;
+  font: inherit;
+  color: var(--ink);
+  background-color: var(--paper);
+  border: 1px solid var(--ink-2);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.window button:hover {
+  background-color: #e8e8e8;
+}
+
+.panes {
+  display: grid;
+  gap: 1.5rem 2rem;
+  margin-top: 1.5rem;
+}
+
+.pane {
+  min-width: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+}
+
+@media (min-width: 60rem) {
+  .panes {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.demo-footer {
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: 1rem 1.5rem 2rem;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}

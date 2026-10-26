@@ -1,0 +1,121 @@
+---
+/**
+ * V1, "How fast did the Ridgecrest aftershocks die down?" (plan §10.2): a vanilla page in the
+ * manner of a USGS event page and a helicorder record. No site chrome; the only shared part is the
+ * thin footer. The charts are made by src/demos/ridgecrest-aftershocks/main.ts.
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import '../../demos/ridgecrest-aftershocks/page.css';
+
+const slug = 'ridgecrest-aftershocks';
+const source = readFileSync(join(process.cwd(), `public/data/${slug}/SOURCE.md`), 'utf8');
+/** The first line under a `## <name>` heading of SOURCE.md. */
+const field = (name: string) =>
+  new RegExp(`^## ${name}\\n+(.+)$`, 'm').exec(source)?.[1]?.trim() ?? '';
+const attribution = field('Attribution');
+const licence = field('Licence');
+const retrieved = new Date(`${field('Retrieved')}T00:00:00Z`).toLocaleDateString('en-GB', {
+  timeZone: 'UTC',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+const events = Number(/`events\.csv`: (\d+) events/.exec(source)?.[1] ?? Number.NaN);
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const repo = 'https://github.com/liamclarkza/snaplot/tree/main';
+const page = new URL(Astro.url.pathname, Astro.site).href;
+const question = 'How fast did the Ridgecrest aftershocks die down?';
+---
+
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{question} · snaplot examples</title>
+    <meta
+      name="description"
+      content="Daily earthquake counts after the 2019 Ridgecrest M6.4 and M7.1, from the USGS ANSS catalogue."
+    />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <link rel="canonical" href={page} />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="snaplot" />
+    <meta property="og:title" content={question} />
+    <meta property="og:url" content={page} />
+    <meta property="og:image" content={new URL(`${base}examples/${slug}.jpg`, Astro.site).href} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <main class="sequence" data-demo={slug}>
+      <header class="event-header">
+        <h1>2019 Ridgecrest earthquake sequence</h1>
+        <p class="event-meta num">
+          {
+            [
+              'Searles Valley, California',
+              '1 July to 29 September 2019',
+              `${events.toLocaleString('en-GB')} catalogued events`,
+              'times in UTC',
+              `catalogue retrieved ${retrieved}`,
+            ].join(' · ')
+          }
+        </p>
+      </header>
+
+      <section class="trace" aria-labelledby="trace-title">
+        <h2 id="trace-title" class="trace-label">M≥2.5 events per day</h2>
+        <div class="chart chart-strip" data-part="strip"></div>
+        <p class="hint">
+          <span class="hint-mouse">Drag across the daily counts to choose a window.</span>
+          <span class="hint-touch">Touch and hold the daily counts, then drag to choose a window.</span>
+        </p>
+      </section>
+
+      <section class="readout" aria-labelledby="readout-title">
+        <h2 id="readout-title">{question.replace('the Ridgecrest ', 'the ')}</h2>
+        <p class="answer num" data-part="answer" aria-live="polite">Loading the catalogue…</p>
+        <p class="window num">
+          For <span data-part="window">the whole extract</span>.
+          <button type="button" data-part="whole" hidden>Show the whole sequence</button>
+        </p>
+      </section>
+
+      <div class="panes">
+        <section class="pane" aria-labelledby="scatter-title">
+          <h2 id="scatter-title">Magnitude against time</h2>
+          <p class="pane-note">
+            Every event, coloured by depth.{' '}
+            <span class="hint-mouse">Click a point to open its USGS event page.</span>
+            <span class="hint-touch">Tap a point to open its USGS event page.</span>
+          </p>
+          <div class="chart chart-pane" data-part="scatter"></div>
+        </section>
+        <section class="pane" aria-labelledby="decay-title">
+          <h2 id="decay-title">Decay after the M7.1</h2>
+          <p class="pane-note">
+            M≥2.5 events per day against days since the mainshock, both axes logarithmic.
+            The shaded span is the chosen window.
+          </p>
+          <div class="chart chart-pane" data-part="decay"></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="demo-footer">
+      <a href={`${base}examples/`}>← Examples</a>{' · '}
+      <a href={`${repo}/site/src/demos/${slug}`}>Source</a>{' · '}
+      <span data-attribution>Data: {attribution} · {licence}</span>
+    </footer>
+
+    <script>
+      import { mount } from '../../demos/ridgecrest-aftershocks/main';
+
+      const root = document.querySelector<HTMLElement>('[data-demo]');
+      // The charts are on `window.demo` for the page's tests and for anyone at the console.
+      if (root) void mount(root).then((charts) => Object.assign(window, { demo: charts }));
+    </script>
+  </body>
+</html>
