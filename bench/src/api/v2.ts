@@ -1,10 +1,11 @@
 // v2 adapter: the 1.0 surface of plan §4 (M8 onwards). Handles have `setOptions`, take state
 // through `update({ viewport | highlight })`, expose `scale(key)` instead of `getAxis`/`getLayout`,
-// and drop `getStats` for the debug symbol. Legends are built in (`legend`) or a separate
-// `createLegendTable(el, { chart })`, and React's `Chart` hands out its handle through `ref`.
+// and drop `getStats` for the debug symbol (which also carries the plot rectangle). Legends are
+// built in (`legend`) or a separate `createLegendTable(el, { chart })`, plugins draw through
+// `drawBelow | drawAbove | drawOverlay`, a touch pan is `interaction: { drag: 'pan' }`, and
+// React's `Chart` hands out its handle through `ref`.
 //
-// Provisional: written from the plan before M8 exists, and M8 finalises it (plan §12 M4, M8).
-// Detection picks it for any handle with `setOptions`.
+// Finalised by M8 against the shipped handle. Detection picks it for any handle with `setOptions`.
 
 import * as snaplot from 'snaplot';
 import { debugSnapshot, defined, interop, type Loose, renderCounts } from './common';
@@ -49,14 +50,25 @@ function options(spec: ChartSpec): Record<string, unknown> {
     streaming: spec.maxPoints ? { maxPoints: spec.maxPoints } : undefined,
     // Like-for-like with v1, where a legend exists only as an add-on.
     legend: spec.addon === 'legend',
-    plugins: spec.addon === 'noop' ? [{ id: 'noop', afterDrawData() {} }] : undefined,
+    plugins: spec.addon === 'noop' ? [{ id: 'noop', drawAbove() {} }] : undefined,
     group: spec.group?.raw,
     interaction: spec.touchPan ? { drag: 'pan' } : undefined,
     onPointClick: spec.onPointClick,
   });
 }
 
+/** The plot rectangle relative to the container: past a built-in legend above the canvases. */
 function plotRect(chart: Loose): PlotRect {
+  const container = chart.container as HTMLElement;
+  const root = container.querySelector('[role="application"]') ?? container;
+  const offset = root.getBoundingClientRect();
+  const box = container.getBoundingClientRect();
+  const dx = offset.left - box.left;
+  const dy = offset.top - box.top;
+  // The debug symbol's plot (CSS px from the canvases' top-left), else derived from scale().
+  const plot = debugSnapshot(chart)?.plot;
+  if (plot)
+    return { left: dx + plot.left, top: dy + plot.top, width: plot.width, height: plot.height };
   const x = chart.scale('x');
   const y = chart.scale('y');
   const left = x.toPixel(x.min);
@@ -64,8 +76,8 @@ function plotRect(chart: Loose): PlotRect {
   const top = y.toPixel(y.max);
   const bottom = y.toPixel(y.min);
   return {
-    left: Math.min(left, right),
-    top: Math.min(top, bottom),
+    left: dx + Math.min(left, right),
+    top: dy + Math.min(top, bottom),
     width: Math.abs(right - left),
     height: Math.abs(bottom - top),
   };

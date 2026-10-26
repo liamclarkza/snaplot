@@ -77,6 +77,8 @@ export interface DebugCounts {
   drawnPoints: number;
   inViewPoints: number;
   renderCount: Renders;
+  /** The plot rectangle from the canvases' top-left corner (1.0's debug symbol). */
+  plot?: PlotRect;
 }
 
 export interface BenchChart {
