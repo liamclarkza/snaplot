@@ -4,26 +4,16 @@
  * stylesheet, injected once per document. M12b replaces the internals behind the same options.
  */
 import css from '../styles/legendTable.css?inline';
+import { adoptStyles, styleRootOf } from '../dom/styles';
 import { fail } from '../engine/errors';
 import { type Companion, companions } from './companion';
 import type { ChartHandle, ChartPoint, SeriesState } from './types';
 
 // ─── Styles ──────────────────────────────────────────────────────────
 
-const styled = new WeakMap<Node, HTMLStyleElement>();
-
 /** Add the legend stylesheet to the document (or shadow root) that holds `element`, once. */
 export function injectStyles(element: Element): void {
-  const root = element.getRootNode();
-  if (styled.get(root)?.isConnected) return;
-  const shadow = typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot;
-  const parent = shadow ? root : element.ownerDocument.head;
-  if (!parent) return;
-  const style = element.ownerDocument.createElement('style');
-  style.dataset.snaplotStyles = '';
-  style.textContent = css;
-  parent.append(style);
-  styled.set(root, style);
+  adoptStyles(styleRootOf(element), 'legend', css);
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────
