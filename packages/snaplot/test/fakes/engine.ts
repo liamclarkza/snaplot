@@ -13,7 +13,8 @@
  *   hoverAt(chart, plotPoint(chart));
  *   fakes.uninstall(); // destroys every engine it built, then restores the globals
  */
-import { ChartCore, type DebugSnapshot } from '../../src/engine/Engine';
+import type { DebugSnapshot } from '../../src/engine/debug';
+import { ChartCore } from '../../src/engine/Engine';
 import type { ChartSpec, ColumnarData } from '../../src/engine/spec';
 import { type FakeOptions, type Fakes, installFakes, type MountOptions } from './index';
 

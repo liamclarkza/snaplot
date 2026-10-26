@@ -128,126 +128,7 @@ import {
 } from './cursor';
 import { setHighlight, clearProximityHighlight } from './highlight';
 import { computeCustomXTicks } from './axes/ticks';
-
-// ─── Debug counters (plan D31) ──────────────────────────────
-// Tests and the bench read these through `chart[Symbol.for('snaplot.debug')]`
-// on the public handle; they are not part of any public type. Instrumentation
-// only: a data pass records O(series) facts, and point counts are computed
-// when a snapshot is read, never on the render path.
-
-/** One visible series in the most recent data-layer pass. */
-interface DataPassSeries {
-  type: NonNullable<SeriesSpec['type']>;
-  xData: Float64Array;
-  yData: Float64Array;
-  /** Physical index runs handed to the mark, before any sampling. */
-  runs: readonly ColumnarSegment[];
-  /** The M4-decimated runs a line or area stroked, when decimation ran. */
-  decimated?: readonly LineRenderSegment[];
-  /** Scatter interaction-sampling stride (1 draws every point). */
-  stride: number;
-  xMin: number;
-  xMax: number;
-  yMin: number;
-  yMax: number;
-}
-
-/** An axis label as last laid out: its text and anchor point in CSS pixels. */
-export interface DebugLabelBox {
-  axis: string;
-  kind: 'tick' | 'title';
-  text: string;
-  x: number;
-  y: number;
-  anchor: 'start' | 'middle' | 'end';
-}
-
-/** A point-in-time read of the debug counters. Read it again after acting. */
-export interface DebugSnapshot {
-  /** Full data ingests: the initial sources and every `replaceSources`. Appends do not count. */
-  readonly ingestCount: number;
-  /** Per-layer paint counts (a vetoed paint does not count). */
-  readonly renderCount: { grid: number; data: number; overlay: number };
-  /** The three canvas layers, for pixel hashing. */
-  readonly layers: {
-    grid: HTMLCanvasElement;
-    data: HTMLCanvasElement;
-    overlay: HTMLCanvasElement;
-  };
-  /** Points the last data pass drew inside the viewport, after M4 decimation or scatter sampling. */
-  readonly drawnPoints: number;
-  /** Points inside the viewport in the last data pass (X range; X and Y for scatter). */
-  readonly inViewPoints: number;
-  /** Times a ring store rebuilt its logical columns (`RingColumnarStore.materialize` cache misses). */
-  readonly materializeCount: number;
-  /** The plot rectangle in CSS pixels from the canvases' top-left corner (replaces getLayout()). */
-  readonly plot: { left: number; top: number; width: number; height: number };
-  /** The last layout: the canvas size, the plot and each axis' side and area (replaces getLayout()). */
-  readonly layout: Layout;
-  /** The resolved theme roles (replaces getTheme()). */
-  readonly theme: Readonly<ThemeConfig>;
-  /** Axis labels from the last grid paint, in paint order. */
-  labelBoxes(): DebugLabelBox[];
-}
-
-function countDataPass(pass: readonly DataPassSeries[]): { drawn: number; inView: number } {
-  let drawn = 0;
-  let inView = 0;
-  for (const series of pass) {
-    const scatter = series.type === 'scatter';
-    const visible = (x: number, y: number) =>
-      x >= series.xMin &&
-      x <= series.xMax &&
-      Number.isFinite(y) &&
-      (!scatter || (y >= series.yMin && y <= series.yMax));
-    let seriesInView = 0;
-    for (const run of series.runs) {
-      for (let i = run.physicalStart; i <= run.physicalEnd; i++) {
-        if (visible(series.xData[i], series.yData[i])) seriesInView++;
-      }
-    }
-    inView += seriesInView;
-    if (series.decimated) {
-      for (const run of series.decimated) {
-        for (let i = run.startIdx; i <= run.endIdx; i++) {
-          if (visible(run.xData[i], run.yData[i])) drawn++;
-        }
-      }
-    } else if (series.stride > 1) {
-      // Mirrors renderScatterSegments: the (fractional) stride restarts at every run.
-      for (const run of series.runs) {
-        const start = run.physicalStart;
-        for (
-          let k = 0, i = start;
-          i <= run.physicalEnd;
-          i = start + Math.floor(++k * series.stride)
-        ) {
-          if (visible(series.xData[i], series.yData[i])) drawn++;
-        }
-      }
-    } else {
-      drawn += seriesInView;
-    }
-  }
-  return { drawn, inView };
-}
-
-function debugLabelBoxes(labels: AxesRenderResult['labels'] | null): DebugLabelBox[] {
-  const boxes: DebugLabelBox[] = [];
-  for (const [axis, list] of labels ?? []) {
-    for (const label of list) {
-      boxes.push({
-        axis,
-        kind: label.kind ?? 'tick',
-        text: label.text,
-        x: label.x,
-        y: label.y,
-        anchor: label.anchor,
-      });
-    }
-  }
-  return boxes;
-}
+import { debugSnapshot, type DataPassSeries, type DebugSnapshot } from './debug';
 
 /**
  * Chart, the composition root.
@@ -397,13 +278,13 @@ export class ChartCore implements EngineHost {
   /** Bumped by every data change: the range index and the hit and density caches key on it. */
   dataVersion = 0;
   // D31 debug counters; see DebugSnapshot. Ring stores share this object.
-  private debugCounters = {
+  debugCounters = {
     ingestCount: 0,
     materializeCount: 0,
     renderCount: { grid: 0, data: 0, overlay: 0 },
   };
-  private lastDataPass: DataPassSeries[] = [];
-  private lastAxisLabels: AxesRenderResult['labels'] | null = null;
+  lastDataPass: DataPassSeries[] = [];
+  lastAxisLabels: AxesRenderResult['labels'] | null = null;
 
   // Readout precision per axis (plan P9), recomputed when the domain or the
   // tick settings change; read on the cursor hot path.
@@ -976,37 +857,8 @@ export class ChartCore implements EngineHost {
     return this.cursorDataX;
   }
 
-  /**
-   * Internal: the D31 debug counters, exposed on the public handle as
-   * `chart[Symbol.for('snaplot.debug')]`. Point counts are computed lazily
-   * from the last data pass when first read.
-   */
   debugSnapshot(): DebugSnapshot {
-    const pass = this.lastDataPass;
-    const labels = this.lastAxisLabels;
-    const canvases = this.canvasManager;
-    let counts: { drawn: number; inView: number } | undefined;
-    const count = () => (counts ??= countDataPass(pass));
-    return Object.freeze({
-      ingestCount: this.debugCounters.ingestCount,
-      renderCount: { ...this.debugCounters.renderCount },
-      layers: {
-        grid: canvases.gridCanvas,
-        data: canvases.dataCanvas,
-        overlay: canvases.overlayCanvas,
-      },
-      get drawnPoints() {
-        return count().drawn;
-      },
-      get inViewPoints() {
-        return count().inView;
-      },
-      materializeCount: this.debugCounters.materializeCount,
-      plot: Object.freeze({ ...this.layout.plot }),
-      layout: this.layout,
-      theme: Object.freeze({ ...this.theme }),
-      labelBoxes: () => debugLabelBoxes(labels),
-    });
+    return debugSnapshot(this);
   }
 
   // ─── Private: Initialization ────────────────────────────────
