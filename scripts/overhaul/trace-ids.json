@@ -245,7 +245,7 @@
       "category": "simplification",
       "title": "ChartCore is a god object with duplicated single-store and multi-source code paths",
       "required": true,
-      "owners": ["M9a", "M9b"],
+      "owners": ["M9a", "M9b", "M14"],
       "rootCauses": ["RC16"],
       "status": "tracked",
       "lock": {
@@ -316,7 +316,7 @@
       "category": "simplification",
       "title": "The new API and adapter layers are hard to read (360-line single function, untyped internals, very long lines)",
       "required": false,
-      "owners": ["M9b"],
+      "owners": ["M9b", "M14"],
       "rootCauses": ["RC16"],
       "status": "tracked",
       "lock": {
