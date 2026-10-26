@@ -2,7 +2,7 @@
 // The interim legends (plan §12 M8, D6, D27): `legend: 'auto'` and createLegendTable, as thin
 // views over the 0.12 legend DOM, styled by one stylesheet injected per document.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createLegendTable } from '../../src/index';
+import { createChart, createLegendTable } from '../../src/index';
 import { type Fakes, installFakes } from '../fakes';
 import { type FinalHandle, mount } from './contract';
 
@@ -115,6 +115,39 @@ describe('the built-in legend (plan D6)', () => {
     expect(records.map((record) => `${record.type} ${record.attributeName ?? ''}`)).toEqual([]);
   });
 
+  it.fails('[frameworks-11] a container hidden at mount stays hidden: the legend leaves its display alone', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const style = document.createElement('style');
+    style.textContent = '.legend-test-off { display: none; }';
+    document.head.append(style);
+    const byAttribute = document.createElement('div');
+    byAttribute.hidden = true;
+    const byClass = document.createElement('div');
+    byClass.className = 'legend-test-off';
+    for (const host of [byAttribute, byClass]) {
+      fakes.layout.setSize(host, 400, 300);
+      document.body.append(host);
+      const chart = createChart(host, shown as never);
+      expect(buttons(chart as never)).toHaveLength(2);
+      expect(host.style.display).toBe('');
+      expect(getComputedStyle(host).display).toBe('none');
+      chart.destroy();
+    }
+  });
+
+  it('[frameworks-11] a visible container gets the column layout, and destroy restores it', () => {
+    const host = document.createElement('div');
+    host.style.display = 'block';
+    fakes.layout.setSize(host, 400, 300);
+    document.body.append(host);
+    const chart = createChart(host, shown as never);
+    expect(host.style.display).toBe('flex');
+    expect(host.style.flexDirection).toBe('column');
+    chart.destroy();
+    expect(host.style.display).toBe('block');
+    expect(host.style.flexDirection).toBe('');
+  });
+
   it('[frameworks-11] the legend styles are injected once per document', () => {
     mount<Row>(fakes, shown);
     mount<Row>(fakes, shown);
@@ -192,6 +225,17 @@ describe('[frameworks-11][frameworks-01] createLegendTable (plan D27)', () => {
     chart.on('highlight:change', seen);
     host.querySelector('tbody tr')?.dispatchEvent(new MouseEvent('mouseenter'));
     expect(seen).toHaveBeenCalledWith('cpu');
+  });
+
+  it.fails('[backlog-27] an unknown fallback throws, naming the values it takes', () => {
+    const chart = mount<Row>(fakes, { ...two, legend: false });
+    expect(() => table(chart, { fallback: 'lastest' })).toThrow(
+      /^snaplot: createLegendTable\(\) fallback "lastest" is not valid\. Use 'latest', 'first' or 'hide'\. Did you mean "latest"\?/,
+    );
+    const { host, handle } = table(chart, { fallback: 'hide' });
+    expect(() => handle.update({ fallback: 'never' as never })).toThrow(/fallback "never"/);
+    // The table keeps the fallback it had.
+    expect((host.firstElementChild as HTMLElement).hidden).toBe(true);
   });
 
   it('[frameworks-11] a chart that is not a live createChart() handle throws', () => {

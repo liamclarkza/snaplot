@@ -67,6 +67,32 @@ describe('[arch-10] unknown option keys warn', () => {
     expect(warnings().join('\n')).toMatch(/did you mean "ariaLabel"/i);
   });
 
+  it('[arch-10] a 0.12 plugin hook and a misspelled hook warn, naming the plugin key', () => {
+    mount({
+      ...base,
+      plugins: [{ id: 'old-hooks', onDataUpdate() {}, drawAbov() {} }],
+    });
+    const text = warnings().join('\n');
+    expect(text).toMatch(/"plugins\[0\]\.onDataUpdate" is not a plugin hook/);
+    expect(text).toMatch(/"plugins\[0\]\.drawAbov" is not a plugin hook/);
+  });
+
+  it.fails('[arch-10] a plugin object may hold its own data and helpers without a warning', () => {
+    mount({
+      ...base,
+      plugins: [
+        {
+          id: 'stateful',
+          options: { color: 'red' },
+          count: 0,
+          format: (value: number) => value.toFixed(1),
+          drawAbove() {},
+        },
+      ],
+    });
+    expect(warnings()).toEqual([]);
+  });
+
   it('known keys print nothing (control)', () => {
     mount({ ...base, ariaLabel: 'CPU', axes: { y: { title: 'Load' } } });
     expect(warnings()).toEqual([]);

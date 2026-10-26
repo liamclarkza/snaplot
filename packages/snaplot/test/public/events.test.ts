@@ -177,6 +177,21 @@ describe('[backlog-02][dataapi-21] events are queued until the call commits', ()
     expect(Object.keys(viewports[0]).sort()).toEqual(['x', 'y']);
   });
 
+  // dataapi-21 calls `following: true` on a static chart a surprise. It is the accepted meaning
+  // (plan D3, §4.4): following is true while X is automatic, so the view includes the latest
+  // data, streamed or not; pinning X (a zoom, a pan, a viewport option) pauses it.
+  it('[dataapi-21] following says whether X is automatic, on a static chart too', () => {
+    const chart = mount<Row>(fakes, base);
+    const seen: boolean[] = [];
+    chart.on('following:change', (following) => seen.push(following));
+    expect(chart.getState().following).toBe(true);
+    wheelZoom(chart, 50, 24);
+    expect(chart.getState().following).toBe(false);
+    chart.resetViewport();
+    expect(chart.getState().following).toBe(true);
+    expect(seen).toEqual([false, true]);
+  });
+
   it('[dataapi-21] getState() is a frozen snapshot that stays put until the next commit', () => {
     const chart = mount<Row>(fakes, base);
     const state = chart.getState();
