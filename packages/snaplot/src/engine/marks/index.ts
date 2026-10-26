@@ -345,21 +345,23 @@ export function interactionActive(engine: ChartCore): boolean {
 }
 
 /**
- * During an active viewport gesture, replace line/area render segments with
- * an M4-decimated copy (first/last/min/max per pixel column) so a wide line
- * strokes ~4 points per column instead of every visible sample. M4 is
- * shape-preserving (the vertical envelope is exact) and gap-aware, and the
- * full data repaints on gesture settle. Returns the segments unchanged when
- * decimation is off, the gesture is idle, or the series already fits the
- * pixel budget. Sets sampledLastDataRender so the settle timer refines.
+ * Replace line/area render segments with an M4-decimated copy (first/last/min/max per pixel
+ * column) when they hold more than 4 points per column. During a gesture the columns are CSS
+ * pixels and the settle timer refines; at rest they are device pixels, which is visually
+ * lossless and keeps every path far below the size Chromium silently refuses to stroke.
+ * M4 is shape-preserving and gap-aware. Hit-testing always uses the full data.
  */
 export function decimateLineSegments(
   engine: ChartCore,
   segments: RenderSegment[],
   xScale: Scale,
 ): RenderSegment[] {
-  if (!interactionActive(engine)) return segments;
-  const pixelWidth = Math.max(1, Math.round(engine.layout.plot.width));
+  // At rest, decimate per device-pixel column: visually lossless, and it keeps the path far
+  // below the ~2M vertices at which Chromium silently strokes nothing (gap-perf-gate-10).
+  // During a gesture, per CSS pixel is enough; the settle repaint refines.
+  const interacting = interactionActive(engine);
+  const dpr = interacting ? 1 : Math.max(1, engine.layout.dpr || 1);
+  const pixelWidth = Math.max(1, Math.round(engine.layout.plot.width * dpr));
   const budget = pixelWidth * 4;
 
   let total = 0;
@@ -379,6 +381,6 @@ export function decimateLineSegments(
     out.push({ xData: dx, yData: dy, startIdx: 0, endIdx: dx.length - 1 });
   }
   if (out.length === 0) return segments;
-  engine.sampledLastDataRender = true;
+  if (interacting) engine.sampledLastDataRender = true;
   return out;
 }

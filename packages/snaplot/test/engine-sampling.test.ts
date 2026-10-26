@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe('engine interaction sampling', () => {
-  it('decimates a large line only while a gesture is active, full fidelity at rest', () => {
+  it('[gap-perf-gate-10] decimates a large line per CSS column during a gesture and per device column at rest', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const n = 5000;
     const xs = new Float64Array(n);
@@ -46,9 +46,13 @@ describe('engine interaction sampling', () => {
       [xs, ys],
     );
 
-    // At rest: no decimation, every in-view point is stroked.
-    expect(engineDebug(chart).inViewPoints).toBe(n);
-    expect(engineDebug(chart).drawnPoints).toBe(n);
+    // At rest: M4 per device-pixel column (visually lossless), never more than 4 per column.
+    const restBudget = (width: number, dpr: number) => Math.max(1, Math.round(width * dpr)) * 4;
+    const rest = engineDebug(chart);
+    expect(rest.inViewPoints).toBe(n);
+    expect(rest.drawnPoints).toBeLessThanOrEqual(
+      restBudget(chart.getLayout().plot.width, chart.getLayout().dpr),
+    );
 
     // During a gesture (a key zoom): decimated to at most 4 points per pixel column.
     press(chart, '+');
@@ -60,13 +64,19 @@ describe('engine interaction sampling', () => {
     expect(during.drawnPoints).toBeGreaterThan(1);
     expect(during.drawnPoints).toBeLessThan(during.inViewPoints);
 
-    // Once the viewport has been quiet for the refine delay, the full data repaints.
+    // Once the viewport has been quiet for the refine delay, it repaints at device resolution.
     vi.mocked(performance.now).mockReturnValue(1_000 + REFINE_MS + 1);
     vi.advanceTimersByTime(REFINE_MS);
     fakes.frames.step();
     const settled = engineDebug(chart);
-    expect(settled.drawnPoints).toBe(settled.inViewPoints);
     expect(settled.inViewPoints).toBe(during.inViewPoints);
+    expect(settled.drawnPoints).toBeLessThanOrEqual(
+      Math.min(
+        settled.inViewPoints,
+        restBudget(chart.getLayout().plot.width, chart.getLayout().dpr),
+      ),
+    );
+    expect(settled.drawnPoints).toBeGreaterThanOrEqual(during.drawnPoints);
   });
 
   /**

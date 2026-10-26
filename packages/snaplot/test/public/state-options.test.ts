@@ -169,7 +169,7 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
     ]);
   });
 
-  it('a viewport option that moves the view draws the gesture pass, then every point once it settles', () => {
+  it('a viewport option that moves the view draws the gesture pass, then the device-resolution pass once it settles', () => {
     // An app that pans from a slider or an overview chart pays what a pan gesture pays.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const now = vi.spyOn(performance, 'now').mockReturnValue(1_000);
@@ -194,8 +194,12 @@ describe('[frameworks-04][frameworks-05][dxtrial-04] viewport', () => {
       vi.advanceTimersByTime(150);
       fakes.frames.flush();
       const settled = debug(chart);
-      expect(settled.drawnPoints).toBe(settled.inViewPoints);
       expect(settled.inViewPoints).toBe(during.inViewPoints);
+      // At rest lines are M4-decimated per device column (gap-perf-gate-10), never coarser than the gesture pass.
+      expect(settled.drawnPoints).toBeGreaterThanOrEqual(during.drawnPoints);
+      expect(settled.drawnPoints).toBeLessThanOrEqual(
+        4 * Math.max(1, Math.round(settled.plot.width * settled.layout.dpr)),
+      );
     } finally {
       vi.useRealTimers();
     }

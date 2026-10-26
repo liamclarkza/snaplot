@@ -187,7 +187,7 @@ describe('layers and update classes', () => {
 });
 
 describe('marks', () => {
-  it.fails('[perf:line-at-rest][gap-perf-gate-10][backlog-28:at-rest] a line draws at most 4 points per device column at rest', () => {
+  it('[perf:line-at-rest][gap-perf-gate-10][backlog-28:at-rest] a line draws at most 4 points per device column at rest', () => {
     const chart = fakes.mount(
       { data: columns(200_000, (i) => Math.sin(i / 50)), x: 'x', series: [{ y: 'y' }] },
       { width: 400, height: 200 },
