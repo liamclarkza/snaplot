@@ -172,6 +172,15 @@ export default defineConfig({
         // directives written in source, so the entry chunk gets it as a banner.
         banner: (chunk) => (chunk.isEntry && chunk.name === 'react' ? "'use client';" : ''),
         sourcemapExcludeSources: true,
+        // histogram() and createLegendTable() are imports of their own (scripts/size-budgets.json):
+        // in their own chunks, a bundler that skips unused files (`sideEffects: false`) leaves out
+        // the chart chunk and the top-level constants it cannot tree-shake.
+        manualChunks: (id) => {
+          if (id.endsWith('/src/public/histogram.ts')) return 'histogram';
+          if (/\/src\/(public\/(legend|companion)\.ts|engine\/errors\.ts|styles\/)/.test(id))
+            return 'legend';
+          return undefined;
+        },
       },
     },
     target,

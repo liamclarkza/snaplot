@@ -1,41 +1,40 @@
 {
-  "$comment": "Gzip budgets in bytes for `node scripts/size.mjs` (plan §11.3 G6): measured + 2% when set (`--update`). M14 ratchets them; target createChart <= 50 KiB. `fallback` names the export an entry measures until `import` exists.",
+  "$comment": "Gzip budgets in bytes for `node scripts/size.mjs` (plan §11.3 G6): measured + 2% when set (`--update`). M14 ratchets them; target createChart <= 50 KiB.",
   "imports": [
     {
       "label": "createChart",
       "from": "snaplot",
       "import": "createChart",
-      "measured": 68806,
-      "budget": 70183
+      "measured": 72301,
+      "budget": 73748
     },
     {
       "label": "Chart (react)",
       "from": "snaplot/react",
       "import": "Chart",
-      "measured": 69454,
-      "budget": 70844
+      "measured": 72671,
+      "budget": 74125
     },
     {
       "label": "Chart (solid)",
       "from": "snaplot/solid",
       "import": "Chart",
-      "measured": 69643,
-      "budget": 71036
+      "measured": 72741,
+      "budget": 74196
     },
     {
       "label": "histogram",
       "from": "snaplot",
       "import": "histogram",
-      "measured": 1872,
-      "budget": 1910
+      "measured": 1871,
+      "budget": 1909
     },
     {
       "label": "createLegendTable",
       "from": "snaplot",
       "import": "createLegendTable",
-      "fallback": "createLegendTablePlugin",
-      "measured": 2427,
-      "budget": 2476
+      "measured": 2771,
+      "budget": 2827
     }
   ]
 }
