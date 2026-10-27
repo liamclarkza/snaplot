@@ -139,15 +139,18 @@ export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined
     );
   const maxCategoryTicks = categoryTicks(65);
 
+  const xScale = engine.scales.get('x');
+
   // Histogram: X data = bin edges, use them as tick values
   const histSeries = visibleSeries.find((s) => markOf(s).draw.x === 'bin');
   if (histSeries && engine.hasData()) {
     // X column contains bin edges directly (pre-computed by user)
-    const edgeValues = thinTicks(axisMarkCoordinates(engine, 'bin'), maxCategoryTicks);
-    return { values: edgeValues, format };
+    const edges = axisMarkCoordinates(engine, 'bin');
+    // Log-spaced edges thinned land on odd values (45, 215 ms): a log axis's own ticks read better.
+    if (xScale?.type === 'log' && edges.length > maxCategoryTicks) return undefined;
+    return { values: thinTicks(edges, maxCategoryTicks), format };
   }
 
-  const xScale = engine.scales.get('x');
   const barPlan = xScale ? engine.barXAxisPlans.get('x') : undefined;
   const hasVisibleBar = visibleSeries.some((series) => markOf(series).draw.x === 'slot');
   if (

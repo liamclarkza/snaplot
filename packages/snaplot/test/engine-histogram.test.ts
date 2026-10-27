@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { tooltipText } from './fakes';
-import { type EngineFakes, f, installEngineFakes, tapAt } from './fakes/engine';
+import { type EngineFakes, engineDebug, f, installEngineFakes, tapAt } from './fakes/engine';
 
 // Ported from src/core/Chart.append.test.ts (plan M2).
 
@@ -118,5 +118,26 @@ describe('engine histogram cursor', () => {
     expect(yScale.min).toBe(0);
     // Nice rounding is the padding: 120 is already a tick.
     expect(yScale.max).toBeGreaterThanOrEqual(120);
+  });
+});
+
+describe('engine histogram ticks', () => {
+  it('labels a log axis of many log-spaced bins with its own ticks, not thinned edges', () => {
+    // Four bins per octave from 2 to 2,048: thinned, the edges would read 2, 10, 45, 215.
+    const edges = Array.from({ length: 41 }, (_, i) => 2 * 2 ** (i / 4));
+    const chart = fakes.engine(
+      {
+        axes: { x: { type: 'log' }, y: { type: 'linear' } },
+        series: [{ label: 'count', yColumn: 1, type: 'histogram' }],
+      },
+      [f(edges), f(edges.map((_, i) => (i < 40 ? 1 + (i % 5) : 0)))],
+    );
+    const labels = engineDebug(chart)
+      .labelBoxes()
+      .filter((box) => box.axis === 'x' && box.kind === 'tick')
+      .map((box) => box.text);
+    expect(labels.length).toBeGreaterThan(1);
+    // 1-2-5 values of the log scale (10, 100, 1,000), never an edge such as 45.25.
+    for (const label of labels) expect(label).toMatch(/^[125](0|,000)*$/);
   });
 });
