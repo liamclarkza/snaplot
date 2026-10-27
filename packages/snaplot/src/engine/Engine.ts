@@ -122,14 +122,14 @@ export class ChartCore implements EngineHost {
   layoutCacheKey = '';
   theme!: ThemeConfig;
   /**
-   * Block-aggregate range indexes for viewport-driven vertical auto-range,
-   * built lazily on the first pan/zoom query after a data change. Keyed by
-   * series column (or x:y column pair for arbitrary-X scatter). The
-   * data-change auto-range path deliberately does not build these: a
-   * streaming append per tick would pay an O(n) rebuild for a single query.
+   * Block-aggregate range indexes for viewport-driven vertical auto-range, built lazily on the
+   * first pan/zoom query after a data change and keyed by series column (or x:y column pair for
+   * arbitrary-X scatter); a streaming append would pay an O(n) rebuild per tick for one query.
+   * `columnExtents` holds whole-column extents (ranging.ts) at the data version they were read.
    */
   rangeIndexVersion = -1;
   columnRangeIndexes = new Map<string, ColumnRangeIndex>();
+  columnExtents = new Map<string, { version: number; range: [number, number] | null }>();
   scatterRangeIndexes = new Map<string, ScatterColumnRangeIndex>();
   /**
    * Per-series scatter render caches (heatmap bitmaps), keyed by series

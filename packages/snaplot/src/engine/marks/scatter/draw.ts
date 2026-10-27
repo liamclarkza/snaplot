@@ -4,16 +4,21 @@
  * Scatter is the cloud mark: it may read X from its own column (`xColumn`), so it is culled by Y
  * as well as X and hit-tested by nearest point.
  */
-import type { ChartCore } from '../../Engine';
 import type { Scale, Layout, SeriesSpec } from '../../spec';
 import { context2d } from '../../render/surface';
 import { affineParams } from '../../scales/affine';
 import { NO_COLUMNS, seriesYColumn } from '../columns';
 import type { MarkDraw } from '../index';
 import {
+  drawHeatmapSegments,
+  type HeatmapCacheEntry,
+  heatmapGradient,
+  isOffscreenCanvas,
+  segmentPointCount,
+} from './density';
+import {
   createScatterStyleResolver,
   type IndexRange,
-  rgbOf,
   type ScatterStyleResolver,
   type ScatterPalettes,
   scatterResolvers,
@@ -53,10 +58,6 @@ export function isDensityScatterSeries(series: SeriesSpec, pointCount: number): 
   return (
     renderMode === 'density' || (renderMode === 'auto' && pointCount > SCATTER_DENSITY_THRESHOLD)
   );
-}
-
-function isOffscreenCanvas(canvas: OffscreenCanvas | HTMLCanvasElement): canvas is OffscreenCanvas {
-  return typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas;
 }
 
 /** Radius passed here must already be quantized (see quantizeRadius). */
@@ -429,25 +430,6 @@ function buildSegmentResolver(
   });
 }
 
-// ─── Heatmap: 2D histogram for extreme point counts ────────────
-
-interface HeatmapCacheEntry {
-  canvas: OffscreenCanvas | HTMLCanvasElement;
-  xData: Float64Array;
-  yData: Float64Array;
-  segmentKey: string;
-  w: number;
-  h: number;
-  dpr: number;
-  dataLen: number;
-  xMin: number;
-  xMax: number;
-  yMin: number;
-  yMax: number;
-  binSize: number;
-  gradientKey: string;
-}
-
 /**
  * Per-series render cache, owned by the chart instance and passed into
  * renderScatterSegments. Heatmap bitmaps used to live in a module-level
@@ -458,6 +440,8 @@ interface HeatmapCacheEntry {
  */
 export class ScatterSeriesCache {
   heatmap: HeatmapCacheEntry | null = null;
+  /** Density binning passes over the data (the debug symbol's `densityRebins`). */
+  rebins = 0;
 
   private stampTable = new Map<number, OffscreenCanvas | HTMLCanvasElement>();
   private stampTableResolver: ScatterStyleResolver | null = null;
@@ -483,198 +467,6 @@ export class ScatterSeriesCache {
     }
     return this.stampTable;
   }
-}
-
-/**
- * Sample a multi-stop gradient at t ∈ [0, 1]. Stops are spaced evenly;
- * interpolation is linear in sRGB (fine for short, theme-matching ramps).
- */
-function sampleGradient(stops: [number, number, number][], t: number): [number, number, number] {
-  if (stops.length === 1) return stops[0];
-  const scaled = t * (stops.length - 1);
-  const i = Math.min(stops.length - 2, Math.floor(scaled));
-  const f = scaled - i;
-  const a = stops[i];
-  const b = stops[i + 1];
-  return [
-    Math.round(a[0] + (b[0] - a[0]) * f),
-    Math.round(a[1] + (b[1] - a[1]) * f),
-    Math.round(a[2] + (b[2] - a[2]) * f),
-  ];
-}
-
-function drawHeatmapSegments(
-  ctx: CanvasRenderingContext2D,
-  segments: ScatterRenderSegment[],
-  scaleX: Scale,
-  scaleY: Scale,
-  layout: Layout,
-  cache: ScatterSeriesCache,
-  binSizeCss?: number,
-  gradient?: string[],
-): void {
-  const { plot, dpr } = layout;
-  const binPx = Math.max(1, Math.round((binSizeCss ?? 1) * dpr));
-  const w = Math.ceil((plot.width * dpr) / binPx);
-  const h = Math.ceil((plot.height * dpr) / binPx);
-  if (w <= 0 || h <= 0) return;
-
-  const dataLen = segmentPointCount(segments);
-  const bs = binSizeCss ?? 1;
-  const gradientKey = gradient?.join('|') ?? 'viridis';
-  const firstSegment = segments[0];
-  const segmentKey = segments
-    .map((segment) => {
-      const first = segment.startIdx;
-      const last = segment.endIdx;
-      return [
-        first,
-        last,
-        segment.xData[first],
-        segment.xData[last],
-        segment.yData[first],
-        segment.yData[last],
-      ].join(':');
-    })
-    .join('|');
-
-  // Check cache: reuse if data, viewport, and gradient haven't changed
-  const cached = cache.heatmap;
-  if (
-    cached &&
-    cached.xData === firstSegment.xData &&
-    cached.yData === firstSegment.yData &&
-    cached.segmentKey === segmentKey &&
-    cached.w === w &&
-    cached.h === h &&
-    cached.dpr === dpr &&
-    cached.dataLen === dataLen &&
-    cached.xMin === scaleX.min &&
-    cached.xMax === scaleX.max &&
-    cached.yMin === scaleY.min &&
-    cached.yMax === scaleY.max &&
-    cached.binSize === bs &&
-    cached.gradientKey === gradientKey
-  ) {
-    ctx.drawImage(cached.canvas, plot.left, plot.top, plot.width, plot.height);
-    return;
-  }
-
-  // Pre-parse the gradient once per render; fall back to Viridis.
-  const parsedStops = gradient && gradient.length >= 2 ? gradient.map(rgbOf) : null;
-
-  // Bin all points. Affine scales fold the whole data-to-bin transform
-  // into one multiply-add per axis.
-  const bins = new Uint32Array(w * h);
-  let maxCount = 0;
-
-  const ax = affineParams(scaleX);
-  const ay = affineParams(scaleY);
-  const binScale = dpr / binPx;
-  const kx = ax ? ax[0] * binScale : 0;
-  const bx = ax ? (ax[1] - plot.left) * binScale : 0;
-  const ky = ay ? ay[0] * binScale : 0;
-  const by = ay ? (ay[1] - plot.top) * binScale : 0;
-
-  for (const segment of segments) {
-    const { xData, yData, startIdx, endIdx } = segment;
-    for (let i = startIdx; i <= endIdx; i++) {
-      const yVal = yData[i];
-      if (!Number.isFinite(yVal)) continue;
-
-      const px = Math.floor(
-        ax ? xData[i] * kx + bx : ((scaleX.dataToPixel(xData[i]) - plot.left) * dpr) / binPx,
-      );
-      const py = Math.floor(
-        ay ? yVal * ky + by : ((scaleY.dataToPixel(yVal) - plot.top) * dpr) / binPx,
-      );
-
-      // The bounds checks also reject NaN from non-finite X values.
-      if (px >= 0 && px < w && py >= 0 && py < h) {
-        const idx = py * w + px;
-        bins[idx]++;
-        if (bins[idx] > maxCount) maxCount = bins[idx];
-      }
-    }
-  }
-
-  if (maxCount === 0) return;
-
-  // Render to temp canvas at bin resolution
-  const tmpCanvas =
-    typeof OffscreenCanvas !== 'undefined'
-      ? new OffscreenCanvas(w, h)
-      : document.createElement('canvas');
-  if (!isOffscreenCanvas(tmpCanvas)) {
-    tmpCanvas.width = w;
-    tmpCanvas.height = h;
-  }
-  const tmpCtx = context2d(tmpCanvas);
-  const imageData = tmpCtx.createImageData(w, h);
-  const data = imageData.data;
-
-  for (let i = 0; i < bins.length; i++) {
-    if (bins[i] === 0) continue;
-
-    const t = Math.log(1 + bins[i]) / Math.log(1 + maxCount);
-    const [r, g, b] = parsedStops ? sampleGradient(parsedStops, t) : viridisColor(t);
-    const off = i * 4;
-    data[off] = r;
-    data[off + 1] = g;
-    data[off + 2] = b;
-    data[off + 3] = 255;
-  }
-
-  tmpCtx.putImageData(imageData, 0, 0);
-
-  // Cache for subsequent frames (e.g. overlay-only redraws)
-  cache.heatmap = {
-    canvas: tmpCanvas,
-    xData: firstSegment.xData,
-    yData: firstSegment.yData,
-    segmentKey,
-    w,
-    h,
-    dpr,
-    dataLen,
-    xMin: scaleX.min,
-    xMax: scaleX.max,
-    yMin: scaleY.min,
-    yMax: scaleY.max,
-    binSize: bs,
-    gradientKey,
-  };
-
-  ctx.drawImage(tmpCanvas, plot.left, plot.top, plot.width, plot.height);
-}
-
-function segmentPointCount(segments: ScatterRenderSegment[]): number {
-  let count = 0;
-  for (const segment of segments) {
-    count += segment.endIdx - segment.startIdx + 1;
-  }
-  return count;
-}
-
-function viridisColor(t: number): [number, number, number] {
-  if (t < 0.25) {
-    const s = t / 0.25;
-    return [Math.round(68 * s), Math.round(1 + 83 * s), Math.round(84 + 86 * s)];
-  }
-  if (t < 0.5) {
-    const s = (t - 0.25) / 0.25;
-    return [Math.round(68 - 35 * s), Math.round(84 + 86 * s), Math.round(170 - 10 * s)];
-  }
-  if (t < 0.75) {
-    const s = (t - 0.5) / 0.25;
-    return [Math.round(33 + 90 * s), Math.round(170 + 50 * s), Math.round(160 - 80 * s)];
-  }
-  const s = (t - 0.75) / 0.25;
-  return [Math.round(123 + 130 * s), Math.round(220 + 33 * s), Math.round(80 - 60 * s)];
-}
-
-export function heatmapGradient(engine: ChartCore): string[] | undefined {
-  return engine.theme.heatmapGradient ?? engine.theme.sequentialPalette;
 }
 
 export const scatterDraw: MarkDraw = {

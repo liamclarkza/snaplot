@@ -5382,13 +5382,12 @@
     },
     "perf:density-cache": {
       "title": "density cache hit on pan (0 rebins)",
-      "owners": ["M11"],
-      "status": "wont-do",
+      "owners": ["M11", "M17"],
+      "status": "tracked",
       "lock": {
         "kind": "test",
         "title": "[perf:density-cache]"
-      },
-      "lockNote": "deferred at M17 (docs/backlog.md): the density cache was not built; its guard stays an expected failure; recorded in ADR 0002 §6 and the overhaul handoff for review"
+      }
     },
     "perf:pan-no-scan": {
       "title": "pan frame does not scan the full column",
@@ -5514,6 +5513,15 @@
       "lock": {
         "kind": "test",
         "title": "[perf:state-coalesce]"
+      }
+    },
+    "perf:x-extent-ends": {
+      "title": "an option update reads a sorted X from its ends (no full scan)",
+      "owners": ["M17"],
+      "status": "tracked",
+      "lock": {
+        "kind": "test",
+        "title": "[perf:x-extent-ends]"
       }
     }
   }

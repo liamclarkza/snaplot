@@ -11,6 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import * as snaplot from '../src/index';
 import { createChartGroup } from '../src/index';
+import { ColumnarStore } from '../src/engine/data/ColumnarStore';
 import type { ChartHandle } from '../src/index';
 import { clientPoint, debug, type Fakes, installFakes, pointerTarget, wheelGesture } from './fakes';
 
@@ -48,6 +49,22 @@ function calls(chart: ChartHandle<any>, layer: 'grid' | 'data' | 'overlay', name
 }
 
 describe('data and culling', () => {
+  it('[perf:x-extent-ends] an option update reads a sorted X from its ends and Y from its cache, not row by row', () => {
+    const n = 200_000;
+    const chart = fakes.mount({ data: columns(n, (i) => i % 50), x: 'x', series: [{ y: 'y' }] });
+    fakes.frames.flush();
+    const reads = vi.spyOn(ColumnarStore.prototype, 'valueAt');
+    const scanned = future(chart).rangeScanPoints ?? 0;
+    chart.update({ axes: { y: { title: 'Load' } } });
+    fakes.frames.flush();
+    expect(reads.mock.calls.filter(([column]) => column === 0).length).toBeLessThan(100);
+    // Nor the Y column: its whole-column extent holds until the data changes.
+    expect((future(chart).rangeScanPoints ?? 0) - scanned).toBeLessThan(100);
+    const x = chart.scale('x');
+    expect(x?.min).toBe(0);
+    expect(x?.max).toBeGreaterThanOrEqual(n - 1);
+  });
+
   it('[perf:visible-range] render visits only the visible index range ±1', () => {
     const chart = fakes.mount({
       data: columns(10_000, (i) => i % 50),
@@ -234,7 +251,7 @@ describe('marks', () => {
     expect(fidelity(false)).toBeGreaterThanOrEqual(0.8);
   });
 
-  it.fails('[perf:density-cache] a pan inside the cached density bucket rebins nothing', () => {
+  it('[perf:density-cache] a pan inside the cached density bucket rebins nothing', () => {
     // The canvas recorder has no createImageData; give density rendering one.
     const getContext = HTMLCanvasElement.prototype.getContext;
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
@@ -262,10 +279,11 @@ describe('marks', () => {
       series: [{ type: 'scatter', y: 'y', renderMode: 'density' }],
     });
     fakes.frames.flush();
-    chart.update({ viewport: { x: [100, 900] } });
+    // A pan moves both axes of a cloud by the same span (zoom: 'xy', its default).
+    chart.update({ viewport: { x: [100, 900], y: [100, 900] } });
     fakes.frames.flush();
     const before = future(chart).densityRebins;
-    chart.update({ viewport: { x: [101, 901] } });
+    chart.update({ viewport: { x: [101, 901], y: [99, 899] } });
     fakes.frames.flush();
     expect(before).toBeDefined();
     expect(future(chart).densityRebins).toBe(before);

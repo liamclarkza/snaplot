@@ -62,6 +62,8 @@ export interface DebugSnapshot {
   hitVisits: number;
   /** Points the last vertical auto-range read. */
   rangeScanPoints: number;
+  /** Density binning passes over the data, summed over the density series. */
+  densityRebins: number;
 }
 
 function countDataPass(pass: readonly DataPassSeries[]): { drawn: number; inView: number } {
@@ -139,6 +141,7 @@ export function debugSnapshot(engine: ChartCore): DebugSnapshot {
     materializeCount: engine.debugCounters.materializeCount,
     hitVisits: engine.hitTester.lastVisits,
     rangeScanPoints: engine.debugCounters.rangeScanPoints,
+    densityRebins: [...engine.scatterSeriesCaches.values()].reduce((sum, c) => sum + c.rebins, 0),
     plot: Object.freeze({ ...engine.layout.plot }),
     layout: engine.layout,
     theme: Object.freeze({ ...engine.theme }),

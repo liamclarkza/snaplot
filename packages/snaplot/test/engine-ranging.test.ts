@@ -176,6 +176,19 @@ describe('engine auto-range and log interactions', () => {
     chart.destroy();
   });
 
+  it('starts a log X at the first positive value of a sorted X', () => {
+    const chart = fakes.engine(
+      {
+        axes: { x: { type: 'log', padding: 0 }, y: { type: 'linear' } },
+        series: [{ label: 'v', type: 'line', yColumn: 1 }],
+      },
+      [f([-5, 0, 2, 10, 1000]), f([1, 2, 3, 4, 5])],
+    );
+    expect(chart.getAxis('x')?.min).toBeCloseTo(2, 6);
+    expect(chart.getAxis('x')?.max).toBeCloseTo(1000, 6);
+    chart.destroy();
+  });
+
   it('zooms log axes in log space around the pointer anchor', () => {
     const chart = fakes.engine(
       {

@@ -120,7 +120,23 @@ export function autoRangeHorizontal(engine: ChartCore): void {
       }
       if (visited.has(columnIdx)) return;
       visited.add(columnIdx);
-      for (let i = 0; i < store.length; i++) {
+      // A store's own X (column 0) is sorted and finite: its ends are its extent, and its first
+      // positive value is a binary search away, so an option update does not scan 200k rows.
+      const n = store.length;
+      if (columnIdx === 0 && n > 0) {
+        const first = store.xAt(0);
+        const last = store.xAt(n - 1);
+        if (Number.isFinite(first) && Number.isFinite(last)) {
+          hasXValue = true;
+          if (first < xMin) xMin = first;
+          if (last > xMax) xMax = last;
+          const positive = first > 0 ? 0 : store.upperBoundX(0) + 1;
+          if (positive < n && store.xAt(positive) < xPositiveMin)
+            xPositiveMin = store.xAt(positive);
+          return;
+        }
+      }
+      for (let i = 0; i < n; i++) {
         const value = store.valueAt(columnIdx, i);
         if (!Number.isFinite(value)) continue;
         hasXValue = true;
@@ -409,6 +425,7 @@ export function ensureRangeIndexesFresh(engine: ChartCore): void {
 export function invalidateRangeCache(engine: ChartCore): void {
   engine.rangeIndexVersion = -1;
   engine.columnRangeIndexes.clear();
+  engine.columnExtents.clear();
   engine.scatterRangeIndexes.clear();
   engine.scatterSeriesCaches.clear();
   engine.scatterEncodingCache.clear();
@@ -452,6 +469,12 @@ export function columnRange(
     return min === Infinity ? null : [min, max];
   }
 
+  // A whole column's extent holds until the data changes: an option update (a title, a format)
+  // re-ranges without scanning every row again.
+  const whole = start === 0 && end === store.length - 1;
+  const key = `${engine.sourceStores.indexOf(store)}:${columnIdx}:${positiveOnly}`;
+  const cached = whole ? engine.columnExtents.get(key) : undefined;
+  if (cached && cached.version === engine.dataVersion) return cached.range;
   let min = Infinity;
   let max = -Infinity;
   engine.debugCounters.rangeScanPoints += end - start + 1;
@@ -461,7 +484,9 @@ export function columnRange(
     if (v < min) min = v;
     if (v > max) max = v;
   }
-  return min === Infinity ? null : [min, max];
+  const range: [number, number] | null = min === Infinity ? null : [min, max];
+  if (whole) engine.columnExtents.set(key, { version: engine.dataVersion, range });
+  return range;
 }
 
 export function scatterViewportColumnRange(
