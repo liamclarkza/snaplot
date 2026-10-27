@@ -44,9 +44,6 @@ function table(chart: FinalHandle<Row>, options: Record<string, unknown> = {}) {
 describe('the built-in legend (plan D6)', () => {
   it("[frameworks-11] 'auto' shows one button per series from two series, none for one", () => {
     expect(names(mount<Row>(fakes, two))).toEqual(['CPU', 'Memory']);
-    // A container too short for a plot below the legend shows only the chart.
-    expect(names(mount<Row>(fakes, two, { height: 120 }))).toEqual([]);
-    expect(names(mount<Row>(fakes, shown, { height: 120 }))).toEqual(['CPU', 'Memory']);
     expect(names(mount<Row>(fakes, { ...two, series: [two.series[0]] }))).toEqual([]);
     expect(names(mount<Row>(fakes, { ...two, legend: false }))).toEqual([]);
     expect(names(mount<Row>(fakes, { ...two, series: [two.series[0]], legend: true }))).toEqual([
@@ -55,13 +52,14 @@ describe('the built-in legend (plan D6)', () => {
   });
 
   it('[frameworks-11] the legend sits above the plot, or below it with position: bottom', () => {
+    // Chrome inside the chart's root, at the side it reserves (plan §5.6).
+    const legendOf = (chart: FinalHandle<Row>) =>
+      buttons(chart)[0].closest<HTMLElement>('[data-snaplot-legend]')!;
     const top = mount<Row>(fakes, shown);
-    const plot = top.container.querySelector('[role="application"]')!;
-    expect(top.container.firstElementChild?.querySelector('button')).not.toBeNull();
-    expect(plot.previousElementSibling?.contains(buttons(top)[0])).toBe(true);
+    expect(legendOf(top).parentElement?.getAttribute('role')).toBe('application');
+    expect(legendOf(top).dataset.position).toBe('top');
     const bottom = mount<Row>(fakes, { ...two, legend: { position: 'bottom' } });
-    const root = bottom.container.querySelector('[role="application"]')!;
-    expect(root.nextElementSibling?.contains(buttons(bottom)[0])).toBe(true);
+    expect(legendOf(bottom).dataset.position).toBe('bottom');
   });
 
   it('[frameworks-11] a click toggles the series and reports hiddenSeries:change', () => {
@@ -135,17 +133,16 @@ describe('the built-in legend (plan D6)', () => {
     }
   });
 
-  it('[frameworks-11] a visible container gets the column layout, and destroy restores it', () => {
+  it('[frameworks-11] the host keeps its own layout, and destroy leaves it as it was', () => {
     const host = document.createElement('div');
     host.style.display = 'block';
     fakes.layout.setSize(host, 400, 300);
     document.body.append(host);
     const chart = createChart(host, shown as never);
-    expect(host.style.display).toBe('flex');
-    expect(host.style.flexDirection).toBe('column');
-    chart.destroy();
     expect(host.style.display).toBe('block');
     expect(host.style.flexDirection).toBe('');
+    chart.destroy();
+    expect(host.style.display).toBe('block');
   });
 
   it('[frameworks-11] the legend styles are injected once per document', () => {
@@ -164,20 +161,20 @@ describe('the built-in legend (plan D6)', () => {
  * restyles the container (which overrides a `hidden` attribute or a class's display: none).
  */
 describe('[research-13] the final default legend (M12b, plan §5.6)', () => {
-  it.fails("[research-13] the default legend leaves the container's inline style alone", () => {
+  it("[research-13] the default legend leaves the container's inline style alone", () => {
     const chart = mount<Row>(fakes, two);
     expect(buttons(chart)).toHaveLength(2);
     expect(chart.container.style.display).toBe('');
     expect(chart.container.style.flexDirection).toBe('');
   });
 
-  it.fails('[research-13] the default legend is left-aligned', () => {
+  it('[research-13] the default legend is left-aligned', () => {
     const chart = mount<Row>(fakes, two);
     const legend = buttons(chart)[0].parentElement!;
     expect(getComputedStyle(legend).justifyContent).not.toBe('center');
   });
 
-  it.fails("[research-13] 'auto' shows the legend for two series in a container under 160 px tall", () => {
+  it("[research-13] 'auto' shows the legend for two series in a container under 160 px tall", () => {
     expect(names(mount<Row>(fakes, two, { height: 120 }))).toEqual(['CPU', 'Memory']);
   });
 });

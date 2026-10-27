@@ -144,7 +144,8 @@ export function applyThemeToElement(element: HTMLElement, theme: ThemeConfig): v
     else style[name] = value;
   };
   set(SNAPLOT_THEME_CSS_VARS.text, theme.textColor);
-  set(SNAPLOT_THEME_CSS_VARS.muted, theme.tickColor);
+  // Muted text is the axis labels' colour: legends and tables match them (plan §5.6).
+  set(SNAPLOT_THEME_CSS_VARS.muted, theme.axisLabelColor ?? theme.tickColor);
   set(SNAPLOT_THEME_CSS_VARS.border, withAlpha(theme.borderColor, theme.borderOpacity));
   set(SNAPLOT_THEME_CSS_VARS.hover, withAlpha(theme.textColor, 0.08));
   set(SNAPLOT_THEME_CSS_VARS.highlight, withAlpha(theme.textColor, 0.14));

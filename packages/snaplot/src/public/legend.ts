@@ -38,108 +38,145 @@ export interface LegendPlacement {
 }
 
 /**
- * Mount the built-in legend in the chart's container, above or below `plot` (the engine's
- * root): one `<button aria-pressed>` per series; a click toggles the series and a hover or focus
- * highlights it. Returns the unmount function.
+ * Mount the built-in legend (plan §5.6) at the top or bottom of the chart's root, in space the
+ * layout reserves for it, so the host's own style is never touched: one `<button aria-pressed>`
+ * per series, named by its label, that toggles the series and highlights it on hover or focus;
+ * or, for a series coloured by category, one static item per category. Returns the unmount.
  */
 export function mountLegend<Row>(
   chart: ChartHandle<Row>,
   plot: HTMLElement,
   placement: LegendPlacement,
 ): () => void {
-  const parent = chart.container;
-  injectStyles(parent);
+  injectStyles(plot);
+  const control = companion(chart);
   const root = document.createElement('div');
   root.className = 'snaplot-legend-root';
   root.dataset.snaplotLegend = '';
-  const restore = {
-    display: parent.style.display,
-    direction: parent.style.flexDirection,
-    flex: plot.style.flex,
-    minHeight: plot.style.minHeight,
-  };
-  // An inline display would show a container its page hides (a `hidden` attribute, or a class
-  // with display: none), so a hidden one keeps its own. M12b's legend reserves its own space.
-  if (!parent.hidden && getComputedStyle(parent).display !== 'none') {
-    parent.style.display = 'flex';
-    parent.style.flexDirection = 'column';
-  }
-  plot.style.flex = '1';
-  plot.style.minHeight = '0';
-  if (placement.position === 'top') parent.insertBefore(root, plot);
-  else plot.after(root);
+  root.dataset.position = placement.position;
+  plot.append(root);
 
-  const control = companion(chart);
-  /** Each series' button and what it last showed: a commit that changes no series writes nothing. */
-  const buttons = new Map<
+  // The space the legend takes: its height and a gap, kept current as it wraps.
+  let reserved = -1;
+  const reserve = () => {
+    const height = root.getBoundingClientRect().height;
+    const px = height > 0 ? Math.ceil(height + LEGEND_GAP) : 0;
+    if (px === reserved) return;
+    reserved = px;
+    control.reserve(placement.position, px);
+  };
+  const observer =
+    typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => reserve());
+  observer?.observe(root);
+
+  /** Each item and what it last showed: a commit that changes no series writes nothing. */
+  const items = new Map<
     string,
-    { button: HTMLButtonElement; dot: HTMLElement; label: HTMLElement; shows?: string }
+    { item: HTMLElement; dot: HTMLElement; label: HTMLElement; shows?: string }
   >();
+  const item = (key: string, interactive: boolean) => {
+    let entry = items.get(key);
+    if (entry) return entry;
+    const element = document.createElement(interactive ? 'button' : 'span');
+    element.className = 'snaplot-legend-item';
+    const dot = document.createElement('span');
+    dot.className = 'snaplot-legend-dot';
+    const label = document.createElement('span');
+    label.className = 'snaplot-legend-label';
+    element.append(dot, label);
+    if (interactive && element instanceof HTMLButtonElement) {
+      element.type = 'button';
+      element.dataset.seriesId = key;
+      element.addEventListener('click', () => control.toggle(key));
+      element.addEventListener('mouseenter', () => control.highlight(key));
+      element.addEventListener('mouseleave', () => control.highlight(null));
+      element.addEventListener('focus', () => control.highlight(key));
+      element.addEventListener('blur', () => control.highlight(null));
+    } else element.dataset.static = '';
+    entry = { item: element, dot, label };
+    items.set(key, entry);
+    return entry;
+  };
+  const show = (
+    entry: { item: HTMLElement; dot: HTMLElement; label: HTMLElement; shows?: string },
+    index: number,
+    look: { label: string; color: string; fill?: string; mark: string; dashed: boolean },
+    visible?: boolean,
+  ) => {
+    if (root.children[index] !== entry.item)
+      root.insertBefore(entry.item, root.children[index] ?? null);
+    const shows = [visible, look.label, look.color, look.fill, look.mark, look.dashed].join(
+      '\u0000',
+    );
+    if (entry.shows === shows) return;
+    entry.shows = shows;
+    if (visible !== undefined) {
+      // The name is the label alone; aria-pressed says whether the series shows (interact-21).
+      entry.item.setAttribute('aria-pressed', String(visible));
+      setFlag(entry.item, 'hidden', !visible);
+    }
+    entry.dot.dataset.mark = look.mark;
+    entry.dot.style.color = look.color;
+    entry.dot.style.borderColor = look.color;
+    entry.dot.style.backgroundColor = look.fill ?? '';
+    setFlag(entry.dot, 'dashed', look.dashed);
+    if (entry.label.textContent !== look.label) entry.label.textContent = look.label;
+  };
+
   const refresh = () => {
     const list = control.series();
-    const ids = new Set(list.map((item) => item.id));
-    for (const [id, entry] of buttons)
-      if (!ids.has(id)) {
-        entry.button.remove();
-        buttons.delete(id);
+    const categories = list.length === 1 ? control.categories() : [];
+    const keys = new Set(
+      categories.length > 0
+        ? categories.map((category) => `category:${category.label}`)
+        : list.map((series) => series.id),
+    );
+    for (const [key, entry] of items)
+      if (!keys.has(key)) {
+        entry.item.remove();
+        items.delete(key);
       }
-    list.forEach((item, index) => {
-      let entry = buttons.get(item.id);
-      if (!entry) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'snaplot-legend-item';
-        button.dataset.seriesId = item.id;
-        const dot = document.createElement('span');
-        dot.className = 'snaplot-legend-dot';
-        const label = document.createElement('span');
-        label.className = 'snaplot-legend-label';
-        button.append(dot, label);
-        button.addEventListener('click', () => control.toggle(item.id));
-        button.addEventListener('mouseenter', () => control.highlight(item.id));
-        button.addEventListener('mouseleave', () => control.highlight(null));
-        button.addEventListener('focus', () => control.highlight(item.id));
-        button.addEventListener('blur', () => control.highlight(null));
-        entry = { button, dot, label };
-        buttons.set(item.id, entry);
+    if (categories.length > 0) {
+      const mark = list[0]?.type ?? 'scatter';
+      for (const [index, category] of categories.entries()) {
+        show(item(`category:${category.label}`, false), index, {
+          label: category.label,
+          color: category.color,
+          mark,
+          dashed: false,
+        });
       }
-      const { button, dot, label } = entry;
-      if (root.children[index] !== button) root.insertBefore(button, root.children[index] ?? null);
-      const shows = [
-        item.visible,
-        item.label,
-        item.color,
-        item.fill ?? '',
-        item.opacity,
-        item.type ?? 'line',
-        item.dash.length > 0,
-      ].join('\u0000');
-      if (entry.shows === shows) return;
-      entry.shows = shows;
-      setFlag(button, 'hidden', !item.visible);
-      button.setAttribute('aria-label', `Toggle ${item.label} ${item.visible ? 'off' : 'on'}`);
-      button.setAttribute('aria-pressed', String(item.visible));
-      dot.dataset.mark = item.type ?? 'line';
-      dot.style.color = item.color;
-      dot.style.borderColor = item.color;
-      dot.style.backgroundColor = item.fill ?? '';
-      dot.style.opacity = String(item.opacity);
-      setFlag(dot, 'dashed', item.dash.length > 0);
-      if (label.textContent !== item.label) label.textContent = item.label;
-    });
+    } else {
+      for (const [index, series] of list.entries()) {
+        show(
+          item(series.id, true),
+          index,
+          {
+            label: series.label,
+            color: series.color,
+            fill: series.fill ?? undefined,
+            mark: series.type ?? 'line',
+            dashed: series.dash.length > 0,
+          },
+          series.visible,
+        );
+      }
+    }
+    reserve();
   };
   refresh();
   const unobserve = control.observe(refresh);
   return () => {
     unobserve();
+    observer?.disconnect();
     root.remove();
-    buttons.clear();
-    parent.style.display = restore.display;
-    parent.style.flexDirection = restore.direction;
-    plot.style.flex = restore.flex;
-    plot.style.minHeight = restore.minHeight;
+    items.clear();
+    control.reserve(placement.position, 0);
   };
 }
+
+/** The space between the legend and the plot's axis area, in CSS pixels. */
+const LEGEND_GAP = 4;
 
 // ─── The legend table ────────────────────────────────────────────────
 
@@ -159,8 +196,11 @@ export type LegendTableColumn<Row = Record<string, any>> =
   | {
       /** The header text. */
       header: string;
-      /** The cell text of one series: `point` is its value at the cursor (or the fallback). */
-      value(point: ChartPoint<Row> | undefined, series: SeriesState): string;
+      /**
+       * The cell of one series: `point` is its value at the cursor (or the fallback). Text, or a
+       * node (a button, a link); a node equal to the one shown is kept, so focus inside it stays.
+       */
+      value(point: ChartPoint<Row> | undefined, series: SeriesState): string | Node;
       /** Text alignment. @defaultValue `'left'` */
       align?: 'left' | 'right' | 'center';
     };
@@ -286,13 +326,17 @@ export function createLegendTable<Row = Record<string, any>>(
       swatch.style.background = series.color;
       return;
     }
-    const text =
+    const content =
       column === 'name'
         ? series.label
         : column === 'value'
           ? (point?.formattedY ?? '')
           : column.value(point, series);
-    if (td.textContent !== text) td.textContent = text;
+    if (typeof content === 'string') {
+      if (td.childElementCount > 0 || td.textContent !== content) td.textContent = content;
+    } else if (!(td.childNodes.length === 1 && td.firstChild?.isEqualNode(content))) {
+      td.replaceChildren(content);
+    }
   };
 
   const refresh = () => {

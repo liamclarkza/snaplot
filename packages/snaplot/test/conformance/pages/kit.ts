@@ -203,11 +203,9 @@ export function normaliseIds(html: string): string {
   );
 }
 
-/** The built-in legend's DOM: every element of the chart host outside its canvas stack. */
+/** The built-in legend's DOM: the legend element inside the chart root. */
 export function legendHTML(chart: ChartHandle<Row>): string {
-  const roots = [...chart.container.children].filter(
-    (child) => !child.matches('[role="application"]'),
-  );
+  const roots = [...chart.container.querySelectorAll('[data-snaplot-legend]')];
   return normaliseIds(roots.map((root) => root.outerHTML).join('\n'));
 }
 

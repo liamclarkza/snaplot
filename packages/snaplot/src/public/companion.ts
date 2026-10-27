@@ -21,6 +21,10 @@ export interface Companion {
   xTitle(): string | undefined;
   /** Follow every data, option and state commit as it happens; returns the unsubscribe. */
   observe(listener: () => void): () => void;
+  /** A series coloured by category: each category and its colour, for static legend items. */
+  categories(): readonly { label: string; color: string }[];
+  /** Reserve CSS pixels at the top or bottom of the chart for the built-in legend. */
+  reserve(side: 'top' | 'bottom', px: number): void;
 }
 
 /** The companion of each live chart handle. */

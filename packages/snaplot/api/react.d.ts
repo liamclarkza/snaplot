@@ -755,8 +755,11 @@ export declare function LegendTable<Row = Record<string, any>>(props: LegendTabl
 export declare type LegendTableColumn<Row = Record<string, any>> = 'swatch' | 'name' | 'value' | {
     /** The header text. */
     header: string;
-    /** The cell text of one series: `point` is its value at the cursor (or the fallback). */
-    value(point: ChartPoint<Row> | undefined, series: SeriesState): string;
+    /**
+     * The cell of one series: `point` is its value at the cursor (or the fallback). Text, or a
+     * node (a button, a link); a node equal to the one shown is kept, so focus inside it stays.
+     */
+    value(point: ChartPoint<Row> | undefined, series: SeriesState): string | Node;
     /** Text alignment. @defaultValue `'left'` */
     align?: 'left' | 'right' | 'center';
 };

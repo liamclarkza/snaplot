@@ -1,10 +1,7 @@
-/* snaplot, opt-in default styles for both legend plugins.
+/* snaplot's legend styles, injected once per document (no import needed):
  *
- *   import 'snaplot/legend-table.css';
- *
- * Covers:
- *   - `<LegendTable>` + createLegendTablePlugin(), cursor-synced tabular legend
- *   - createLegendPlugin(), inline horizontal legend with click-to-toggle
+ *   - createLegendTable() and <LegendTable>, the cursor-synced table
+ *   - the built-in legend (`legend: 'auto'`), with click-to-toggle
  *
  * All rules use plain class names + CSS custom properties so apps can
  * fully restyle without specificity battles. Rules are ordered from
@@ -124,62 +121,71 @@
   }
 }
 
-/* ─── Legend Plugin (inline horizontal) ────────────────────────── */
+/* ─── The built-in legend ───────────────────────────────────────
+   Chrome at the top or bottom of the chart's root, in space the layout reserves; left-aligned
+   and wrapping. Text is the axis labels' muted colour, without stacked opacity (plan §5.6). */
 
 .snaplot-legend-root {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 8px;
-  padding: 8px 8px;
+  justify-content: flex-start;
+  gap: 0 2px;
+  padding: 2px 4px;
   font-size: 12px;
-  justify-content: center;
-  color: var(--snaplot-legend-text);
+  line-height: 1.2;
+  color: var(--snaplot-theme-muted);
   font-family: var(--snaplot-theme-font-family);
-  pointer-events: auto;
-  flex-shrink: 0;
+  pointer-events: none;
 }
 
-.snaplot-series-legend {
-  justify-content: flex-start;
-  padding: 0;
+.snaplot-legend-root[data-position="top"] {
+  top: 0;
+}
+
+.snaplot-legend-root[data-position="bottom"] {
+  bottom: 0;
 }
 
 .snaplot-legend-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: var(--snaplot-legend-row-radius);
-  cursor: pointer;
-  user-select: none;
   background: transparent;
   border: 0;
   font: inherit;
   color: inherit;
-  transition:
-    background-color var(--snaplot-legend-dur) var(--snaplot-legend-ease),
-    opacity var(--snaplot-legend-dur) var(--snaplot-legend-ease);
+  pointer-events: auto;
+  user-select: none;
+  transition: background-color var(--snaplot-legend-dur) var(--snaplot-legend-ease);
 }
 
-.snaplot-legend-item:hover {
+button.snaplot-legend-item {
+  cursor: pointer;
+}
+
+button.snaplot-legend-item:hover {
   background-color: var(--snaplot-legend-row-hover);
 }
 
-.snaplot-legend-item[data-hidden="true"] {
-  opacity: 0.4;
-}
-
 .snaplot-legend-item:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent);
+  outline: 2px solid var(--snaplot-theme-accent, currentColor);
+  outline-offset: 0;
 }
 
 .snaplot-legend-dot {
   display: inline-block;
   position: relative;
-  width: 14px;
+  width: 12px;
   height: 10px;
   flex-shrink: 0;
+  /* A swatch is data: forced colours keep it (gap-environments-05). */
+  forced-color-adjust: none;
 }
 
 .snaplot-legend-dot[data-mark="line"]::after,
@@ -204,35 +210,44 @@
 
 .snaplot-legend-dot[data-mark="band"] {
   height: 8px;
-  margin-top: 1px;
   border: 1px solid currentColor;
+  box-sizing: border-box;
   background: color-mix(in srgb, currentColor 18%, transparent);
 }
 
 .snaplot-legend-dot[data-mark="bar"],
 .snaplot-legend-dot[data-mark="histogram"] {
-  width: 11px;
   height: 10px;
   border-radius: 2px 2px 0 0;
   background: currentColor;
 }
 
 .snaplot-legend-dot[data-mark="scatter"] {
-  width: 9px;
-  height: 9px;
-  margin-inline: 2px 3px;
+  height: 12px;
   border-radius: 50%;
   background: currentColor;
+  transform: scale(0.75);
 }
 
-.snaplot-legend-label {
-  line-height: 1.2;
+/* A hidden series: its swatch fades and its name is struck through. */
+.snaplot-legend-item[data-hidden="true"] .snaplot-legend-dot {
+  opacity: 0.45;
 }
 
-/* Touch targets: each pill hits 44×44 under coarse pointers. */
+.snaplot-legend-item[data-hidden="true"] .snaplot-legend-label {
+  text-decoration: line-through;
+}
+
+@media (forced-colors: active) {
+  .snaplot-legend-item:focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+/* Touch targets: each item hits 44 px tall under coarse pointers. */
 @media (pointer: coarse) {
   .snaplot-legend-item {
-    padding: 10px 14px;
+    padding: 10px 10px;
     min-height: 44px;
   }
 }

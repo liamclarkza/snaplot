@@ -222,12 +222,18 @@ test.describe('the homepage', () => {
     await page.goto(BASE);
     await page.locator(HERO).scrollIntoViewIfNeeded();
     await page.locator('[data-hero-toggle]').click();
-    // The chart's canvases: the plot and its gutters, below the legend.
-    const plot = await page
-      .locator(`${HERO} [role="tabpanel"][data-framework="vanilla"] [data-example-output] canvas`)
-      .first()
-      .boundingBox();
-    if (!plot) throw new Error('no hero');
+    // The chart below its legend: the plot and its gutters.
+    const output = `${HERO} [role="tabpanel"][data-framework="vanilla"] [data-example-output]`;
+    const canvas = await page.locator(`${output} canvas`).first().boundingBox();
+    const legend = await page.locator(`${output} [data-snaplot-legend]`).boundingBox();
+    if (!canvas || !legend) throw new Error('no hero');
+    const top = legend.y + legend.height;
+    const plot = {
+      x: canvas.x,
+      y: top,
+      width: canvas.width,
+      height: canvas.y + canvas.height - top,
+    };
     let shown = 0;
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 12; col++) {

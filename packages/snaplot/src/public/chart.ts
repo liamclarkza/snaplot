@@ -64,7 +64,6 @@ export { createChartGroup };
 const CHURN_ROWS = 10_000;
 
 /** The container height from which `legend: 'auto'` shows the legend (CSS pixels). */
-const LEGEND_MIN_HEIGHT = 160;
 
 /** The seven events, in plan §4.4's order. */
 const EVENTS: readonly (keyof ChartEvents)[] = [
@@ -173,6 +172,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       cursor: (fallback) => this.getCursor({ fallback }),
       xTitle: () => this.ingested.spec.axes?.x?.title,
       observe: (listener) => this.events.observe(listener),
+      categories: () => this.legendCategories(),
+      reserve: (side, px) => this.engine.reserveChrome(side, px),
     });
     try {
       this.applyAccessibleName();
@@ -802,20 +803,18 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   /**
-   * Show or hide the built-in legend as the `legend` option asks (plan D6): `'auto'` shows it
-   * for two or more series. A change of the space it takes resizes the plot before the next paint.
+   * Show or hide the built-in legend as the `legend` option asks (plan D6, §5.6): `'auto'` shows
+   * it for two or more series, or for a series coloured by category. It takes its space from the
+   * chart's own layout (`reserveChrome`), so any container height works.
    */
   private syncLegend(): void {
     if (this.destroyed) return;
     const option = this.normalized.engine.legend ?? 'auto';
-    // Until M12b reserves its space in the layout, 'auto' gives way in a container too short to
-    // keep a usable plot below it (a 200 × 120 box shows only the chart).
     const show =
       option === true ||
       typeof option === 'object' ||
       (option === 'auto' &&
-        this.ingested.seriesIds.length >= 2 &&
-        this.container.clientHeight >= LEGEND_MIN_HEIGHT);
+        (this.ingested.seriesIds.length >= 2 || this.legendCategories().length > 0));
     const position = typeof option === 'object' ? (option.position ?? 'top') : 'top';
     if (this.legend && (!show || this.legend.position !== position)) {
       this.legend.unmount();
@@ -823,7 +822,28 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     } else if (this.legend || !show) return;
     if (show)
       this.legend = { position, unmount: mountLegend(this.handle, this.engine.root, { position }) };
-    this.engine.fitToRoot();
+  }
+
+  /**
+   * The static legend items of a series coloured by category (plan §5.6): each category and its
+   * colour, for the first visible series that has them.
+   */
+  private legendCategories(): { label: string; color: string }[] {
+    const series = this.ingested.spec.series;
+    for (const spec of series) {
+      const colorBy = spec.colorBy;
+      if (spec.visible === false || typeof colorBy !== 'object') continue;
+      if (colorBy.type !== 'category' || !colorBy.categoryValues || !colorBy.format) continue;
+      const palette = (colorBy.palette ?? this.engine.categoricalPalette()).map((color) =>
+        this.engine.resolveColor(color),
+      );
+      const format = colorBy.format;
+      return colorBy.categoryValues.map((code, i) => ({
+        label: format(code),
+        color: palette[i % palette.length],
+      }));
+    }
+    return [];
   }
 
   /** A legend click: show or hide one series, reported as `hiddenSeries:change`. */

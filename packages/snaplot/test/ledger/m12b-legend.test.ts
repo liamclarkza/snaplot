@@ -64,7 +64,7 @@ describe('[dxtrial-06][demos-13] an automatic, styled legend', () => {
     ]);
   });
 
-  it.fails('[dxtrial-06] the legend is styled without importing any CSS file', () => {
+  it('[dxtrial-06] the legend is styled without importing any CSS file', () => {
     const buttons = legendButtons(mountTwo());
     expect(buttons).toHaveLength(2);
     // Computed styles (plan RC12): padded buttons and a 12 px swatch, from the
@@ -80,14 +80,14 @@ describe('[dxtrial-06][demos-13] an automatic, styled legend', () => {
     }
   });
 
-  it.fails('[gap-environments-05:swatches] legend swatches keep their colour in forced colours', () => {
+  it('[gap-environments-05:swatches] legend swatches keep their colour in forced colours', () => {
     mountTwo();
     expect(styleText()).toMatch(/forced-color-adjust:\s*none/);
   });
 });
 
 describe('[interact-21][gap-overhaul-delta-02] legend behaviour', () => {
-  it.fails('[interact-21] a legend button keeps its name and toggles aria-pressed', () => {
+  it('[interact-21] a legend button keeps its name and toggles aria-pressed', () => {
     const chart = mountTwo();
     const [cpu] = legendButtons(chart);
     expect(cpu?.getAttribute('aria-pressed')).toBe('true');
@@ -99,7 +99,7 @@ describe('[interact-21][gap-overhaul-delta-02] legend behaviour', () => {
     expect(after?.getAttribute('aria-label') ?? after?.textContent).toBe(name);
   });
 
-  it.fails('[gap-overhaul-delta-02] update({ theme }) recolours the legend swatches', () => {
+  it('[gap-overhaul-delta-02] update({ theme }) recolours the legend swatches', () => {
     const chart = mountTwo();
     const swatchColours = () =>
       [...chart.container.querySelectorAll<HTMLElement>('button[aria-pressed] *')]
@@ -108,7 +108,7 @@ describe('[interact-21][gap-overhaul-delta-02] legend behaviour', () => {
         .join(' ');
     const before = swatchColours();
     expect(before).not.toBe('');
-    chart.update({ theme: { palette: ['#ff0000', '#00ff00'] } } as never);
+    chart.update({ theme: { categorical: ['#ff0000', '#00ff00'] } });
     fakes.frames.flush();
     expect(swatchColours()).not.toBe(before);
   });
@@ -128,7 +128,7 @@ describe('[frameworks-01][frameworks-08][frameworks-20] the core legend table', 
     expect(host.textContent).toContain('44');
   });
 
-  it.fails('[frameworks-08] a cursor move keeps focus inside an interactive cell', () => {
+  it('[frameworks-08] a cursor move keeps focus inside an interactive cell', () => {
     const chart = mountTwo({ legend: false });
     const host = document.createElement('div');
     document.body.append(host);

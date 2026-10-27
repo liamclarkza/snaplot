@@ -7,7 +7,6 @@ test.describe('legend', () => {
   test('[dxtrial-06] two series show padded legend buttons in the axis-label colour, with no CSS import', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[dxtrial-06]');
     await page.evaluate(() => {
       window.harness.mount(
         {

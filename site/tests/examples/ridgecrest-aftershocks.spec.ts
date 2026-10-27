@@ -196,11 +196,10 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       await context.close();
     });
 
-    // M12b gives a categorical colorBy static legend items; flip this when it merges.
+    // A categorical colorBy gets static legend items (M12b).
     test('[dxtrial-13:categorical] the built-in legend names the three depth bands', async ({
       page,
     }) => {
-      test.fail(true, '[dxtrial-13:categorical][backlog-15:categorical] M12b: no legend items');
       await openDemo(page, SLUG);
       const legend = page.locator('[data-part="scatter"]');
       for (const band of ['0–5 km', '5–10 km', '>10 km']) await expect(legend).toContainText(band);

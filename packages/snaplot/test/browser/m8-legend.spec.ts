@@ -1,5 +1,5 @@
-// The interim built-in legend in a real browser (plan §12 M8 exit): two series show a styled
-// legend whose buttons have a size, and the plot sits below it. M12b owns the final legend.
+// The built-in legend in a real browser (plan §12 M8 exit, §5.6): two series show a styled
+// legend whose buttons have a size, and the plot sits below it.
 import { expect, settle, test } from './fixtures';
 
 test.describe('legend', () => {
@@ -31,8 +31,8 @@ test.describe('legend', () => {
             width: box.width,
             height: box.height,
             bottom: box.bottom,
-            // The injected stylesheet: no native button border, 10 px side padding.
-            styled: style.borderTopWidth === '0px' && style.paddingLeft === '10px',
+            // The injected stylesheet: no native button border, side padding.
+            styled: style.borderTopWidth === '0px' && Number.parseFloat(style.paddingLeft) >= 6,
           };
         },
       );
