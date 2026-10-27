@@ -275,16 +275,18 @@ export function renderAllSeries(engine: ChartCore): void {
       drawn = decimateLineSegments(engine, renderSegments, xScale);
       if (drawn !== renderSegments) record.decimated = drawn;
     } else if (mark.interaction === 'sample') {
-      // The budget counts in-view points (plan §3.4). A source culled by X is all in view; an
-      // unsorted one is strided over its whole length, so its in-view share is estimated from a
-      // sparse probe of the column (gap-perf-gate-01:sampling).
+      // The budget counts in-view points (plan §3.4). A cloud's runs hold the points in the X
+      // window (culled by X) or every point (unsorted), and in either case some sit outside the
+      // Y domain, so the in-view share is estimated from a sparse probe of the column
+      // (gap-perf-gate-01:sampling). Without it, a pinch zoom on a sorted cloud drew under 3/4
+      // of its budget of visible points.
       const budget = interactionSamplingBudget(engine);
       if (budget !== null && interactionActive(engine)) {
         let visible = 0;
         for (const segment of renderSegments) {
           visible += segment.endIdx - segment.startIdx + 1;
         }
-        if (!canCullByGlobalX && visible > budget) {
+        if (visible > budget) {
           visible = Math.max(1, Math.round(visible * inViewShare(renderSegments, xScale, yScale)));
         }
         if (visible > budget) {
