@@ -328,6 +328,12 @@ h2 {
   background: var(--white);
 }
 
+.track-dot[data-hint] {
+  width: 5px;
+  height: 18px;
+  background: var(--cyan);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;

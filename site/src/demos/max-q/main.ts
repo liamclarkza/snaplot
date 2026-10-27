@@ -322,6 +322,17 @@ export function mount(root: HTMLElement): Demo {
   // Each event's dot sits at its share of the flight along the track.
   for (const dot of dots)
     dot.style.setProperty('--at', String(Number(dot.dataset.t) / summary.seco));
+  // Pointing at or focusing an event's chip marks its tick on the track: MECO, separation and
+  // ignition sit seconds apart there.
+  for (const chip of chips) {
+    const dot = dots.find((d) => d.dataset.t === chip.dataset.t);
+    if (!dot) continue;
+    const mark = (on: boolean) => () => dot.toggleAttribute('data-hint', on);
+    chip.addEventListener('pointerenter', mark(true));
+    chip.addEventListener('pointerleave', mark(false));
+    chip.addEventListener('focus', mark(true));
+    chip.addEventListener('blur', mark(false));
+  }
   const readoutNote = part(root, 'readout-note');
 
   /** The frame at or just before a time. */

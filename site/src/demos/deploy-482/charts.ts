@@ -23,7 +23,7 @@ export const COLOR = {
   deploy: '#8AB8FF',
   before: '#7B7F87',
   after: '#D9DAE0',
-  endpoints: ['#B877D9', '#56C2B5', '#C8C9D0', '#7B8CA6'],
+  endpoints: ['#B877D9', '#56C2B5', '#C8C9D0', '#6FA3E8'],
 } as const;
 
 export const THEME: ThemeTokens = {
