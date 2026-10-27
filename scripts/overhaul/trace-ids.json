@@ -3044,12 +3044,12 @@
       "required": true,
       "owners": ["M12a"],
       "rootCauses": ["RC3"],
-      "status": "wont-do",
+      "status": "tracked",
       "lock": {
         "kind": "gate",
         "name": "bench hover-sync-{line,scatter,unsorted}-200k ≤ 0.2 ms per move on mobile"
       },
-      "lockNote": "deferred at M17 (docs/backlog.md): missed at the M14 and M16 bench runs; recorded in ADR 0002 §6 and the overhaul handoff for review (desktop 0.31–0.38 ms per move against 0.2 on mobile; the mobile profile was not run)"
+      "lockNote": "Met (mobile profile): hover-sync-line-200k 0.060 ms, -scatter-200k 0.050 ms, -unsorted-200k 0.045 ms against 0.2 (npm run bench:ab -- --base overhaul-baseline --profile mobile --filter hover-sync)."
     },
     "gap-perf-gate-04": {
       "severity": "medium",

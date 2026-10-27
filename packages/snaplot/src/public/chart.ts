@@ -8,6 +8,7 @@ import { ColumnarStore } from '../engine/data/ColumnarStore';
 import { fail, hint } from '../engine/errors';
 import type { ScaleRange, SelectionRange, TooltipPoint } from '../engine/spec';
 import { createReferenceLinesPlugin, createReferenceRegionsPlugin } from '../engine/annotations';
+import { settleRange } from '../engine/ranging';
 import { appendRows, categoryLabels } from './append';
 import { classify, sameData, STATE_KEYS, type StateKey, type Work } from './classify';
 import {
@@ -670,6 +671,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
    * it again after the viewport moves.
    */
   scale(key: string): ChartScale | undefined {
+    settleRange(this.engine);
     return chartScale(this, key);
   }
   groupCategories(): ReadonlyMap<string, readonly string[]> {
@@ -699,6 +701,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.publish();
   }
   private readState(): ChartState {
+    settleRange(this.engine);
     return Object.freeze({
       revision: this.events.revision,
       viewport: this.viewport(),

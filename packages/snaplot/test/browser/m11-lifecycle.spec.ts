@@ -361,3 +361,35 @@ test.describe('mount below the fold', () => {
     expect(renders.after).toBeGreaterThan(0);
   });
 });
+
+test.describe('streaming offscreen', () => {
+  test('a chart appended to below the fold ranges its new data when read and when scrolled to', async ({
+    harnessPage: page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const spacer = document.createElement('div');
+      spacer.style.height = '3000px';
+      document.body.append(spacer);
+      const chart = window.harness.mount({
+        data: Array.from({ length: 100 }, (_, t) => ({ t, v: Math.sin(t / 10) })),
+        x: 't',
+        series: [{ y: 'v' }],
+        streaming: { maxPoints: 100 },
+      });
+      const frames = () =>
+        new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await frames();
+      for (let t = 100; t < 120; t++) chart.appendData([{ t, v: 50 }]);
+      // A read settles the range the append left pending.
+      const read = chart.scale('y')?.max ?? 0;
+      for (let t = 120; t < 130; t++) chart.appendData([{ t, v: 80 }]);
+      chart.container.scrollIntoView();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const debug = (chart as unknown as Record<symbol, any>)[Symbol.for('snaplot.debug')];
+      return { read, after: chart.scale('y')?.max ?? 0, grid: debug.renderCount.grid };
+    });
+    expect(result.read).toBeGreaterThanOrEqual(50);
+    expect(result.after).toBeGreaterThanOrEqual(80);
+    expect(result.grid).toBeGreaterThan(0);
+  });
+});

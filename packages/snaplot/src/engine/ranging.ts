@@ -31,10 +31,32 @@ export type BarXAxisPlan = {
  * user-zoomed axes). Returns whether the grid layer needs a repaint.
  */
 export function rangeForDataChange(engine: ChartCore): boolean {
+  // Offscreen, the range waits for the next look (D37): a streaming chart nobody sees pays for
+  // its stores, not its axes (offscreen-stream-24). The grid is marked for that look.
+  if (engine.scheduler && !engine.scheduler.isVisible) {
+    pendingRange.add(engine);
+    return true;
+  }
+  pendingRange.delete(engine);
   if (engine.following && followWindow(engine) !== undefined && engine.hasData()) {
     return applyFollowWindow(engine);
   }
   return autoRangeTracked(engine);
+}
+
+/** Charts whose data changed while offscreen, so their ranges are behind their data. */
+const pendingRange = new WeakSet<ChartCore>();
+
+/**
+ * Bring a chart's ranges up to its data before anything reads them: the layout of the next paint
+ * (layout.ts), and the handle's `scale()` and state.
+ */
+export function settleRange(engine: ChartCore): void {
+  if (!pendingRange.has(engine)) return;
+  pendingRange.delete(engine);
+  if (engine.following && followWindow(engine) !== undefined && engine.hasData())
+    applyFollowWindow(engine);
+  else autoRangeTracked(engine);
 }
 
 /** Join every scale's key and bounds; used to detect any domain change. */

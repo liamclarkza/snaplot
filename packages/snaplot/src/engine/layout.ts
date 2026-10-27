@@ -10,6 +10,7 @@ import {
 import type { ChartCore } from './Engine';
 import { type FormatContext, formatTick } from './format';
 import { refreshCursor } from './cursor';
+import { settleRange } from './ranging';
 import { DirtyFlag } from './spec';
 
 /**
@@ -381,6 +382,7 @@ export function layoutIsStale(engine: ChartCore): boolean {
 }
 
 export function updateLayout(engine: ChartCore): void {
+  settleRange(engine);
   const w = engine.canvasManager.boxWidth || 600;
   const h = engine.canvasManager.boxHeight || 400;
   const cacheKey = createLayoutCacheKey(engine, w, h);

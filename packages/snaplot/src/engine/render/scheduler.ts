@@ -37,6 +37,11 @@ export class RenderScheduler {
   /**
    * Show or hide the chart. Hidden, dirty layers wait; shown again, they paint on the next frame.
    */
+  /** Whether frames run: false while the chart is offscreen (plan D37). */
+  get isVisible(): boolean {
+    return this.visible;
+  }
+
   setVisible(visible: boolean): void {
     if (this.visible === visible) return;
     this.visible = visible;
