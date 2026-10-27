@@ -387,6 +387,11 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
       (s) => (s.yAxis ?? 'y') === key && s.visible !== false && markOf(s).draw.zeroBased,
     );
     if (!hasValue) continue;
+    for (const value of ac.include ?? []) {
+      if (!Number.isFinite(value) || (scale.type === 'log' && value <= 0)) continue;
+      if (value < yMin) yMin = value;
+      if (value > yMax) yMax = value;
+    }
 
     if (hasBarOrHist && scale.type !== 'log') {
       if (yMin > 0) yMin = 0;

@@ -263,6 +263,26 @@ describe('public chart transactions', () => {
     expect(chart.getCursor({ fallback: 'latest' }).points[0].y).toBe(5);
   });
 
+  it('keeps a reference line or region past the data in the automatic Y range', () => {
+    const data = [
+      { x: 1, y: 2 },
+      { x: 2, y: 7 },
+    ];
+    const chart = make({ data, x: 'x', series: [{ y: 'y' }] });
+    expect(axis(chart, 'y')!.max).toBeLessThan(12);
+    chart.update({ referenceLines: [{ axis: 'y', value: 12, label: 'Target' }] });
+    expect(axis(chart, 'y')!.max).toBeGreaterThanOrEqual(12);
+    chart.update({ referenceLines: [], referenceRegions: [{ axis: 'y', from: -4, to: 0 }] });
+    expect(axis(chart, 'y')!.min).toBeLessThanOrEqual(-4);
+    expect(axis(chart, 'y')!.max).toBeLessThan(12);
+    // On X a marker past the data does not widen the window.
+    chart.update({ referenceRegions: [], referenceLines: [{ axis: 'x', value: 40 }] });
+    expect(axis(chart, 'x')!.max).toBeLessThan(40);
+    // An explicit bound still wins.
+    chart.update({ referenceLines: [{ axis: 'y', value: 12 }], axes: { y: { max: 10 } } });
+    expect(axis(chart, 'y')!.max).toBe(10);
+  });
+
   it('retains unchanged plugin instances and gives them the public handle', () => {
     const cleanup = vi.fn();
     const install = vi.fn(() => cleanup);

@@ -47,6 +47,26 @@ describe('debug counters (plan D31)', () => {
     expect(before.renderCount.data).toBe(1);
   });
 
+  it('keeps the data layer when an option update leaves the marks as they were', () => {
+    const chart = make();
+    const data = () => debug(chart).renderCount.data;
+    const before = data();
+    chart.update({ tooltip: { mode: 'nearest' }, cursor: false, locale: 'de-DE' });
+    fakes.frames.flush();
+    expect(data()).toBe(before);
+    expect(debug(chart).renderCount.grid).toBe(2);
+    // A style change, a theme change and a new range repaint it.
+    chart.update({ series: [{ y: 'y', color: '#d33' }] });
+    fakes.frames.flush();
+    expect(data()).toBe(before + 1);
+    chart.update({ axes: { y: { max: 100 } } });
+    fakes.frames.flush();
+    expect(data()).toBe(before + 2);
+    chart.update({ referenceLines: [{ axis: 'y', value: 400 }] });
+    fakes.frames.flush();
+    expect(data()).toBe(before + 3);
+  });
+
   it('counts in-view and drawn points of the last data pass', () => {
     const chart = make();
     expect(debug(chart).inViewPoints).toBe(10);

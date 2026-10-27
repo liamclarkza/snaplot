@@ -55,55 +55,66 @@ export function describeOptions<Row>(
     series: seriesSpecs,
     tooltip: tooltipSpec(n, seriesSpecs),
   };
-  return {
-    spec,
-    seriesIds,
-    referenceLines: n.referenceLines.map((line, i) => ({
-      ...line,
-      axis: orientation(axisSpecs, line.axis),
-      axisKey: line.axis,
-      value: annotationValue(
-        line.axis,
-        line.value,
-        `referenceLines[${i}].value`,
-        axisSpecs,
-        kinds,
-        categories,
-        n,
-      ),
-    })),
-    referenceRegions: n.referenceRegions.map((region, i) => {
-      const from = annotationValue(
-        region.axis,
-        region.from,
-        `referenceRegions[${i}].from`,
-        axisSpecs,
-        kinds,
-        categories,
-        n,
-        true,
-      );
-      const to = annotationValue(
-        region.axis,
-        region.to,
-        `referenceRegions[${i}].to`,
-        axisSpecs,
-        kinds,
-        categories,
-        n,
-        true,
-      );
-      // On a category axis a region names whole categories: it spans their slots, edge to edge.
-      const slots = categories.has(region.axis);
-      return {
-        ...region,
-        axis: orientation(axisSpecs, region.axis),
-        axisKey: region.axis,
-        from: slots ? Math.min(from, to) - 0.5 : from,
-        to: slots ? Math.max(from, to) + 0.5 : to,
-      };
-    }),
+  const referenceLines = n.referenceLines.map((line, i) => ({
+    ...line,
+    axis: orientation(axisSpecs, line.axis),
+    axisKey: line.axis,
+    value: annotationValue(
+      line.axis,
+      line.value,
+      `referenceLines[${i}].value`,
+      axisSpecs,
+      kinds,
+      categories,
+      n,
+    ),
+  }));
+  const referenceRegions = n.referenceRegions.map((region, i) => {
+    const from = annotationValue(
+      region.axis,
+      region.from,
+      `referenceRegions[${i}].from`,
+      axisSpecs,
+      kinds,
+      categories,
+      n,
+      true,
+    );
+    const to = annotationValue(
+      region.axis,
+      region.to,
+      `referenceRegions[${i}].to`,
+      axisSpecs,
+      kinds,
+      categories,
+      n,
+      true,
+    );
+    // On a category axis a region names whole categories: it spans their slots, edge to edge.
+    const slots = categories.has(region.axis);
+    return {
+      ...region,
+      axis: orientation(axisSpecs, region.axis),
+      axisKey: region.axis,
+      from: slots ? Math.min(from, to) - 0.5 : from,
+      to: slots ? Math.max(from, to) + 0.5 : to,
+    };
+  });
+  // A line or region on a vertical axis is in its automatic range; on X a marker past the data
+  // (an old deploy beside a streaming window) would hold the window open.
+  const include = new Map<string, number[]>();
+  const keep = (key: string, ...values: number[]) => {
+    if (!include.has(key)) include.set(key, []);
+    include.get(key)!.push(...values);
   };
+  for (const line of referenceLines) if (line.axis === 'y') keep(line.axisKey, line.value);
+  for (const region of referenceRegions) {
+    if (region.axis === 'y') keep(region.axisKey, region.from, region.to);
+  }
+  for (const [key, values] of include) {
+    axisSpecs[key] = { ...axisSpecs[key], include: values };
+  }
+  return { spec, seriesIds, referenceLines, referenceRegions };
 }
 
 /** The axes the options name, with the positions series axes imply. */
@@ -198,7 +209,10 @@ export function refreshColorCodes<Row>(ingested: Ingested<Row>): void {
     if (colorBy.categoryValues.length === count) return spec;
     return {
       ...spec,
-      colorBy: { ...colorBy, categoryValues: Array.from({ length: count }, (_, i) => i) },
+      colorBy: {
+        ...colorBy,
+        categoryValues: Array.from({ length: count }, (_, i) => i),
+      },
     };
   });
 }

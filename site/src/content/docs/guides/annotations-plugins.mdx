@@ -12,6 +12,10 @@ two values. Values are written the way the axis reads them: numbers, `Date`s, IS
 category labels. A region on a category axis covers its categories' whole slots, and an open end
 (`-Infinity` or `Infinity`) runs to the edge of the plot.
 
+On a value axis, lines and regions stay in view: the automatic range takes in a target above the
+data the way it takes in the data. A line on the X axis does not widen it, so an old marker beside
+a streaming window does not hold the window open, and an axis `min` or `max` still wins.
+
 <Example name="annotations-guide/lines-regions" />
 
 Lines draw over the data and regions under it. Labels never overlap one another: a region's label

@@ -460,6 +460,11 @@ export interface AxisSpec {
   title?: string;
   /** Fixed lower bound. Pinned, auto-range will restore to this value on reset. */
   min?: number;
+  /**
+   * Values a vertical axis's automatic range always contains, once it has data: the reference
+   * lines and regions on it, so a target above the data stays in view.
+   */
+  include?: readonly number[];
   /** Fixed upper bound. Pinned, auto-range will restore to this value on reset. */
   max?: number;
   /**

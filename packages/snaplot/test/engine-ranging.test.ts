@@ -50,6 +50,30 @@ describe('engine auto-range and log interactions', () => {
     expect(niceChart.getAxis('x')?.max).toBe(100);
   });
 
+  it('keeps the values an axis includes (its reference lines) in the automatic range', () => {
+    const chart = fakes.engine(
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear', include: [12, Number.NaN] } },
+        series: [{ label: 'value', type: 'line', yColumn: 1 }],
+      },
+      [f([0, 1, 2]), f([2, 5, 7])],
+    );
+    expect(chart.getAxis('y')?.min).toBeLessThanOrEqual(2);
+    expect(chart.getAxis('y')?.max).toBeGreaterThanOrEqual(12);
+    chart.destroy();
+
+    // A log axis leaves out a value it cannot show.
+    const log = fakes.engine(
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'log', include: [0, 5000] } },
+        series: [{ label: 'value', type: 'line', yColumn: 1 }],
+      },
+      [f([0, 1, 2]), f([20, 50, 70])],
+    );
+    expect(log.getAxis('y')?.min).toBeGreaterThan(0);
+    expect(log.getAxis('y')?.max).toBeGreaterThanOrEqual(5000);
+  });
+
   it('uses tickCount to stabilize both automatic bounds and generated intervals', () => {
     const chart = fakes.engine(
       {

@@ -312,6 +312,8 @@ what to use instead, and the chart keeps its default:
   a time axis and the numbers read as epoch milliseconds, whichever series comes first.
 - A reference region on a category axis covers whole slots; a region from 0 on a log axis starts
   at the domain.
+- Reference lines and the finite ends of regions on a value axis are in its automatic range, so a
+  target above the data stays in view; markers on X do not widen it, and `min`/`max` still win.
 - Value axes keep about two and a half lines between labels; log ticks across decades keep every
   decade, and a log axis under a decade labels evenly spaced nice values. A time axis asks for a
   label per 75 px, so a quarter on a phone reads Jul Aug Sep, and time bars take calendar ticks. A
@@ -361,6 +363,10 @@ what to use instead, and the chart keeps its default:
   29 ms (was 142). A hover on 200k points visits a few dozen through a grid of the visible points;
   an unsorted cloud samples its in-view share during gestures; labels are measured once and the
   render path reads no layout. Bench tables are in ADR 0002.
+- A streaming append and its paint allocate about 40 KB (was 550 at the start of the overhaul):
+  tick labels, grid colours, label widths and time formats are cached per axis. An option update
+  that changes nothing a series draws (the tooltip, the cursor, the legend, interaction, the
+  locale) keeps the data layer instead of repainting it.
 
 ### Removed
 - Type exports `SeriesBase`, `AxisGridConfig`, `AxisTickMarksConfig`, `ScatterPointShape`,

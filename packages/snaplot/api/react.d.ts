@@ -297,9 +297,14 @@ export declare interface ChartOptions<Row = Record<string, any>> {
     axes?: Readonly<Record<string, AxisOptions>>;
     /** Streaming limits for `appendData`. @defaultValue unbounded, following the whole extent */
     streaming?: StreamingOptions;
-    /** Lines at fixed values. @defaultValue none */
+    /**
+     * Lines at fixed values. Those on a vertical axis are in its automatic range. @defaultValue none
+     */
     referenceLines?: readonly ReferenceLine[];
-    /** Shaded spans between values. @defaultValue none */
+    /**
+     * Shaded spans between values. The finite ends of those on a vertical axis are in its automatic
+     * range. @defaultValue none
+     */
     referenceRegions?: readonly ReferenceRegion[];
     /** Plugins, by id. @defaultValue none */
     plugins?: readonly ChartPlugin<NoInfer<Row>>[];

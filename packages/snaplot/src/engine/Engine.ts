@@ -77,6 +77,7 @@ import {
   setPlotInsets,
   naturalGutters,
   layoutIsStale,
+  marksKey,
   updateLayout,
   updateScalePixelRanges,
 } from './layout';
@@ -508,16 +509,22 @@ export class ChartCore implements EngineHost {
     this.applyConfigSideEffects(partial, false);
   }
 
-  replaceOptions(config: ChartSpec): void {
+  /** `marks: false`: nothing the series draw changed (a tooltip, a legend, the locale). */
+  replaceOptions(config: ChartSpec, marks = true): void {
     if (this.destroyed) return;
+    const before = marks ? null : marksKey(this);
     this.config = deepMerge(
       DEFAULT_CONFIG as unknown as Record<string, unknown>,
       config as unknown as Record<string, unknown>,
     ) as unknown as ChartSpec;
-    this.applyConfigSideEffects(config, true);
+    this.applyConfigSideEffects(config, true, before);
   }
 
-  private applyConfigSideEffects(partial: DeepPartial<ChartSpec>, fullReplace: boolean): void {
+  private applyConfigSideEffects(
+    partial: DeepPartial<ChartSpec>,
+    fullReplace: boolean,
+    marksBefore: string | null = null,
+  ): void {
     let themeChanged = false;
     if (fullReplace || partial.mode) {
       applyModePresets(this.config, partial);
@@ -549,7 +556,9 @@ export class ChartCore implements EngineHost {
     if (this.following) applyFollowWindow(this);
     // The hover model under a still pointer: hidden series leave the tooltip.
     refreshCursor(this);
-    this.scheduler.markDirty(DirtyFlag.ALL);
+    // Marks drawn as before over the same scales and plot keep the data layer.
+    const keep = marksBefore !== null && marksKey(this) === marksBefore;
+    this.scheduler.markDirty(keep ? DirtyFlag.GRID | DirtyFlag.OVERLAY : DirtyFlag.ALL);
     this.emitEvent('options:update', this.config);
     if (themeChanged) this.emitEvent('theme:update', this.theme);
   }

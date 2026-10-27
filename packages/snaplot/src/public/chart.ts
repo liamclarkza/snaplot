@@ -412,7 +412,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.options = normalized.options;
     this.normalized = normalized;
     // A group change moves the palette slots of series without a colour (plan D17).
-    if (work.engine || work.group) this.engine.replaceOptions(this.configFor(ingested, normalized));
+    if (work.engine || work.group)
+      this.engine.replaceOptions(this.configFor(ingested, normalized), work.marks || work.group);
     // Plugins are reconciled by id: an inline object with a known id only repaints (D21).
     if (work.plugins) this.engine.setPlugins(normalized.plugins, this.handle);
     if (work.annotations) {

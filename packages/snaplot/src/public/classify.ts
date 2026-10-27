@@ -27,6 +27,8 @@ export interface Work {
   accessor?: { id: string; field: string };
   /** The engine's options (axes, series style, theme, tooltip, interaction…). */
   engine: boolean;
+  /** Engine options that can change how the series draw (all but `PAINT_NEUTRAL`). */
+  marks: boolean;
   annotations: boolean;
   plugins: boolean;
   group: boolean;
@@ -37,6 +39,14 @@ export const STATE_KEYS = ['viewport', 'selection', 'hiddenSeries', 'highlight']
 export type StateKey = (typeof STATE_KEYS)[number];
 
 const CALLBACK_KEYS: ReadonlySet<string> = new Set(CALLBACKS);
+/** Engine options no mark reads: the data layer keeps its pixels when only these change. */
+const PAINT_NEUTRAL: ReadonlySet<string> = new Set([
+  'tooltip',
+  'cursor',
+  'legend',
+  'interaction',
+  'locale',
+]);
 const STATE: ReadonlySet<string> = new Set(STATE_KEYS);
 /** Series fields that read the data; the rest of a series is its style. */
 const READERS = ['data', 'x', 'y', 'lower', 'upper', 'rowId', 'colorBy', 'sizeBy', 'tooltipFields'];
@@ -133,6 +143,7 @@ export function classify<Row>(
   const work: Work = {
     data: false,
     engine: false,
+    marks: false,
     annotations: false,
     plugins: false,
     group: false,
@@ -150,6 +161,7 @@ export function classify<Row>(
     if (key === 'series') {
       seriesWork(p, n, work);
       if (forced) work.engine = true;
+      work.marks ||= work.engine;
       continue;
     }
     if (key === 'data') {
@@ -157,6 +169,7 @@ export function classify<Row>(
       continue;
     }
     if (!forced && equivalent(a[key], b[key])) continue;
+    if (!PAINT_NEUTRAL.has(key)) work.marks = true;
     switch (key) {
       case 'x':
       case 'rowId': {
@@ -187,7 +200,9 @@ export function classify<Row>(
         break;
       case 'referenceLines':
       case 'referenceRegions':
+        // Those on a vertical axis are in its automatic range.
         work.annotations = true;
+        work.engine = true;
         break;
       case 'plugins':
         work.plugins = true;
