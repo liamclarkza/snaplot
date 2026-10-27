@@ -48,6 +48,8 @@ export interface ReferenceLine {
  */
 export function createReferenceLinesPlugin(options: {
   lines: ReferenceLine[];
+  /** Label boxes already on the plot (the regions' labels), which these labels keep clear of. */
+  avoid?: (chart: EngineHost, ctx: CanvasRenderingContext2D) => LabelRect[];
 }): Plugin & { setLines(lines: ReferenceLine[]): void } {
   let lines = options.lines;
   let chartRef: EngineHost | null = null;
@@ -111,20 +113,14 @@ export function createReferenceLinesPlugin(options: {
       ctx.font = `11px ${theme.fontFamily}`;
       ctx.setLineDash([]);
       const surface = chart.resolveColor(theme.surfaceColor ?? theme.backgroundColor);
-      const ROW = 14;
-      const placed: Array<[number, number, number, number]> = [];
+      const placed: LabelRect[] = options.avoid?.(chart, ctx) ?? [];
       const free = (x: number, y: number, w: number) =>
         !placed.some(
           ([x1, y1, x2, y2]) => x < x2 + 4 && x + w + 4 > x1 && y - 10 < y2 && y + 3 > y1,
         );
       const draw = (text: string, x: number, y: number, w: number, color: string) => {
-        placed.push([x, y - 10, x + w, y + 3]);
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = surface;
-        ctx.fillRect(x - 3, y - 10, w + 6, 14);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = color;
-        ctx.fillText(text, x, y);
+        placed.push(rectOf(x, y, w));
+        drawLabel(ctx, surface, text, x, y, w, color);
       };
       const byPixel = (p: { px: number }, q: { px: number }) => p.px - q.px;
       for (const { line, px, color } of labels
@@ -164,6 +160,32 @@ export function createReferenceLinesPlugin(options: {
   };
 }
 
+/** A label's box on the plot: left, top, right, bottom in CSS pixels. */
+type LabelRect = [number, number, number, number];
+
+/** Rows of stacked annotation labels, baseline to baseline. */
+const ROW = 14;
+
+const rectOf = (x: number, y: number, w: number): LabelRect => [x, y - 10, x + w, y + 3];
+
+/** An 11 px annotation label at baseline `y`, on a backing box of the surface (it reads over data). */
+function drawLabel(
+  ctx: CanvasRenderingContext2D,
+  surface: string,
+  text: string,
+  x: number,
+  y: number,
+  w: number,
+  color: string,
+): void {
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = surface;
+  ctx.fillRect(x - 3, y - 10, w + 6, ROW);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+}
+
 /** A labelled X or Y interval rendered beneath the series marks. */
 export interface ReferenceRegion {
   axis: 'x' | 'y';
@@ -181,6 +203,8 @@ export interface ReferenceRegion {
 
 export interface ReferenceRegionsPlugin extends Plugin {
   setRegions(regions: ReferenceRegion[]): void;
+  /** Where each visible region label sits (`ctx` carries the label font). */
+  labelBoxes(chart: EngineHost, ctx: CanvasRenderingContext2D): LabelRect[];
 }
 
 /** Create theme-aware shaded intervals for tariffs, incidents, or targets. */
@@ -207,6 +231,31 @@ export function createReferenceRegionsPlugin(options: {
     const start = Math.max(top, Math.min(a, b));
     const end = Math.min(top + height, Math.max(a, b));
     return end > start ? { x: left, y: start, width, height: end - start, a, b } : null;
+  };
+
+  // An X region's label sits centred over it on the first row at the top (wider than a narrow
+  // region, it overhangs, kept inside the plot), a Y region's at the right of its top edge.
+  const labelsOf = (chart: EngineHost, ctx: CanvasRenderingContext2D) => {
+    const { left, width } = chart.getLayout().plot;
+    ctx.font = `11px ${chart.getTheme().fontFamily}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    const labels: Array<{ text: string; x: number; y: number; w: number }> = [];
+    for (const region of regions) {
+      if (!region.label) continue;
+      const geometry = visibleGeometry(chart, region);
+      if (!geometry) continue;
+      const w = ctx.measureText(region.label).width;
+      const x =
+        region.axis === 'x'
+          ? Math.max(
+              left + 3,
+              Math.min(left + width - w - 3, geometry.x + (geometry.width - w) / 2),
+            )
+          : geometry.x + geometry.width - w - 6;
+      labels.push({ text: region.label, x, y: geometry.y + 12, w });
+    }
+    return labels;
   };
 
   return {
@@ -254,27 +303,15 @@ export function createReferenceRegionsPlugin(options: {
       }
       ctx.restore();
     },
+    labelBoxes(chart, ctx) {
+      return labelsOf(chart, ctx).map(({ x, y, w }) => rectOf(x, y, w));
+    },
     afterDrawData(chart, ctx) {
       const theme = chart.getTheme();
+      const surface = chart.resolveColor(theme.surfaceColor ?? theme.backgroundColor);
       ctx.save();
-      ctx.font = `11px ${theme.fontFamily}`;
-      ctx.textBaseline = 'top';
-      ctx.fillStyle = theme.tickColor;
-      for (const region of regions) {
-        if (!region.label) continue;
-        const geometry = visibleGeometry(chart, region);
-        if (!geometry) continue;
-        const textWidth = ctx.measureText(region.label).width;
-        if (region.axis === 'x') {
-          if (textWidth + 8 <= geometry.width) {
-            ctx.textAlign = 'center';
-            ctx.fillText(region.label, geometry.x + geometry.width / 2, geometry.y + 6);
-          }
-        } else if (textWidth + 8 <= geometry.width) {
-          ctx.textAlign = 'right';
-          ctx.fillText(region.label, geometry.x + geometry.width - 6, geometry.y + 6);
-        }
-      }
+      for (const { text, x, y, w } of labelsOf(chart, ctx))
+        drawLabel(ctx, surface, text, x, y, w, theme.tickColor);
       ctx.restore();
     },
   };

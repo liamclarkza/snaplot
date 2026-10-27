@@ -8,7 +8,7 @@ import { inferPosition } from './layout';
 import type { DataStore } from './data/DataStore';
 import { seriesYColumn } from './marks/columns';
 import { markOf, xColumnOf } from './marks/index';
-import { AUTO_RANGE_PADDING, DEFAULT_TICK_COUNT } from '../constants';
+import { AUTO_RANGE_PADDING, CLOUD_EDGE_PADDING, DEFAULT_TICK_COUNT } from '../constants';
 import { categoryWidthFromData } from './marks/bar/geometry';
 import type { Scale, AxisSpec } from './spec';
 import { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRangeIndex';
@@ -229,6 +229,8 @@ export function autoRangeHorizontal(engine: ChartCore): void {
       if (ac.min === undefined && xMin >= 0 && xMax > 0 && scale.min < 0) scale.min = 0;
       if (ac.max === undefined && xMax <= 0 && xMin < 0 && scale.max > 0) scale.max = 0;
     }
+    if (isScatterOnly && shouldNiceAutoRange(scale, ac, false))
+      padCloudEdges(scale, ac, xMin, xMax);
 
     // Nicening may expand either side, but an explicitly pinned side must
     // remain exactly where the caller put it.
@@ -382,6 +384,10 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
       if (ac.min === undefined && yMin >= 0 && yMax > 0 && scale.min < 0) scale.min = 0;
       if (ac.max === undefined && yMax <= 0 && yMin < 0 && scale.max > 0) scale.max = 0;
     }
+    const hasCloud = engine.config.series.some(
+      (s) => (s.yAxis ?? 'y') === key && s.visible !== false && markOf(s).draw.cloud,
+    );
+    if (hasCloud && shouldNiceAutoRange(scale, ac, false)) padCloudEdges(scale, ac, yMin, yMax);
 
     // Preserve one-sided explicit domains after automatic nicening.
     if (ac.min !== undefined) scale.min = ac.min;
@@ -503,6 +509,18 @@ export function scatterViewportColumnRange(
     if (v > max) max = v;
   }
   return min === Infinity ? null : [min, max];
+}
+
+/**
+ * Keeps a scatter cloud's outermost markers inside the plot. Nice rounding is the padding (plan
+ * §5.1), but a value on a nice edge would draw its marker half outside: such an edge moves out by
+ * 2% of the span, short of the next tick.
+ */
+function padCloudEdges(scale: Scale, ac: AxisSpec, min: number, max: number): void {
+  if (ac.padding !== undefined) return;
+  const pad = (scale.max - scale.min) * CLOUD_EDGE_PADDING;
+  if (ac.min === undefined && min - scale.min < pad) scale.min = min - pad;
+  if (ac.max === undefined && scale.max - max < pad) scale.max = max + pad;
 }
 
 export function paddedLogRange(min: number, max: number, padding: number): [number, number] {

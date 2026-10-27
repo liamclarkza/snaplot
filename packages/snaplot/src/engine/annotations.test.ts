@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { lightTheme } from './theme/resolve';
 import type { EngineHost } from './spec';
-import { createReferenceRegionsPlugin } from './annotations';
+import { createReferenceLinesPlugin, createReferenceRegionsPlugin } from './annotations';
 
 function chart(redraw = vi.fn()): EngineHost {
   return {
@@ -48,6 +48,21 @@ function context(): CanvasRenderingContext2D {
 }
 
 describe('createReferenceRegionsPlugin', () => {
+  it('centres a label wider than its region over it, inside the plot', () => {
+    const plugin = createReferenceRegionsPlugin({
+      regions: [
+        { axis: 'x', from: 4, to: 5, label: 'Outage' },
+        { axis: 'x', from: 0, to: 0.5, label: 'Start' },
+      ],
+    });
+    const ctx = context();
+    plugin.afterDrawData?.(chart(), ctx);
+    // 100–120 is narrower than the 40 px label: centred on 110.
+    expect(ctx.fillText).toHaveBeenCalledWith('Outage', 90, 22);
+    // 20–30 at the plot's left edge: moved in to 3 px from it.
+    expect(ctx.fillText).toHaveBeenCalledWith('Start', 23, 22);
+  });
+
   it('draws a clipped data-space interval and its label', () => {
     const plugin = createReferenceRegionsPlugin({
       regions: [{ axis: 'x', from: 2, to: 5, label: 'Peak', fill: '#d00' }],
@@ -59,7 +74,27 @@ describe('createReferenceRegionsPlugin', () => {
     plugin.afterDrawData?.(instance, ctx);
 
     expect(ctx.fillRect).toHaveBeenCalledWith(60, 10, 60, 120);
-    expect(ctx.fillText).toHaveBeenCalledWith('Peak', 90, 16);
+    // Centred on the first row: (60 + 120) / 2 less half of the 40 px label.
+    expect(ctx.fillText).toHaveBeenCalledWith('Peak', 70, 22);
+  });
+
+  it('keeps a vertical line label off the region label it would cover', () => {
+    const regions = createReferenceRegionsPlugin({
+      regions: [{ axis: 'x', from: 2, to: 5, label: 'Peak' }],
+    });
+    const lines = createReferenceLinesPlugin({
+      lines: [{ axis: 'x', value: 2.5, label: 'Start' }],
+      avoid: (host, ctx) => regions.labelBoxes(host, ctx),
+    });
+    const instance = chart();
+    const ctx = context();
+
+    regions.afterDrawData?.(instance, ctx);
+    lines.afterDrawData?.(instance, ctx);
+
+    expect(ctx.fillText).toHaveBeenCalledWith('Peak', 70, 22);
+    // The first row (22) is the region's; the line's label takes the next.
+    expect(ctx.fillText).toHaveBeenCalledWith('Start', 75, 36);
   });
 
   it('redraws every installed chart when reactive regions change', () => {

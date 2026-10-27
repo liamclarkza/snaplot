@@ -113,8 +113,11 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   private off: Array<() => void> = [];
   private mutating = false;
   private destroyed = false;
-  private lines = createReferenceLinesPlugin({ lines: [] });
   private regions = createReferenceRegionsPlugin({ regions: [] });
+  private lines = createReferenceLinesPlugin({
+    lines: [],
+    avoid: (chart, ctx) => this.regions.labelBoxes(chart, ctx),
+  });
   /** The built-in legend: its placement and how to unmount it. */
   private legend?: { position: 'top' | 'bottom'; unmount: () => void };
 

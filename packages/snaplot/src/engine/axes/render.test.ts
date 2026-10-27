@@ -86,6 +86,26 @@ describe('renderAxes vertical label filtering', () => {
   });
 });
 
+describe('label fit', () => {
+  it('keeps a log axis thinned when asking for fewer ticks returns fewer labels', () => {
+    // 10 px apart, so every second tick fits; asked for 3, the scale offers only 2.
+    const yScale: Scale = {
+      ...linearScale(0, 100, []),
+      type: 'log',
+      ticks: vi.fn((count?: number) => (count === 3 ? [20, 60] : [10, 20, 30, 40, 50])),
+    };
+    const scales = new Map<string, Scale>([['y', yScale]]);
+    const config = { series: [], axes: { y: { position: 'left' } } } as unknown as ChartSpec;
+    const result = renderAxes(context(), layout(), scales, { ...theme, fontSize: 6 }, config);
+
+    expect(result.labels.filter((l) => l.axis === 'y').map((l) => l.text)).toEqual([
+      '10',
+      '30',
+      '50',
+    ]);
+  });
+});
+
 describe('per-axis grid config', () => {
   const gridConfig = (grid: unknown) =>
     ({ series: [], axes: { y: { position: 'left', grid } } }) as unknown as ChartSpec;

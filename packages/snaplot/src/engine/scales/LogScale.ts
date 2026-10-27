@@ -46,7 +46,7 @@ export class LogScale implements Scale {
     return Math.pow(10, logValue);
   }
 
-  ticks(_count?: number): number[] {
+  ticks(count?: number): number[] {
     const logMin = Math.floor(this.log(this.min));
     const logMax = Math.ceil(this.log(this.max));
     const ticks: number[] = [];
@@ -63,10 +63,11 @@ export class LogScale implements Scale {
     }
 
     const inside = ticks.filter((t) => t >= this.min && t <= this.max).sort((a, b) => a - b);
-    if (inside.length >= 2) return inside;
-    // Within one decade (120–180): evenly spaced nice values, so the axis keeps references (render-06).
-    const linear = niceTicks(this.min, this.max, 4).filter((t) => t > 0);
-    return linear.length >= 2 ? linear : inside;
+    if (inside.length >= 3 || (inside.length === 2 && this.max / this.min >= 10)) return inside;
+    // Within one decade (120–180, 0.13–0.34): evenly spaced nice values, so the axis keeps
+    // references (render-06); at most 5, and fewer when the label fit asks.
+    const linear = niceTicks(this.min, this.max, Math.min(count ?? 5, 5)).filter((t) => t > 0);
+    return linear.length > inside.length ? linear : inside;
   }
 
   /** BCP 47 locale of tick labels; the runtime default when unset (plan D7). */

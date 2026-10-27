@@ -159,6 +159,23 @@ describe('engine auto-range and log interactions', () => {
     expect(topPad).toBeCloseTo(bottomPad, 10);
   });
 
+  it('moves a nice edge out a little when a scatter marker sits on it', () => {
+    const chart = fakes.engine(
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        series: [{ label: 'quakes', type: 'scatter', xColumn: 1, yColumn: 2 }],
+      },
+      [f([0, 1, 2]), f([0.9, 5.5, 11.4]), f([4.5, 5.2, 7.1])],
+    );
+    // Y nices to 4.5–7.5 and 4.5 is a value: that edge moves out by 2% of the span, not a step.
+    expect(chart.getAxis('y')?.min).toBeCloseTo(4.44, 6);
+    expect(chart.getAxis('y')?.max).toBe(7.5);
+    // X nices to 0–12 with no value near an edge, so it stays nice.
+    expect(chart.getAxis('x')?.min).toBe(0);
+    expect(chart.getAxis('x')?.max).toBe(12);
+    chart.destroy();
+  });
+
   it('zooms log axes in log space around the pointer anchor', () => {
     const chart = fakes.engine(
       {

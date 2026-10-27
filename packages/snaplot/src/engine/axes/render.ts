@@ -159,13 +159,16 @@ export function renderAxes(
         let count = ac.tickCount ?? DEFAULT_TICK_COUNT;
         for (let attempt = 0; attempt < 4 && kept.length < ticks.length && count > 2; attempt++) {
           const next = scale.ticks(Math.max(2, Math.min(count - 1, kept.length)));
-          if (next.length >= ticks.length || next.length < 2) {
+          // A linear set with a rounder step reads better even with a label fewer (0 50 100 over
+          // 0 40 80 120); a log axis under a decade asked for 3 can come back with 2, which is not.
+          const nextKept = next.length >= ticks.length || next.length < 2 ? [] : fitLabels(next);
+          if (!nextKept.length || (scale.type === 'log' && nextKept.length < kept.length)) {
             scale.ticks(count); // the scale formats by its last step: restore it
             break;
           }
           count = Math.max(2, Math.min(count - 1, kept.length));
           ticks = next;
-          kept = fitLabels(ticks);
+          kept = nextKept;
         }
       }
       if (kept.length < ticks.length) ticks = kept.map((i) => ticks[i]);

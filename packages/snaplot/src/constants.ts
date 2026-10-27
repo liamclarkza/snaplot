@@ -205,6 +205,12 @@ export const DEFAULT_WHEEL_STEP = 0.1;
 /** Auto-range Y padding as fraction of range */
 export const AUTO_RANGE_PADDING = 0.05;
 
+/**
+ * The pad a scatter cloud gets before nice rounding: a marker on a nice value would otherwise sit
+ * half outside the plot.
+ */
+export const CLOUD_EDGE_PADDING = 0.02;
+
 /** Default long-press duration (ms) before opt-in touch selection */
 export const DEFAULT_LONG_PRESS_MS = 400;
 
