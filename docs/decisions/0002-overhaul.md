@@ -1273,9 +1273,109 @@ measurements:
 
 ## 5. Approved baselines
 
-Filled in by M14: the approved screenshot set, its commit, its size, and a summary of rows V17 onward.
+**Method.** The visual harness (`npm run test:visual -- --against <ref>`) renders all 141 fixture
+shots (normal and `@2x`) at the working tree and at a git ref, then compares them exactly (threshold
+0). There is no Docker image on this machine, so there is no separate committed-baseline set: the
+approved set is the shots at the `overhaul` tip, and each milestone reviewed its own diff against its
+merge base before merging (`check-visual-diffs`, the contact sheet). Every default that changed has
+a row in [`visual-ledger/`](visual-ledger/README.md):
+
+| Rows | What changed |
+|---|---|
+| V0 | M3a's initial fixtures |
+| V17–V20 | ISO date X, nice histogram bins, the histogram colour, the default legend |
+| V30–V31 | one formatter for ticks and readouts; one domain policy |
+| V50–V53 | the theme follows the page; areas fill to zero; device-pixel strokes; reference labels |
+| V54 | axis labels fit as measured; long titles cut to their edge |
+| V55 | the point tooltip names its series and values |
+| V56 | the legend is chrome the layout reserves |
+| V90 | annotations given at creation draw at mount |
+
+Geometry: 570 checks over the fixtures (no overlapping or clipped labels, at least two labels per
+axis, no repeated adjacent labels), 0 failing.
 
 ## 6. Outcome
 
-Filled in by M14 (final metrics against the plan §0 targets, with a per-module table for any missed target,
-and the bench A/B tables) and M17 (release status and handoff).
+### Plan §0 targets
+
+Measured by `npm run metrics` at the M14 tip.
+
+| Metric | Target | M14 tip | |
+|---|---:|---:|---|
+| Package entry points | 3 | 3 | met |
+| Runtime exports `snaplot` / `react` / `solid` | 4 / 4 (+2) / 4 (+2) | 4 / 6 / 6 | met |
+| Public option leaves | ≤ 110 | 106 | met |
+| `ChartHandle` members / events | 14 / 7 | 14 / 7 | met |
+| Legend implementations | 1 list + 1 table | 1 (`public/legend.ts`: list and table) | met |
+| Largest source file | ≤ 850 (cap 900) | 890 (`public/chart.ts`) | cap met, target missed |
+| Library code lines | ≤ 10,500 (≤ 12,125 formatted) | 17,016 | missed |
+| `createChart` gzip | ≤ 50 KiB | 78.7 KiB | missed |
+
+**The misses.** The line and size targets were set before the scope grew: the accessibility layer
+(D20), measured label fitting, one hit pipeline with a spatial index, the touch rules (D19), the
+legend as reserved chrome, theme resolution from the page and device-pixel snapping each added code
+that the 0.12 tree did not have. By directory
+(code lines): `public/` 5,160, `engine/` (core) 4,440, `engine/marks/` 2,314,
+`engine/interaction/` 1,172, `engine/data/` 790, `engine/render/` 704, `engine/scales/` 620,
+`engine/axes/` 552, `engine/theme/` 410, the rest under 300 each. Backlog: the public layer's
+normalize/ingest/describe trio repeats the option schema three times (one schema table would remove
+about 1,000 lines), and `engine/marks/scatter` carries two draw paths (stamps and batched fills).
+The size budgets are ratcheted to the measured size + 2% (`scripts/size-budgets.json`), so the
+bundle cannot grow unnoticed.
+
+### Bench A/B (`npm run bench:ab -- --base overhaul-baseline --profile desktop`)
+
+Desktop, GPU raster, three runs a side, medians in ms (busy time, or sync or wall where marked by
+the scenario). Ratio = head / base; the limit is 1.5. ⁽ⁱ⁾ marks scenarios outside the required set.
+
+| scenario | base | head | ratio | result |
+|---|---:|---:|---:|---|
+| append-stream-50k-window ⁽ⁱ⁾ | 1.72 | 1.57 | 0.91 | ok (noisy: spread 1.26×) |
+| heatmap-pan-300k | 3.10 | 2.27 | 0.73 | ok (noisy: load, spread 1.3×) |
+| hover-sweep-50k | 0.535 | 0.215 | 0.47 | improved (noisy: load, spread 1.65×) |
+| independent-lines-pan-75k ⁽ⁱ⁾ | 1.78 | 1.04 | 0.58 | improved |
+| line-pan-200k | 1.39 | 0.598 | 0.43 | improved (noisy: load, spread 2.44×) |
+| pinch-zoom-gesture-50k | 1.74 | 1.99 | 1.14 | ok (re-run after the visible-range hit grid; 2.34× before) |
+| scatter-encoded-pan-50k ⁽ⁱ⁾ | 2.96 | 1.08 | 0.36 | improved |
+| scatter-offaxis-pan-50k ⁽ⁱ⁾ | 1.56 | 0.993 | 0.64 | improved (noisy: spread 1.26×) |
+| scatter-pan-200k | 1.45 | 0.745 | 0.52 | improved (noisy: spread 1.55×) |
+| scatter-pan-50k ⁽ⁱ⁾ | 1.67 | 0.833 | 0.50 | improved (noisy: spread 1.94×) |
+| scatter-render-10k ⁽ⁱ⁾ | 3.65 | 3.27 | 0.90 | ok |
+| scatter-render-200k ⁽ⁱ⁾ | 183.3 | 175.9 | 0.96 | ok |
+| scatter-render-50k ⁽ⁱ⁾ | 28.48 | 28.60 | 1.00 | ok |
+| scatter-zoom-200k ⁽ⁱ⁾ | 1.87 | 0.868 | 0.47 | improved |
+| scatter-zoom-50k ⁽ⁱ⁾ | 1.36 | 0.438 | 0.32 | improved (noisy: spread 2.22×) |
+| touch-pan-gesture-50k ⁽ⁱ⁾ | 1.13 | 1.37 | 1.22 | ok (noisy: load, spread 1.87×) |
+| two-heatmaps-highlight-150k ⁽ⁱ⁾ | 0.330 | 0.458 | 1.39 | ok (noisy: load, spread 1.36×) |
+| wheel-zoom-gesture-50k ⁽ⁱ⁾ | 1.30 | 0.743 | 0.57 | improved (noisy: load, spread 2.03×) |
+| ingest-cols-1m | 113.8 | 28.80 | 0.25 | improved |
+| react-rerender-200k-inline | 37.44 | 0.125 | 0.01 | improved |
+| react-rerender-200k-stable ⁽ⁱ⁾ | 0.077 | 0.105 | 1.00 | ok |
+| reingest-cols-200k-callback ⁽ⁱ⁾ | 14.88 | 0.045 | 0.02 | improved |
+| reingest-cols-200k-title ⁽ⁱ⁾ | 14.96 | 2.50 | 0.17 | improved |
+| reingest-rows-200k-callback ⁽ⁱ⁾ | 53.42 | 0.045 | 0.01 | improved |
+| reingest-rows-200k-title | 53.83 | 2.43 | 0.04 | improved |
+| group-append-3x20k-align | 1.80 | 0.410 | 0.23 | improved |
+| stream-50hz-idle | 3.75 | 3.15 | 0.84 | ok (noisy: spread 2.37×) |
+| stream20hz-50k-legendtable | 2.38 | 1.06 | 0.45 | improved (noisy: load, spread 3.74×) |
+| stream20hz-50k-none | 6.14 | 3.85 | 0.63 | improved (noisy: spread 3.89×) |
+| stream20hz-50k-plugin | 5.04 | 3.92 | 0.78 | ok (noisy: spread 2.96×) |
+| hover-sync-group-20 | 1.80 | 0.385 | 0.21 | improved (noisy: spread 1.85×) |
+| hover-sync-line-200k | 0.325 | 0.237 | 0.77 | ok (noisy: spread 2.34×) |
+| hover-sync-scatter-200k | 1.36 | 0.297 | 0.22 | improved |
+| hover-sync-unsorted-200k | 1.34 | 0.255 | 0.19 | improved (noisy: spread 1.34×) |
+| time-pan-200k | 1.93 | 1.35 | 0.70 | ok |
+| firstpaint-line-1m | 142.0 | 29.40 | 0.21 | improved |
+| mount-24-charts ⁽ⁱ⁾ | 50.04 | 26.50 | 0.53 | improved |
+| offscreen-stream-24 | 8.09 | 2.35 | 0.29 | improved (noisy: spread 5.89×) |
+| resize-storm-24 ⁽ⁱ⁾ | 15.47 | 2.57 | 0.17 | improved |
+| theme-churn-24 | 13.60 | 3.13 | 0.23 | improved |
+
+Budgets missed (non-blocking): heap per streamed append (about 550 KB gross per operation against
+50), the offscreen share of 24 streaming charts (0.40 against 0.15), offscreen paints at mount
+(20 against 0), the zoom-gesture fidelity (0.72 against 0.8) and `reingest-rows-200k-title` (2.43
+ms against 2). `firstpaint-line-1m` met its budget (29.4 ms against 45; D34). The mobile profile
+and the `--base v0.12.0 --filter legacy` run were not repeated at M14; `overhaul-baseline` is the
+0.12 line's last commit.
+
+M17 adds the release status and the handoff.
