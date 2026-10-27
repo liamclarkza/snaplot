@@ -22,7 +22,10 @@
 // (`html[data-demo-ready]` on all six). Optionally `scrollTo`, a selector scrolled to the top of
 // the viewport first, and `crop`, an 8:5 rectangle of the viewport ({ x, y, width, height } in CSS
 // px) to show instead of all of it: it is taken at the density that keeps the JPEGs 640 × 400 and
-// 1280 × 800, so a crop is a sharper close-up, not a smaller picture. Without that file the script
+// 1280 × 800, so a crop is a sharper close-up, not a smaller picture. `closeUp`, another 8:5
+// rectangle of the same viewport (after its own `scrollTo`, if it names one), is written as
+// `<slug>-close.jpg` (and `@2x`): the picture a phone shows, where the whole page scaled to its
+// width cannot be read. Without that file the script
 // opens the page and waits for `window.demo`, `[data-ready]` or a painted canvas. The check fails when two demos share:
 // - a background colour (CIEDE2000 < 2) and the body font family;
 // - a background colour and the number of chart columns at 1280 px (distinct left edges of the
@@ -185,16 +188,19 @@ function hook(slug) {
   }
   if (found.query && !found.query.startsWith('?'))
     problems.push(`${slug}: query must start with ?`);
-  const crop = found.crop;
-  if (crop) {
+  for (const [name, crop] of [
+    ['crop', found.crop],
+    ['closeUp', found.closeUp],
+  ]) {
+    if (!crop) continue;
     const inside =
       crop.x >= 0 &&
       crop.y >= 0 &&
       crop.x + crop.width <= VIEWPORT.width &&
       crop.y + crop.height <= VIEWPORT.height;
-    if (!inside) problems.push(`${slug}: the crop leaves the 1280 × 800 viewport`);
+    if (!inside) problems.push(`${slug}: the ${name} leaves the 1280 × 800 viewport`);
     if (Math.abs(crop.width / crop.height - 1.6) > 0.01)
-      problems.push(`${slug}: the crop is not 8:5 (${crop.width} × ${crop.height})`);
+      problems.push(`${slug}: the ${name} is not 8:5 (${crop.width} × ${crop.height})`);
   }
   return { ...found, problems };
 }
@@ -456,54 +462,67 @@ try {
     const how = hook(slug);
     problems.push(...how.problems);
     // One JPEG per density: 640 × 400 for 1x screens and an @2x of 1280 × 800 for the rest, each
-    // at the highest quality under its budget.
-    for (const { density, suffix, maxBytes } of DENSITIES) {
-      // A crop is taken at the density that fills the same 640 × 400 (or 1280 × 800) pixels.
-      const zoom = how.crop ? VIEWPORT.width / how.crop.width : 1;
-      const context = await browser.newContext({
-        viewport: how.viewport,
-        deviceScaleFactor: density * zoom,
-        colorScheme: 'light',
-        reducedMotion: 'no-preference',
+    // at the highest quality under its budget; the same again for a close-up.
+    const variants = [{ crop: how.crop, scrollTo: how.scrollTo, stem: slug, main: true }];
+    if (how.closeUp) {
+      const { scrollTo, ...crop } = how.closeUp;
+      variants.push({
+        crop,
+        scrollTo: scrollTo ?? how.scrollTo,
+        stem: `${slug}-close`,
+        main: false,
       });
-      const page = await context.newPage();
-      // A demo may open external pages or stream; nothing leaves the machine.
-      await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());
-      const response = await page.goto(`${server.origin}${BASE}${how.path}${how.query}`);
-      if (!response?.ok()) problems.push(`${slug}: HTTP ${response?.status()}`);
-      await settle(page, how.ready);
-      if (how.scrollTo) {
-        await page.evaluate((selector) => {
-          document.querySelector(selector)?.scrollIntoView({ block: 'start' });
-        }, how.scrollTo);
-        // Charts scrolled into view paint on their next frames.
-        await page.waitForTimeout(600);
-      }
-      const clip = how.crop ?? undefined;
-      let quality = 80;
-      let shot = await page.screenshot({ type: 'jpeg', quality, clip });
-      while (shot.length > maxBytes && quality > 40) {
-        quality -= 5;
-        shot = await page.screenshot({ type: 'jpeg', quality, clip });
-      }
-      if (!suffix) {
-        shots.set(slug, shot);
-        facts.set(slug, await page.evaluate(probe));
-      }
-      const name = `${slug}${suffix}.jpg`;
-      const file = join(out, name);
-      const kb = (bytes) => (bytes / 1024).toFixed(1);
-      if (CHECK) {
-        if (!existsSync(file))
-          problems.push(`${slug}: no thumbnail at site/public/examples/${name}`);
-        else if (statSync(file).size > maxBytes)
-          problems.push(`${slug}: ${name} is ${kb(statSync(file).size)} KB (max ${kb(maxBytes)})`);
-      } else {
-        writeFileSync(file, shot);
-        console.log(`thumbs: ${name} ${kb(shot.length)} KB (quality ${quality})`);
-      }
-      await context.close();
     }
+    for (const { crop, scrollTo, stem, main } of variants)
+      for (const { density, suffix, maxBytes } of DENSITIES) {
+        // A crop is taken at the density that fills the same 640 × 400 (or 1280 × 800) pixels.
+        const zoom = crop ? VIEWPORT.width / crop.width : 1;
+        const context = await browser.newContext({
+          viewport: how.viewport,
+          deviceScaleFactor: density * zoom,
+          colorScheme: 'light',
+          reducedMotion: 'no-preference',
+        });
+        const page = await context.newPage();
+        // A demo may open external pages or stream; nothing leaves the machine.
+        await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());
+        const response = await page.goto(`${server.origin}${BASE}${how.path}${how.query}`);
+        if (!response?.ok()) problems.push(`${slug}: HTTP ${response?.status()}`);
+        await settle(page, how.ready);
+        if (scrollTo) {
+          await page.evaluate((selector) => {
+            document.querySelector(selector)?.scrollIntoView({ block: 'start' });
+          }, scrollTo);
+          // Charts scrolled into view paint on their next frames.
+          await page.waitForTimeout(600);
+        }
+        const clip = crop ?? undefined;
+        let quality = 80;
+        let shot = await page.screenshot({ type: 'jpeg', quality, clip });
+        while (shot.length > maxBytes && quality > 40) {
+          quality -= 5;
+          shot = await page.screenshot({ type: 'jpeg', quality, clip });
+        }
+        if (!suffix && main) {
+          shots.set(slug, shot);
+          facts.set(slug, await page.evaluate(probe));
+        }
+        const name = `${stem}${suffix}.jpg`;
+        const file = join(out, name);
+        const kb = (bytes) => (bytes / 1024).toFixed(1);
+        if (CHECK) {
+          if (!existsSync(file))
+            problems.push(`${slug}: no thumbnail at site/public/examples/${name}`);
+          else if (statSync(file).size > maxBytes)
+            problems.push(
+              `${slug}: ${name} is ${kb(statSync(file).size)} KB (max ${kb(maxBytes)})`,
+            );
+        } else {
+          writeFileSync(file, shot);
+          console.log(`thumbs: ${name} ${kb(shot.length)} KB (quality ${quality})`);
+        }
+        await context.close();
+      }
   }
 
   // The social card: the top of the homepage, with the sentence and the hero.

@@ -36,17 +36,26 @@ const examples = DEMOS.map((demo) => ({
       examples.map((demo) => (
         <li data-demo={demo.slug} data-framework={demo.framework}>
           {demo.thumbnail ? (
-            <img
-              class="thumb"
-              src={`${base}examples/${demo.slug}.jpg`}
-              srcset={`${base}examples/${demo.slug}.jpg 640w, ${base}examples/${demo.slug}@2x.jpg 1280w`}
-              sizes="(min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw"
-              alt=""
-              width="320"
-              height="200"
-              loading="lazy"
-              decoding="async"
-            />
+            <picture>
+              {/* A phone shows a close-up of the page's main chart: the whole page cannot be read
+                  at its width. */}
+              <source
+                media="(max-width: 39.99rem)"
+                srcset={`${base}examples/${demo.slug}-close.jpg 640w, ${base}examples/${demo.slug}-close@2x.jpg 1280w`}
+                sizes="100vw"
+              />
+              <img
+                class="thumb"
+                src={`${base}examples/${demo.slug}.jpg`}
+                srcset={`${base}examples/${demo.slug}.jpg 640w, ${base}examples/${demo.slug}@2x.jpg 1280w`}
+                sizes="(min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw"
+                alt=""
+                width="320"
+                height="200"
+                loading="lazy"
+                decoding="async"
+              />
+            </picture>
           ) : (
             <span class="thumb thumb-missing" />
           )}
@@ -105,6 +114,9 @@ const examples = DEMOS.map((demo) => ({
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+  ul.examples picture {
+    display: block;
   }
   .row-text {
     display: flex;

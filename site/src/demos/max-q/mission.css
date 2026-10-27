@@ -514,3 +514,16 @@ h2 {
     width: calc(100% - 2rem);
   }
 }
+
+/* The way back to the examples, as quiet as the mission name beside it. */
+.back {
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.back:hover,
+.back:focus-visible {
+  color: var(--ink);
+  text-decoration: underline;
+}

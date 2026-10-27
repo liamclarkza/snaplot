@@ -6,5 +6,11 @@
     "width": 1280,
     "height": 800
   },
-  "query": "?paused"
+  "query": "?paused",
+  "closeUp": {
+    "x": 8,
+    "y": 190,
+    "width": 840,
+    "height": 525
+  }
 }

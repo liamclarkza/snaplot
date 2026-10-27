@@ -30,15 +30,25 @@ export class Peaks {
 const SHRINK_BELOW = 0.4;
 
 /**
- * The next maximum for an axis showing `peak`: the first step at or above it when the peak has
- * grown past `current` or fallen under 40% of it, else `current` unchanged.
+ * The next maximum for an axis showing `peak`: the first step at or above `peak × headroom` when
+ * the peak has grown past `current / headroom` or fallen under 40% of it, else `current` unchanged.
+ * Headroom over 1 keeps the top of the plot clear (for labels there).
  */
-export function steadyMax(current: number | undefined, peak: number, steps: readonly number[]) {
+export function steadyMax(
+  current: number | undefined,
+  peak: number,
+  steps: readonly number[],
+  headroom = 1,
+) {
   if (!Number.isFinite(peak)) return current;
-  const fit = steps.find((step) => step >= peak) ?? steps[steps.length - 1];
-  if (current === undefined || peak > current || peak < current * SHRINK_BELOW) return fit;
+  const need = peak * headroom;
+  const fit = steps.find((step) => step >= need) ?? steps[steps.length - 1];
+  if (current === undefined || need > current || peak < current * SHRINK_BELOW) return fit;
   return current;
 }
+
+/** The latency axis's headroom: the deploy labels' row at its top stays clear of the trace. */
+export const LATENCY_HEADROOM = 1.6;
 
 /** Latency in ms on a log axis, error %, and requests per second. */
 export const STEPS = {

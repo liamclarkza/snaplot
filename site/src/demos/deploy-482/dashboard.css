@@ -92,6 +92,18 @@ select:hover {
   border-bottom: 1px solid var(--border);
 }
 
+.back {
+  color: var(--text-dim);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.back:hover,
+.back:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 .service {
   margin: 0;
   font-size: 15px;

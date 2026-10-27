@@ -184,7 +184,10 @@ export function mount(root: HTMLElement): Demo {
           format: { notation: 'compact' },
         },
       },
-      referenceLines: [{ axis: 'y', value: 100, label: 'Kármán line', color: COLOR.karman }],
+      // On a narrow chart the label would sit on the speed curve; the panel's note names the line.
+      referenceLines: [
+        { axis: 'y', value: 100, color: COLOR.karman, ...(!narrow && { label: 'Kármán line' }) },
+      ],
       plugins: [liveHead('head', COLOR.altitude, () => head && { x: head.t, y: head.altitude })],
       ariaLabel: 'Altitude and speed against mission time, simulated.',
     });

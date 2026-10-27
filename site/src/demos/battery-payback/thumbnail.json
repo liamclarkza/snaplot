@@ -13,5 +13,12 @@
     "y": 0,
     "width": 880,
     "height": 550
+  },
+  "closeUp": {
+    "scrollTo": ".r2-figure",
+    "x": 212,
+    "y": 0,
+    "width": 856,
+    "height": 535
   }
 }

@@ -30,7 +30,7 @@ import {
 } from './charts';
 import { type Columns, EDGES, NAMES, createIncident, stem } from './incident';
 import { parseSeed } from './simulator';
-import { Peaks, STEPS, steadyMax } from './steady';
+import { LATENCY_HEADROOM, Peaks, STEPS, steadyMax } from './steady';
 import { Verdict } from './Verdict.solid';
 
 const SPEEDS = [1, 10, 60];
@@ -99,7 +99,12 @@ export default function Dashboard() {
     const current = maxima();
     const name = endpoint();
     const next = {
-      latency: steadyMax(current.latency, peaks.latency.get(name)!.maxSince(since), STEPS.latency),
+      latency: steadyMax(
+        current.latency,
+        peaks.latency.get(name)!.maxSince(since),
+        STEPS.latency,
+        LATENCY_HEADROOM,
+      ),
       errors: steadyMax(current.errors, peaks.errors.get(name)!.maxSince(since), STEPS.errors),
       traffic: steadyMax(current.traffic, peaks.traffic.maxSince(since), STEPS.traffic),
     };
@@ -197,6 +202,9 @@ export default function Dashboard() {
   return (
     <div class="dashboard">
       <header class="topbar">
+        <a class="back" href={`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}examples/`}>
+          ← Examples
+        </a>
         <p class="service">shop-web production</p>
         <span class="tag">Simulated service · seed {seed}</span>
         <span class="paged">Paged 03:12 UTC</span>

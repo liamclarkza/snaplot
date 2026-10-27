@@ -184,6 +184,9 @@ export default function Editor() {
   return (
     <div class="editor">
       <header class="toolbar">
+        <a class="back" href={`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}examples/`}>
+          ← Examples
+        </a>
         <p class="file">{loaded()?.title ?? 'recording.mp3'}</p>
         <div class="transport" role="toolbar" aria-label="Transport">
           <button

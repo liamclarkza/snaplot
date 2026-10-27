@@ -13,5 +13,11 @@
     "y": 0,
     "width": 1280,
     "height": 800
+  },
+  "closeUp": {
+    "x": 644,
+    "y": 4,
+    "width": 576,
+    "height": 360
   }
 }

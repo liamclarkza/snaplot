@@ -139,16 +139,25 @@ const examples = DEMOS.map((demo) => ({
       examples.map((demo) => (
         <li data-demo={demo.slug}>
           {demo.thumbnail && (
-            <img
-              class="demo-thumb"
-              src={`${base}examples/${demo.slug}.jpg`}
-              srcset={`${base}examples/${demo.slug}.jpg 640w, ${base}examples/${demo.slug}@2x.jpg 1280w`}
-              sizes="(min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw"
-              alt=""
-              width="640"
-              height="400"
-              loading="lazy"
-            />
+            <picture>
+              {/* A phone shows a close-up of the page's main chart: the whole page cannot be read
+                  at its width. */}
+              <source
+                media="(max-width: 39.99rem)"
+                srcset={`${base}examples/${demo.slug}-close.jpg 640w, ${base}examples/${demo.slug}-close@2x.jpg 1280w`}
+                sizes="100vw"
+              />
+              <img
+                class="demo-thumb"
+                src={`${base}examples/${demo.slug}.jpg`}
+                srcset={`${base}examples/${demo.slug}.jpg 640w, ${base}examples/${demo.slug}@2x.jpg 1280w`}
+                sizes="(min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw"
+                alt=""
+                width="640"
+                height="400"
+                loading="lazy"
+              />
+            </picture>
           )}
           <div>
             <h3>
@@ -313,6 +322,9 @@ const examples = DEMOS.map((demo) => ({
   }
   ul.home-examples > li {
     position: relative;
+  }
+  ul.home-examples picture {
+    display: block;
   }
   .demo-thumb {
     display: block;

@@ -104,6 +104,13 @@ test.describe('the examples hub', () => {
       const retina = file.replace(/\.jpg$/, '@2x.jpg');
       expect(existsSync(retina), `${demo.slug}: run npm run thumbs`).toBe(true);
       expect(statSync(retina).size).toBeLessThanOrEqual(160 * 1024);
+      // The close-up a phone shows, at both densities.
+      for (const close of [`${demo.slug}-close.jpg`, `${demo.slug}-close@2x.jpg`]) {
+        expect(
+          existsSync(join(site, 'public/examples', close)),
+          `${close}: run npm run thumbs`,
+        ).toBe(true);
+      }
       const image = page.locator(`.examples > li[data-demo="${demo.slug}"] img.thumb`);
       await image.scrollIntoViewIfNeeded();
       const src = (await image.getAttribute('src')) ?? '';
@@ -160,5 +167,13 @@ test.describe('the examples hub on a phone', () => {
     const image = await first.locator('.thumb').boundingBox();
     const text = await first.locator('.row-text').boundingBox();
     expect((image?.y ?? 0) < (text?.y ?? 0)).toBe(true);
+    // A phone shows the close-up of the page's main chart.
+    await expect
+      .poll(() =>
+        first
+          .locator('img.thumb')
+          .evaluate((img: HTMLImageElement) => img.currentSrc.split('/').pop() ?? ''),
+      )
+      .toMatch(/-close(@2x)?\.jpg$/);
   });
 });

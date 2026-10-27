@@ -42,6 +42,19 @@ body.r2 {
   padding: 48px 20px 24px;
 }
 
+.r2-back {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: var(--r2-ink-2);
+  font: 14px / 1.4 var(--r2-sans);
+  text-decoration: none;
+}
+.r2-back:hover,
+.r2-back:focus-visible {
+  color: var(--r2-ink);
+  text-decoration: underline;
+}
+
 .r2-article h1 {
   margin: 0 0 16px;
   font-size: 2.1rem;

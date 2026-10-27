@@ -62,6 +62,18 @@ a:hover {
   border-bottom: 1px solid var(--rule);
 }
 
+.toolbar .back {
+  color: var(--ink-dim);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.toolbar .back:hover,
+.toolbar .back:focus-visible {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
 .toolbar .file {
   margin: 0;
   font-size: 13px;
