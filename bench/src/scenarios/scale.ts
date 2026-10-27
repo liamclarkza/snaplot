@@ -38,10 +38,19 @@ function chartWidth(): number {
   return Math.min(window.innerWidth - 32, 900);
 }
 
+/**
+ * Past the viewport and the library's 200 px visibility margin (render/scheduler.ts), inside
+ * which a chart paints on purpose, so it is ready when it scrolls in.
+ */
+const VISIBILITY_MARGIN = 200;
 function isOffscreen(el: Element): boolean {
   const r = el.getBoundingClientRect();
+  const m = VISIBILITY_MARGIN;
   return (
-    r.bottom <= 0 || r.top >= window.innerHeight || r.right <= 0 || r.left >= window.innerWidth
+    r.bottom <= -m ||
+    r.top >= window.innerHeight + m ||
+    r.right <= -m ||
+    r.left >= window.innerWidth + m
   );
 }
 

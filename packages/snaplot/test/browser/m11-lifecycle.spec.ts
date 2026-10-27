@@ -335,3 +335,29 @@ test.describe('lifecycle', () => {
     expect(breaks).toContain('avoid');
   });
 });
+
+test.describe('mount below the fold', () => {
+  test('a chart mounted far below the viewport paints nothing until it is scrolled to', async ({
+    harnessPage: page,
+  }) => {
+    const renders = await page.evaluate(async () => {
+      const spacer = document.createElement('div');
+      spacer.style.height = '3000px';
+      document.body.append(spacer);
+      const chart = window.harness.mount({
+        data: Array.from({ length: 200 }, (_, t) => ({ t, v: Math.sin(t / 10) })),
+        x: 't',
+        series: [{ y: 'v' }],
+      });
+      const count = () =>
+        (chart as unknown as Record<symbol, any>)[Symbol.for('snaplot.debug')].renderCount.data;
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const before = count();
+      chart.container.scrollIntoView();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return { before, after: count() };
+    });
+    expect(renders.before).toBe(0);
+    expect(renders.after).toBeGreaterThan(0);
+  });
+});

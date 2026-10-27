@@ -24,7 +24,7 @@ import {
   MIN_TOUCH_INTERACTION_SAMPLING,
   TOUCH_INTERACTION_POINTS_PER_PIXEL,
 } from '../../constants';
-import { m4 } from '../data/m4';
+import { M4Arena, m4 } from '../data/m4';
 import { type RenderSegment, seriesYColumn, toRenderSegments } from './columns';
 import { normalizeScatterColorBy, normalizeScatterSizeBy } from './scatter/encoding';
 import { lineDraw } from './line/draw';
@@ -169,9 +169,18 @@ export function legendItems(engine: ChartCore): LegendItem[] {
 
 // ─── The series pass ──────────────────────────────────────────
 
+/** Each chart's M4 scratch (data/m4.ts), reset at the start of every data pass. */
+const m4Arenas = new WeakMap<ChartCore, M4Arena>();
+const arenaOf = (engine: ChartCore) => {
+  let arena = m4Arenas.get(engine);
+  if (!arena) m4Arenas.set(engine, (arena = new M4Arena()));
+  return arena;
+};
+
 export function renderAllSeries(engine: ChartCore): void {
   const ctx = engine.canvasManager.dataCtx;
   const palette = engine.categoricalPalette();
+  arenaOf(engine).reset();
   // Reset per data pass; drawOne sets it when a scatter series samples.
   engine.sampledLastDataRender = false;
   const pass: DataPassSeries[] = [];
@@ -402,6 +411,7 @@ export function decimateLineSegments(
       pixelWidth,
       xScale.min,
       xScale.max,
+      arenaOf(engine),
     );
     if (dx.length === 0) continue;
     out.push({ xData: dx, yData: dy, startIdx: 0, endIdx: dx.length - 1 });

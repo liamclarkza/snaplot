@@ -5,7 +5,8 @@
  * For each pixel column, retains exactly 4 points: first, last, min, max.
  * Zero visual error compared to rendering all points. O(n) single pass.
  *
- * This is a UTILITY, not called implicitly in the render path.
+ * The series pass decimates lines and areas with it every frame (marks/index.ts), into an
+ * `M4Arena` it resets per pass, so a stream does not allocate two output arrays per frame.
  */
 export function m4(
   x: Float64Array,
@@ -13,12 +14,45 @@ export function m4(
   pixelWidth: number,
   xMin: number,
   xMax: number,
+  arena?: M4Arena,
 ): [Float64Array, Float64Array] {
   const len = x.length;
   if (len === 0 || pixelWidth <= 0) {
     return [new Float64Array(0), new Float64Array(0)];
   }
-  return m4FiniteRun(x, y, 0, len - 1, pixelWidth, xMin, xMax);
+  return m4FiniteRun(x, y, 0, len - 1, pixelWidth, xMin, xMax, arena);
+}
+
+/**
+ * Scratch for M4 output: one pair of buffers that a render pass hands out in slices and resets
+ * at its start. Growing replaces the buffers; slices handed out before keep the old ones alive,
+ * so they stay valid until the pass that took them is over.
+ */
+export class M4Arena {
+  private x = new Float64Array(0);
+  private y = new Float64Array(0);
+  private used = 0;
+
+  reset(): void {
+    this.used = 0;
+  }
+
+  /** Room for `n` points: the buffers and the offset to write at. */
+  take(n: number): { x: Float64Array; y: Float64Array; offset: number } {
+    if (this.used + n > this.x.length) {
+      const size = Math.max(n, this.x.length * 2);
+      this.x = new Float64Array(size);
+      this.y = new Float64Array(size);
+      this.used = 0;
+    }
+    return { x: this.x, y: this.y, offset: this.used };
+  }
+
+  /** Keep the first `n` points of the last `take` and return them as views. */
+  keep(offset: number, n: number): [Float64Array, Float64Array] {
+    this.used = offset + n;
+    return [this.x.subarray(offset, offset + n), this.y.subarray(offset, offset + n)];
+  }
 }
 
 function m4FiniteRun(
@@ -29,11 +63,13 @@ function m4FiniteRun(
   pixelWidth: number,
   xMin: number,
   xMax: number,
+  arena?: M4Arena,
 ): [Float64Array, Float64Array] {
   const len = end - start + 1;
-  // If data fits within pixel budget, return as-is
+  // If data fits within pixel budget, return as-is (views in a render pass: it only reads them)
   const maxOut = pixelWidth * 4;
   if (len <= maxOut) {
+    if (arena) return [x.subarray(start, end + 1), y.subarray(start, end + 1)];
     return [
       Float64Array.from(x.subarray(start, end + 1)),
       Float64Array.from(y.subarray(start, end + 1)),
@@ -47,9 +83,11 @@ function m4FiniteRun(
 
   // Pre-allocate max possible output: 4 per pixel column, plus a break per gap, and a gap needs
   // an empty column (below).
-  const tmpX = new Float64Array(maxOut + pixelWidth);
-  const tmpY = new Float64Array(maxOut + pixelWidth);
-  let out = 0;
+  const room = arena?.take(maxOut + pixelWidth);
+  const tmpX = room ? room.x : new Float64Array(maxOut + pixelWidth);
+  const tmpY = room ? room.y : new Float64Array(maxOut + pixelWidth);
+  const base = room ? room.offset : 0;
+  let out = base;
 
   // Which pixel column a point falls in, clamped at both edges: callers pass a viewport-culled
   // slice that deliberately includes one point just left of xMin (and right of xMax) for line
@@ -148,9 +186,8 @@ function m4FiniteRun(
     previous = bucket;
   }
 
-  // Trim-copy rather than subarray: a subarray view retains the full
-  // 4*pixelWidth scratch buffers for as long as the caller holds the result,
-  // and hands back what looks like a shared buffer. m4 is opt-in and not a
-  // per-frame call, so the small copy is cheap.
+  // In an arena, views of the pass's scratch; alone, a trim-copy, so a caller that keeps the
+  // result does not retain the 5 × pixelWidth scratch.
+  if (arena) return arena.keep(base, out - base);
   return [tmpX.slice(0, out), tmpY.slice(0, out)];
 }

@@ -144,6 +144,23 @@ export const watchTheme = shared((notify) => {
   };
 });
 
+/** The observer's margin: a chart this close to the viewport counts as visible. */
+const VISIBILITY_MARGIN = 200;
+
+/** Whether `element`'s box lies wholly outside the viewport and its margin (an empty box never). */
+function outsideViewport(element: Element): boolean {
+  if (typeof window === 'undefined') return false;
+  const box = element.getBoundingClientRect();
+  if (box.width === 0 && box.height === 0) return false;
+  const m = VISIBILITY_MARGIN;
+  return (
+    box.bottom < -m ||
+    box.top > window.innerHeight + m ||
+    box.right < -m ||
+    box.left > window.innerWidth + m
+  );
+}
+
 /** Each observed element's visibility listeners. */
 const visibilityListeners = new Map<Element, Set<(visible: boolean) => void>>();
 let visibilityObserver: IntersectionObserver | null = null;
@@ -164,7 +181,7 @@ export function watchVisibility(
         for (const listener of visibilityListeners.get(entry.target) ?? [])
           listener(entry.isIntersecting);
     },
-    { rootMargin: '200px' },
+    { rootMargin: `${VISIBILITY_MARGIN}px` },
   );
   const listeners = visibilityListeners.get(element) ?? new Set();
   if (listeners.size === 0) {
@@ -172,6 +189,10 @@ export function watchVisibility(
     visibilityObserver.observe(element);
   }
   listeners.add(onChange);
+  // The observer's first report comes after the mount paint: a chart already far outside the
+  // viewport waits from the start instead of painting once offscreen (mount-24-charts). Mount has
+  // laid the page out, so reading the box costs no extra layout.
+  if (outsideViewport(element)) onChange(false);
   return () => {
     listeners.delete(onChange);
     if (listeners.size > 0) return;
