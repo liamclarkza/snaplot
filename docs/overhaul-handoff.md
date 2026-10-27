@@ -126,9 +126,13 @@ From `docs/backlog.md` §11 and the milestone handoffs:
 - **Smaller gaps.**
   - Reference lines and regions do not extend the auto domain.
   - The 44 px bottom gutter leaves 15–20 px under x labels when an axis has no title.
-  - Central Park's first bar can read a shade darker at some widths.
+  - The homepage and the hub keep a 1,176 px measure anchored left with the header, so a 1920 px screen
+    shows an empty band on the right (deliberate: nav, page and footer share one left edge).
 - **Tooling.** `check-visual-ledger` over the full range fails on V51–V53, which were committed in a docs commit;
   from `ovh-m11-part2` on it passes.
+- **Fixed after M17** (`ovh/polish-final`): the hub is a two-column gallery on wide screens, Central Park's edge
+  days sit under the bands like the rest, the search shortcut hint is hidden on phones, and epoch numbers and ISO
+  times may share an axis in either order.
 - **Not run.** The bench mobile profile and the `--base v0.12.0 --filter legacy` comparison were not repeated
   after M14. No real Android or iOS device was used: every touch check ran in Playwright emulation.
 
