@@ -146,7 +146,7 @@ component.
 
 ## Testing in jsdom
 
-jsdom has no canvas and no `ResizeObserver`. To render a chart in a component test, stub
-`ResizeObserver` with a class whose methods do nothing, and give `HTMLCanvasElement.prototype.getContext`
-an object that accepts every call. Assert on the host element (its role and accessible name) and
-on your own markup rather than on pixels. {/* verify-after: M11 */}
+jsdom has no canvas and no `ResizeObserver`. A chart there warns once, draws nothing and does not
+throw, so components that contain charts render in tests as they are. Assert on the host element
+(its role and accessible name), on what the chart reports (`getState()`, the callbacks) and on
+your own markup rather than on pixels.

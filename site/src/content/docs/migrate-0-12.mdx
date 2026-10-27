@@ -30,7 +30,7 @@ to use instead, and the chart keeps its default, so a page keeps rendering while
 4. **`streaming.maxLen` is `streaming.maxPoints`.** A follow window is `streaming.followWindow`.
 5. **`setData(data)` is `update({ data })`.** `appendData` stays.
 6. **Themes are `theme: 'light' | 'dark'` or ten tokens.** The fourteen theme objects and
-   `createTheme` are gone. Without `theme`, the chart follows the page. {/* verify-after: M11 */}
+   `createTheme` are gone. Without `theme`, the chart follows the page.
 7. **Legends are built in.** Remove `createLegendPlugin()`; set `legend: false` to hide it.
    `createLegendTablePlugin()` is `createLegendTable(element, { chart, columns })`.
 8. **Zoom and pan are `interaction`.** `zoom`, `pan` and `touch` become
@@ -114,3 +114,65 @@ For a legend that is not a table, read the cursor with `useCursor(chart)` in Rea
 `createCursor(chart)` in Solid and render your own markup from `cursor.points`. See
 [React](/snaplot/frameworks/react/#hooks-with-selectors) and
 [Solid](/snaplot/frameworks/solid/#primitives-with-accessors).
+
+## Appendix: every removed name
+
+The tables above cover what most code uses. This list covers the rest of the 0.12 surface;
+[`removed-since-0.12.txt`](https://github.com/liamclarkza/snaplot/blob/main/docs/decisions/removed-since-0.12.txt)
+is the full machine-made list.
+
+**Entries.** `snaplot/core` is `snaplot`. `snaplot/legend-table.css` is gone: the legend styles
+are injected for you. Import `createChart` from `snaplot`, not from `snaplot/solid`.
+
+**Engine internals**, now private, with no replacement: `ChartCore`, `ChartInstance`, `ChartStats`,
+`ColumnarStore`, `ColumnarData`, `LinearScale`, `LogScale`, `TimeScale`, `Scale`, `ScaleType`,
+`createScale`, `niceRange`, `niceStep`, `niceTicks`, `deepMerge`, `DeepPartial`, `Layout`,
+`RenderContext`, `DebugConfig`, `InteractionMode`, `CursorEventOrigin`, `ChartEventMap` (use the
+event names of `chart.on`) and the CSS-variable maps `CHART_CSS_VARS` and `SNAPLOT_THEME_CSS_VARS`
+(the variables themselves are listed on [Theming](/snaplot/guides/theming/#css-variables)).
+`applyThemeToElement` is gone: a chart applies its theme itself.
+
+**Option types** are now one `ChartOptions` with typed series, axes and annotations:
+`ChartConfig` (`ChartOptions`), `SeriesConfig` (`SeriesOptions`), `AxisConfig` and its
+`AxisGridConfig` and `AxisTickMarksConfig` (`AxisOptions`; `grid` is a boolean),
+`StreamingConfig` (`StreamingOptions`), `TooltipConfig` (`TooltipOptions`), `CursorConfig`
+(`cursor: boolean`), `HighlightConfig` (`highlight`), `ZoomConfig`, `PanConfig`, `TouchConfig`,
+`ZoomBoundsSpec` and `SelectionConfig` (`InteractionOptions`), `ThemeConfig` (`ThemeTokens`),
+`AppendDataOptions` (`AppendOptions`), `ScatterColorEncoding`, `ScatterColorEncodingType`,
+`ScatterSizeEncoding` and `ScatterTooltipField` (`ColorEncoding`, `ColorEncodingType`,
+`SizeEncoding`, `TooltipField`), and `ScatterPointShape` (points are circles).
+
+**Readout types:** `TooltipPoint`, `TooltipFieldValue`, `CursorSeriesPoint`, `SelectedPoint` and
+`SelectionResult` are `ChartPoint`, `ChartPointField` and `SelectionChange`.
+
+**Plugins and annotations:** `Plugin` is `ChartPlugin`; `crosshairPlugin` and `tooltipPlugin`
+are built in (`cursor`, `tooltip`); `createReferenceLinesPlugin`, `createReferenceRegions`,
+`createReferenceRegionsPlugin` and `ReferenceRegionsPlugin` are the `referenceLines` and
+`referenceRegions` options.
+
+**Groups and highlight:** `ChartGroupBindOptions`, `ChartGroupBindings`,
+`ChartGroupLinkOptions`, `HighlightSyncKey`, `HighlightSyncPayload` and `createHighlightKey`
+are `createChartGroup({ cursor, highlight, viewport, yRange })` and the `highlight` option.
+
+**Legends:** `createLegendTablePlugin`, `LegendCellContent`, `LegendTableFallback`, `LegendTableSolidColumn`, `SeriesLegend`
+and `SeriesLegendProps` are the built-in legend and `LegendTableColumn`.
+
+**Themes:** `fogTheme`, `forestTheme`, `ivoryTheme`, `marsTheme`, `midnightTheme`, `mintTheme`,
+`oceanTheme`, `refinedDarkTheme`, `studioTheme`, `sunsetTheme`, `tokyoTheme` and `violetTheme`,
+with `lightTheme` and `darkTheme`, are `theme: 'light' | 'dark'` and tokens.
+
+**Members of types that remain:**
+
+| Type | Removed members | Use |
+| --- | --- | --- |
+| `ChartGroup` | `apply`, `bind`, `link`, `cursor`, `cursorDataX`, `highlight`, `highlightKey`, `highlightedKey`, `highlightedSeries`, `syncKey` | `createChartGroup(options)` and each chart's `group` option |
+| `ChartGroupOptions` | `defaults` | spread shared options into each chart |
+| `ChartProps` | `config`, `data`, `onReady` | the options as props, and a `ref` |
+| `CursorSnapshot` | `activeSeriesIndex`, `dataIndex`, `dataX` | `activeSeriesId`, each point's `rowIndex`, `x` |
+| `HistogramOptions` | `binCount`, `method` | `bins` |
+| `LegendTableColumn` | `key`, `title`, `cell`, `width`, `header`, `align` as 0.12 shaped them | `'swatch'`, `'name'`, `'value'` or `{ header, value, align }` |
+| `LegendTableOptions` | `className`, `formatStep`, `highlightOnHover`, `maxHeight`, `position`, `showStepHeader`, `toggleVisibilityOnClick` | style the element you pass; hover always highlights |
+| `LegendTableProps` | `children`, `columns`, `fallback`, `formatStep`, `highlightOnHover`, `maxHeight`, `showStepHeader` | the 1.0 `<LegendTable chart columns fallback>` |
+| `ReferenceLine` | `axisKey` | `axis` |
+| `ReferenceRegion` | `axisKey`, `edges`, `edgeColor`, `edgeDash`, `fill` | `axis`, `color` |
+| `ThemeTokens` | `base`, `borderOpacity`, `gridOpacity`, `heatmap`, `tooltip` | `muted` sets the grid and frame; `sequential` the density ramp |

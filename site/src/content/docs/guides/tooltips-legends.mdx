@@ -1,30 +1,59 @@
 ---
-title: Tooltips, cursor and legends
-description: Tooltip modes and custom content, the legend, legend tables and custom legends.
+title: Tooltips and legends
+description: Tooltip modes and content, your own tooltip, the built-in legend and legend tables.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
-
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+import Example from '../../../components/Example.astro';
 
 ## Tooltip modes
 
-Show every series at the cursor, or the nearest point.
+`tooltip.mode` picks what the tooltip lists:
+
+- **`'index'`** (the default): every series at the x nearest the pointer, anywhere over the plot
+  inside the data's x range. The header is the x; each row is the series swatch, name and value,
+  in series order.
+- **`'nearest'`** (the default when every series is a scatter): the point nearest the pointer,
+  within 32 px for a mouse and 44 px for touch. Points that coincide are all listed.
+
+<Example name="tooltips-guide/index" />
+
+Values are written at the precision of the data, through the series `format`, else the axis
+`format`. On a bar chart, lines and points on the same chart join the bar's tooltip. The tooltip
+shows above open dialogs and fullscreen elements, flips to stay in the viewport, and on touch it
+sits above the finger and stays after a tap until you tap elsewhere or scroll.
+
+`tooltip: false` hides it; the crosshair stays unless `cursor: false`.
 
 ## Custom tooltip content
 
-`tooltip.render` returns a string or a DOM node. Escape any text you did not write.
+`tooltip.render(points)` returns the tooltip's content: a `Node`, or a string of HTML. Build a node
+with `textContent`, as here, or escape any text that comes from data before you return a string.
+
+<Example name="tooltips-guide/render" />
 
 ## The legend
 
-A legend appears for two or more series; turn it off with `legend: false`.
+With two or more series, or a scatter coloured by category, the chart shows a legend above the
+plot (`legend: 'auto'`). `legend: { position: 'bottom' }` moves it below; `true` and `false`
+force it on or off. The legend takes its height from the chart, so the plot fits around it at
+any size, and it needs no stylesheet.
 
-## Legend tables
-
-`createLegendTable` and `<LegendTable>` show columns of values for the cursor position.
+Each series is a button named by its label. A click shows or hides the series and reports
+`onHiddenSeriesChange`; a hover or focus highlights it (`onHighlightChange`) and dims the
+others. A hidden series keeps its place in the legend, faded and struck through. A category
+legend lists each colour with its category and does not toggle.
 
 ## A custom legend
 
-Build your own with `useCursor` in React or `createCursor` in Solid.
+To build your own legend, hide the built-in one (`legend: false`) and drive the chart's state:
+`hiddenSeries` and `highlight` are options, with `onHiddenSeriesChange` and `onHighlightChange`,
+and `getState().series` lists each series' label, colour, mark and visibility.
+
+### Legend tables
+
+`createLegendTable(element, { chart })` renders a table of each series' value at the cursor,
+or at the latest data when the cursor is off the chart. In React and Solid, `<LegendTable>`
+does the same. Columns are `'swatch'`, `'name'`, `'value'` or your own
+`{ header, value(point, series) }`; a column's value may be a DOM node, such as a button, and
+the table keeps it in place while the cursor moves, so focus inside it survives. See the
+[React page](/snaplot/frameworks/react/) for an example.

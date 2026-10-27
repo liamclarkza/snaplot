@@ -24,6 +24,7 @@
     "check:api": "npm run check:api -w packages/snaplot --",
     "api:update": "npm run api:update -w packages/snaplot --",
     "check:palettes": "node scripts/check-palettes.mjs",
+    "check:migration": "node scripts/overhaul/check-migration.mjs",
     "check:examples": "npm run check:examples -w site --",
     "build:site": "npm run build -w site --",
     "dev": "npm run dev -w site --",

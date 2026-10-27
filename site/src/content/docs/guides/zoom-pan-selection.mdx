@@ -3,28 +3,70 @@ title: Zoom, pan and selection
 description: Interaction presets, mouse, touch and keyboard controls, and viewport state.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
-
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+import Example from '../../../components/Example.astro';
 
 ## Interaction presets
 
-`interaction` sets zoom, pan and selection together.
+`interaction` sets how gestures behave:
+
+| Option | Values | Default |
+| --- | --- | --- |
+| `zoom` | `'x'`, `'xy'`, `'none'` | `'x'`, or `'xy'` when every series is a scatter |
+| `drag` | `'zoom'` (box zoom), `'select'` (keep a selection), `'pan'` | `'zoom'` |
+| `bounds` | `'data'` (stay inside the data), `'none'` | `'data'` |
+
+`interaction: 'readonly'` keeps the tooltip and turns every other gesture off; the chart is then
+not a tab stop.
+
+Zoom has a floor: a gesture never zooms past two adjacent data points.
 
 ## Mouse
 
-Wheel, drag and double-click.
+| Gesture | Action |
+| --- | --- |
+| Drag | Box zoom (or select, with `drag: 'select'`); only the axes the drag spans |
+| Shift + drag | Pan |
+| Ctrl or ⌘ + wheel, trackpad pinch | Zoom at the pointer |
+| Wheel | Scrolls the page |
+| Double-click | Reset the zoom |
+| Click | `onPointClick`, however long the button is held |
 
 ## Touch
 
-Swipe, drag, tap and pinch.
+With `zoom: 'x'` or `'none'`, a vertical swipe scrolls the page, a horizontal drag moves the
+cursor, and two fingers pinch to zoom. With `zoom: 'xy'` or `drag: 'pan'`, one finger pans. A tap
+shows the tooltip and keeps it until a tap elsewhere. Pans keep a little momentum, except with
+reduced motion.
+
+<Example name="interaction-guide/xy" />
 
 ## Keyboard
 
-Arrow keys move the cursor; Shift with an arrow pans; plus and minus zoom.
+The chart is one tab stop; a click on the plot focuses it too.
 
-## Viewport, selection and highlight
+| Key | Action |
+| --- | --- |
+| ← → | Move the cursor to the previous or next point |
+| Home, End | The first or last point in view, once the cursor is on the chart |
+| Shift + ← → | Pan |
+| + − | Zoom in, zoom out |
+| 0 | Reset the zoom |
+| Escape | Clear the selection and the tooltip |
 
-Read and set them as options, with a change callback each.
+Ctrl, ⌘ and Alt combinations always reach the browser.
+
+## Selection
+
+With `drag: 'select'`, a drag keeps a selection instead of zooming. Escape, or a click outside
+it, clears it, and a drag past the plot edge stops at the edge. `onSelectionChange` receives
+`{ x: [from, to] }` and the `points` it covers.
+
+<Example name="interaction-guide/select" />
+
+## Viewport, selection and highlight as state
+
+`viewport`, `selection`, `hiddenSeries` and `highlight` are options you can set and callbacks
+that report gestures (`onViewportChange` and the rest). A gesture changes the chart at once; set
+the option back to undo it. `viewport: { x: [from, to] }` pins the x axis; `{}` returns every
+axis to automatic. A chart following a stream stops when you pan or zoom it, and
+`chart.resumeFollow()` starts it again.

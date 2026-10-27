@@ -1,46 +1,72 @@
 ---
-title: Axes and formatting
-description: Axis types, titles, bounds, ticks, formatting, dual axes, locale and time zones.
+title: Axes
+description: Axis kinds and inference, bounds, ticks and formats, titles, second axes and how labels fit.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
+import Example from '../../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+Every chart has an `x` and a `y` axis. `axes` configures them by key, and any other key (`y2`,
+`x2`) adds an axis that series name with `yAxis` or `xAxis`.
 
 ## Axis types
 
-Linear, log, time and category axes.
+| `type` | Values | Notes |
+| --- | --- | --- |
+| `'linear'` | numbers | The default for numbers. |
+| `'log'` | positive numbers | Values at or below 0 are not drawn. |
+| `'time'` | epoch milliseconds, `Date`s or ISO 8601 strings | Ticks fall on calendar boundaries in the chart's `timeZone`. |
+| `'category'` | strings | One slot per label, in order of first appearance, or in the order `categories` gives. |
 
-## Titles
+Without a `type`, the x values decide (see [Data](/snaplot/guides/data/#axis-inference)).
 
-Name an axis with `title`.
+<Example name="axes-guide/log" />
 
 ## Bounds
 
-Set `min` and `max`, or turn off rounding with `nice: false`.
+Automatic bounds come from the data. A value axis rounds them out to a tick step (`nice`), and the
+x of a line, area or band ends at the data. Data that is all positive or all negative never
+crosses zero, and an area or a bar always includes zero.
 
-## Explicit ticks
+`min` and `max` fix a bound; give one and the other stays automatic. `nice: false` keeps the
+data's own extent.
 
-Choose the tick values with `ticks`.
+## Ticks
+
+Ticks are chosen for the space the axis has. Labels are measured as they render (in the axis
+font, with tabular figures, at the size the page shows them), and when they would collide the
+axis takes fewer ticks with a coarser step, so a time axis that runs out of room says `09:00`,
+not `09:00:00.0`. Category labels thin to every second, third or nth label that fits, and a long
+axis title is cut to its edge with an ellipsis.
+
+### Explicit ticks
+
+`ticks` gives exact tick values (numbers or `Date`s), which the axis keeps as given: the way to
+get 0, 50 and 100 on a percentage axis, or only the ends of a sparkline. Gridlines follow them.
 
 ## Formatting values
 
-`format` takes a function, Intl options, or a prefix and suffix.
+`format` writes tick labels and the values the tooltip, the cursor and legend tables show:
+
+- **numbers:** an `Intl.NumberFormat` options object, plus `prefix` and `suffix`; or a function;
+- **times:** an `Intl.DateTimeFormat` options object, or a function of epoch milliseconds.
+
+A series `format` wins over its axis for that series.
+
+<Example name="axes-guide/format" />
+
+## Titles
+
+`title` draws the axis name outside its tick labels, cut with an ellipsis when it is longer than
+its side of the plot.
+
+## Positions
+
+`position` moves an axis to any side. Keys starting with `x` default to the bottom, `y` to the
+left, and a second value axis to the right.
 
 ## Dual axes
 
-Put a second value axis on the right.
+A series with `yAxis: 'y2'` reads its own axis, and gets its own range and format. Use it for
+two quantities in different units, and say in each axis title which is which.
 
-## Locale
-
-`locale` sets the language for numbers and dates.
-
-## Time zones
-
-`timeZone` shows times in local time or UTC.
-
-## Tick and value precision
-
-Ticks round to the step; tooltips show the value.
+<Example name="axes-guide/second-axis" />

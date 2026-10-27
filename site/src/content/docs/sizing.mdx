@@ -24,7 +24,7 @@ option: the width is always the element's.
 
 An element with no height of its own (an empty `<div>` is 0 pixels tall) gets a 300 pixel chart
 and one console warning that says so. A missing height shows as a chart of the wrong size, never
-as an empty page. {/* verify-after: M11 */}
+as an empty page.
 
 ## Aspect ratio with CSS
 
@@ -56,5 +56,5 @@ zoomed.
 
 ## Printing
 
-A chart prints as it was last drawn on screen. For a print layout, give the element a fixed
-height in a print stylesheet. {/* verify-after: M11 */}
+Printing draws every chart, including ones scrolled out of view, hides the tooltip and keeps each
+chart on one page. For a print layout, give the element a fixed height in a print stylesheet.

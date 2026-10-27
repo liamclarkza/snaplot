@@ -1,42 +1,53 @@
 ---
 title: Theming
-description: The automatic theme, tokens, CSS variables, dark mode and two token recipes.
+description: How the chart follows the page, light and dark roles, tokens and CSS variables.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
+import Example from '../../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+## Following the page
 
-## The automatic theme
+Without a `theme`, the chart takes its colours from the page it sits on. It finds the first opaque
+background behind it, picks light or dark roles from it, and draws on a transparent plot, so a
+card, a dark section or a print preview shows through. When the page's theme changes (a class or
+`data-theme` attribute on `<html>`, or the system colour scheme) the chart follows.
 
-`theme: 'auto'` takes its colours from the page, so a chart matches light and dark pages.
+## Light and dark
+
+`theme: 'light'` or `'dark'` pins the roles whatever the page. Each mode has a colour-blind-safe
+categorical palette, a sequential ramp, a diverging ramp and text at 4.5:1 contrast or more on
+its surface.
 
 ## Tokens
 
-Override surface, text, accent, palettes and fonts with a token object.
+An object of tokens overrides single roles and leaves the rest to the page:
+
+| Token | Role |
+| --- | --- |
+| `surface` | The colour behind the chart, for contrast; painted only when you set it |
+| `text`, `muted` | Strong text; axis labels, legend text, gridlines and the frame |
+| `accent` | The crosshair and the focus ring |
+| `categorical` | Series colours, in order |
+| `sequential`, `diverging` | Ramps for continuous colour and density |
+| `fontFamily`, `fontSize` | Chart text |
+| `mode` | `'light'` or `'dark'` roles |
+
+<Example name="theming-guide/tokens" />
+
+Any CSS colour works in a token or a series `color`: names, `#hex`, `rgb()`, `hsl()`, `oklch()`
+and `var(--your-token)`.
 
 ## CSS variables
 
-Set `--chart-1` to `--chart-8` and the other variables on the container.
+Variables on the chart's container, or any ancestor, set roles without code:
 
-## Dark mode
+| Variable | Role |
+| --- | --- |
+| `--chart-bg` | The surface (painted) |
+| `--chart-text` | Text, and axis labels unless they have their own |
+| `--chart-axis-label`, `--chart-tick` | Axis labels and tick marks |
+| `--chart-grid`, `--chart-axis`, `--chart-border` | Gridlines, axis lines, the frame |
+| `--chart-crosshair` | The crosshair |
+| `--chart-tooltip-bg`, `--chart-tooltip-text`, `--chart-tooltip-border` | The tooltip |
 
-Follow your page theme, or pin a chart with `theme: 'dark'`.
-
-## Styling the host
-
-Pass a class name to the host element.
-
-## Recipe: warm paper
-
-A validated token set for a cream page.
-
-## Recipe: high contrast
-
-A validated token set for maximum contrast.
-
-## Strict CSP
-
-How the injected styles behave under a strict Content Security Policy.
+Tokens win over variables, and variables over the page.

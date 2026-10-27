@@ -1,4 +1,4 @@
-// The M15a pages (plan §8.1 pages 1, 2, 4–8, 13 and the page-20 draft) against the example style
+// The docs pages (plan §8.1; M15a and M15b) against the example style
 // guide: every page runs examples (three tabs each, which the smoke spec executes), every example
 // is a file under src/examples/ on real data with a provenance line and an accessible name, and
 // the framework pages teach their own framework (docs-01, dxtrial-16, frameworks-18).
@@ -36,10 +36,36 @@ const PAGES: Record<string, number> = {
   'guides/updating': 3,
   'guides/linked-charts': 2,
   'migrate-0-12': 1,
+  // M15b
+  'guides/axes': 3,
+  'guides/marks': 5,
+  'guides/tooltips-legends': 2,
+  'guides/zoom-pan-selection': 2,
+  'guides/annotations-plugins': 2,
+  'guides/theming': 1,
+  'guides/accessibility': 1,
+  'guides/performance': 1,
+  troubleshooting: 1,
 };
 
 /** The example folders M15a owns (plan §12 M15a). */
-const OWNED = ['start', 'frameworks', 'data-guide', 'updating', 'linked'];
+const OWNED = [
+  'start',
+  'frameworks',
+  'data-guide',
+  'updating',
+  'linked',
+  // M15b
+  'axes-guide',
+  'marks-guide',
+  'tooltips-guide',
+  'interaction-guide',
+  'annotations-guide',
+  'theming-guide',
+  'a11y-guide',
+  'performance-guide',
+  'troubleshooting',
+];
 const ownedFiles = OWNED.flatMap((folder) => walk(join(examples, folder))).map((file) => ({
   path: relative(examples, file),
   text: read(file),

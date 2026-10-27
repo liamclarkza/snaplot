@@ -18,7 +18,7 @@ number of pixels or any CSS length. In React and Solid, `height` sets the height
 the component renders.
 
 A container with no height gets 300 pixels and one console warning, so a missing height shows
-as a chart of the wrong size rather than an empty page. {/* verify-after: M11 */}
+as a chart of the wrong size rather than an empty page.
 
 ## Mount a chart
 
@@ -54,10 +54,10 @@ Without setting anything else:
   double-click to reset. Ctrl or ⌘ with the wheel, or a pinch, zooms too.
 - **Colours and text from the page.** The theme follows the light or dark page the chart sits on,
   the background stays transparent, the text uses the page's font, and the series take a palette
-  that stays distinct for colour-blind readers. {/* verify-after: M11 */}
+  that stays distinct for colour-blind readers.
 - **Keyboard and screen readers.** The chart takes focus with Tab; ← and → move the cursor from
   point to point, and Shift with ← or → pans. Without `ariaLabel`, the accessible name is a
-  summary such as "Line chart, 2 series: High, Low". {/* verify-after: M12a */}
+  summary such as "Line chart, 2 series: High, Low".
 
 Each of these is one option to change: `legend`, `tooltip`, `interaction`, `theme`, `cursor` and
 `ariaLabel`. The [guides](/snaplot/guides/data/) cover them one topic at a time.

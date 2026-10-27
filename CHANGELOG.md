@@ -10,8 +10,8 @@ to [Semantic Versioning](https://semver.org/).
 
 - A framework-independent `createChart(element, options)` accepts rows or named typed columns, shared or independent series datasets, stable series/row IDs, categories, named encodings and direct histogram results.
 - Atomic `update`, the `viewport` state option, `resetViewport`, `resumeFollow`, declarative reference lines/regions, typed interaction events and core chart groups replace the previous public authoring surface.
-- Native React 19 and Solid 1.9 integrations provide equivalent direct props, controlled state, state subscriptions, groups and JSX legend/table companions with isolated optional peers and SSR-safe imports.
-- Axis options use `title`, `roundBounds`, `rangePadding` and `format`; streaming uses `maxPoints` and `followWindow`. Repository examples, documentation, benchmarks and comparison adapters use the new API. No compatibility aliases are retained.
+- Native React 18.3 and 19 and Solid 1.9 integrations provide equivalent direct props, controlled state, state subscriptions, groups and JSX legend/table companions with isolated optional peers and SSR-safe imports.
+- Axis options use `title`, `nice` and `format`; streaming uses `maxPoints` and `followWindow`. Repository examples, documentation, benchmarks and comparison adapters use the new API. No compatibility aliases are retained.
 - Existing visual defaults are preserved by the API overhaul.
 
 ### Options and validation (1.0)
@@ -88,11 +88,15 @@ to [Semantic Versioning](https://semver.org/).
   refreshed on every data commit. Columns are data only: `'swatch'`, `'name'`, `'value'` or
   `{ header, value(point, series), align }`; it returns `{ update(options), destroy() }`.
 - The built-in legend replaces `createLegendPlugin()`. `legend: 'auto'`, the default, shows it for
-  two or more series (in a container at least 160 px tall, until the legend reserves its own space
-  in the layout); `legend: true` or `{ position: 'top' | 'bottom' }` always shows it, one button
-  per series above (or below) the plot; `legend: false` hides it (visual V20). A click
-  shows or hides the series (`hiddenSeries:change`) and a hover highlights it
-  (`highlight:change`).
+  two or more series, or for a scatter coloured by category (one static item per category);
+  `legend: true` or `{ position: 'top' | 'bottom' }` always shows it; `legend: false` hides it
+  (visual V20). It sits inside the chart, left-aligned and wrapping, in space the layout reserves,
+  so the host's own style is never changed and any height works (V56). Each series is a button
+  named by its label, with `aria-pressed`: a click shows or hides the series
+  (`hiddenSeries:change`) and a hover or focus highlights it (`highlight:change`). A hidden
+  series fades and is struck through; swatches keep their colour in forced colours.
+- A legend table column's `value` may return a DOM node; a node equal to the one shown is kept,
+  so focus inside a cell survives cursor moves.
 - The legend styles are injected once per document: `import 'snaplot/legend-table.css'` is no
   longer needed. `createLegendPlugin`, `createLegendTablePlugin` and the column helpers
   `nameColumn`, `valueColumn`, `swatchColumn`, `metricColumn` and `column` are removed.
@@ -284,29 +288,62 @@ what to use instead, and the chart keeps its default:
 - The React and Solid `<Chart>` keep their controlled `viewport`, `selectionState` and
   `hiddenSeries` props, typed with `ViewportRanges` and `SelectionRange`.
 
-### Changed
-- Plot edges and clips are square; titles and tick labels share a muted color.
-  Built-in grid, frame and tick strokes have consistent strength. Grid colors
-  are composited against the opaque chart surface before painting, preventing
-  brighter intersections from accumulated opacity.
-- Bars default to a softer fill, fine outline and rounded value ends with square
-  baselines. Continuous linear axes now round automatic bounds to regular tick
-  intervals; `nice: false` retains tight bounds. Constant Y ranges receive a
-  useful span. Explicit domains remain intact.
-- Automatic linear bar axes plan their center ticks, half-interval bounds and
-  grid boundaries together, eliminating unequal first/last grid cells. Label
-  thinning keeps the full regular grid; irregular bar widths remain contained.
-- Aligned decimal bounds retain their endpoint ticks despite floating-point
-  division error (for example, -0.4 through 0.6 at 0.2 intervals).
+### Axes (1.0)
 
-### Added
-- `chartFromRows(rows, { x, series })` converts named fields or accessors into
-  `{ data, config }` for the existing chart API. It handles missing Y values,
-  infers time axes from Dates, validates X ordering and exposes typed field names.
-  The columnar and streaming APIs remain available unchanged.
-- `theme.axisLabelColor` and `--chart-axis-label` separate quiet axis text from
-  primary companion text. `createTheme({ muted })` supplies this role and quiet
-  stroke opacities automatically.
+- One formatter for tick labels and readouts (series `format` > axis `format` > automatic);
+  calendar time ticks in local time or UTC; the locale from `locale`, else the page (V30).
+- One domain policy: `nice` rounding is the padding, data that is all positive or all negative
+  never crosses zero, areas and bars include zero, numeric bars span their slots and a second
+  value axis sits on the right (V31).
+- Labels fit as they render: measured in the axis font with tabular figures at the size the page
+  shows them, a generated axis takes fewer ticks with a coarser step before thinning, category
+  labels thin to every nth that fits, edge labels never touch their neighbours, adjacent labels
+  never repeat, values under 1e-4 or past 1e15 read in exponent form, and a long title is cut to
+  its edge with an ellipsis (V54).
+- A reference region on a category axis covers whole slots; a region from 0 on a log axis starts
+  at the domain.
+
+### Marks, colour and sizing (1.0)
+
+- The theme follows the page the chart sits on (an explicit surface, else the first opaque
+  background, else the text colour), and the plot is transparent (V50). `--chart-text` colours
+  axis labels too. Any CSS colour is accepted, including names, `oklch()` and `var()`.
+- Areas fill to zero in their own interpolation and honour `fill`, `fill: null` and `opacity`; a
+  value on its own between gaps draws a dot; density maps use the theme's ramp (V51).
+- Backing stores are whole device pixels and every 1 px stroke is snapped to a device pixel at any
+  ratio (V52). Reference-line labels never overlap and sit on a halo (V53).
+- An explicit `height` always sets the chart's height; a container with no height gets 300 px and
+  one warning. Offscreen charts do not paint; printing paints every chart. Without a canvas or a
+  ResizeObserver (jsdom), a chart warns once and draws nothing instead of throwing.
+
+### Interaction and accessibility (1.0)
+
+- The index tooltip shows anywhere along x inside the data, not only near a line; a point cloud
+  reads the point nearest the pointer and lists coincident points; one tooltip layout with the
+  series named, a point's values named by axis title or field (V55). The hover is recomputed under
+  a still pointer after any data, viewport, option or visibility change. The tooltip shows inside
+  open dialogs and fullscreen elements, and pointer coordinates follow CSS transforms.
+- Gestures: a zoom never goes past two adjacent points; a box zoom spans only the axes the drag
+  covers and keeps whole categories; a press pauses following; a followed chart can pan back
+  through retained data; a held mouse click still fires `point:click`; Ctrl+wheel reaches the
+  page when zoom is off; line- and page-mode wheels zoom like pixels.
+- `drag: 'select'`: Escape and a click outside clear the selection, a drag past the edge stops
+  at it, and `selection:change` carries the `points` it covers.
+- Touch: `touch-action: pan-y` by default (a vertical swipe scrolls the page, a horizontal drag
+  moves the cursor); one finger pans under `zoom: 'xy'` or `drag: 'pan'`; a tap's tooltip stays
+  until a tap elsewhere or a scroll; momentum respects reduced motion.
+- The host is a figure named by `ariaLabel` or a summary of its series; attributes it already had
+  are kept and `destroy()` removes only what the chart added. The chart is one tab stop with a
+  focus ring: the arrows move the cursor point by point, Home and End jump to the ends, Shift
+  pans, + and − zoom, 0 resets and Escape clears; a polite live region reads the cursor. Readonly
+  charts are not tab stops.
+
+### Performance (1.0)
+
+- Lines and areas are decimated per device column at rest; a 1M-point line first paints in about
+  29 ms (was 142). A hover on 200k points visits a few dozen through a grid of the visible points;
+  an unsorted cloud samples its in-view share during gestures; labels are measured once and the
+  render path reads no layout. Bench tables are in ADR 0002.
 
 ### Removed
 - Type exports `SeriesBase`, `AxisGridConfig`, `AxisTickMarksConfig`, `ScatterPointShape`,

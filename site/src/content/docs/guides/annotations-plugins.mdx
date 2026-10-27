@@ -1,34 +1,41 @@
 ---
-title: Annotations, plugins and adapters
-description: Reference lines and regions, the plugin contract, recipes, and writing an adapter.
+title: Annotations and plugins
+description: Reference lines and regions, and plugins that draw with the chart's scales.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
-
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+import Example from '../../../components/Example.astro';
 
 ## Reference lines and regions
 
-Mark a value or a range on any axis.
+`referenceLines` draws a line at a value of one axis; `referenceRegions` shades the span between
+two values. Values are written the way the axis reads them: numbers, `Date`s, ISO 8601 strings or
+category labels. A region on a category axis covers its categories' whole slots, and an open end
+(`-Infinity` or `Infinity`) runs to the edge of the plot.
+
+<Example name="annotations-guide/lines-regions" />
+
+Lines draw over the data and regions under it. Labels never overlap one another: a label for a
+horizontal line sits above its line at the right edge, a label for a vertical line takes the
+first free row at the top, and each sits on a halo of the page colour so it reads over the data.
 
 ## The plugin contract
 
-A plugin has an `id` and draw hooks below, above or over the data.
+A plugin is an object with an `id` and up to three draw hooks, each called with the canvas
+context, the chart and the plot rectangle:
 
-## Draw order
+| Hook | Draws |
+| --- | --- |
+| `drawBelow` | under the data, after the grid and the reference regions |
+| `drawAbove` | over the data, after the reference lines |
+| `drawOverlay` | on the overlay, above the crosshair |
 
-Where each hook draws relative to the marks and annotations.
+`chart.scale(key)` maps values to pixels (`toPixel`, `fromPixel`), with the axis range, its type
+and its categories. `install(chart)` runs once when the plugin is added and may return a cleanup
+function. Plugins are matched by `id`, so passing a new object with the same id on every render
+changes nothing; two plugins with one id throw. A plugin that throws is disabled, with one
+warning, and the chart keeps drawing.
 
-## Recipe: text labels
+<Example name="annotations-guide/plugin" />
 
-Draw labels at data positions with a plugin.
-
-## Recipe: error bars
-
-Draw error bars from lower and upper fields.
-
-## Write an adapter
-
-Wrap `createChart` for Vue or Svelte.
+Call `chart.redraw('overlay')`, `'data'` or `'all'` when what a plugin draws changes outside
+the chart's options.

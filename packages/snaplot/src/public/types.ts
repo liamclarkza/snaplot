@@ -611,7 +611,7 @@ export interface StreamingOptions {
 
 /**
  * Theme tokens. Any token you leave out comes from CSS variables on the
- * container (`--chart-surface`, `--chart-text`, …), then from the page.
+ * container (`--chart-bg`, `--chart-text`, …), then from the page.
  *
  * @example
  * ```ts

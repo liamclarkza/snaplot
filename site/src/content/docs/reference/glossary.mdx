@@ -3,16 +3,31 @@ title: Glossary
 description: The words the docs and the API use, and the ones they avoid.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
-
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
-
 ## Terms
 
-Follow window, source, state option and the other public terms.
+| Term | Meaning |
+| --- | --- |
+| **Source** | Rows or typed columns a series reads: the chart's `data`, or a series' own. |
+| **Series** | One mark over one source, named by its `id`. |
+| **Mark** | How a series draws: line, area, band, bar, scatter or histogram. |
+| **Axis key** | The name of an axis in `axes`: `x`, `y`, `y2` and so on. |
+| **Category axis** | An axis of string labels, one slot each, in order of first appearance. |
+| **Slot** | The width a bar or category takes on its axis. |
+| **Viewport** | The pinned range of each axis that is not automatic: `{ x: [from, to] }`. |
+| **Follow window** | The span of x a streaming chart shows behind the latest point. |
+| **Following** | Whether a streaming chart is showing the latest data; panning stops it. |
+| **State option** | `viewport`, `selection`, `hiddenSeries` and `highlight`: options a gesture also changes, each with a change callback. |
+| **Selection** | The range a `drag: 'select'` gesture keeps. |
+| **Highlight** | The series in focus; the others dim. |
+| **Cursor** | The x the pointer or the keyboard is on, and the values there. |
+| **Readout** | A value as the tooltip, the cursor and legend tables write it. |
+| **Legend table** | A table of each series' value at the cursor (`createLegendTable`, `<LegendTable>`). |
+| **Group** | Charts linked by `createChartGroup`: cursor, highlight, x viewport and y range. |
+| **Plugin** | An object with an `id` and draw hooks that paint with the chart's scales. |
+| **Token** | A theme role you set: `surface`, `text`, `muted`, `accent`, `categorical` and the rest. |
 
 ## Words we avoid
 
-Engine words that never appear in the docs or messages.
+The docs and error messages never use the engine's words for these: "store", "ingest",
+"scale" for an axis, "dirty flag", "overlay layer" or "rAF". When an error needs one of them, it
+names the option you wrote instead.

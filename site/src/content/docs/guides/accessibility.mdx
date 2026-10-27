@@ -3,40 +3,52 @@ title: Accessibility
 description: Names, keyboard, focus, live announcements, contrast and forced colours.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
+import Example from '../../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
+## Names
 
-## Names and summaries
-
-`ariaLabel` names a chart; without it, a summary of its series is used.
+The chart's container is a figure named by `ariaLabel`, or by a summary of its series ("Line
+chart, 2 series: High, Low") when you give none. Write `ariaLabel` as you would a caption: what
+the chart shows and over what range. Attributes the container already has are kept, and
+`destroy()` removes only what the chart added. The React and Solid components render the role
+and the name on their own element, so server-rendered markup is already a named figure.
 
 ## Keyboard
 
-An interactive chart is one tab stop with arrow-key navigation.
+An interactive chart is one tab stop, named by its label and a short key hint. The arrow keys move
+the cursor point by point; Home and End jump to the first and last point; Shift with an arrow
+pans; plus and minus zoom; 0 resets; Escape clears the selection and the tooltip. Ctrl, ⌘ and Alt
+combinations pass through to the browser. The full table is on
+[Zoom, pan and selection](/snaplot/guides/zoom-pan-selection/#keyboard).
 
-## Focus
+<Example name="a11y-guide/keyboard" />
 
-A visible focus ring in the accent colour.
+## Focus and live announcements
 
-## Live announcements
+Keyboard focus draws a 2 px ring in the theme's accent colour; a mouse click focuses the chart
+without one. As the keyboard moves the cursor, a polite live region reads the x and every
+series' value, at most once every 250 ms. Canvases, tick labels and the tooltip are hidden from
+assistive technology, so a screen reader hears the chart's name and the announcements, not a
+list of tick numbers.
 
-A polite live region reads the tooltip.
+## Contrast and colour
 
-## Contrast
-
-The palettes and their contrast on light and dark surfaces.
+Text and axis labels are at least 4.5:1 on their surface. The categorical palettes are chosen to
+stay distinct with the common colour-vision deficiencies; when colour carries meaning, say it in
+words too, in a label, a legend or the surrounding text.
 
 ## Forced colours
 
-What changes when the system forces colours.
+In Windows high-contrast modes the focus ring uses the system highlight colour, and legend
+swatches and axis labels keep their colours, since the canvas they describe keeps its own.
 
 ## Recipe: a data table
 
-Pair a chart with a table of its data.
+A chart is a summary. When readers need exact values, put a table of the data next to it, or
+behind a disclosure, with the same caption as `ariaLabel`. A
+[legend table](/snaplot/guides/tooltips-legends/#legend-tables) shows the values at the cursor.
 
 ## Minimum font size
 
-Axis labels honour the browser minimum font size.
+Axis labels honour the browser's minimum font size and any `font-size` the page forces on them:
+the chart measures them at the size they render and fits fewer ticks when they grow.

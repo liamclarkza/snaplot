@@ -1,42 +1,50 @@
 ---
 title: Performance and limits
-description: Typed columns, density, decimation, many charts, offscreen charts and scale limits.
+description: What the chart draws at rest and during gestures, streaming, and measured numbers.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
-
-:::note[Draft]
-This page is an outline of what it will cover.
-:::
-
-## Typed columns
-
-`Float64Array` columns skip row extraction.
-
-## Density
-
-Large scatter sets render as density.
+import Example from '../../../components/Example.astro';
 
 ## Decimation
 
-Lines draw at most a few points per pixel.
+What the chart draws for large data:
 
-## Many charts
+- **Lines and areas** are decimated per device pixel column at rest and during gestures: each
+  column keeps its first, last, lowest and highest points, so the picture is the one every point
+  would draw, at a fraction of the work.
+- **Scatter points** are all drawn at rest. During a pan or zoom, a large cloud draws a sample
+  of the points in view (at least 400, or 1.5 per pixel of plot width), then redraws in full when
+  the gesture stops. Above 200,000 points in view the default `renderMode: 'auto'` draws a
+  density map.
+- **Hover** looks points up in a grid of the visible points, so a tooltip on 200,000 points visits
+  a few dozen.
+- **Offscreen charts** do not paint until they scroll into view.
 
-Dashboards with dozens of charts on one page.
+## Typed columns
 
-## Offscreen charts
+Rows are read into columns once. For large data, pass the columns yourself: `Float64Array`s are
+used in place, with no copy and no object per row.
 
-Charts outside the viewport keep their state and skip painting.
+<Example name="performance-guide/columns" />
 
-## What scales with the view
+## Streaming
 
-Which costs grow with the visible points and which with all the data.
+`appendData` adds rows without reading the old ones again. `streaming.maxPoints` caps what a
+source keeps, dropping the oldest rows, and `streaming.followWindow` shows the latest span of x.
 
-## Memory and scale limits
+## Measured
 
-How much data a chart can hold.
+On a desktop Chromium with GPU raster, at the M14 tip (`npm run bench:ab`; ADR 0002 has the full
+tables):
 
-## The scale promise
+| Scenario | Time |
+| --- | ---: |
+| First paint of a 1,000,000-point line | 29 ms |
+| Ingesting 1,000,000 rows of typed columns | 29 ms |
+| A pan frame of a 200,000-point line | 0.6 ms |
+| A pan frame of a 200,000-point scatter | 0.7 ms |
+| A hover on a 200,000-point scatter | 0.3 ms |
+| Mounting 24 charts | 27 ms |
 
-The dashboard sizes snaplot is measured against.
+An option that does not touch the data (a title, a colour) repaints 200,000 rows in about 2.5 ms,
+without reading them again.

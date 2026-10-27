@@ -3,40 +3,64 @@ title: Troubleshooting
 description: Blank charts, field errors, a 1970 axis, types, SSR and jsdom.
 ---
 
-{/* Outline only: plan §8.1 drafts this page in M15b. */}
+import Example from '../../components/Example.astro';
 
-:::note[Draft]
-This page is an outline of what it will cover.
+Errors start with `snaplot:` and say what to change. Warnings print once per page.
+
+:::tip
+Open the browser console first: most of the problems below print the fix as a warning.
 :::
 
 ## A blank chart
 
-Check the container size and the field names.
+- **No height.** A chart fills its container's height. A container with none (a plain `<div>` in
+  normal flow) gets 300 px and the warning "The chart's container has no height". Give the
+  container a height, or pass `height`.
+- **No data in view.** Check `viewport`, `min` and `max`, and that the series' `y` field has
+  numbers: strings in a value field are not plotted.
+- **Hidden.** A chart outside the viewport paints when it scrolls in; one in a collapsed
+  `<details>` or a `display: none` tab paints when it is shown.
 
 ## Field errors
 
-What the error messages for unknown fields mean.
+A field that no row has throws and names the closest one: `snaplot: series "hgih": no row has a
+field "hgih". Did you mean "high"?`. With TypeScript, the same mistake does not compile when the
+options are typed with the row (see below).
 
 ## An axis that starts in 1970
 
-Seconds passed where milliseconds were expected.
+Epoch times are milliseconds. Unix seconds (`1562400000`) on a time axis read as a few weeks into
+January 1970; multiply by 1,000. Numbers that look like milliseconds on an axis with no `type`
+warn once and suggest `type: 'time'`.
 
-## Literal widening and satisfies
+<Example name="troubleshooting/epoch" />
 
-Use `satisfies ChartOptions<Row>` so field names keep their literal types.
+## Literal types and satisfies
+
+Write options with `satisfies ChartOptions<Row>` (or pass them straight to `createChart`), so
+field names keep their literal types and `y: 'hgih'` is an error. Annotating the variable as
+`ChartOptions` without the row type checks nothing about fields.
 
 ## Format types
 
-The value types a `format` function receives.
+A number `format` function receives the value as a number; a time axis' `format` receives epoch
+milliseconds. A category axis takes no `format`: its labels are shown as they are.
 
 ## Server rendering
 
-Charts mount in the browser; the server renders the host.
+Charts draw in the browser. On the server, the React and Solid components render their host
+element, already a named figure with its height, and the chart mounts when the page hydrates.
+In Next.js, put the chart in a `'use client'` component.
 
 ## jsdom
 
-Rendering charts in tests without a canvas.
+Without a canvas (jsdom without the `canvas` package) or a ResizeObserver, a chart warns once,
+draws nothing and does not throw, so components that contain charts can be tested. Test what the
+chart reports (`getState()`, `getCursor()`, events) rather than its pixels.
 
 ## Data replaced on a streamed source
 
-Why passing new `data` discards appended rows, and how to avoid it.
+A source extended with `appendData` keeps its appended rows only while you pass the same `data`.
+Passing a new array (a component that builds `data` on every render) replaces the stream and
+warns with the number of rows discarded. Keep the data in state (`useState`, `createSignal`), or
+omit `data` and append everything.

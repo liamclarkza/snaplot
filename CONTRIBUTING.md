@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest. This is a small, opinionated project, we aim to stay that way.
+Thanks for your interest. This is a small, opinionated project; we aim to keep it that way.
 
 ## Setup
 
@@ -36,15 +36,15 @@ and run only if it passes. Every workflow declares its `permissions:`.
 |---|---|---|---|
 | G1 | Lint and format | `npx biome ci .` | blocking |
 | G2 | Types | `npm run typecheck` (library: `tsconfig.json` and `tsconfig.test.json`; every workspace) | blocking |
-| G3 | Unit | `npm test` (CI adds v8 coverage), `npm run test:tz`, `node scripts/check-architecture.mjs` | blocking; architecture rules warn until M13 (P3) and M14 (P2) |
+| G3 | Unit | `npm test` (CI adds v8 coverage), `npm run test:tz`, `node scripts/check-architecture.mjs` | blocking |
 | G4 | Ledger | `npm run ledger`, `npm run trace-check`, `node scripts/overhaul/check-visual-ledger.mjs` | blocking (overhaul tooling, removed at M17) |
 | G5 | Package | `npm run build && npm run check:package` | blocking, on Node 22.12.0 and `.nvmrc` |
 | G6 | Size | `npm run build && npm run check:size` | blocking |
 | G7 | API | `npm run build && npm run check:api` | blocking |
-| G8 | Palettes | `npm run check:palettes` | advisory until M11 (the script decides) |
+| G8 | Palettes | `npm run check:palettes` | blocking |
 | G9 | Browser | `npm run test:browser` (Chromium, WebKit and Firefox smoke) | blocking |
-| G10 | Visual | `npx playwright test --project visual` in the pinned Playwright image | advisory until M14 |
-| G11 | Docs | `npm run build:site`, `npm run check:examples` | from M6a |
+| G10 | Visual | `npm run test:visual -- --against <ref>`, then `node scripts/overhaul/check-visual-diffs.mjs` | advisory in CI; review every changed shot and add a `docs/decisions/visual-ledger/` row in the commit that changes it |
+| G11 | Docs | `npm run build:site`, `npm run check:examples`, `npm run check:migration` | blocking |
 | G12 | Perf | `npm run bench:ab -- --base <ref>` | advisory in CI |
 
 What the package, size and API gates check:
@@ -97,7 +97,13 @@ PR descriptions: bullet points, short. The diff explains the what; the descripti
 
 New library code should come with a unit test when the logic is non-trivial. Co-locate tests next to sources: `foo.ts` + `foo.test.ts`.
 
-Tests run in Node by default. DOM-dependent modules (gesture handlers, tooltips) need `environment: 'jsdom'` set per file, we'll add that shared setup once there's a reason to.
+Tests run in Node by default. A test that needs a DOM sets `// @vitest-environment jsdom` at the
+top of the file; `test/fakes` installs a recording canvas, frames, layout and media for chart-level
+tests. Browser behaviour (gestures, focus, pixels) is tested with Playwright under `test/browser/`,
+and the framework adapters under `test/conformance/`.
+
+A known defect is a test marked `it.fails('[finding-id] …')` (or `test.fail(true, '[id]')`), which
+`npm run ledger` lists; the fix flips it.
 
 ## Releases
 
