@@ -10,6 +10,16 @@ import { affineParams } from '../../scales/affine';
 import type { ScatterRenderSegment, ScatterSeriesCache } from './draw';
 import { rgbOf } from './encoding';
 
+/**
+ * Where a density map's points come from when X is the store's own sorted column: a key that
+ * changes with the data (length and end values: a full ring store keeps its arrays and length),
+ * and the points of any X range, so the cached margin beyond the viewport holds its points too.
+ */
+export interface DensitySource {
+  key: string;
+  segments: (xMin: number, xMax: number) => ScatterRenderSegment[];
+}
+
 export function isOffscreenCanvas(
   canvas: OffscreenCanvas | HTMLCanvasElement,
 ): canvas is OffscreenCanvas {
@@ -68,6 +78,7 @@ export function drawHeatmapSegments(
   cache: ScatterSeriesCache,
   binSizeCss?: number,
   gradient?: string[],
+  source?: DensitySource,
 ): void {
   const { plot, dpr } = layout;
   const binPx = Math.max(1, Math.round((binSizeCss ?? 1) * dpr));
@@ -99,8 +110,9 @@ export function drawHeatmapSegments(
   if (ax && ay) {
     drawLatticeHeatmap(ctx, segments, scaleX, scaleY, layout, cache, binPx, bs, gradient, {
       gradientKey,
-      segmentKey,
-      dataLen,
+      // Without a sorted-X source the segments are every point, and their ends key the data.
+      dataKey: source?.key ?? `${segmentKey}#${dataLen}`,
+      source,
     });
     return;
   }
@@ -216,7 +228,8 @@ export function drawHeatmapSegments(
 
 /**
  * The density map on linear scales. Points are binned on a lattice fixed in data space that
- * covers the viewport and half a span beyond each edge; the visible window of that bitmap is
+ * covers the viewport and (unless one axis is auto-ranging to a pan) half a span beyond each
+ * edge; the visible window of that bitmap is
  * drawn into the plot. A pan at the same zoom inside the cached area draws a shifted window and
  * rebins nothing (perf:density-cache); a zoom, a resize or new data rebins. Colours are scaled
  * to the busiest bin of the whole cached area, so they hold still during a pan.
@@ -231,7 +244,7 @@ function drawLatticeHeatmap(
   binPx: number,
   binSize: number,
   gradient: string[] | undefined,
-  keys: { gradientKey: string; segmentKey: string; dataLen: number },
+  keys: { gradientKey: string; dataKey: string; source?: DensitySource },
 ): void {
   const { plot, dpr } = layout;
   const spanX = scaleX.max - scaleX.min;
@@ -248,7 +261,7 @@ function drawLatticeHeatmap(
     lattice &&
     cached.xData === firstSegment.xData &&
     cached.yData === firstSegment.yData &&
-    cached.dataLen === keys.dataLen &&
+    cached.segmentKey === keys.dataKey &&
     cached.dpr === dpr &&
     cached.binSize === binSize &&
     cached.gradientKey === keys.gradientKey &&
@@ -262,19 +275,32 @@ function drawLatticeHeatmap(
   let entry = cached;
   if (!reusable) {
     cache.rebins++;
-    const left = Math.floor((scaleX.min - spanX / 2) / perBinX) * perBinX;
-    const top = Math.ceil((scaleY.max + spanY / 2) / perBinY) * perBinY;
-    const w = Math.ceil((2 * spanX) / perBinX) + 2;
-    const h = Math.ceil((2 * spanY) / perBinY) + 2;
+    // When only one axis changed its bin size since the last bitmap, that axis is auto-ranging to
+    // a pan along the other (a time-series heatmap panned in X): the next frame rebins anyway, so
+    // the margin would only cost a bigger grid. A first paint, a zoom or a pure pan keeps it.
+    const movedX = lattice !== undefined && !same(lattice.perBinX, perBinX);
+    const movedY = lattice !== undefined && !same(lattice.perBinY, perBinY);
+    const margin = movedX !== movedY ? 0 : 0.5;
+    const left = Math.floor((scaleX.min - spanX * margin) / perBinX) * perBinX;
+    const top = Math.ceil((scaleY.max + spanY * margin) / perBinY) * perBinY;
+    const w = Math.ceil((spanX * (1 + 2 * margin)) / perBinX) + 2;
+    const h = Math.ceil((spanY * (1 + 2 * margin)) / perBinY) + 2;
     const bins = new Uint32Array(w * h);
     let maxCount = 0;
-    for (const segment of segments) {
+    // One multiply-add per axis per point (a division per point costs a frame on 300k points).
+    const kx = 1 / perBinX;
+    const bx = -left * kx;
+    const ky = -1 / perBinY;
+    const by = top / perBinY;
+    // The margin's points too, when the viewport's segments hold only the points in view.
+    const binned = keys.source ? keys.source.segments(left, left + w * perBinX) : segments;
+    for (const segment of binned) {
       const { xData, yData, startIdx, endIdx } = segment;
       for (let i = startIdx; i <= endIdx; i++) {
         const yVal = yData[i];
         if (!Number.isFinite(yVal)) continue;
-        const px = Math.floor((xData[i] - left) / perBinX);
-        const py = Math.floor((top - yVal) / perBinY);
+        const px = Math.floor(xData[i] * kx + bx);
+        const py = Math.floor(yVal * ky + by);
         // The bounds checks also reject NaN from non-finite X values.
         if (px >= 0 && px < w && py >= 0 && py < h) {
           const idx = py * w + px;
@@ -314,11 +340,11 @@ function drawLatticeHeatmap(
       canvas,
       xData: firstSegment.xData,
       yData: firstSegment.yData,
-      segmentKey: keys.segmentKey,
+      segmentKey: keys.dataKey,
       w,
       h,
       dpr,
-      dataLen: keys.dataLen,
+      dataLen: 0,
       xMin: scaleX.min,
       xMax: scaleX.max,
       yMin: scaleY.min,

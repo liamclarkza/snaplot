@@ -145,6 +145,58 @@ describe('renderScatterSegments cache keys', () => {
     expect(ctx.drawImage).toHaveBeenCalledTimes(3);
   });
 
+  it('bins a sorted X beyond the viewport, so a pan inside the margin shows its points', () => {
+    const ctx = createContext();
+    const xData = Float64Array.from({ length: 100 }, (_, i) => i);
+    const yData = Float64Array.from({ length: 100 }, (_, i) => i % 4);
+    const yScale = createScale(0, 4, 20, 0);
+    const series: SeriesSpec = { label: 'heat', yColumn: 1, type: 'scatter', heatmap: true };
+    const cache = new ScatterSeriesCache();
+    // The points of an X range: what the viewport segments of a sorted store would hold.
+    const asked: [number, number][] = [];
+    const source = {
+      key: 'v1',
+      segments: (lo: number, hi: number) => {
+        asked.push([lo, hi]);
+        return [
+          {
+            xData,
+            yData,
+            startIdx: Math.max(0, Math.ceil(lo)),
+            endIdx: Math.min(99, Math.floor(hi)),
+          },
+        ];
+      },
+    };
+    const draw = (min: number, max: number) =>
+      renderScatterSegments(
+        ctx,
+        // Only the points in view, as the series pass hands them over.
+        [{ xData, yData, startIdx: min, endIdx: max }],
+        createScale(min, max, 0, 20),
+        yScale,
+        createLayout(),
+        series,
+        '#4e79a7',
+        1,
+        { categorical: [] },
+        cache,
+        undefined,
+        1,
+        false,
+        source,
+      );
+    draw(20, 40);
+    // The bitmap holds half a span of points either side of the 20–40 view.
+    expect(asked).toHaveLength(1);
+    expect(asked[0][0]).toBeLessThanOrEqual(10);
+    expect(asked[0][1]).toBeGreaterThanOrEqual(50);
+    draw(25, 45);
+    // A pan inside the margin draws a window of the same bitmap.
+    expect(asked).toHaveLength(1);
+    expect(createImageDataCalls).toBe(1);
+  });
+
   it('keeps separate caches warm when two heatmap series interleave', () => {
     // Regression test for the module-level single-slot cache: two charts
     // (or two density series) alternating repaints used to evict each

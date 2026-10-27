@@ -8,8 +8,9 @@ import type { Scale, Layout, SeriesSpec } from '../../spec';
 import { context2d } from '../../render/surface';
 import { affineParams } from '../../scales/affine';
 import { NO_COLUMNS, seriesYColumn } from '../columns';
-import type { MarkDraw } from '../index';
+import type { MarkDraw, SeriesPass } from '../index';
 import {
+  type DensitySource,
   drawHeatmapSegments,
   type HeatmapCacheEntry,
   heatmapGradient,
@@ -149,6 +150,8 @@ export function renderScatterSegments(
   sampleStride: number = 1,
   /** Use Safari-friendly batched vector marks during an active viewport gesture. */
   interactionFastPath: boolean = false,
+  /** The points of any X range, when X is the store's sorted column (density maps bin beyond view). */
+  widen?: DensitySource,
 ): void {
   const count = segmentPointCount(segments);
   if (count <= 0) return;
@@ -171,6 +174,7 @@ export function renderScatterSegments(
       cache ?? new ScatterSeriesCache(),
       series.heatmapBinSize,
       series.heatmapGradient,
+      widen,
     );
   } else {
     drawStampedSegments(
@@ -502,6 +506,20 @@ export const scatterDraw: MarkDraw = {
       scatterResolvers(engine, si, series, pass.color).renderResolver,
       pass.stride,
       pass.interacting,
+      (series.xColumn ?? 0) === 0 ? densitySource(pass) : undefined,
     );
   },
 };
+
+/** A sorted-X store's points over any X range, for a density map's cached margin. */
+function densitySource(pass: SeriesPass): DensitySource {
+  const { store, xData, yData } = pass;
+  const n = store.length;
+  return {
+    key: n === 0 ? '0' : `${n}:${store.xAt(0)}:${store.xAt(n - 1)}`,
+    segments: (xMin, xMax) =>
+      store
+        .getSegments(...store.getViewportIndices(xMin, xMax))
+        .map((s) => ({ xData, yData, startIdx: s.physicalStart, endIdx: s.physicalEnd })),
+  };
+}
