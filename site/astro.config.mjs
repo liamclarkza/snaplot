@@ -144,6 +144,8 @@ export default defineConfig({
             // The entry points name their modules with `@module` (snaplot, snaplot/react and
             // snaplot/solid); a module named `index` would collide with the landing page.
             name: 'API reference',
+            // "Extended by" names the module of a React or Solid declaration.
+            plugin: [fileURLToPath(new URL('./scripts/typedoc-qualify.mjs', import.meta.url))],
           },
         }),
       ],
