@@ -27,9 +27,9 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
 - Options are copied when they are passed: mutating an array or object you passed changes nothing
   until you pass it again.
 - New options: `interaction: 'readonly' | { zoom: 'x' | 'xy' | 'none', drag: 'zoom' | 'select' |
-  'pan', bounds: 'data' | 'none' }` (all-scatter charts zoom `'xy'` by default), `cursor: false`,
-  `tooltip: false` or `{ mode, render }`, `theme: 'light' | 'dark'` or the ten `ThemeTokens`,
-  the state options `viewport` (`{ x: [from, to] }`), `selection`, `hiddenSeries` and
+  'pan', bounds: 'data' | 'none' }` (all-scatter charts zoom `'xy'` by default), `cursor: false` or
+  `{ snap, indicators, xLine, yLine }`, `tooltip: false` or `{ mode, distance, offset, render }`,
+  `theme: 'light' | 'dark'` or the ten `ThemeTokens`, the state options `viewport` (`{ x: [from, to] }`), `selection`, `hiddenSeries` and
   `highlight`, and the callbacks `onViewportChange`, `onSelectionChange`, `onHiddenSeriesChange`,
   `onHighlightChange`, `onFollowingChange` and `onCursorChange`. `update()` applies the state
   options it names without re-reading data.

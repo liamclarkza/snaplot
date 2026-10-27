@@ -87,7 +87,8 @@ export const AXIS = keys(
 );
 export const STREAMING = keys('maxPoints', 'followWindow');
 export const INTERACTION = keys('zoom', 'drag', 'bounds');
-export const TOOLTIP = keys('mode', 'distance', 'render');
+export const TOOLTIP = keys('mode', 'distance', 'offset', 'render');
+export const CURSOR = keys('snap', 'indicators', 'xLine', 'yLine');
 export const THEME_TOKENS = keys(
   'mode',
   'surface',
@@ -152,9 +153,13 @@ export const HINTS: Record<string, string> = {
   'referenceRegions.*.edges': 'Removed in 1.0.',
   'referenceRegions.*.edgeColor': 'Removed in 1.0.',
   'referenceRegions.*.edgeDash': 'Removed in 1.0.',
+  // Cursor.
+  'cursor.show': 'Use cursor: false.',
+  'cursor.color': "Removed in 1.0: the crosshair takes the theme's accent.",
+  'cursor.dash': 'Removed in 1.0.',
+  'cursor.syncTooltip': 'Removed in 1.0: a group shares the cursor; each chart keeps its tooltip.',
   // Tooltip.
   'tooltip.show': 'Use tooltip: false.',
-  'tooltip.offset': 'Removed in 1.0: the tooltip places itself.',
   'tooltip.xFormat': 'Use axes.x.format.',
   'tooltip.yFormat': 'Use the series format or axes.y.format.',
   'tooltip.rangeFormat': 'Use axes.x.format.',
@@ -187,8 +192,6 @@ export const HINTS: Record<string, string> = {
 
 /** The removed 0.12 values of object-or-value options, with what to use instead. */
 export const REMOVED_VALUES: Record<string, string> = {
-  cursor:
-    "cursor takes true or false; its 0.12 options were removed (the Y line is automatic with interaction: { zoom: 'xy' }).",
   highlight:
     'highlight takes a series id or null; its 0.12 options were removed (legend hover dims the other series).',
   selection:

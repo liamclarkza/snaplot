@@ -37,6 +37,7 @@ import {
   STREAMING,
   THEME_TOKENS,
   TOOLTIP,
+  CURSOR,
   TOOLTIP_FIELD,
   TOP,
 } from './option-keys';
@@ -279,8 +280,19 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
   // Cursor and highlight: a boolean and a series id.
   if (raw.cursor !== undefined) {
     if (typeof raw.cursor === 'boolean') engine.cursor = { show: raw.cursor };
-    else if (isPlain(raw.cursor)) removedValue('cursor');
-    else fail(`cursor must be true or false, not ${describe(raw.cursor)}.`);
+    else if (isPlain(raw.cursor)) {
+      const c = raw.cursor;
+      checkKeys(c, CURSOR, 'cursor');
+      const cursor: NonNullable<typeof engine.cursor> = { show: true };
+      for (const key of ['snap', 'indicators', 'xLine', 'yLine'] as const) {
+        if (c[key] === undefined) continue;
+        if (typeof c[key] !== 'boolean') {
+          fail(`cursor.${key} must be true or false, not ${describe(c[key])}.`);
+        }
+        cursor[key] = c[key];
+      }
+      engine.cursor = cursor;
+    } else fail(`cursor must be true, false or cursor options, not ${describe(raw.cursor)}.`);
   }
   const state: NormalizedState = {};
   if (raw.highlight !== undefined) {
@@ -309,6 +321,14 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
           );
         }
         engine.tooltip.distance = distance;
+      }
+      if (t.offset !== undefined) {
+        if (typeof t.offset !== 'number' || !Number.isFinite(t.offset) || t.offset < 0) {
+          fail(
+            `tooltip.offset must be a number of CSS pixels of at least 0, not ${describe(t.offset)}.`,
+          );
+        }
+        engine.tooltip.offset = t.offset;
       }
       if (t.render !== undefined) {
         if (typeof t.render !== 'function') fail('tooltip.render must be a function.');

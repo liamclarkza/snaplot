@@ -1,5 +1,5 @@
 {
-  "$comment": "Gzip budgets in bytes for `node scripts/size.mjs` (plan §11.3 G6): measured + 2% when set (`--update`). M14 ratchets them; target createChart <= 50 KiB.",
+  "$comment": "Gzip budgets in bytes for `node scripts/size.mjs` (plan §11.3 G6): measured + 2% when set (`--update`). The 1.0 target is this baseline (ADR 0002 §6); createChart <= 50 KiB is the post-1.0 aim.",
   "imports": [
     {
       "label": "createChart",

@@ -35,10 +35,29 @@ scatter, so keep a finite reach on series of millions of points.
 
 Values are written at the precision of the data, through the series `format`, else the axis
 `format`. On a bar chart, lines and points on the same chart join the bar's tooltip. The tooltip
-shows above open dialogs and fullscreen elements, flips to stay in the viewport, and on touch it
-sits above the finger and stays after a tap until you tap elsewhere or scroll.
+sits `tooltip.offset` CSS pixels (12 by default) right of and below the pointer, shows above open
+dialogs and fullscreen elements, flips to stay in the viewport, and on touch it sits above the
+finger and stays after a tap until you tap elsewhere or scroll.
 
 `tooltip: false` hides it; the crosshair stays unless `cursor: false`.
+
+### The crosshair
+
+`cursor` takes options for the crosshair and the dots it puts on each series under the pointer:
+
+```ts
+chart.update({
+  cursor: {
+    snap: false, // follow the pointer exactly instead of the nearest sample
+    indicators: false, // no dots on the series
+    xLine: true, // the vertical line (off by default on bar-only charts)
+    yLine: true, // a horizontal line at the pointer's height
+  },
+});
+```
+
+`cursor: true` is the default; `cursor: false` hides the crosshair and its dots, and the tooltip
+still follows the pointer.
 
 ## Custom tooltip content
 

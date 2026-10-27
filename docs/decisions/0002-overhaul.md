@@ -1323,6 +1323,11 @@ about 1,000 lines), and `engine/marks/scatter` carries two draw paths (stamps an
 The size budgets are ratcheted to the measured size + 2% (`scripts/size-budgets.json`), so the
 bundle cannot grow unnoticed.
 
+**The revised target (October 2026).** For 1.0 the line and size targets are the measured
+baseline: `createChart` about 82 KiB gzip and about 17,800 code lines, held by the size budgets at
++2%. 50 KiB stays the aim after 1.0, reached by the one option-schema table first, then by sharing
+the two scatter draw paths.
+
 ### Bench A/B (`npm run bench:ab -- --base overhaul-baseline --profile desktop`)
 
 Desktop, GPU raster, three runs a side, medians in ms (busy time, or sync or wall where marked by

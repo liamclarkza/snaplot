@@ -591,11 +591,31 @@ export interface TooltipOptions<Row> {
    */
   distance?: number;
   /**
+   * The gap between the pointer and the tooltip, in CSS pixels; on touch the tooltip keeps at
+   * least the finger's clearance above it. @defaultValue `12`
+   */
+  offset?: number;
+  /**
    * Render the tooltip yourself. A string is inserted as HTML, so escape untrusted text or return a
    * `Node` built with `textContent`.
    * @defaultValue the built-in tooltip
    */
   render?(points: readonly ChartPoint<Row>[]): string | Node;
+}
+
+/** The crosshair and the dots it puts on the series under the pointer (`cursor`). */
+export interface CrosshairOptions {
+  /**
+   * Snap the crosshair to the nearest data X, so it and its dots sit on real samples; `false`
+   * follows the pointer exactly. @defaultValue `true`
+   */
+  snap?: boolean;
+  /** A dot on each series' point under the cursor. @defaultValue `true` */
+  indicators?: boolean;
+  /** The vertical line. @defaultValue `true`, except on charts of bars or histograms only */
+  xLine?: boolean;
+  /** The horizontal line, at the pointer's height. @defaultValue `false` */
+  yLine?: boolean;
 }
 
 /** The built-in legend. */
@@ -731,8 +751,11 @@ export interface ChartOptions<Row = Record<string, any>> {
    * @defaultValue `{ zoom: 'x', drag: 'zoom', bounds: 'data' }`
    */
   interaction?: 'readonly' | InteractionOptions;
-  /** Show the crosshair and point indicators. @defaultValue `true` */
-  cursor?: boolean;
+  /**
+   * The crosshair and point indicators: `false` hides them, `true` or options show them.
+   * @defaultValue `true`
+   */
+  cursor?: boolean | CrosshairOptions;
   /**
    * The highlighted series id; the others dim. `null` highlights none. An id the chart does not
    * have throws.

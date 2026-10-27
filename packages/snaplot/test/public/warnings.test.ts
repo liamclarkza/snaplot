@@ -151,7 +151,7 @@ describe('[arch-15] removed options name their replacement', () => {
       referenceRegions: [{ axis: 'x', from: 1, to: 2, fill: '#eee' }],
       theme: { backgroundColor: '#fff' },
       tooltip: { xFormat: String },
-      cursor: { yLine: true },
+      cursor: { color: '#d55e00' },
       highlight: { dimOpacity: 0.5 },
     });
     const text = warnings().join('\n');
@@ -162,7 +162,7 @@ describe('[arch-15] removed options name their replacement', () => {
     expect(text).toMatch(/fill.*color/);
     expect(text).toMatch(/backgroundColor.*surface/);
     expect(text).toMatch(/xFormat.*format/);
-    expect(text).toMatch(/cursor/);
+    expect(text).toMatch(/cursor\.color.*accent/);
     expect(text).toMatch(/highlight/);
   });
 

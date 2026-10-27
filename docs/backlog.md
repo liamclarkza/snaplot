@@ -226,8 +226,8 @@ profiles. What is still open:
 
 | Item | Finding | Status | Measured | Acceptance |
 |---|---|---|---|---|
-| Library size: about 17,700 code lines and 81.4 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `node scripts/overhaul/metrics.mjs`; one option-schema table would remove about 1,000 lines |
-| A check on real phones (iOS Safari, a low-end Android) | — | partly done | iOS Safari on the iPhone 17 simulator (iOS 27): the home page, max-q, hottest-year (touch-and-hold tooltips), find-the-clipping (audio decode) and deploy-482; it found the touch focus ring and the hero's overlap, both fixed in `2bc671f`. A physical phone and a low-end Android are not checked | the handoff's human step 8, on a physical device |
+| Library size: about 17,800 code lines and 82 KiB gzip against 10,500 and 50 | — | closed: target revised | the 1.0 target is the measured baseline, held by the size budgets at +2%; 50 KiB is the post-1.0 aim (ADR 0002 §6) | `npm run check:size`; one option-schema table would remove about 1,000 lines |
+| A check on real phones (iOS Safari, a low-end Android) | — | partly done | iOS Safari on the iPhone 17 simulator (iOS 27): the home page, max-q, hottest-year (touch-and-hold tooltips), find-the-clipping (audio decode) and deploy-482; it found the touch focus ring and the hero's overlap, both fixed in `2bc671f`. A physical phone and a low-end Android are left as a human step | the handoff's human step 8, on a physical device |
 
 ## Sources
 

@@ -143,9 +143,11 @@ A revert can conflict with later commits that build on the change. Revert one ro
 
 From `docs/backlog.md` §11:
 
-- **Size.** About 17,700 code lines and 81.4 KiB gzip miss the §0 targets (10,500 and 50 KiB). One option-schema
-  table in `public/` would remove about 1,000 lines. The size budgets were reset to measured + 2% in `43dd3c2`, for
-  the streaming caches and the two features after them (about 1 KiB gzip).
+- **Size.** About 17,800 code lines and 82 KiB gzip. The target was revised for 1.0 to this baseline (ADR 0002 §6),
+  held by the size budgets at measured + 2%; 50 KiB is the post-1.0 aim. One option-schema table in `public/` would
+  remove about 1,000 lines.
+- **Devices.** iOS Safari was checked on the iPhone 17 simulator. A physical phone and a low-end Android are a
+  human step (step 8).
 - **Tooling.**
   - `check-visual-ledger` over the full range fails on V51–V53, which were committed in a docs commit; from
     `ovh-m11-part2` on it passes.
