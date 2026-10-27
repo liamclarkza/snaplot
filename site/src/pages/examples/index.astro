@@ -1,7 +1,7 @@
 ---
 /**
  * The examples hub (plan §10.3): an index, not a landing page. One sentence, then one row per
- * example: its question, who decides what with it, a thumbnail Playwright took of the real page
+ * example (two a line on wide screens): its question, who decides what with it, a thumbnail Playwright took of the real page
  * (`npm run thumbs`), the dataset with its licence and size, the framework, and Open and Source
  * links. No hero, statistics or call to action.
  */
@@ -113,6 +113,28 @@ const examples = DEMOS.map((demo) => ({
     color: var(--snaplot-ink-secondary);
     border: 1px solid var(--snaplot-rule);
     border-radius: 3px;
+  }
+
+  /* Wide screens: two examples a line, each thumbnail the width of its column above its text, so
+     the page fills its measure instead of leaving a third of it empty. */
+  @media (min-width: 72rem) {
+    ul.examples {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 2rem;
+    }
+
+    ul.examples > li {
+      grid-template-columns: minmax(0, 1fr);
+      /* Both cards of a line are as tall as the taller: keep the text under its picture. */
+      align-content: start;
+      row-gap: 1rem;
+      padding-block: 1.5rem;
+    }
+
+    .thumb {
+      width: 100%;
+    }
   }
 
   @media (max-width: 44rem) {

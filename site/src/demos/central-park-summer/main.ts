@@ -84,12 +84,25 @@ export async function mount(root: HTMLElement): Promise<ChartHandle<SummerRow>> 
   const summer = rows(data);
   const answer = summarize(data);
 
+  // The bands run to the plot's edges, half a day past the first and last days, so the edge days'
+  // bars sit under the same veil as the rest: copies of those days at the edges, at ISO times.
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const first = summer[0];
+  const last = summer.at(-1);
+  const veil = [
+    ...(first ? [{ ...first, t: iso(dayEdge(first.date, -1)!) }] : []),
+    ...summer.map((day) => ({ ...day, t: `${day.date}T00:00:00.000Z` })),
+    ...(last ? [{ ...last, t: iso(dayEdge(last.date, 1)!) }] : []),
+  ];
+
   const chart = createChart(part(root, 'chart'), {
     data: summer,
     x: 'date',
     series: [
       {
         type: 'band',
+        data: veil,
+        x: 't',
         id: 'record',
         label: `Record range, ${data.recordYears.join('–')}`,
         y: 'normalMedian',
@@ -101,6 +114,8 @@ export async function mount(root: HTMLElement): Promise<ChartHandle<SummerRow>> 
       },
       {
         type: 'band',
+        data: veil,
+        x: 't',
         id: 'normal',
         label: `Normal range of highs, ${data.normalYears.join('–')}`,
         y: 'normalMedian',

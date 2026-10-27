@@ -309,6 +309,12 @@ import { Icon } from '@astrojs/starlight/components';
   button > kbd[hidden] {
     display: none;
   }
+  /* A shortcut hint means nothing without a keyboard: not on narrow screens or touch. */
+  @media (max-width: 49.99rem), (pointer: coarse) {
+    button > kbd {
+      display: none;
+    }
+  }
   dialog {
     margin: 0;
     padding: 0;
