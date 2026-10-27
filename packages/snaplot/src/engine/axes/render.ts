@@ -134,6 +134,7 @@ export function renderAxes(
       const half = theme.fontSize * 0.6;
       const fitLabels = (values: number[]) => {
         const texts = values.map(tickLabel);
+        const decades = scale.type === 'log' && Math.max(...values) >= 10 * Math.min(...values);
         return fitTicks(
           values.length,
           isHorizontal
@@ -149,9 +150,9 @@ export function renderAxes(
               },
           (i) => texts[i],
           // Vertical labels keep about two and a half lines between centres: closer, a short axis
-          // reads as a column of numbers. A log axis keeps every decade down to under two lines
-          // apart: one skipped reads as a decade.
-          isHorizontal ? LABEL_MIN_GAP : theme.fontSize * (scale.type === 'log' ? 0.6 : 1.4),
+          // reads as a column of numbers. Log ticks across decades keep down to under two lines
+          // apart: a skipped decade reads as one.
+          isHorizontal ? LABEL_MIN_GAP : theme.fontSize * (decades ? 0.6 : 1.4),
           alignedEnds(values),
         );
       };
