@@ -3,6 +3,14 @@ import { For, Show } from 'solid-js';
 import { type ClipReport, type Span, formatMs, headline, timecode } from './answer';
 import { runChannels } from './audio';
 
+/**
+ * A peak in dBFS to two decimals. A peak a hair under full scale rounds to zero, and toFixed
+ * would print it as "-0.00" (WebKit's decoder lands there where Chromium's reads exactly 1).
+ */
+function peakDb(peak: number): string {
+  return (Math.round(20 * Math.log10(peak) * 100) / 100 + 0).toFixed(2);
+}
+
 /** The clip-list panel: the answer, then every clipped run and long silence, each a jump target. */
 export function ClipList(props: {
   report: ClipReport;
@@ -44,7 +52,7 @@ export function ClipList(props: {
                     {run.length} samples, {formatMs((run.length * 1000) / rate())}
                   </td>
                   <td>{runChannels(props.marks, run, rate())}</td>
-                  <td>{(20 * Math.log10(props.peaks[i()] ?? 1)).toFixed(2)} dBFS</td>
+                  <td>{peakDb(props.peaks[i()] ?? 1)} dBFS</td>
                 </tr>
               )}
             </For>

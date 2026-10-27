@@ -125,10 +125,23 @@ kbd {
   color: var(--ink-dim);
 }
 
+.open {
+  position: relative;
+}
+
+/* Visually hidden but focusable. The clip matters: WebKit lays a file input's button and label
+   out past a 1 px box, which widened a phone's page by 33 px. */
 .open input {
   position: absolute;
+  inset: 0 auto auto 0;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
   opacity: 0;
 }
 
@@ -260,6 +273,12 @@ tr[data-run] td:first-child button {
 @media (max-width: 760px) {
   .analysis {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The tables keep their columns; on a narrow phone in a wide font they scroll in their panel
+     instead of widening the page. */
+  .cliplist {
+    overflow-x: auto;
   }
 
   .lane .plot {
