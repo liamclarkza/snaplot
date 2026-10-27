@@ -19,8 +19,11 @@
 // high-density screens (Playwright cannot write WebP). Each demo says how to take it in
 // site/src/demos/<slug>/thumbnail.json: `path` and `query` to open (`?paused` holds a stream
 // still), the `viewport` (1280 × 800) and `ready`, the selector that marks the first paint
-// (`html[data-demo-ready]` on all six). Without that file the script opens the page and waits for
-// `window.demo`, `[data-ready]` or a painted canvas. The check fails when two demos share:
+// (`html[data-demo-ready]` on all six). Optionally `scrollTo`, a selector scrolled to the top of
+// the viewport first, and `crop`, an 8:5 rectangle of the viewport ({ x, y, width, height } in CSS
+// px) to show instead of all of it: it is taken at the density that keeps the JPEGs 640 × 400 and
+// 1280 × 800, so a crop is a sharper close-up, not a smaller picture. Without that file the script
+// opens the page and waits for `window.demo`, `[data-ready]` or a painted canvas. The check fails when two demos share:
 // - a background colour (CIEDE2000 < 2) and the body font family;
 // - a background colour and the number of chart columns at 1280 px (distinct left edges of the
 //   chart canvases in the page's main region);
@@ -182,6 +185,17 @@ function hook(slug) {
   }
   if (found.query && !found.query.startsWith('?'))
     problems.push(`${slug}: query must start with ?`);
+  const crop = found.crop;
+  if (crop) {
+    const inside =
+      crop.x >= 0 &&
+      crop.y >= 0 &&
+      crop.x + crop.width <= VIEWPORT.width &&
+      crop.y + crop.height <= VIEWPORT.height;
+    if (!inside) problems.push(`${slug}: the crop leaves the 1280 × 800 viewport`);
+    if (Math.abs(crop.width / crop.height - 1.6) > 0.01)
+      problems.push(`${slug}: the crop is not 8:5 (${crop.width} × ${crop.height})`);
+  }
   return { ...found, problems };
 }
 
@@ -444,9 +458,11 @@ try {
     // One JPEG per density: 640 × 400 for 1x screens and an @2x of 1280 × 800 for the rest, each
     // at the highest quality under its budget.
     for (const { density, suffix, maxBytes } of DENSITIES) {
+      // A crop is taken at the density that fills the same 640 × 400 (or 1280 × 800) pixels.
+      const zoom = how.crop ? VIEWPORT.width / how.crop.width : 1;
       const context = await browser.newContext({
         viewport: how.viewport,
-        deviceScaleFactor: density,
+        deviceScaleFactor: density * zoom,
         colorScheme: 'light',
         reducedMotion: 'no-preference',
       });
@@ -456,11 +472,19 @@ try {
       const response = await page.goto(`${server.origin}${BASE}${how.path}${how.query}`);
       if (!response?.ok()) problems.push(`${slug}: HTTP ${response?.status()}`);
       await settle(page, how.ready);
+      if (how.scrollTo) {
+        await page.evaluate((selector) => {
+          document.querySelector(selector)?.scrollIntoView({ block: 'start' });
+        }, how.scrollTo);
+        // Charts scrolled into view paint on their next frames.
+        await page.waitForTimeout(600);
+      }
+      const clip = how.crop ?? undefined;
       let quality = 80;
-      let shot = await page.screenshot({ type: 'jpeg', quality });
+      let shot = await page.screenshot({ type: 'jpeg', quality, clip });
       while (shot.length > maxBytes && quality > 40) {
         quality -= 5;
-        shot = await page.screenshot({ type: 'jpeg', quality });
+        shot = await page.screenshot({ type: 'jpeg', quality, clip });
       }
       if (!suffix) {
         shots.set(slug, shot);

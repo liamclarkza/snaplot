@@ -68,6 +68,8 @@ export function TypicalDay(props: { hours: readonly Hour[]; year: number; chartR
               lower: 'useLow',
               upper: 'useHigh',
               color: COLORS.use,
+              // Lighter than the solar band, so where they overlap the solar band still reads.
+              opacity: 0.14,
             },
           ]}
           axes={{

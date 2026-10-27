@@ -24,11 +24,13 @@ import {
   errors,
   latency,
   latencySeries,
+  STREAMING,
   sloLine,
   traffic,
 } from './charts';
-import { EDGES, NAMES, createIncident } from './incident';
+import { type Columns, EDGES, NAMES, createIncident, stem } from './incident';
 import { parseSeed } from './simulator';
+import { Peaks, STEPS, steadyMax } from './steady';
 import { Verdict } from './Verdict.solid';
 
 const SPEEDS = [1, 10, 60];
@@ -62,6 +64,61 @@ export default function Dashboard() {
   const [paused, setPaused] = createSignal(params.has('paused'));
   const [latencyChart, setLatencyChart] = createSignal<ChartHandle>();
   const touch = matchMedia('(pointer: coarse)').matches;
+  const base = {
+    latency: latency(history.latency, group),
+    errors: errors(history.errors, group),
+    traffic: traffic(history.traffic, group),
+  };
+
+  // Steady value axes (steady.ts): each panel's peak per second, by endpoint, and the maximum
+  // each axis shows, which moves only in nice steps.
+  const peaks = {
+    latency: new Map(NAMES.map((name) => [name, new Peaks()])),
+    errors: new Map(NAMES.map((name) => [name, new Peaks()])),
+    traffic: new Peaks(),
+  };
+  const note = (rows: { latency: Columns; errors: Columns; traffic: Columns }) => {
+    const { time } = rows.latency.columns;
+    for (let i = 0; i < time.length; i++) {
+      let requests = 0;
+      for (const name of NAMES) {
+        const s = stem(name);
+        peaks.latency.get(name)?.push(time[i], rows.latency.columns[`${s}_p99`][i]);
+        peaks.errors.get(name)?.push(time[i], rows.errors.columns[s][i]);
+        requests = Math.max(requests, rows.traffic.columns[s][i]);
+      }
+      peaks.traffic.push(time[i], requests);
+    }
+  };
+  note(history);
+  const [maxima, setMaxima] = createSignal<{ latency?: number; errors?: number; traffic?: number }>(
+    {},
+  );
+  const steady = () => {
+    const since = incident.now - STREAMING.followWindow;
+    const current = maxima();
+    const name = endpoint();
+    const next = {
+      latency: steadyMax(current.latency, peaks.latency.get(name)!.maxSince(since), STEPS.latency),
+      errors: steadyMax(current.errors, peaks.errors.get(name)!.maxSince(since), STEPS.errors),
+      traffic: steadyMax(current.traffic, peaks.traffic.maxSince(since), STEPS.traffic),
+    };
+    // Most seconds leave every axis where it was: no new options then.
+    if (
+      next.latency !== current.latency ||
+      next.errors !== current.errors ||
+      next.traffic !== current.traffic
+    )
+      setMaxima(next);
+  };
+  steady();
+  /** A panel's value axis: its steady maximum while following, its own range once you look back. */
+  const valueAxis = (panel: 'latency' | 'errors' | 'traffic') => {
+    const { axes } = base[panel];
+    const y = axes?.y ?? {};
+    const max = following() ? maxima()[panel] : undefined;
+    return { ...axes, y: { ...y, ...(panel === 'latency' ? { min: 10 } : {}), max } };
+  };
 
   /** A deploy's summary; frozen summaries keep their identity, so memos settle. */
   const summary = (id: string) => {
@@ -97,21 +154,31 @@ export default function Dashboard() {
     ];
   });
 
-  // The replay: one simulated second per 100 ms at 10×, appended to the three panels.
+  // The replay, on the display's frames: `speed` simulated seconds pass per real second, and
+  // each frame appends the whole seconds that are due (one every sixth frame at 10×, one a frame
+  // at 60×), so the panels move on an even beat instead of a timer's uneven one.
   let carry = 0;
-  const timer = setInterval(() => {
+  let last = performance.now();
+  let frame = 0;
+  const tick = (now: number) => {
+    const dt = Math.min(250, now - last);
+    last = now;
+    frame = requestAnimationFrame(tick);
     if (paused() || !charts.latency || !charts.errors || !charts.traffic) return;
-    carry += speed() / 10;
+    carry += (speed() * dt) / 1000;
     const seconds = Math.floor(carry);
     if (seconds === 0) return;
     carry -= seconds;
     const rows = incident.advance(seconds);
+    note(rows);
+    steady();
     charts.latency.appendData(rows.latency);
     charts.errors.appendData(rows.errors);
     charts.traffic.appendData(rows.traffic);
     setNow(incident.now);
-  }, 100);
-  onCleanup(() => clearInterval(timer));
+  };
+  frame = requestAnimationFrame(tick);
+  onCleanup(() => cancelAnimationFrame(frame));
   onMount(() =>
     requestAnimationFrame(() => {
       document.documentElement.dataset.demoReady = 'true';
@@ -135,7 +202,15 @@ export default function Dashboard() {
         <span class="paged">Paged 03:12 UTC</span>
         <label class="field">
           Endpoint
-          <select value={endpoint()} onChange={(e) => setEndpoint(e.currentTarget.value)}>
+          <select
+            value={endpoint()}
+            onChange={(e) => {
+              setEndpoint(e.currentTarget.value);
+              // Another endpoint's axes start from its own peaks.
+              setMaxima({});
+              steady();
+            }}
+          >
             <For each={NAMES}>{(name) => <option value={name}>{name}</option>}</For>
           </select>
         </label>
@@ -196,7 +271,8 @@ export default function Dashboard() {
           <h2 id="latency-title">Latency, {endpoint()}</h2>
           <div class="plot">
             <Chart
-              {...latency(history.latency, group)}
+              {...base.latency}
+              axes={valueAxis('latency')}
               series={latencySeries(endpoint())}
               referenceLines={deployLines(deploys())}
               ariaLabel={`p50, p95 and p99 latency of ${endpoint()} per second`}
@@ -213,7 +289,8 @@ export default function Dashboard() {
           <h2 id="errors-title">Errors, {endpoint()}</h2>
           <div class="plot">
             <Chart
-              {...errors(history.errors, group)}
+              {...base.errors}
+              axes={valueAxis('errors')}
               series={errorSeries(endpoint())}
               referenceLines={[...deployLines(deploys(), false), sloLine]}
               ariaLabel={`Share of ${endpoint()} requests that failed, per second, against the 1% SLO`}
@@ -226,7 +303,8 @@ export default function Dashboard() {
           <h2 id="traffic-title">Requests per second</h2>
           <div class="plot">
             <Chart
-              {...traffic(history.traffic, group)}
+              {...base.traffic}
+              axes={valueAxis('traffic')}
               referenceLines={deployLines(deploys(), false)}
               ariaLabel="Requests per second by endpoint"
               data-chart="traffic"
@@ -236,6 +314,7 @@ export default function Dashboard() {
         </section>
         <section class="panel area-change" aria-labelledby="change-title">
           <h2 id="change-title">p99 change by endpoint, {selected()}</h2>
+          <p class="panel-note">The grey band is within ±20%: unchanged.</p>
           <div class="plot">
             <Chart
               {...change}

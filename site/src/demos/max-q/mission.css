@@ -311,10 +311,10 @@ h2 {
   position: absolute;
   top: 50%;
   left: calc(var(--at, 0) * 100%);
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--space);
-  border-radius: 5px;
+  /* A tick, not a dot: events seconds apart (MECO, separation, ignition) stay apart. */
+  width: 3px;
+  height: 14px;
+  border-radius: 1px;
   background: var(--ink-3);
   transform: translate(-50%, -50%);
 }

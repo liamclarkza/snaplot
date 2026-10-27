@@ -57,7 +57,7 @@ export function MetricCharts(props: Props) {
           data: raw[i],
           y: 'loss',
           color: RUN_COLORS[id],
-          opacity: 0.25,
+          opacity: 0.15,
           lineWidth: 1,
         },
         { id, label: `${id} smoothed`, data: smoothed[i], y: 'loss', color: RUN_COLORS[id] },

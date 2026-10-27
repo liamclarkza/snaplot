@@ -2,6 +2,15 @@
   "slug": "deploy-482",
   "path": "examples/deploy-482/",
   "ready": "html[data-demo-ready]",
-  "viewport": { "width": 1280, "height": 800 },
-  "query": "?paused"
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "query": "?paused",
+  "crop": {
+    "x": 0,
+    "y": 40,
+    "width": 1024,
+    "height": 640
+  }
 }

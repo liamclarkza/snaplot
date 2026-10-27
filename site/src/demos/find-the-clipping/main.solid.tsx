@@ -6,7 +6,7 @@
  */
 import { Chart, type ChartHandle, createChartGroup } from 'snaplot/solid';
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
-import { type ClipReport, type Span, rmsDb, scan, timecode } from './answer';
+import { type ClipReport, RULE, type Span, rmsDb, scan, timecode } from './answer';
 import { type Audio, clipMarks, decode, waveformColumns } from './audio';
 import { ClipList } from './ClipList.solid';
 import { type Track, lane, overview, spectrumChart, tc } from './charts';
@@ -236,7 +236,8 @@ export default function Editor() {
               <p class="hint">
                 {touch
                   ? 'Double-tap and drag across the overview to inspect a stretch; pinch a channel to zoom.'
-                  : 'Drag across the overview to inspect a stretch. In a channel, drag to zoom in, Shift-drag to move, double-click to see it all.'}
+                  : 'Drag across the overview to inspect a stretch. In a channel, drag to zoom in, Shift-drag to move, double-click to see it all.'}{' '}
+                {`In each channel the thin line is the loudness (RMS) on the dB axis, and the dashed line the silence threshold, ${String(RULE.silenceDbfs).replace('-', '−')} dB.`}
               </p>
             </section>
             <For each={l.audio.channels}>

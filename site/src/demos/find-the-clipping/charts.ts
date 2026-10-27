@@ -124,14 +124,10 @@ export function lane(track: Track, c: number, group: ChartGroup): ChartProps {
       y: { min: -1, max: 1, format: { maximumFractionDigits: 3 } },
       y2: { min: -90, max: 0, position: 'right', grid: false, format: db },
     },
-    // The silence rule reads RMS in dBFS, so its threshold sits on the dB axis.
+    // The silence rule reads RMS in dBFS, so its threshold sits on the dB axis. The help line
+    // names it: a label on the line would sit on the waveform and on the axis's own tick.
     referenceLines: [
-      {
-        axis: 'y2',
-        value: RULE.silenceDbfs,
-        label: `silence below ${String(RULE.silenceDbfs).replace('-', '−')} dB`,
-        color: COLORS.threshold,
-      },
+      { axis: 'y2', value: RULE.silenceDbfs, color: COLORS.threshold, dash: [4, 3] },
     ],
     referenceRegions: silenceRegions(track),
     legend: false,

@@ -85,6 +85,13 @@ body.r2 {
   padding-top: 12px;
   border-top: 1px solid var(--r2-rule);
 }
+/* On a wide screen the figures leave the text's measure, 120px out on either side, as an
+   article's charts do: the text stays at its reading width, the charts get room. */
+@media (min-width: 60rem) {
+  .r2-figure {
+    margin-inline: -120px;
+  }
+}
 .r2-figure h3 {
   margin: 0 0 4px;
   font-size: 1.1rem;

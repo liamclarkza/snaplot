@@ -2,6 +2,16 @@
   "slug": "battery-payback",
   "path": "examples/battery-payback/",
   "ready": "html[data-demo-ready]",
-  "viewport": { "width": 1280, "height": 800 },
-  "query": ""
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "query": "",
+  "scrollTo": ".r2-figure",
+  "crop": {
+    "x": 200,
+    "y": 0,
+    "width": 880,
+    "height": 550
+  }
 }

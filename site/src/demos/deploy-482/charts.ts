@@ -71,7 +71,8 @@ export const latency = (data: Columns, group: ChartGroup): ChartProps => ({
   ...live(data, group),
   series: latencySeries('/search'),
   axes: { x: time, y: { type: 'log', format: ms } },
-  legend: false,
+  // p50 and p95 are two greys: the legend names them.
+  legend: { position: 'top' },
 });
 
 /** The latency series of one endpoint; the ids stay p50, p95 and p99 for every endpoint. */
@@ -146,7 +147,8 @@ export const change: ChartProps = {
     },
   ],
   axes: { y: { format: signed } },
-  referenceRegions: [{ axis: 'y', from: -20, to: 20, label: 'unchanged ±20%', opacity: 0.1 }],
+  // The band's meaning is in the panel's note: a label inside it would sit on the small bars.
+  referenceRegions: [{ axis: 'y', from: -20, to: 20, opacity: 0.1 }],
   interaction: 'readonly',
   legend: false,
   theme: THEME,

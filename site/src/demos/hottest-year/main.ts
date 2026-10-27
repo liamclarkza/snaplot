@@ -253,8 +253,10 @@ export async function mount(root: HTMLElement): Promise<Demo> {
 
   // ─── The warmest ten ────────────────────────────────────────────────
   const top = ranked.slice(0, 10);
+  // A phone's ten slots are too narrow for four digits: '24, '23, … so every bar keeps its year.
+  const short = part(root, 'warmest').clientWidth < 520;
   const warmest = createChart<RankRow>(part(root, 'warmest'), {
-    data: top.map((y) => ({ ...y, label: String(y.year) })),
+    data: top.map((y) => ({ ...y, label: short ? `’${String(y.year).slice(2)}` : String(y.year) })),
     x: 'label',
     series: [
       {
@@ -262,7 +264,8 @@ export async function mount(root: HTMLElement): Promise<Demo> {
         type: 'bar',
         y: 'anomaly',
         label: 'Against 1991–2020',
-        color: (value) => stripe(value),
+        // The record year in the darkest stripe red, the other nine in one muted red.
+        color: (_, row) => (row?.year === summary.warmest.year ? '#a50f15' : '#e8a598'),
         format: { maximumFractionDigits: 2, signDisplay: 'exceptZero', suffix: ' °C' },
       },
     ],

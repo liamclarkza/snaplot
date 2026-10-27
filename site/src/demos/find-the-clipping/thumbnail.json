@@ -2,6 +2,15 @@
   "slug": "find-the-clipping",
   "path": "examples/find-the-clipping/",
   "ready": "html[data-demo-ready]",
-  "viewport": { "width": 1280, "height": 800 },
-  "query": ""
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "query": "",
+  "crop": {
+    "x": 0,
+    "y": 40,
+    "width": 1088,
+    "height": 680
+  }
 }

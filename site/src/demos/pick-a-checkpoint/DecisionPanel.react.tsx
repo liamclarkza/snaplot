@@ -151,7 +151,12 @@ export function DecisionPanel({ logs, by, onBy, pins, onPin, validation, coarse 
           </tbody>
         </table>
       )}
-      <PinForm logs={logs} onPin={onPin} pins={pins} />
+      <PinForm
+        logs={logs}
+        onPin={onPin}
+        pins={pins}
+        suggest={decide(logs.allVal, by === 'valLoss' ? 'valAcc' : 'valLoss').ship}
+      />
 
       <h3>At the cursor</h3>
       <p className={epoch === undefined ? 'r1-hint' : undefined}>
@@ -182,9 +187,15 @@ function correctAt(logs: Logs, epoch: number): string {
 }
 
 /** Pin a checkpoint by number: the keyboard's way to do what a click on a point does. */
-function PinForm({ logs, onPin, pins }: Pick<Props, 'logs' | 'onPin' | 'pins'>) {
-  const [run, setRun] = useState(logs.runs[0]?.id ?? 'A');
-  const [text, setText] = useState('1');
+/** Pin a checkpoint; it opens on the other criterion's pick, the one worth comparing. */
+function PinForm({
+  logs,
+  onPin,
+  pins,
+  suggest,
+}: Pick<Props, 'logs' | 'onPin' | 'pins'> & { suggest: { run: string; epoch: number } }) {
+  const [run, setRun] = useState(suggest.run);
+  const [text, setText] = useState(String(suggest.epoch));
   const epoch = Number(text);
   const valid = Number.isInteger(epoch) && epoch >= 1 && epoch <= logs.epochs;
   const pinned = pins.some((p) => p.run === run && p.epoch === epoch);

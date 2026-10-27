@@ -16,7 +16,7 @@ export default function hero(el: HTMLElement) {
     },
     streaming: { maxPoints: 900, followWindow: 4 * 60_000 },
     timeZone: 'UTC',
-    height: 280,
+    height: 340,
     ariaLabel: 'Latency of /search, p50 and p99, streaming',
   });
   searchLatency(chart, (rows) => chart.appendData(rows));

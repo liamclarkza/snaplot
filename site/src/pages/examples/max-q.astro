@@ -145,19 +145,24 @@ const tiles = [
       <div class="panels">
         <section class="panel" aria-labelledby="ascent-title">
           <h2 id="ascent-title">Altitude and speed</h2>
+          <p class="panel-note">Space starts at the Kármán line, 100 km up.</p>
           <div class="chart" data-part="ascent"></div>
         </section>
         <section class="panel" aria-labelledby="pressure-title">
           <h2 id="pressure-title">Dynamic pressure</h2>
-          <p class="panel-note">The aerodynamic load: ½ × air density × speed².</p>
+          <p class="panel-note">
+            The aerodynamic load, ½ × air density × speed²; the shaded span is the throttle bucket.
+          </p>
           <div class="chart" data-part="pressure"></div>
         </section>
         <section class="panel" aria-labelledby="accel-title">
           <h2 id="accel-title">Acceleration and throttle</h2>
+          <p class="panel-note">What the crew feels, in g; the dashed line is the throttle.</p>
           <div class="chart" data-part="accel"></div>
         </section>
         <section class="panel" aria-labelledby="trajectory-title">
           <h2 id="trajectory-title">Trajectory</h2>
+          <p class="panel-note">Height against distance over the ground, and the spent first stage.</p>
           <div class="chart" data-part="trajectory"></div>
         </section>
       </div>

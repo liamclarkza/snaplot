@@ -168,7 +168,13 @@ export function mount(root: HTMLElement): Demo {
       axes: {
         ...timeOptions.axes,
         y: { min: 0, max: 250, format: { suffix: ' km' } },
-        speed: { min: 0, max: 30_000, position: 'right', format: { notation: 'compact' } },
+        speed: {
+          min: 0,
+          max: 30_000,
+          position: 'right',
+          title: 'km/h',
+          format: { notation: 'compact' },
+        },
       },
       referenceLines: [{ axis: 'y', value: 100, label: 'Kármán line', color: COLOR.karman }],
       plugins: [liveHead('head', COLOR.altitude, () => head && { x: head.t, y: head.altitude })],
@@ -260,7 +266,7 @@ export function mount(root: HTMLElement): Demo {
       x: 'downrange',
       series: trajectorySeries(),
       axes: {
-        x: { min: 0, max: 1_400, format: { suffix: ' km' } },
+        x: { min: 0, max: 1_400, ticks: [0, 300, 600, 900, 1_200], format: { suffix: ' km' } },
         y: { min: 0, max: 250, format: { suffix: ' km' } },
       },
       referenceLines: [{ axis: 'y', value: 100, label: 'Kármán line', color: COLOR.karman }],
@@ -367,7 +373,6 @@ export function mount(root: HTMLElement): Demo {
                 axis: 'x',
                 from: summary.bucket.from,
                 to: Math.min(time, summary.bucket.to),
-                label: 'Throttle bucket',
                 opacity: 0.12,
               },
             ]

@@ -2,6 +2,16 @@
   "slug": "max-q",
   "path": "examples/max-q/",
   "ready": "html[data-demo-ready]",
-  "viewport": { "width": 1280, "height": 800 },
-  "query": "?t=end"
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "query": "?t=end",
+  "scrollTo": ".panels",
+  "crop": {
+    "x": 0,
+    "y": 0,
+    "width": 1280,
+    "height": 800
+  }
 }

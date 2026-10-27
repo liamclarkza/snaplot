@@ -171,8 +171,9 @@ body.r1 {
 }
 .r1-decision h2 {
   margin: 0 0 8px;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 .r1-decision h3 {
   margin: 20px 0 6px;
@@ -287,17 +288,20 @@ table.r1-table td,
 }
 .r1-pin-form button {
   font: inherit;
-  padding: 3px 12px;
-  border: 1px solid #adb5bd;
-  border-radius: 3px;
-  background: var(--r1-chrome);
-  color: var(--r1-ink);
+  font-weight: 500;
+  padding: 4px 14px;
+  border: 1px solid #1f4fd1;
+  border-radius: 4px;
+  background: #1f4fd1;
+  color: #fff;
   cursor: pointer;
 }
 .r1-pin-form button:hover:not(:disabled) {
-  background: var(--r1-rule);
+  background: #1a43b3;
 }
 .r1-pin-form button:disabled {
+  border-color: #adb5bd;
+  background: var(--r1-chrome);
   color: var(--r1-ink-2);
   cursor: default;
 }

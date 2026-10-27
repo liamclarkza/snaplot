@@ -2,6 +2,15 @@
   "slug": "hottest-year",
   "path": "examples/hottest-year/",
   "ready": "html[data-demo-ready]",
-  "viewport": { "width": 1280, "height": 800 },
-  "query": ""
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "query": "",
+  "crop": {
+    "x": 64,
+    "y": 24,
+    "width": 1152,
+    "height": 720
+  }
 }

@@ -191,9 +191,17 @@ select:hover {
   margin: 2px 0 6px;
 }
 
+/* The page's one action: a solid button, the only filled red on the page besides the breaches. */
 .rollback {
-  background: #4a1d24;
-  border-color: var(--breach);
+  background: #c8323f;
+  border-color: #c8323f;
+  color: #fff;
+  font-weight: 600;
+}
+
+.rollback:hover {
+  background: #a92633;
+  border-color: #a92633;
 }
 
 .recovery {
@@ -222,6 +230,12 @@ select:hover {
 .panel h2 {
   font-size: 12px;
   margin-bottom: 4px;
+}
+
+.panel-note {
+  margin: 2px 0 0;
+  color: var(--text-dim);
+  font-size: 11px;
 }
 
 .plot {
