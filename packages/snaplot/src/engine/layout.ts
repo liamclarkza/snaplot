@@ -28,34 +28,42 @@ import { DirtyFlag } from './spec';
 // function of (font, text), and pan/zoom re-measures the same handful of
 // tick strings every frame. Created lazily so module load stays DOM-free.
 let measureCtx: CanvasRenderingContext2D | null = null;
-const measureCache = new Map<string, number>();
+/** Widths by font, then by label as given (before its digits become `0`). */
+const measureCache = new Map<string, Map<string, number>>();
 const MEASURE_CACHE_MAX = 4096;
+// The last font asked for, so a frame of labels in one font builds no key.
+let lastFamily = '';
+let lastSize = Number.NaN;
+let lastWidths: Map<string, number> | null = null;
 
 /**
  * The width of a label as the DOM shows it, in CSS pixels. Labels use tabular figures, which the
  * canvas cannot set: every digit is measured as a `0`, the width tabular digits share.
  */
 export function measureLabel(text: string, fontFamily: string, fontSize: number): number {
-  return measureTextWidth(text.replace(/\d/g, '0'), fontFamily, fontSize);
-}
-
-function measureTextWidth(text: string, fontFamily: string, fontSize: number): number {
   if (typeof document === 'undefined') return text.length * 7;
-
-  const font = fontSize + 'px ' + fontFamily;
-  const key = font + '|' + text;
-  const cached = measureCache.get(key);
+  if (!lastWidths || fontFamily !== lastFamily || fontSize !== lastSize) {
+    const font = fontSize + 'px ' + fontFamily;
+    lastWidths = measureCache.get(font) ?? null;
+    if (!lastWidths) {
+      lastWidths = new Map();
+      measureCache.set(font, lastWidths);
+    }
+    lastFamily = fontFamily;
+    lastSize = fontSize;
+  }
+  const cached = lastWidths.get(text);
   if (cached !== undefined) return cached;
 
   if (!measureCtx) {
     measureCtx = document.createElement('canvas').getContext('2d');
     if (!measureCtx) return text.length * 7;
   }
-  measureCtx.font = font;
-  const width = measureCtx.measureText(text).width;
+  measureCtx.font = fontSize + 'px ' + fontFamily;
+  const width = measureCtx.measureText(text.replace(/\d/g, '0')).width;
 
-  if (measureCache.size >= MEASURE_CACHE_MAX) measureCache.clear();
-  measureCache.set(key, width);
+  if (lastWidths.size >= MEASURE_CACHE_MAX) lastWidths.clear();
+  lastWidths.set(text, width);
   return width;
 }
 
@@ -471,6 +479,15 @@ export function createLayoutCacheKey(engine: ChartCore, width: number, height: n
     engine.canvasManager.reservedChrome('bottom'),
     axes,
   ].join('|');
+}
+
+/**
+ * What the data layer's pixels depend on besides the series options: the canvas, the plot and
+ * every scale (`replaceOptions` keeps the layer when an update leaves it unchanged).
+ */
+export function marksKey(engine: ChartCore): string {
+  const { boxWidth, boxHeight } = engine.canvasManager;
+  return createLayoutCacheKey(engine, boxWidth || 600, boxHeight || 400);
 }
 
 export function updateScalePixelRanges(engine: ChartCore): void {

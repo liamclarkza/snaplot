@@ -186,6 +186,23 @@ export function opaqueColorOnBackground(
   opacity: number,
   background: string,
 ): string {
+  // Every grid paint asks again with the same few strokes: answer from the recent ones, compared
+  // by value, so a frame neither parses nor builds a string.
+  for (const entry of opaqueRecent) {
+    if (entry.color === color && entry.opacity === opacity && entry.background === background)
+      return entry.result;
+  }
+  const result = blendOpaque(color, opacity, background);
+  opaqueRecent[opaqueNext] = { color, opacity, background, result };
+  opaqueNext = (opaqueNext + 1) % OPAQUE_RECENT;
+  return result;
+}
+
+const OPAQUE_RECENT = 8;
+const opaqueRecent: { color: string; opacity: number; background: string; result: string }[] = [];
+let opaqueNext = 0;
+
+function blendOpaque(color: string, opacity: number, background: string): string {
   const foreground = parseColor(color);
   const surface = parseColor(background);
   const alpha = Math.max(0, Math.min(1, opacity));

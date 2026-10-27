@@ -128,18 +128,40 @@ export function updateDOMLabels(
     }
     used++;
 
-    const pos = axisInfo.position;
-    const styleSig = baseStyle + (label.kind === 'title' ? TITLE_STYLE[pos] : TICK_STYLE[pos]);
-    if (el.dataset.labelStyle !== styleSig) {
-      el.style.cssText = styleSig;
-      el.dataset.labelStyle = styleSig;
+    // What the span shows, kept beside it, so a frame that moves nothing writes nothing.
+    let shown = shownLabels.get(el);
+    if (!shown) {
+      shown = { base: '', kind: label.kind, position: axisInfo.position, x: NaN, y: NaN, text: '' };
+      shownLabels.set(el, shown);
     }
-    el.style.left = label.x + 'px';
-    el.style.top = label.y + 'px';
-    if (el.textContent !== label.text) el.textContent = label.text;
+    const pos = axisInfo.position;
+    if (shown.base !== baseStyle || shown.kind !== label.kind || shown.position !== pos) {
+      el.style.cssText = baseStyle + (label.kind === 'title' ? TITLE_STYLE[pos] : TICK_STYLE[pos]);
+      shown.base = baseStyle;
+      shown.kind = label.kind;
+      shown.position = pos;
+      shown.x = NaN;
+      shown.y = NaN;
+    }
+    if (shown.x !== label.x) el.style.left = (shown.x = label.x) + 'px';
+    if (shown.y !== label.y) el.style.top = (shown.y = label.y) + 'px';
+    if (shown.text !== label.text) el.textContent = shown.text = label.text;
   }
 
   while (domLayer.children.length > used) {
     domLayer.lastChild?.remove();
   }
 }
+
+/** The style, position and text each pooled label span was last given. */
+const shownLabels = new WeakMap<
+  Element,
+  {
+    base: string;
+    kind: LabelBox['kind'];
+    position: AxisPosition;
+    x: number;
+    y: number;
+    text: string;
+  }
+>();

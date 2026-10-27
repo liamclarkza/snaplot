@@ -5,22 +5,22 @@
       "label": "createChart",
       "from": "snaplot",
       "import": "createChart",
-      "measured": 81064,
-      "budget": 82686
+      "measured": 83391,
+      "budget": 85059
     },
     {
       "label": "Chart (react)",
       "from": "snaplot/react",
       "import": "Chart",
-      "measured": 81677,
-      "budget": 83311
+      "measured": 84012,
+      "budget": 85693
     },
     {
       "label": "Chart (solid)",
       "from": "snaplot/solid",
       "import": "Chart",
-      "measured": 81613,
-      "budget": 83246
+      "measured": 83955,
+      "budget": 85635
     },
     {
       "label": "histogram",
@@ -33,8 +33,8 @@
       "label": "createLegendTable",
       "from": "snaplot",
       "import": "createLegendTable",
-      "measured": 3223,
-      "budget": 3288
+      "measured": 3267,
+      "budget": 3333
     }
   ]
 }

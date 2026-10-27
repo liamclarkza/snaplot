@@ -210,7 +210,12 @@ function summarizeLoaf(entries: readonly LoafEntry[]): LoafSummary {
 // ─── Frame-driven sweeps ────────────────────────────────────────
 
 export interface SweepSpec {
+  /** Frames in the measured window. */
   steps: number;
+  /**
+   * Operations run before the window opens. Counted in operations, not frames: a stream that
+   * appends every third frame would otherwise warm up on a third as many appends.
+   */
   warmup: number;
   /**
    * Runs once per animation frame. Return `false` when the frame did no operation (a
@@ -279,6 +284,9 @@ export async function sweep(spec: SweepSpec): Promise<SweepOut> {
 
   await new Promise<void>((resolve) => {
     let i = 0;
+    // The frame the window opens at: the first after the warm-up operations (-1 until then).
+    let opened = spec.warmup <= 0 ? 0 : -1;
+    let warmed = 0;
     let lastTs = -1;
     let open: OpenOp | null = null;
     const tick = (ts: number) => {
@@ -294,21 +302,22 @@ export async function sweep(spec: SweepSpec): Promise<SweepOut> {
         }
         open = null;
       }
-      const inWindow = i > spec.warmup;
+      if (opened < 0 && warmed >= spec.warmup) opened = i;
+      const inWindow = opened >= 0 && i > opened;
       if (inWindow && lastTs >= 0) frames.push(ts - lastTs);
       if (inWindow && heapOn) {
         const h = heapBytes() ?? heapPrev;
         if (h > heapPrev) gross += h - heapPrev;
         heapPrev = h;
       }
-      if (i > spec.warmup) spec.afterFlush?.(i - 1);
+      if (inWindow) spec.afterFlush?.(i - 1);
       lastTs = ts;
-      if (i >= spec.steps + spec.warmup) {
+      if (opened >= 0 && i >= spec.steps + opened) {
         spec.onWindowEnd?.();
         resolve();
         return;
       }
-      const measured = i >= spec.warmup;
+      const measured = opened >= 0;
       if (measured && Number.isNaN(asyncAtWindow)) {
         spec.onWindowStart?.();
         asyncAtWindow = libraryBusyMs();
@@ -325,6 +334,7 @@ export async function sweep(spec: SweepSpec): Promise<SweepOut> {
           op.sync = performance.now() - t0;
         });
         if (measured) ops++;
+        else warmed++;
       }
       i++;
       native.raf(tick);

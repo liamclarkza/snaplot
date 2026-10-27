@@ -169,12 +169,16 @@ export function cachedDateFormat(
  * The runtime's time zone, read again only when its offsets in January and July change (a TZ
  * change), so labelling every frame constructs no formatter (gap-perf-gate-09).
  */
-let runtimeZone: { offsets: string; name: string } | null = null;
+let runtimeZone: { january: number; july: number; name: string } | null = null;
+const JANUARY = new Date(2026, 0, 1);
+const JULY = new Date(2026, 6, 1);
 export function runtimeTimeZone(): string {
-  const offsets = `${new Date(2026, 0, 1).getTimezoneOffset()}|${new Date(2026, 6, 1).getTimezoneOffset()}`;
-  if (runtimeZone?.offsets !== offsets) {
+  const january = JANUARY.getTimezoneOffset();
+  const july = JULY.getTimezoneOffset();
+  if (runtimeZone?.january !== january || runtimeZone.july !== july) {
     runtimeZone = {
-      offsets,
+      january,
+      july,
       name: new Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'local',
     };
   }

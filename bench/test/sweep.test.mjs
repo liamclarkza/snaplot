@@ -54,7 +54,7 @@ describe('sweep', () => {
     assert.equal(paints - atWindowStart.paints, sw.ops);
   });
 
-  test('a rate-limited sweep opens its window on the warm-up frame count, not on operations', async () => {
+  test('a rate-limited sweep warms up on operations, not frames', async () => {
     let frame = 0;
     let ops = 0;
     let opsAtStart = null;
@@ -72,8 +72,12 @@ describe('sweep', () => {
         opsAtStart = ops;
       },
     });
-    assert.equal(opsAtStart, 2, 'frames 1 and 3 of the 3 warm-up frames did an operation');
+    // A stream appending every other frame runs all 3 warm-up appends (frames 1, 3 and 5), not
+    // the 2 that fall in the first 3 frames: cold JIT code stays out of the window.
+    assert.equal(opsAtStart, 3);
     assert.equal(ops - opsAtStart, sw.ops);
+    // The window still spans `steps` frames: 4 of its 8 do an operation.
+    assert.equal(sw.ops, 4);
   });
 
   test('counts read at onWindowStart and onWindowEnd cover the measured operations at any paint latency', async () => {

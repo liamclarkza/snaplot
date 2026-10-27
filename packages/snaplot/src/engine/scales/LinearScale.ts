@@ -26,6 +26,11 @@ export class LinearScale implements Scale {
   // decimal precision from this so labels match whatever count was requested,
   // not a fixed DEFAULT_TICK_COUNT assumption. NaN until ticks() has run.
   private lastTickStep = Number.NaN;
+  // Tick labels by value, in `labelsDecimals` and `labelsLocale`: a stream or a pan labels the
+  // same values frame after frame.
+  private labels = new Map<number, string>();
+  private labelsDecimals = -1;
+  private labelsLocale: string | undefined = undefined;
 
   constructor(key: string, min = 0, max = 1) {
     this.key = key;
@@ -72,7 +77,20 @@ export class LinearScale implements Scale {
       return rounded.toExponential(Math.min(6, stepDecimals(step / 10 ** exponent)));
     }
     const decimals = Math.min(20, stepDecimals(step));
-    return tickNumberFormat(this.locale, decimals).format(rounded);
+    if (decimals !== this.labelsDecimals || this.locale !== this.labelsLocale) {
+      this.labels.clear();
+      this.labelsDecimals = decimals;
+      this.labelsLocale = this.locale;
+    }
+    // -0 (a tick rounded from just below zero) reads as 0.
+    const key = rounded === 0 ? 0 : rounded;
+    let label = this.labels.get(key);
+    if (label === undefined) {
+      label = tickNumberFormat(this.locale, decimals).format(key);
+      if (this.labels.size >= LABELS_MAX) this.labels.clear();
+      this.labels.set(key, label);
+    }
+    return label;
   }
 
   nice(count: number = DEFAULT_TICK_COUNT): void {
@@ -111,6 +129,8 @@ export class LinearScale implements Scale {
     return true;
   }
 }
+
+const LABELS_MAX = 512;
 
 /** A cached fixed-decimals number format for tick labels. */
 export function tickNumberFormat(locale: string | undefined, decimals: number): Intl.NumberFormat {
