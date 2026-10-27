@@ -148,7 +148,9 @@ export function renderAxes(
                 return [y - half, y + half];
               },
           (i) => texts[i],
-          isHorizontal ? LABEL_MIN_GAP : theme.fontSize * 0.2,
+          // Vertical labels keep about two and a half lines between centres: closer, a short
+          // axis reads as a column of numbers.
+          isHorizontal ? LABEL_MIN_GAP : theme.fontSize * 1.4,
           alignedEnds(values),
         );
       };

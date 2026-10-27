@@ -102,17 +102,16 @@ export function createReferenceLinesPlugin(options: {
         if (line.label) labels.push({ line, px, color });
       }
 
-      // Labels after every line, so none is crossed by a later line, each on a halo of the
-      // surface and clear of every label placed before it. A horizontal line's label marks a
-      // value, so it goes first: at the right edge just above its line, moved a row down or up
-      // (nearest first) when that spot is taken. A vertical line's sits at the top, right of the
-      // line (left of it at the right edge), on the first free row.
+      // Labels after every line, so none is crossed by a later line, each on a backing box of
+      // the surface (it reads over dense data) and clear of every label placed before it. A
+      // horizontal line's label marks a value, so it goes first: at the right edge just above its
+      // line, moved a row down or up (nearest first) when that spot is taken. A vertical line's
+      // sits at the top, on the side of its line that no other vertical line crosses (right
+      // first), on the first free row.
       ctx.font = `11px ${theme.fontFamily}`;
       ctx.setLineDash([]);
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = theme.surfaceColor ?? theme.backgroundColor;
-      const ROW = 13;
+      const surface = chart.resolveColor(theme.surfaceColor ?? theme.backgroundColor);
+      const ROW = 14;
       const placed: Array<[number, number, number, number]> = [];
       const free = (x: number, y: number, w: number) =>
         !placed.some(
@@ -120,10 +119,11 @@ export function createReferenceLinesPlugin(options: {
         );
       const draw = (text: string, x: number, y: number, w: number, color: string) => {
         placed.push([x, y - 10, x + w, y + 3]);
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = surface;
+        ctx.fillRect(x - 3, y - 10, w + 6, 14);
         ctx.globalAlpha = 1;
-        ctx.strokeText(text, x, y);
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.9;
         ctx.fillText(text, x, y);
       };
       const byPixel = (p: { px: number }, q: { px: number }) => p.px - q.px;
@@ -133,7 +133,7 @@ export function createReferenceLinesPlugin(options: {
         const text = line.label!;
         const w = ctx.measureText(text).width;
         const x = left + width - w - 6;
-        const home = Math.max(top + 12, Math.min(top + height - 4, px - 4));
+        const home = Math.max(top + 12, Math.min(top + height - 4, px - 5));
         let y = home;
         for (let step = 1; !free(x, y, w) && step <= 8; step++) {
           const offset = Math.ceil(step / 2) * ROW * (step % 2 === 1 ? 1 : -1);
@@ -142,12 +142,18 @@ export function createReferenceLinesPlugin(options: {
         }
         draw(text, x, y, w, color);
       }
-      for (const { line, px, color } of labels
-        .filter(({ line }) => line.axis !== 'y')
-        .sort(byPixel)) {
+      const verticals = labels.filter(({ line }) => line.axis !== 'y').sort(byPixel);
+      const crossings = verticals.map(({ px }) => px);
+      for (const { line, px, color } of verticals) {
         const text = line.label!;
         const w = ctx.measureText(text).width;
-        const x = px + 4 + w > left + width ? px - 4 - w : px + 4;
+        const right = px + 5;
+        const leftSide = px - 5 - w;
+        const fits = (x: number) => x - 3 >= left && x + w + 3 <= left + width;
+        const clear = (x: number) =>
+          crossings.every((other) => other === px || other < x - 3 || other > x + w + 3);
+        const x =
+          [right, leftSide].find((c) => fits(c) && clear(c)) ?? (fits(right) ? right : leftSide);
         let y = top + 12;
         while (!free(x, y, w) && y + ROW <= top + height - 4) y += ROW;
         draw(text, x, y, w, color);

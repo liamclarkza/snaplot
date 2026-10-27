@@ -91,7 +91,7 @@ describe('per-axis grid config', () => {
     ({ series: [], axes: { y: { position: 'left', grid } } }) as unknown as ChartSpec;
 
   it('grid: false suppresses this axis gridlines but keeps its labels', () => {
-    const scale = linearScale(0, 100, [25, 50, 75]);
+    const scale = linearScale(0, 100, [10, 50, 90]);
     const scales = new Map<string, Scale>([['y', scale]]);
     const ctx = context();
 
@@ -103,7 +103,7 @@ describe('per-axis grid config', () => {
   });
 
   it('can hide tick marks independently of gridlines and labels', () => {
-    const scale = linearScale(0, 100, [25, 50, 75]);
+    const scale = linearScale(0, 100, [10, 50, 90]);
     const scales = new Map<string, Scale>([['y', scale]]);
     const ctx = context();
     const config = {

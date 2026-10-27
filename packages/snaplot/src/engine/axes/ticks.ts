@@ -49,7 +49,8 @@ export function thinTicks(values: number[], maxCount: number, preserveEnds = fal
  * at the smallest stride where neighbouring labels keep `gap` pixels between their boxes and never
  * read the same. `extent(i)` is label i's [start, end] along the axis as it will be placed (edge
  * labels clamped into the container). With `preserveEnds`, a stride that also keeps the last tick
- * wins when it is at most twice the smallest and keeps three labels.
+ * wins when it is at most twice the smallest and keeps three labels. When no stride fits, each tick
+ * that clears the last one kept stays.
  */
 export function fitTicks(
   count: number,
@@ -73,7 +74,18 @@ export function fitTicks(
   };
   let stride = 1;
   while (stride < count && !fits(stride)) stride++;
-  if (stride >= count) return [0];
+  if (stride >= count) {
+    // No even stride fits (irregular ticks, such as sparse bars): keep each tick that clears the
+    // last one kept.
+    const kept = [0];
+    for (let i = 1; i < count; i++) {
+      const [a0, a1] = extents[kept[kept.length - 1]];
+      const [b0, b1] = extents[i];
+      if (Math.max(a0, b0) >= Math.min(a1, b1) + gap && texts[i] !== texts[kept[kept.length - 1]])
+        kept.push(i);
+    }
+    return kept;
+  }
   if (preserveEnds && (count - 1) % stride !== 0) {
     for (let d = stride + 1; d <= stride * 2 && (count - 1) / d >= 2; d++) {
       if ((count - 1) % d === 0 && fits(d)) {
@@ -153,10 +165,13 @@ export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined
     };
   }
 
-  // Bar chart: tick at each category X value
+  // Bar chart: tick at each category X value. On a time axis with more bars than labels fit,
+  // the calendar ticks read better than every nth bar (sparse, irregular bars land anywhere).
   const barSeries = visibleSeries.find((s) => markOf(s).draw.x === 'slot');
   if (barSeries && engine.hasData()) {
-    const values = thinTicks(axisMarkCoordinates(engine, 'slot'), maxCategoryTicks);
+    const coordinates = axisMarkCoordinates(engine, 'slot');
+    if (xScale?.type === 'time' && coordinates.length > maxCategoryTicks) return undefined;
+    const values = thinTicks(coordinates, maxCategoryTicks);
     return { values, format };
   }
 
