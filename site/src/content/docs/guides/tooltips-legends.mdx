@@ -13,9 +13,25 @@ import Example from '../../../components/Example.astro';
   inside the data's x range. The header is the x; each row is the series swatch, name and value,
   in series order.
 - **`'nearest'`** (the default when every series is a scatter): the point nearest the pointer,
-  within 32 px for a mouse and 44 px for touch. Points that coincide are all listed.
+  within `tooltip.distance` of it (32 px for a mouse, 44 px for touch, unless you set it). Points
+  that coincide are all listed.
 
 <Example name="tooltips-guide/index" />
+
+### How close the pointer has to be
+
+`tooltip.distance` is the reach of `'nearest'`, in CSS pixels: a point farther from the pointer
+than that shows no tooltip. Raise it for sparse data, lower it to keep the tooltip from popping up
+between points, or pass `Infinity` to show the nearest point wherever the pointer is over the
+plot. `'index'` has no reach: it shows wherever the pointer is over the plot's x range.
+
+```ts
+// Always show the nearest point while the pointer is over the plot.
+chart.update({ tooltip: { mode: 'nearest', distance: Infinity } });
+```
+
+With `Infinity`, each pointer move searches the whole line, or the whole cloud's grid for a
+scatter, so keep a finite reach on series of millions of points.
 
 Values are written at the precision of the data, through the series `format`, else the axis
 `format`. On a bar chart, lines and points on the same chart join the bar's tooltip. The tooltip

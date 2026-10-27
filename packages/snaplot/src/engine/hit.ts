@@ -512,7 +512,8 @@ function nearestInGrid(
   const cell = grid.cellSize;
   const cx = Math.floor((px - grid.x0) / cell);
   const cy = Math.floor((py - grid.y0) / cell);
-  const rings = Math.ceil(radius / cell) + 1;
+  // A radius past the grid (Infinity: anywhere over the plot) stops at its last ring.
+  const rings = Math.min(Math.ceil(radius / cell) + 1, Math.max(grid.columns, grid.rows) + 1);
   let bestIdx = -1;
   let bestDist = Infinity;
   let visits = 0;

@@ -229,10 +229,15 @@ const examples = DEMOS.map((demo) => ({
     }
   }
 
-  /* The adapters do not size their host from `height` yet (frameworks-15, D26); the islands'
-     wrappers give the 340px the hero's code asks for. */
-  .hero :global(.example-island) {
+  /* The hero's code asks for 340px. The adapters do not size their host from `height` yet
+     (frameworks-15, D26), so the islands' wrappers and the vanilla mount (sized for the docs'
+     280px examples) take it here, or the chart runs over the code below it on a phone. */
+  .hero :global(.example-island),
+  .hero :global(.example-chart) {
     height: 340px;
+  }
+  .hero :global(.example-output) {
+    min-height: 340px;
   }
 
   .hero-caption {

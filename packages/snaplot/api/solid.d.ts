@@ -1181,6 +1181,13 @@ export declare interface TooltipOptions<Row> {
      */
     mode?: 'index' | 'nearest';
     /**
+     * How far the pointer may be from a point, in CSS pixels, for `nearest` to show it. `Infinity`
+     * shows the nearest point wherever the pointer is over the plot. `index` shows wherever the
+     * pointer is over the plot's X range, whatever this is.
+     * @defaultValue `32` for a mouse or pen, `44` for touch
+     */
+    distance?: number;
+    /**
      * Render the tooltip yourself. A string is inserted as HTML, so escape untrusted text or return a
      * `Node` built with `textContent`.
      * @defaultValue the built-in tooltip

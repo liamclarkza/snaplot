@@ -58,3 +58,54 @@ it('[interact-04] a single-series line tooltip shows the X and names its series'
   fakes.frames.flush();
   expect(tooltipText()).toContain('CPU');
 });
+
+it('tooltip.distance sets how far from a point nearest still shows it; Infinity is anywhere', () => {
+  const data = Array.from({ length: 11 }, (_, t) => ({ t, v: 1 }));
+  const options = {
+    data,
+    x: 't',
+    series: [{ y: 'v', label: 'Value' }],
+    axes: { x: { min: 0, max: 10 }, y: { min: 0, max: 10 } },
+  } as const;
+  // The line runs along v = 1; the pointer sits at v = 8, far above it.
+  const chart = fakes.mount({ ...options, tooltip: { mode: 'nearest' } });
+  fakes.frames.flush();
+  hover(chart, 5, 8);
+  fakes.frames.flush();
+  expect(tooltipText()).toBe('');
+  chart.update({ tooltip: { mode: 'nearest', distance: Number.POSITIVE_INFINITY } });
+  fakes.frames.flush();
+  hover(chart, 5, 8);
+  fakes.frames.flush();
+  expect(tooltipText()).toContain('Value');
+  chart.update({ tooltip: { mode: 'nearest', distance: 4 } });
+  fakes.frames.flush();
+  hover(chart, 5, 8);
+  fakes.frames.flush();
+  expect(tooltipText()).toBe('');
+});
+
+it('tooltip.distance is validated', () => {
+  expect(() =>
+    fakes.mount({
+      data: [{ t: 0, v: 1 }],
+      x: 't',
+      series: [{ y: 'v' }],
+      tooltip: { distance: -1 },
+    }),
+  ).toThrow(/tooltip\.distance must be a number of CSS pixels/);
+});
+
+it('a scatter with distance Infinity reads its nearest point from an empty corner', () => {
+  const chart = fakes.mount({
+    data: [{ t: 9, v: 9 }],
+    x: 't',
+    series: [{ type: 'scatter', y: 'v', label: 'Lone' }],
+    axes: { x: { min: 0, max: 10 }, y: { min: 0, max: 10 } },
+    tooltip: { distance: Number.POSITIVE_INFINITY },
+  });
+  fakes.frames.flush();
+  hover(chart, 0.5, 0.5);
+  fakes.frames.flush();
+  expect(tooltipText()).toContain('Lone');
+});

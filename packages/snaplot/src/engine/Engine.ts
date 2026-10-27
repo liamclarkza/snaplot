@@ -328,7 +328,7 @@ export class ChartCore implements EngineHost {
     // If the user pinned a hitRadius via `touch.hitRadius`, that becomes
     // the global override (applies to both touch and mouse). Otherwise
     // HitTester picks per-pointer defaults: 44 px for touch, 32 for mouse.
-    this.hitTester = new HitTester(this.config.touch?.hitRadius);
+    this.hitTester = new HitTester(this.config.tooltip?.distance ?? this.config.touch?.hitRadius);
     this.tooltipManager = new TooltipManager(this.theme, parent);
     this.canvasManager.setInteractive(this.config.mode !== 'readonly');
 
@@ -558,6 +558,9 @@ export class ChartCore implements EngineHost {
     // extent, so a config update does not knock a following chart off its
     // trailing window (matches initAxes).
     if (this.following) applyFollowWindow(this);
+    this.hitTester.setProximity(
+      this.config.tooltip?.distance ?? this.config.touch?.hitRadius ?? null,
+    );
     // The hover model under a still pointer: hidden series leave the tooltip.
     refreshCursor(this);
     // Marks drawn as before over the same scales and plot keep the data layer.

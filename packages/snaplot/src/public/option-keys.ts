@@ -87,7 +87,7 @@ export const AXIS = keys(
 );
 export const STREAMING = keys('maxPoints', 'followWindow');
 export const INTERACTION = keys('zoom', 'drag', 'bounds');
-export const TOOLTIP = keys('mode', 'render');
+export const TOOLTIP = keys('mode', 'distance', 'render');
 export const THEME_TOKENS = keys(
   'mode',
   'surface',

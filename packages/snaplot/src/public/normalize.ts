@@ -301,6 +301,15 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
       checkKeys(t, TOOLTIP, 'tooltip');
       const mode = enumValue('tooltip.mode', t.mode, ['index', 'nearest'] as const, undefined);
       engine.tooltip = mode === undefined ? {} : { mode };
+      if (t.distance !== undefined) {
+        const distance = t.distance;
+        if (typeof distance !== 'number' || Number.isNaN(distance) || distance < 0) {
+          fail(
+            `tooltip.distance must be a number of CSS pixels of at least 0, or Infinity, not ${describe(distance)}.`,
+          );
+        }
+        engine.tooltip.distance = distance;
+      }
       if (t.render !== undefined) {
         if (typeof t.render !== 'function') fail('tooltip.render must be a function.');
         tooltip.render = t.render as never;

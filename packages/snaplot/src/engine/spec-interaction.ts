@@ -202,6 +202,12 @@ export interface TooltipConfig {
    * equivalent for line/area/bar data.
    */
   mode?: 'nearest' | 'index' | 'x';
+  /**
+   * How far the pointer may be from a point, in CSS px, for `nearest` (and scatter series) to
+   * show it; `Infinity` for anywhere over the plot. Default: 32 for mouse / pen, 44 for touch
+   * (`touch.hitRadius` when that is set).
+   */
+  distance?: number;
   /** Pixel offset from the cursor. Defaults to TOOLTIP_OFFSET (12 px). */
   offset?: number;
   /**

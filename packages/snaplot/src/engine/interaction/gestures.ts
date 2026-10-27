@@ -301,10 +301,14 @@ export class GestureManager {
     const area = this.getAxisArea(x, y);
     if (area.type === 'outside') return;
 
-    // Pointer interaction should not paint the browser's keyboard-focus ring, but it does focus
-    // the chart, so the keys work next (plan D20); :focus-visible keeps the ring for keyboard focus.
-    if (!this.isTouchLike(e)) e.preventDefault();
-    if (mode !== 'readonly') this.coordinateTarget.focus({ preventScroll: true });
+    // Pointer interaction should not paint the browser's keyboard-focus ring, but a mouse or pen
+    // press does focus the chart, so the keys work next (plan D20); :focus-visible keeps the ring
+    // for keyboard focus. A touch does not focus it: no keys follow a finger, and iOS Safari
+    // draws the focus-visible ring around a chart focused from script after a touch.
+    if (!this.isTouchLike(e)) {
+      e.preventDefault();
+      if (mode !== 'readonly') this.coordinateTarget.focus({ preventScroll: true });
+    }
 
     if (this.isTouchLike(e) && area.type === 'plot') {
       if (mode !== 'readonly') e.preventDefault();
