@@ -242,10 +242,11 @@ button.snaplot-legend-item:hover {
   }
 }
 
-/* Touch targets: each item hits 44 px tall under coarse pointers. */
+/* Touch targets: each item is 32 px tall under coarse pointers, past the 24 px of WCAG 2.2's
+   target size (2.5.8). 44 px rows took half of a short chart once the legend wrapped. */
 @media (pointer: coarse) {
   .snaplot-legend-item {
-    padding: 10px 10px;
-    min-height: 44px;
+    padding: 6px 10px;
+    min-height: 32px;
   }
 }
