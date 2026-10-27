@@ -87,6 +87,33 @@ function m4FiniteRun(
   const tmpX = room ? room.x : new Float64Array(maxOut + pixelWidth);
   const tmpY = room ? room.y : new Float64Array(maxOut + pixelWidth);
   const base = room ? room.offset : 0;
+  const out = m4Columns(x, y, start, end, pixelWidth, xMin, xRange, tmpX, tmpY, base);
+
+  // In an arena, views of the pass's scratch; alone, a trim-copy, so a caller that keeps the
+  // result does not retain the 5 × pixelWidth scratch.
+  if (arena) return arena.keep(base, out - base);
+  return [tmpX.slice(0, out), tmpY.slice(0, out)];
+}
+
+/**
+ * The M4 pass itself: points `start`–`end` of x and y into `tmpX` and `tmpY` from `base`, and the
+ * index after the last point written. Only numbers and typed arrays: with the arena's property
+ * reads in the same function, V8 deoptimised it on every call (insufficient type feedback for the
+ * code after the loop) and ran the loop unoptimised, boxing every double, so a stream allocated
+ * well over 100 KB a frame.
+ */
+function m4Columns(
+  x: Float64Array,
+  y: Float64Array,
+  start: number,
+  end: number,
+  pixelWidth: number,
+  xMin: number,
+  xRange: number,
+  tmpX: Float64Array,
+  tmpY: Float64Array,
+  base: number,
+): number {
   let out = base;
 
   // Which pixel column a point falls in, clamped at both edges: callers pass a viewport-culled
@@ -185,9 +212,5 @@ function m4FiniteRun(
     }
     previous = bucket;
   }
-
-  // In an arena, views of the pass's scratch; alone, a trim-copy, so a caller that keeps the
-  // result does not retain the 5 × pixelWidth scratch.
-  if (arena) return arena.keep(base, out - base);
-  return [tmpX.slice(0, out), tmpY.slice(0, out)];
+  return out;
 }
