@@ -3044,11 +3044,12 @@
       "required": true,
       "owners": ["M12a"],
       "rootCauses": ["RC3"],
-      "status": "tracked",
+      "status": "wont-do",
       "lock": {
         "kind": "gate",
         "name": "bench hover-sync-{line,scatter,unsorted}-200k ≤ 0.2 ms per move on mobile"
-      }
+      },
+      "lockNote": "deferred at M17 (docs/backlog.md): missed at the M14 and M16 bench runs; recorded in ADR 0002 §6 and the overhaul handoff for review (desktop 0.31–0.38 ms per move against 0.2 on mobile; the mobile profile was not run)"
     },
     "gap-perf-gate-04": {
       "severity": "medium",
@@ -3073,12 +3074,12 @@
       "required": true,
       "owners": ["M8", "M14"],
       "rootCauses": ["RC1"],
-      "status": "tracked",
+      "status": "wont-do",
       "lock": {
         "kind": "gate",
         "name": "bench reingest-rows-200k-title ≤ 2/8 ms and react-rerender-200k-inline ≤ 3 ms"
       },
-      "lockNote": "bench `reingest-rows-200k-title`, `react-rerender-200k-inline` budgets"
+      "lockNote": "deferred at M17 (docs/backlog.md): missed at the M14 and M16 bench runs; recorded in ADR 0002 §6 and the overhaul handoff for review (reingest-rows-200k-title 2.47 ms against 2; react-rerender-200k-inline 0.115 ms met its 3 ms)"
     },
     "gap-perf-gate-06": {
       "severity": "medium",
@@ -4619,10 +4620,10 @@
       "rootCauses": ["RC9", "RC19"],
       "status": "tracked",
       "lock": {
-        "kind": "test",
-        "title": "[uisite-03]"
+        "kind": "gate",
+        "name": "site test [uisite-03] (site/tests/examples/home.spec.ts)"
       },
-      "lockNote": "hover sweep 96/96; homepage spec"
+      "lockNote": "The test lives in the site suite, which trace-check does not run; M17 made it a gate lock."
     },
     "uisite-04": {
       "severity": "medium",
@@ -5382,11 +5383,12 @@
     "perf:density-cache": {
       "title": "density cache hit on pan (0 rebins)",
       "owners": ["M11"],
-      "status": "tracked",
+      "status": "wont-do",
       "lock": {
         "kind": "test",
         "title": "[perf:density-cache]"
-      }
+      },
+      "lockNote": "deferred at M17 (docs/backlog.md): the density cache was not built; its guard stays an expected failure; recorded in ADR 0002 §6 and the overhaul handoff for review"
     },
     "perf:pan-no-scan": {
       "title": "pan frame does not scan the full column",

@@ -14,6 +14,29 @@
 import { nextFrame } from '../engine/render/scheduler';
 import { fail, hint } from '../engine/errors';
 import { equivalent } from './options';
+import type { ChartEvents } from './types';
+
+/** The seven events, in plan §4.4's order. */
+export const EVENTS: readonly (keyof ChartEvents)[] = [
+  'cursor:change',
+  'viewport:change',
+  'selection:change',
+  'hiddenSeries:change',
+  'highlight:change',
+  'following:change',
+  'point:click',
+];
+
+/** The on<Key>Change option of each event (plan §4.5: a 1:1 alias). */
+export const OPTION_OF = {
+  'cursor:change': 'onCursorChange',
+  'viewport:change': 'onViewportChange',
+  'selection:change': 'onSelectionChange',
+  'hiddenSeries:change': 'onHiddenSeriesChange',
+  'highlight:change': 'onHighlightChange',
+  'following:change': 'onFollowingChange',
+  'point:click': 'onPointClick',
+} as const;
 
 /** The state a chart reports through `<key>:change` events (plan §4.4). */
 export type ReportedKey = 'viewport' | 'selection' | 'hiddenSeries' | 'highlight' | 'following';

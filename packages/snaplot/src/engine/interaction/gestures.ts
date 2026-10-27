@@ -3,9 +3,9 @@ import type { EventBus } from './bus';
 import type { ActivePressState, AreaResult, GestureState, PointerState } from './gesture-state';
 import { handleChartKey } from './keyboard';
 import { PanMomentum } from './momentum';
+import { areaAt, inPlot, localPoint, wheelFactor } from './pointer';
 import {
   MIN_DRAG_DISTANCE,
-  DEFAULT_WHEEL_STEP,
   DEFAULT_LONG_PRESS_MS,
   TAP_TIMEOUT,
   DOUBLE_TAP_TIMEOUT,
@@ -180,55 +180,16 @@ export class GestureManager {
 
   // ─── Helpers ──────────────────────────────────────────────
 
-  /**
-   * The pointer in the chart's own CSS pixels: corrected for a CSS transform or `zoom` on an
-   * ancestor, which scale the on-screen box but not the layout (interact-12).
-   */
   private localCoords(e: PointerEvent | WheelEvent | MouseEvent): { x: number; y: number } {
-    const target = this.coordinateTarget;
-    const rect = target.getBoundingClientRect();
-    // offsetWidth is a whole number and the box fractional: within a pixel there is no transform.
-    const scale = (box: number, layout: number) =>
-      layout > 0 && Math.abs(box - layout) > 1 ? box / layout : 1;
-    const sx = scale(rect.width, target.offsetWidth);
-    const sy = scale(rect.height, target.offsetHeight);
-    return { x: (e.clientX - rect.left) / sx, y: (e.clientY - rect.top) / sy };
+    return localPoint(this.coordinateTarget, e);
   }
 
   private inPlotArea(x: number, y: number): boolean {
-    const { plot } = this.getLayout();
-    return (
-      // Inclusive, like layout's isInPlotArea: a point on the plot's edge (a data extreme now that
-      // domains are not padded) is in the plot.
-      x >= plot.left && x <= plot.left + plot.width && y >= plot.top && y <= plot.top + plot.height
-    );
+    return inPlot(this.getLayout(), x, y);
   }
 
-  /**
-   * Determine which area a point falls in by checking against layout.axes entries.
-   * Returns { type: 'plot'|'axis'|'outside', axisKey?: string }.
-   */
   private getAxisArea(x: number, y: number): AreaResult {
-    const layout = this.getLayout();
-
-    if (this.inPlotArea(x, y)) {
-      return { type: 'plot' };
-    }
-
-    // Check each configured axis region
-    for (const [key, entry] of Object.entries(layout.axes)) {
-      const { area } = entry;
-      if (
-        x >= area.left &&
-        x <= area.left + area.width &&
-        y >= area.top &&
-        y <= area.top + area.height
-      ) {
-        return { type: 'axis', axisKey: key };
-      }
-    }
-
-    return { type: 'outside' };
+    return areaAt(this.getLayout(), x, y);
   }
 
   private clearLongPress(): void {
@@ -800,12 +761,7 @@ export class GestureManager {
         if (!zoom.enabled || zoom.axis !== true) return;
         e.preventDefault();
 
-        // Magnitude only, direction comes from the sign of deltaY.
-        // Negative values are clamped to 0 (disabled); there's no
-        // legitimate use for an inverted wheel.
-        const strength = Math.max(0, zoom.wheelStep ?? DEFAULT_WHEEL_STEP);
-        const delta = Math.min(Math.abs(deltaY), 20) * 0.005;
-        const factor = deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
+        const factor = wheelFactor(deltaY, zoom.wheelStep);
         // Anchor and axis must agree: use the axis under the pointer now, not
         // the gesture-start axis. Crossing from one gutter into another within
         // the 200ms window would otherwise zoom the start axis anchored at a
@@ -831,9 +787,7 @@ export class GestureManager {
     if (!zoom.enabled) return;
     e.preventDefault();
 
-    const strength = Math.max(0, zoom.wheelStep ?? DEFAULT_WHEEL_STEP);
-    const delta = Math.min(Math.abs(deltaY), 20) * 0.005;
-    const factor = deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
+    const factor = wheelFactor(deltaY, zoom.wheelStep);
 
     let axis: string = 'xy';
     if (zoom.x && !zoom.y) axis = 'x';

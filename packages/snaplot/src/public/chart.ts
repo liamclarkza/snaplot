@@ -32,7 +32,8 @@ import { categoryItems, chartPoint, cursorSnapshot, selectionWithPoints } from '
 import { type NormalizedOptions, type NormalizedState, normalize } from './normalize';
 import { equivalent, patchOptions } from './options';
 import { type Ingested, type IngestContext, retainedSource } from './sources';
-import { Dispatcher, type ReportedKey } from './state';
+import { publicHandle } from './handle';
+import { Dispatcher, EVENTS, OPTION_OF, type ReportedKey } from './state';
 import type {
   AppendOptions,
   ChartEvents,
@@ -52,32 +53,6 @@ import type {
 } from './types';
 
 export { createChartGroup };
-
-/** Sources of at least this many rows warn about accessor churn and re-ingest churn (plan D16). */
-
-/** The container height from which `legend: 'auto'` shows the legend (CSS pixels). */
-
-/** The seven events, in plan §4.4's order. */
-const EVENTS: readonly (keyof ChartEvents)[] = [
-  'cursor:change',
-  'viewport:change',
-  'selection:change',
-  'hiddenSeries:change',
-  'highlight:change',
-  'following:change',
-  'point:click',
-];
-
-/** The on<Key>Change option of each event (plan §4.5: a 1:1 alias). */
-const OPTION_OF = {
-  'cursor:change': 'onCursorChange',
-  'viewport:change': 'onViewportChange',
-  'selection:change': 'onSelectionChange',
-  'hiddenSeries:change': 'onHiddenSeriesChange',
-  'highlight:change': 'onHighlightChange',
-  'following:change': 'onFollowingChange',
-  'point:click': 'onPointClick',
-} as const;
 
 /** Each state option's value when it is not given (plan D3). */
 const DEFAULTS: { [K in StateKey]-?: NonNullable<NormalizedState[K]> | null } = {
@@ -520,11 +495,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     coordinate(this.options.group);
   }
 
-  /**
-   * Warn once when a source of at least 10,000 rows keeps being read again (plan D16, §5.9): by an
-   * accessor whose identity changes while nothing else does, three times in a row or more than
-   * ten times a second, or by data replaced more than ten times a second.
-   */
+  /** Rows added to the sources, as one batch of notifications (`public/append.ts`). */
   appendData(data: DataSource<Row>, options: AppendOptions = {}): void {
     if (this.destroyed) return;
     this.events.batch(() => appendRows(this, data, options));
@@ -865,31 +836,6 @@ export function createChart<Row = Record<string, any>>(
   options: ChartOptions<Row>,
 ): ChartHandle<Row> {
   return new Controller(element, options).handle;
-}
-
-/**
- * The handle createChart() returns (plan §4.4, gap-environments-03): its fourteen members, each
- * calling the chart, and nothing a group, a legend or the engine uses, so the runtime surface is
- * the typed one. Plugins, the built-in legend and the legend table receive this object; a group's
- * member is the chart itself.
- */
-function publicHandle<Row>(chart: Controller<Row>): ChartHandle<Row> {
-  return {
-    container: chart.container,
-    update: (patch) => chart.update(patch),
-    setOptions: (options) => chart.setOptions(options),
-    appendData: (data, options) => chart.appendData(data, options),
-    getState: () => chart.getState(),
-    subscribe: (listener) => chart.subscribe(listener),
-    on: (event, listener) => chart.on(event, listener),
-    getCursor: (options) => chart.getCursor(options),
-    resetViewport: () => chart.resetViewport(),
-    resumeFollow: () => chart.resumeFollow(),
-    setCursor: (x) => chart.setCursor(x),
-    scale: (key) => chart.scale(key),
-    redraw: (layer) => chart.redraw(layer),
-    destroy: () => chart.destroy(),
-  };
 }
 
 // The stores only skip validation inside ColumnarStore.trusted; keep the import live.

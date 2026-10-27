@@ -1,7 +1,8 @@
 // The framework pages in the browser (docs-01, dxtrial-16): every example on them shows each
 // framework's own code in its tab and paints a chart there. The smoke spec checks every route's
-// examples paint and copy; this spec checks that the tabs teach the right framework, and that the
-// pages' companions (a hook readout, a legend table) render beside their charts.
+// examples paint and copy; this spec checks that the tabs teach the right framework, that the
+// pages' companions (a hook readout, a legend table) render beside their charts, and that the
+// sizing contract has its page (docs-05).
 import { expect, type Page, test } from '@playwright/test';
 
 const BASE = '/snaplot/';
@@ -46,4 +47,17 @@ test('[dxtrial-16] the React page runs its hooks and legend table beside the cha
   await table.scrollIntoViewIfNeeded();
   await expect(table).toBeVisible({ timeout: 10_000 });
   await expect(table.locator('tbody tr')).toHaveCount(2);
+});
+
+test('[docs-05] the sizing contract is on its own page and comes before the first mount', async ({
+  page,
+}) => {
+  await page.goto(`${BASE}sizing/`);
+  const headings = await page.locator('main h2').allInnerTexts();
+  for (const heading of ['The height contract', 'The 300 px fallback', 'Aspect ratio with CSS'])
+    expect(headings.map((text) => text.trim())).toContain(heading);
+  await page.goto(`${BASE}first-chart/`);
+  const order = (await page.locator('main h2').allInnerTexts()).map((text) => text.trim());
+  expect(order.indexOf('Size the container first')).toBeGreaterThanOrEqual(0);
+  expect(order.indexOf('Size the container first')).toBeLessThan(order.indexOf('Mount a chart'));
 });

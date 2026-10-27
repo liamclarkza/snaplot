@@ -2,6 +2,12 @@
 
 Branch `ovh/m9b-engine-contracts`, merge base `9705b0f` (overhaul).
 
+## Summary
+
+The engine refactors and the W5 contracts below.
+
+Closes: arch-14, with M14, which finished the file splits (this line added at M17).
+
 ## What changed
 - Probe record of hit, cursor and click results (`test/visual/__probe__/m9a.json`, project `probe`) taken before the refactors.
 - One cursor snapshot path; a mark registry replaces per-type branches (`series.type ===` now only in `marks/index.ts`).
