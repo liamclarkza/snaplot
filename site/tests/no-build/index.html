@@ -18,13 +18,13 @@
     <script type="module">
       import { createChart } from 'snaplot';
 
-      const highs = [66, 71, 79, 83, 87, 84, 76, 76, 64, 73, 81, 87, 78, 68, 64];
-      const rows = highs.map((high, i) => ({ day: i + 1, high }));
+      const temps = [16.57, 16.52, 16.48, 16.47, 16.51, 16.49, 16.5, 16.55, 16.61, 16.63, 16.68];
+      const rows = temps.map((temp, i) => ({ day: i + 1, temp }));
       createChart(document.getElementById('chart'), {
         data: rows,
         x: 'day',
-        series: [{ y: 'high' }],
-        ariaLabel: 'Daily high temperature in Central Park, June 2025',
+        series: [{ y: 'temp' }],
+        ariaLabel: 'Daily global mean temperature, June 2024',
       });
     </script>
   </body>

@@ -25,15 +25,16 @@ The chart fills its element, so give the element a height.
 ```ts
 import { createChart } from 'snaplot';
 
-// Source: NOAA NCEI GHCN-Daily, Central Park, New York (USW00094728), June 2025, °F.
+// Source: Copernicus C3S / ECMWF, ERA5 via Climate Pulse (CC BY 4.0). The daily global mean
+// temperature, first week of June 2024, and the 1991–2020 mean of each date, °C.
 const days = [
-  { date: '2025-06-01', high: 66, low: 50 },
-  { date: '2025-06-02', high: 71, low: 53 },
-  { date: '2025-06-03', high: 79, low: 56 },
-  { date: '2025-06-04', high: 83, low: 62 },
-  { date: '2025-06-05', high: 87, low: 70 },
-  { date: '2025-06-06', high: 84, low: 71 },
-  { date: '2025-06-07', high: 76, low: 66 },
+  { date: '2024-06-01', temp: 16.57, normal: 15.7 },
+  { date: '2024-06-02', temp: 16.52, normal: 15.72 },
+  { date: '2024-06-03', temp: 16.48, normal: 15.75 },
+  { date: '2024-06-04', temp: 16.47, normal: 15.77 },
+  { date: '2024-06-05', temp: 16.51, normal: 15.8 },
+  { date: '2024-06-06', temp: 16.49, normal: 15.82 },
+  { date: '2024-06-07', temp: 16.5, normal: 15.84 },
 ];
 
 // The chart fills its element, so give the element a height:
@@ -43,12 +44,12 @@ export default function firstChart(element: HTMLElement) {
     data: days,
     x: 'date',
     series: [
-      { y: 'high', label: 'High' },
-      { y: 'low', label: 'Low' },
+      { y: 'temp', label: '2024' },
+      { y: 'normal', label: '1991–2020 mean' },
     ],
-    axes: { y: { format: { suffix: ' °F' } } },
+    axes: { y: { format: { suffix: ' °C' } } },
     ariaLabel:
-      'Daily high and low in Central Park, first week of June 2025',
+      'Daily global mean temperature, first week of June 2024, against the 1991–2020 mean',
   });
 }
 ```
@@ -60,15 +61,16 @@ export default function firstChart(element: HTMLElement) {
 ```tsx
 import { Chart } from 'snaplot/react';
 
-// Source: NOAA NCEI GHCN-Daily, Central Park, New York (USW00094728), June 2025, °F.
+// Source: Copernicus C3S / ECMWF, ERA5 via Climate Pulse (CC BY 4.0). The daily global mean
+// temperature, first week of June 2024, and the 1991–2020 mean of each date, °C.
 const days = [
-  { date: '2025-06-01', high: 66, low: 50 },
-  { date: '2025-06-02', high: 71, low: 53 },
-  { date: '2025-06-03', high: 79, low: 56 },
-  { date: '2025-06-04', high: 83, low: 62 },
-  { date: '2025-06-05', high: 87, low: 70 },
-  { date: '2025-06-06', high: 84, low: 71 },
-  { date: '2025-06-07', high: 76, low: 66 },
+  { date: '2024-06-01', temp: 16.57, normal: 15.7 },
+  { date: '2024-06-02', temp: 16.52, normal: 15.72 },
+  { date: '2024-06-03', temp: 16.48, normal: 15.75 },
+  { date: '2024-06-04', temp: 16.47, normal: 15.77 },
+  { date: '2024-06-05', temp: 16.51, normal: 15.8 },
+  { date: '2024-06-06', temp: 16.49, normal: 15.82 },
+  { date: '2024-06-07', temp: 16.5, normal: 15.84 },
 ];
 
 export default function FirstChart() {
@@ -77,12 +79,12 @@ export default function FirstChart() {
       data={days}
       x="date"
       series={[
-        { y: 'high', label: 'High' },
-        { y: 'low', label: 'Low' },
+        { y: 'temp', label: '2024' },
+        { y: 'normal', label: '1991–2020 mean' },
       ]}
-      axes={{ y: { format: { suffix: ' °F' } } }}
+      axes={{ y: { format: { suffix: ' °C' } } }}
       height={280}
-      ariaLabel="Daily high and low in Central Park, first week of June 2025"
+      ariaLabel="Daily global mean temperature, first week of June 2024, against the 1991–2020 mean"
     />
   );
 }
@@ -95,15 +97,16 @@ export default function FirstChart() {
 ```tsx
 import { Chart } from 'snaplot/solid';
 
-// Source: NOAA NCEI GHCN-Daily, Central Park, New York (USW00094728), June 2025, °F.
+// Source: Copernicus C3S / ECMWF, ERA5 via Climate Pulse (CC BY 4.0). The daily global mean
+// temperature, first week of June 2024, and the 1991–2020 mean of each date, °C.
 const days = [
-  { date: '2025-06-01', high: 66, low: 50 },
-  { date: '2025-06-02', high: 71, low: 53 },
-  { date: '2025-06-03', high: 79, low: 56 },
-  { date: '2025-06-04', high: 83, low: 62 },
-  { date: '2025-06-05', high: 87, low: 70 },
-  { date: '2025-06-06', high: 84, low: 71 },
-  { date: '2025-06-07', high: 76, low: 66 },
+  { date: '2024-06-01', temp: 16.57, normal: 15.7 },
+  { date: '2024-06-02', temp: 16.52, normal: 15.72 },
+  { date: '2024-06-03', temp: 16.48, normal: 15.75 },
+  { date: '2024-06-04', temp: 16.47, normal: 15.77 },
+  { date: '2024-06-05', temp: 16.51, normal: 15.8 },
+  { date: '2024-06-06', temp: 16.49, normal: 15.82 },
+  { date: '2024-06-07', temp: 16.5, normal: 15.84 },
 ];
 
 export default function FirstChart() {
@@ -112,12 +115,12 @@ export default function FirstChart() {
       data={days}
       x="date"
       series={[
-        { y: 'high', label: 'High' },
-        { y: 'low', label: 'Low' },
+        { y: 'temp', label: '2024' },
+        { y: 'normal', label: '1991–2020 mean' },
       ]}
-      axes={{ y: { format: { suffix: ' °F' } } }}
+      axes={{ y: { format: { suffix: ' °C' } } }}
       height={280}
-      ariaLabel="Daily high and low in Central Park, first week of June 2025"
+      ariaLabel="Daily global mean temperature, first week of June 2024, against the 1991–2020 mean"
     />
   );
 }
@@ -132,13 +135,13 @@ export default function FirstChart() {
 <script type="module">
   import { createChart } from 'https://cdn.jsdelivr.net/npm/snaplot@1.0.0-beta.0/+esm';
 
-  const highs = [66, 71, 79, 83, 87, 84, 76, 76, 64, 73, 81, 87, 78, 68, 64];
+  const temps = [16.57, 16.52, 16.48, 16.47, 16.51, 16.49, 16.5, 16.55, 16.61, 16.63, 16.68];
   createChart(document.getElementById('chart'), {
-    data: highs.map((high, i) => ({ day: i + 1, high })),
+    data: temps.map((temp, i) => ({ day: i + 1, temp })),
     x: 'day',
-    series: [{ y: 'high' }],
+    series: [{ y: 'temp' }],
     height: 280,
-    ariaLabel: 'Daily high temperature in Central Park, June 2025',
+    ariaLabel: 'Daily global mean temperature, June 2024',
   });
 </script>
 ```

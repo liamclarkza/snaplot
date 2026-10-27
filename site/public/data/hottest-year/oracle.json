@@ -1,0 +1,5 @@
+{
+  "report": "https://climate.copernicus.eu/global-climate-highlights-2024",
+  "year2024": { "mean": 15.1, "anomaly": 0.72 },
+  "warmestDay": { "date": "2024-07-22", "temp": 17.16 }
+}

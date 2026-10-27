@@ -1,14 +1,18 @@
 import type { ChartOptions } from 'snaplot';
-import { largeQuakes, type Quake } from '../data/aftershocks';
+import { LIFTOFF, telemetry } from '../data/launch';
 
 // `time` holds epoch milliseconds, so the x axis is told it is a time axis. Seconds would need
 // multiplying by 1,000 first.
+const rows = telemetry.map((frame) => ({
+  time: LIFTOFF + frame.t * 1000,
+  altitude: frame.altitude,
+}));
+
 export default {
-  data: largeQuakes,
+  data: rows,
   x: 'time',
-  series: [{ type: 'scatter', y: 'mag', label: 'Magnitude' }],
+  series: [{ y: 'altitude', label: 'Altitude (km)' }],
   axes: { x: { type: 'time' } },
   timeZone: 'UTC',
-  ariaLabel:
-    'Magnitude of each M4.5 or larger quake near Ridgecrest in 2019, by time',
-} satisfies ChartOptions<Quake>;
+  ariaLabel: 'Altitude of a simulated launch by clock time, UTC',
+} satisfies ChartOptions<(typeof rows)[number]>;

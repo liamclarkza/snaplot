@@ -5,6 +5,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { fly } from '../../src/demos/max-q/flight';
 import { DEMOS } from '../../src/lib/demos';
 import { BASE, DESKTOP, PHONE, watch } from './page-checks';
 
@@ -17,20 +18,13 @@ const lines = (slug: string, file: string) =>
 
 /** The size each row states, counted from the data files. */
 const SIZES: Record<string, () => string[]> = {
-  'ridgecrest-aftershocks': () => [
-    lines('ridgecrest-aftershocks', 'events.csv').toLocaleString('en-US'),
-  ],
-  'central-park-summer': () => [
-    String(
-      (
-        JSON.parse(
-          readFileSync(join(site, 'public/data/central-park-summer/summer.json'), 'utf8'),
-        ) as {
-          summer2025: unknown[];
-        }
-      ).summer2025.length,
-    ),
-    '1869',
+  'max-q': () => [fly().frames.length.toLocaleString('en-US')],
+  'hottest-year': () => [
+    (
+      JSON.parse(readFileSync(join(site, 'public/data/hottest-year/daily.json'), 'utf8')) as {
+        temps: unknown[];
+      }
+    ).temps.length.toLocaleString('en-US'),
   ],
   'pick-a-checkpoint': () => [
     lines('pick-a-checkpoint', 'train.csv').toLocaleString('en-US'),

@@ -34,10 +34,10 @@ Three things in the options do the work:
 - `series` lists what to draw. Each `y` names a field; `label` is the name in the legend and the
   tooltip.
 
-`axes.y.format` writes the values as `66 °F` on the ticks and in the tooltip, and `ariaLabel` is
+`axes.y.format` writes the values as `16.5 °C` on the ticks and in the tooltip, and `ariaLabel` is
 the name a screen reader announces.
 
-TypeScript checks the field names against the rows: `y: 'hgih'` is a compile error, and at run
+TypeScript checks the field names against the rows: `y: 'tmep'` is a compile error, and at run
 time a field that no row has throws an error that names the closest field.
 
 ## What you get by default

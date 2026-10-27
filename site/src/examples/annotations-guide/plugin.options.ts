@@ -1,9 +1,12 @@
 import type { ChartOptions, ChartPlugin } from 'snaplot';
-import { type SummerDay, summer2025 } from '../data/central-park';
+import {
+  type GlobalDay,
+  summer2024,
+} from '../data/global-temperature';
 
-// A plugin draws on the canvas with the chart's own scales: here, a tick from each day's low to
-// its high, under the lines.
-const dayRange: ChartPlugin<SummerDay> = {
+// A plugin draws on the canvas with the chart's own scales: here, a tick for each date's range in
+// 1991–2020, from its coolest to its warmest, under the line of 2024.
+const dayRange: ChartPlugin<GlobalDay> = {
   id: 'day-range',
   drawBelow(context, chart) {
     const x = chart.scale('x');
@@ -12,7 +15,7 @@ const dayRange: ChartPlugin<SummerDay> = {
     context.strokeStyle = 'rgba(0, 114, 178, 0.35)';
     context.lineWidth = 3;
     context.beginPath();
-    for (const day of summer2025) {
+    for (const day of summer2024) {
       const px = x.toPixel(day.date);
       context.moveTo(px, y.toPixel(day.low));
       context.lineTo(px, y.toPixel(day.high));
@@ -22,11 +25,11 @@ const dayRange: ChartPlugin<SummerDay> = {
 };
 
 export default {
-  data: summer2025,
+  data: summer2024,
   x: 'date',
-  series: [{ y: 'high', label: 'High' }],
-  axes: { y: { min: 40, max: 100, format: { suffix: ' °F' } } },
+  series: [{ y: 'temp', label: '2024' }],
+  axes: { y: { min: 15, max: 17.5, format: { suffix: ' °C' } } },
   plugins: [dayRange],
   ariaLabel:
-    'Daily high in Central Park in summer 2025, with each day drawn from its low to its high',
-} satisfies ChartOptions<SummerDay>;
+    'Daily global mean temperature in summer 2024, above a tick for each date’s 1991–2020 range',
+} satisfies ChartOptions<GlobalDay>;

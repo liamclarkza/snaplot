@@ -1,36 +1,29 @@
 import type { ChartOptions } from 'snaplot';
-import { dailyCounts, largeQuakes } from '../data/aftershocks';
+import { booster, telemetry } from '../data/launch';
 
 // Two datasets on one chart: each series brings its own `data` and names its own fields.
-const days = dailyCounts.map((d) => ({
-  time: Date.parse(`${d.day}T00:00:00Z`),
-  events: d.events,
-}));
-
 export default {
   series: [
     {
-      type: 'bar',
-      data: days,
-      x: 'time',
-      y: 'events',
-      label: 'Events per day',
+      id: 'rocket',
+      data: telemetry,
+      x: 'downrange',
+      y: 'altitude',
+      label: 'Rocket',
     },
     {
-      type: 'scatter',
-      data: largeQuakes,
-      x: 'time',
-      y: 'mag',
-      yAxis: 'mag',
-      label: 'M4.5 and over',
+      id: 'booster',
+      data: booster,
+      x: 'downrange',
+      y: 'altitude',
+      label: 'First stage after separation',
+      dash: [5, 4],
     },
   ],
   axes: {
-    x: { type: 'time' },
-    y: { title: 'Events per day' },
-    mag: { position: 'right', title: 'Magnitude', min: 4, max: 7 },
+    x: { title: 'Downrange (km)' },
+    y: { title: 'Altitude (km)' },
   },
-  timeZone: 'UTC',
   ariaLabel:
-    'Ridgecrest aftershocks, July to September 2019: events per day and M4.5+ quakes',
+    'A simulated launch: the rocket’s path to orbit and the first stage’s arc back down',
 } satisfies ChartOptions;

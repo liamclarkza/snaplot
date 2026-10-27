@@ -19,8 +19,8 @@ import { CACHE, DATA, HERE, REPO, SLICES, gzipSize, rel, sha256 } from './lib.mj
 
 /** slug → generator and outputs. */
 export const DEMOS = {
-  'ridgecrest-aftershocks': { script: 'ridgecrest-aftershocks.mjs', slices: ['aftershocks.ts'] },
-  'central-park-summer': { script: 'central-park-summer.mjs', slices: ['central-park.ts'] },
+  'max-q': { script: 'max-q.mjs', slices: ['launch.ts'] },
+  'hottest-year': { script: 'hottest-year.mjs', slices: ['global-temperature.ts'] },
   'pick-a-checkpoint': { script: 'train-digits.mjs', slices: ['training.ts'] },
   'battery-payback': { script: 'battery-payback.mjs', slices: ['household.ts'] },
   'find-the-clipping': {

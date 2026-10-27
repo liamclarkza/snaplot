@@ -11,13 +11,13 @@ export const noBuild = `<div id="chart"></div>
 <script type="module">
   import { createChart } from 'https://cdn.jsdelivr.net/npm/snaplot@${version}/+esm';
 
-  const highs = [66, 71, 79, 83, 87, 84, 76, 76, 64, 73, 81, 87, 78, 68, 64];
+  const temps = [16.57, 16.52, 16.48, 16.47, 16.51, 16.49, 16.5, 16.55, 16.61, 16.63, 16.68];
   createChart(document.getElementById('chart'), {
-    data: highs.map((high, i) => ({ day: i + 1, high })),
+    data: temps.map((temp, i) => ({ day: i + 1, temp })),
     x: 'day',
-    series: [{ y: 'high' }],
+    series: [{ y: 'temp' }],
     height: 280,
-    ariaLabel: 'Daily high temperature in Central Park, June 2025',
+    ariaLabel: 'Daily global mean temperature, June 2024',
   });
 </script>`;
 
@@ -35,8 +35,8 @@ import { createChart } from 'snaplot';
 const chart = createChart(document.getElementById('temps')!, {
   data: rows,
   x: 'date',
-  series: [{ y: 'high', label: 'High' }],
-  ariaLabel: 'Daily high in Central Park',
+  series: [{ y: 'temp', label: 'Global mean' }],
+  ariaLabel: 'Daily global mean temperature',
 });
 // later, when the element goes away:
 chart.destroy();

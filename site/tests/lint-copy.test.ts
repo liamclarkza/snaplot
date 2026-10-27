@@ -80,10 +80,9 @@ const PROPER = new Set([
   'TypeScript',
   'JavaScript',
   'Chart.js',
-  'NOAA',
-  'Central',
-  'Park',
-  'Ridgecrest',
+  'Copernicus',
+  'ERA5',
+  'Kármán',
   'Internet',
   'Archive',
 ]);

@@ -1,14 +1,16 @@
 import type { ChartOptions } from 'snaplot';
-import { type DailyCount, dailyCounts } from '../data/aftershocks';
+import { type LaunchFrame, telemetry } from '../data/launch';
 
-// Earthquakes per day around Ridgecrest, 2019: a log axis keeps the quiet weeks readable next to
-// the day of the M7.1.
+// The altitude of a simulated launch: a log axis keeps the first seconds off the pad readable
+// next to the climb to 200 km.
 export default {
-  data: dailyCounts,
-  x: 'day',
-  series: [{ type: 'bar', y: 'events', label: 'Events per day' }],
-  axes: { y: { type: 'log', title: 'Events per day' } },
-  timeZone: 'UTC',
+  data: telemetry,
+  x: 't',
+  series: [{ y: 'altitude', label: 'Altitude' }],
+  axes: {
+    x: { title: 'Seconds after liftoff' },
+    y: { type: 'log', title: 'Altitude (km)' },
+  },
   ariaLabel:
-    'Earthquakes per day near Ridgecrest, July to September 2019, on a log axis',
-} satisfies ChartOptions<DailyCount>;
+    'Altitude of a simulated launch against time, on a log axis',
+} satisfies ChartOptions<LaunchFrame>;

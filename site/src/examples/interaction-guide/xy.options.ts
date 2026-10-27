@@ -1,12 +1,15 @@
 import type { ChartOptions } from 'snaplot';
-import { largeQuakes, type Quake } from '../data/aftershocks';
+import { type LaunchFrame, telemetry } from '../data/launch';
 
 // Every series is a scatter, so zoom works on both axes and one finger pans on a phone.
 export default {
-  data: largeQuakes,
-  x: 'depth',
-  series: [{ type: 'scatter', y: 'mag', label: 'Quakes' }],
-  axes: { x: { title: 'Depth (km)' }, y: { title: 'Magnitude' } },
+  data: telemetry,
+  x: 'downrange',
+  series: [{ type: 'scatter', y: 'altitude', label: 'Rocket' }],
+  axes: {
+    x: { title: 'Downrange (km)' },
+    y: { title: 'Altitude (km)' },
+  },
   ariaLabel:
-    'Magnitude against depth for M4.5 or larger quakes near Ridgecrest in 2019',
-} satisfies ChartOptions<Quake>;
+    'The path of a simulated launch: altitude against distance downrange, every 4 seconds',
+} satisfies ChartOptions<LaunchFrame>;

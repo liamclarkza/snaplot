@@ -1,26 +1,27 @@
 import type { ChartOptions } from 'snaplot';
-import { type DailyCount, dailyCounts } from '../data/aftershocks';
+import { events, type LaunchFrame, telemetry } from '../data/launch';
 
-// The M7.1 main shock as a vertical line, the three weeks after it as a region and 100 a day as a
-// horizontal line. A maximum of 10,000 leaves headroom for the labels above the peak.
+// Max-Q and MECO as vertical lines, the first stage's burn as a region and the Kármán line at
+// 100 km as a horizontal line. Lines on the value axis are in its automatic range.
+const at = (id: string) =>
+  events.find((event) => event.id === id)?.t ?? 0;
+
 export default {
-  data: dailyCounts,
-  x: 'day',
-  series: [{ y: 'events', label: 'Events per day' }],
-  axes: { y: { type: 'log', title: 'Events per day', max: 10_000 } },
+  data: telemetry,
+  x: 't',
+  series: [{ y: 'altitude', label: 'Altitude' }],
+  axes: {
+    x: { title: 'Seconds after liftoff' },
+    y: { title: 'Altitude (km)' },
+  },
   referenceLines: [
-    { axis: 'x', value: '2019-07-06', label: 'M7.1' },
-    { axis: 'y', value: 100, label: '100 a day' },
+    { axis: 'x', value: at('maxq'), label: 'Max-Q' },
+    { axis: 'x', value: at('meco'), label: 'MECO' },
+    { axis: 'y', value: 100, label: 'Kármán line' },
   ],
   referenceRegions: [
-    {
-      axis: 'x',
-      from: '2019-07-06',
-      to: '2019-07-27',
-      label: 'First three weeks',
-    },
+    { axis: 'x', from: 0, to: at('meco'), label: 'First stage' },
   ],
-  timeZone: 'UTC',
   ariaLabel:
-    'Earthquakes per day near Ridgecrest in 2019, with the M7.1 and the three weeks after it marked',
-} satisfies ChartOptions<DailyCount>;
+    'Altitude of a simulated launch, with Max-Q, MECO, the first stage’s burn and the Kármán line marked',
+} satisfies ChartOptions<LaunchFrame>;

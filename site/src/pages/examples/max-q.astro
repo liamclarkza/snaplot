@@ -1,0 +1,180 @@
+---
+/**
+ * "When does the rocket hit Max-Q?" (max-q): a vanilla page in the manner of a launch webcast's
+ * mission display. A simulated flight replays as live telemetry: the mission clock, six readouts,
+ * the flight events and four linked charts. The page is made by src/demos/max-q/main.ts; the model
+ * is src/demos/max-q/flight.ts.
+ */
+import '@fontsource/inter/latin-400.css';
+import '@fontsource/inter/latin-500.css';
+import '@fontsource/inter/latin-600.css';
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import '../../demos/max-q/mission.css';
+import source from '../../../public/data/max-q/SOURCE.md?raw';
+import { fly } from '../../demos/max-q/flight';
+import { clock } from '../../demos/max-q/answer';
+
+const slug = 'max-q';
+const section = (name: string) =>
+  new RegExp(`^## ${name}\\n+(.+)$`, 'm').exec(source)?.[1]?.trim() ?? '';
+const attribution = section('Attribution');
+const licence = section('Licence');
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const repo = 'https://github.com/liamclarkza/snaplot/tree/main';
+const page = new URL(Astro.url.pathname, Astro.site).href;
+const question = 'When does the rocket hit Max-Q?';
+// The same flight the page replays, for the event strip's times.
+const { events } = fly();
+const tiles = [
+  ['speed', 'Speed', 'km/h'],
+  ['altitude', 'Altitude', 'km'],
+  ['accel', 'Acceleration', 'g'],
+  ['q', 'Dynamic pressure', 'kPa'],
+  ['mach', 'Mach', ''],
+  ['downrange', 'Downrange', 'km'],
+] as const;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>{question} · snaplot examples</title>
+    <meta
+      name="description"
+      content="A simulated two-stage launch to orbit, replayed as live telemetry: altitude, speed, dynamic pressure and acceleration, with Max-Q, MECO and SECO. Vanilla JS with snaplot."
+    />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <link rel="canonical" href={page} />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="snaplot" />
+    <meta property="og:title" content={question} />
+    <meta property="og:url" content={page} />
+    <meta property="og:image" content={new URL(`${base}examples/${slug}.jpg`, Astro.site).href} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <main class="mission" data-demo={slug} data-state="paused">
+      <header class="mission-bar">
+        <div class="mission-name">
+          <span class="mission-badge">Simulated</span>
+          <span>SNP-1 · two-stage launch to low Earth orbit</span>
+        </div>
+        <div class="mission-clock">
+          <span class="mission-stage" data-part="stage">Stage 1 burn</span>
+          <span class="clock num" data-part="clock" aria-live="off">T+00:00</span>
+        </div>
+        <div class="mission-controls" role="group" aria-label="Replay">
+          <button type="button" class="control control-play" data-part="play" aria-pressed="false">
+            Play
+          </button>
+          <span class="speeds" role="group" aria-label="Replay speed">
+            <button type="button" class="control" data-speed="1" aria-pressed="false">1×</button>
+            <button type="button" class="control" data-speed="10" aria-pressed="true">10×</button>
+            <button type="button" class="control" data-speed="50" aria-pressed="false">50×</button>
+          </span>
+          <button type="button" class="control" data-part="skip">Skip to orbit</button>
+        </div>
+      </header>
+
+      <section class="question" aria-labelledby="question-title">
+        <h1 id="question-title">{question}</h1>
+        <p class="answer" data-part="answer">Flying the mission…</p>
+        <p class="highlights" data-part="highlights"></p>
+      </section>
+
+      <section class="telemetry" aria-label="Telemetry">
+        <div class="telemetry-head">
+          <h2>Telemetry</h2>
+          <span class="readout-note" data-part="readout-note">Live</span>
+        </div>
+        <dl class="readout">
+          {
+            tiles.map(([id, label, unit]) => (
+              <div class={`reading reading-${id}`}>
+                <dt>{label}</dt>
+                <dd>
+                  <span class="num" data-part={`tile-${id}`}>
+                    0
+                  </span>
+                  {unit && <span class="unit">{unit}</span>}
+                </dd>
+              </div>
+            ))
+          }
+        </dl>
+      </section>
+
+      <section class="events" aria-labelledby="events-title">
+        <h2 id="events-title">Flight events</h2>
+        <div class="track" data-part="progress">
+          {events.map((e) => <span class="track-dot" data-t={e.t} />)}
+        </div>
+        <ol class="chips">
+          {
+            events.map((e) => (
+              <li>
+                <button
+                  type="button"
+                  class="chip"
+                  data-event={e.id}
+                  data-t={e.t}
+                  data-state="upcoming"
+                  disabled
+                >
+                  <span class="chip-time num">{clock(e.t)}</span>
+                  <span class="chip-label">{e.label}</span>
+                </button>
+              </li>
+            ))
+          }
+          <li>
+            <button type="button" class="chip chip-whole" data-part="whole">Whole flight</button>
+          </li>
+        </ol>
+        <p class="hint">
+          After the flight, pick an event to zoom the charts to the minute around it.{' '}
+          <span class="hint-mouse">Point at a chart to read every instrument at that moment.</span>
+          <span class="hint-touch">Touch a chart to read every instrument at that moment.</span>
+        </p>
+      </section>
+
+      <div class="panels">
+        <section class="panel" aria-labelledby="ascent-title">
+          <h2 id="ascent-title">Altitude and speed</h2>
+          <div class="chart" data-part="ascent"></div>
+        </section>
+        <section class="panel" aria-labelledby="pressure-title">
+          <h2 id="pressure-title">Dynamic pressure</h2>
+          <p class="panel-note">The aerodynamic load: ½ × air density × speed².</p>
+          <div class="chart" data-part="pressure"></div>
+        </section>
+        <section class="panel" aria-labelledby="accel-title">
+          <h2 id="accel-title">Acceleration and throttle</h2>
+          <div class="chart" data-part="accel"></div>
+        </section>
+        <section class="panel" aria-labelledby="trajectory-title">
+          <h2 id="trajectory-title">Trajectory</h2>
+          <div class="chart" data-part="trajectory"></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="demo-footer">
+      <a href={`${base}examples/`}>← Examples</a>{' · '}
+      <a href={`${repo}/site/src/demos/${slug}`}>Source</a>{' · '}
+      <span data-attribution>Data: {attribution} ({licence})</span>
+    </footer>
+
+    <script>
+      import { mount } from '../../demos/max-q/main';
+
+      const root = document.querySelector<HTMLElement>('[data-demo]');
+      // The charts and the replay are on `window.demo` for the page's tests and the console.
+      if (root) Object.assign(window, { demo: mount(root) });
+    </script>
+  </body>
+</html>

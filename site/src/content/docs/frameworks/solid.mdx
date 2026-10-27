@@ -22,10 +22,10 @@ const [log, setLog] = createSignal(false);
 <Chart
   data={days}
   x="date"
-  series={[{ y: 'high', label: 'High' }]}
+  series={[{ y: 'temp', label: 'Global mean' }]}
   axes={{ y: { type: log() ? 'log' : 'linear' } }}
   height={280}
-  ariaLabel="Daily high in Central Park"
+  ariaLabel="Daily global mean temperature"
 />;
 ```
 

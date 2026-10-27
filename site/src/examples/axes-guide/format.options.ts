@@ -1,20 +1,23 @@
 import type { ChartOptions } from 'snaplot';
-import { type SummerDay, summer2025 } from '../data/central-park';
+import {
+  type GlobalDay,
+  summer2024,
+} from '../data/global-temperature';
 
-// Daily highs in Central Park: a unit on the value axis, a fixed range, and month-and-day dates.
+// The global mean temperature in summer 2024: a unit on the value axis, a fixed range, and
+// month-and-day dates.
 export default {
-  data: summer2025,
+  data: summer2024,
   x: 'date',
-  series: [{ y: 'high', label: 'High' }],
+  series: [{ y: 'temp', label: '2024' }],
   axes: {
     x: { format: { month: 'short', day: 'numeric' } },
     y: {
-      title: 'Daily high',
-      min: 50,
-      max: 100,
-      format: { suffix: ' °F' },
+      title: 'Global mean',
+      min: 16,
+      max: 17.5,
+      format: { minimumFractionDigits: 1, suffix: ' °C' },
     },
   },
-  ariaLabel:
-    'Daily high temperature in Central Park, June to August 2025',
-} satisfies ChartOptions<SummerDay>;
+  ariaLabel: 'Daily global mean temperature, June to August 2024',
+} satisfies ChartOptions<GlobalDay>;

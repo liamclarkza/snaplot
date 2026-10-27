@@ -1,34 +1,37 @@
 import { createSignal } from 'solid-js';
 import { Chart, type ChartHandle, createCursor } from 'snaplot/solid';
-import { type SummerDay, summer2025 } from '../data/central-park';
+import {
+  type GlobalDay,
+  summer2024,
+} from '../data/global-temperature';
 
-// The daily high against its 1991–2020 normal range, with a line of text that follows the cursor.
-export default function HighsReadout() {
-  const [chart, setChart] = createSignal<ChartHandle<SummerDay>>();
+// 2024 against each date's 1991–2020 range, with a line of text that follows the cursor.
+export default function SummerReadout() {
+  const [chart, setChart] = createSignal<ChartHandle<GlobalDay>>();
   const cursor = createCursor(chart);
   const row = () => cursor()?.points[0]?.row;
   return (
     <>
       <Chart
         ref={setChart}
-        data={summer2025}
+        data={summer2024}
         x="date"
         series={[
           {
             type: 'band',
-            y: 'high',
-            lower: 'normalLow',
-            upper: 'normalHigh',
-            label: 'High',
+            y: 'temp',
+            lower: 'low',
+            upper: 'high',
+            label: '2024',
           },
         ]}
-        axes={{ y: { format: { suffix: ' °F' } } }}
+        axes={{ y: { format: { suffix: ' °C' } } }}
         height={220}
-        ariaLabel="Daily high in Central Park, summer 2025, against the normal range"
+        ariaLabel="Daily global mean temperature in summer 2024 against its 1991–2020 range"
       />
       <p>
         {row()
-          ? `${cursor()?.formattedX}: ${row()?.high} °F, normal ${row()?.normalLow}–${row()?.normalHigh} °F`
+          ? `${cursor()?.formattedX}: ${row()?.temp} °C, 1991–2020 ${row()?.low}–${row()?.high} °C`
           : 'Point at a day to read it.'}
       </p>
     </>

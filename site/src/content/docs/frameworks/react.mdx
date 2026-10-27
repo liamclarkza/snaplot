@@ -23,9 +23,9 @@ export function Temperatures({ days }: { days: Day[] }) {
     <Chart
       data={days}
       x="date"
-      series={[{ y: 'high', label: 'High' }]}
+      series={[{ y: 'temp', label: 'Global mean' }]}
       height={280}
-      ariaLabel="Daily high in Central Park"
+      ariaLabel="Daily global mean temperature"
     />
   );
 }

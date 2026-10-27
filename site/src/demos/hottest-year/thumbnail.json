@@ -1,6 +1,6 @@
 {
-  "slug": "ridgecrest-aftershocks",
-  "path": "examples/ridgecrest-aftershocks/",
+  "slug": "hottest-year",
+  "path": "examples/hottest-year/",
   "ready": "html[data-demo-ready]",
   "viewport": { "width": 1280, "height": 800 },
   "query": ""

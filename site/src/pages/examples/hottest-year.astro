@@ -1,0 +1,132 @@
+---
+/**
+ * "Was 2024 the hottest year on record?" (hottest-year): a vanilla page on the ERA5 daily global
+ * mean temperature, in the manner of a climate explainer: the warming stripes across the top, four
+ * headline figures, every year since 1940 on one calendar, and the ten warmest years. The charts
+ * are made by src/demos/hottest-year/main.ts.
+ */
+import '@fontsource/inter/latin-400.css';
+import '@fontsource/inter/latin-500.css';
+import '@fontsource/inter/latin-600.css';
+import '@fontsource/source-serif-4/latin-600.css';
+import '../../demos/hottest-year/climate.css';
+import source from '../../../public/data/hottest-year/SOURCE.md?raw';
+
+const slug = 'hottest-year';
+const section = (name: string) =>
+  new RegExp(`^## ${name}\\n+(.+)$`, 'm').exec(source)?.[1]?.trim() ?? '';
+const attribution = section('Attribution');
+const licence = section('Licence');
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const repo = 'https://github.com/liamclarkza/snaplot/tree/main';
+const page = new URL(Astro.url.pathname, Astro.site).href;
+const question = 'Was 2024 the hottest year on record?';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{question} · snaplot examples</title>
+    <meta
+      name="description"
+      content="The daily global mean temperature since 1940 from ERA5: the warming stripes, every year on one calendar, and the warmest years. Vanilla JS with snaplot."
+    />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <link rel="canonical" href={page} />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="snaplot" />
+    <meta property="og:title" content={question} />
+    <meta property="og:url" content={page} />
+    <meta property="og:image" content={new URL(`${base}examples/${slug}.jpg`, Astro.site).href} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <main class="climate" data-demo={slug}>
+      <header class="intro">
+        <p class="kicker">Global mean surface air temperature, 1940 to today</p>
+        <h1>{question}</h1>
+        <p class="answer" data-part="answer">Loading 31,000 days of ERA5…</p>
+        <p class="detail" data-part="detail"></p>
+      </header>
+
+      <figure class="stripes-figure">
+        <div class="stripes" data-part="stripes"></div>
+        <figcaption>
+          Each stripe is a year, from blue (cooler than the 1991–2020 average) to red (warmer);
+          the white line is the year’s anomaly.{' '}
+          <span class="hint-mouse">Click a stripe to follow that year below.</span>
+          <span class="hint-touch">Tap a stripe to follow that year below.</span>
+        </figcaption>
+      </figure>
+
+      <dl class="stats">
+        <div class="stat">
+          <dt>2024’s average</dt>
+          <dd><span class="num" data-part="stat-mean">–</span><span class="unit">°C</span></dd>
+        </div>
+        <div class="stat">
+          <dt>Above 1991–2020</dt>
+          <dd><span class="num" data-part="stat-anomaly">–</span><span class="unit">°C</span></dd>
+        </div>
+        <div class="stat">
+          <dt>Warmest day, <span data-part="stat-day-date">–</span></dt>
+          <dd><span class="num" data-part="stat-day">–</span><span class="unit">°C</span></dd>
+        </div>
+        <div class="stat">
+          <dt>Dates whose record 2024 still holds</dt>
+          <dd><span class="num" data-part="stat-records">–</span><span class="unit">of 366</span></dd>
+        </div>
+      </dl>
+
+      <section class="block" aria-labelledby="lines-title">
+        <div class="block-head">
+          <h2 id="lines-title">Every year since 1940, day by day</h2>
+          <label class="year-pick">
+            <span>Follow</span>
+            <select data-part="year"></select>
+          </label>
+        </div>
+        <p class="chosen" data-part="chosen"></p>
+        <div class="key" aria-hidden="true">
+          <span class="key-group"
+            >cooler years <span class="key-ramp" data-part="ramp"></span> warmer years</span
+          >
+          <span class="key-group"><span class="key-normal"></span> 1991–2020 mean</span>
+        </div>
+        <div class="chart chart-lines" data-part="lines"></div>
+        <p class="note">
+          <span class="hint-mouse"
+            >Point at a day to read it; drag across to zoom, double-click to see the year.</span
+          >
+          <span class="hint-touch">Touch and hold a day to read it; pinch to zoom.</span>
+        </p>
+      </section>
+
+      <section class="block" aria-labelledby="warmest-title">
+        <h2 id="warmest-title">The ten warmest years</h2>
+        <p class="note">Each complete year’s mean against 1991–2020.</p>
+        <div class="chart chart-warmest" data-part="warmest"></div>
+      </section>
+
+      <p class="through">
+        Daily data through <span data-part="through">–</span>. <span data-part="preliminary"></span>
+      </p>
+    </main>
+
+    <footer class="demo-footer">
+      <a href={`${base}examples/`}>← Examples</a>{' · '}
+      <a href={`${repo}/site/src/demos/${slug}`}>Source</a>{' · '}
+      <span data-attribution>Data: {attribution} ({licence})</span>
+    </footer>
+
+    <script>
+      import { mount } from '../../demos/hottest-year/main';
+
+      const root = document.querySelector<HTMLElement>('[data-demo]');
+      // The charts are on `window.demo` for the page's tests and for anyone at the console.
+      if (root) void mount(root).then((demo) => Object.assign(window, { demo }));
+    </script>
+  </body>
+</html>

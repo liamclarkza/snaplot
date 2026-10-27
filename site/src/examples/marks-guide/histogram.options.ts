@@ -1,17 +1,20 @@
 import { type ChartOptions, histogram } from 'snaplot';
-import { largeQuakes } from '../data/aftershocks';
+import { anomalies2024 } from '../data/global-temperature';
 
-// How the M4.5+ magnitudes are distributed: histogram() bins them on nice edges.
+// How far each day of 2024 was from its 1991–2020 mean: histogram() bins them on nice edges.
 export default {
   series: [
     {
       type: 'histogram',
-      id: 'magnitudes',
-      label: 'Quakes',
-      data: histogram(largeQuakes.map((quake) => quake.mag)),
+      id: 'anomalies',
+      label: 'Days',
+      data: histogram(anomalies2024),
     },
   ],
-  axes: { x: { title: 'Magnitude' }, y: { title: 'Quakes' } },
+  axes: {
+    x: { title: 'Against 1991–2020 (°C)' },
+    y: { title: 'Days' },
+  },
   ariaLabel:
-    'Histogram of the magnitudes of M4.5 or larger quakes near Ridgecrest in 2019',
+    'Histogram of how far each day of 2024 was from its 1991–2020 mean, global mean temperature',
 } satisfies ChartOptions;

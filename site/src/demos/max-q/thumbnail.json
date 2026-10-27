@@ -1,0 +1,7 @@
+{
+  "slug": "max-q",
+  "path": "examples/max-q/",
+  "ready": "html[data-demo-ready]",
+  "viewport": { "width": 1280, "height": 800 },
+  "query": "?t=end"
+}

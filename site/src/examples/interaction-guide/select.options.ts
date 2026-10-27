@@ -1,14 +1,23 @@
 import type { ChartOptions } from 'snaplot';
-import { type DailyCount, dailyCounts } from '../data/aftershocks';
+import { type YearAnomaly, years } from '../data/global-temperature';
 
-// Drag across the chart to select days; Escape or a click outside the selection clears it.
+// Drag across the chart to select years; Escape or a click outside the selection clears it.
 export default {
-  data: dailyCounts,
-  x: 'day',
-  series: [{ type: 'bar', y: 'events', label: 'Events per day' }],
-  axes: { y: { type: 'log' } },
+  data: years,
+  x: 'year',
+  series: [
+    {
+      type: 'bar',
+      y: 'anomaly',
+      label: 'Against 1991–2020',
+      format: { maximumFractionDigits: 2, suffix: ' °C' },
+    },
+  ],
+  axes: {
+    x: { format: (year) => String(year) },
+    y: { format: { maximumFractionDigits: 1, suffix: ' °C' } },
+  },
   interaction: { drag: 'select', zoom: 'none' },
-  timeZone: 'UTC',
   ariaLabel:
-    'Earthquakes per day near Ridgecrest in 2019; drag to select a span of days',
-} satisfies ChartOptions<DailyCount>;
+    'Each year’s global mean temperature against 1991–2020, from 1940; drag to select a span of years',
+} satisfies ChartOptions<YearAnomaly>;

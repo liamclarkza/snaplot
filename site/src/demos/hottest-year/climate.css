@@ -1,0 +1,312 @@
+/*
+ * hottest-year: a modern climate explainer. Warm off-white paper, near-black ink, Source Serif 4
+ * for the question and Inter for everything else, the warming-stripes ramp as the page's only
+ * colour, and big tabular figures for the four numbers that answer it.
+ */
+:root {
+  --paper: #f7f3ea;
+  --ink: #15171c;
+  --ink-2: #4a4f5c;
+  --ink-3: #5c6170;
+  --rule: #e4e1da;
+  --warm: #cb181d;
+  --serif: "Source Serif 4", Georgia, serif;
+  --sans: Inter, system-ui, sans-serif;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+a {
+  color: #1f5fa8;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.climate {
+  max-width: 72rem;
+  margin-inline: auto;
+  padding: 0 1.5rem 2rem;
+}
+
+/* ─── The question ─── */
+.intro {
+  padding-block: 3rem 1.5rem;
+  max-width: 50rem;
+}
+
+.kicker {
+  margin: 0 0 0.5rem;
+  color: var(--warm);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+}
+
+.answer {
+  margin: 1rem 0 0;
+  font-size: 1.3125rem;
+  line-height: 1.45;
+}
+
+.detail {
+  margin: 0.5rem 0 0;
+  color: var(--ink-2);
+}
+
+/* ─── The stripes, the width of the page ─── */
+.stripes-figure {
+  margin: 0;
+}
+
+.stripes {
+  height: 180px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.stripes-figure figcaption,
+.note,
+.through {
+  margin: 0.625rem 0 0;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+}
+
+/* ─── Four numbers ─── */
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  margin: 1.5rem 0 0;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--rule);
+}
+
+.stat dt {
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+
+.stat dd {
+  margin: 0;
+}
+
+.stat .num {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.stat .unit {
+  margin-left: 0.25rem;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+}
+
+.stat:first-child .num,
+.stat:nth-child(2) .num {
+  color: var(--warm);
+}
+
+/* ─── The charts ─── */
+.block {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.block-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.year-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+}
+
+.year-pick select {
+  min-height: 2.25rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: 500 0.9375rem var(--sans);
+}
+
+.year-pick select:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.chosen {
+  margin: 0.375rem 0 0;
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
+.chosen::before {
+  content: "";
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.5rem;
+  border-radius: 3px;
+  background: var(--swatch, var(--warm));
+  vertical-align: -0.05em;
+}
+
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1.25rem;
+  margin-top: 0.875rem;
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+
+.key-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.key-ramp {
+  width: 6rem;
+  height: 0.5rem;
+  border-radius: 2px;
+  display: inline-flex;
+  overflow: hidden;
+}
+
+.key-step {
+  flex: 1;
+  background: var(--step);
+}
+
+.key-normal {
+  width: 1.5rem;
+  border-top: 1.5px dashed var(--ink);
+}
+
+.chart {
+  margin-top: 0.75rem;
+}
+
+.chart-lines {
+  height: 420px;
+}
+
+.chart-warmest {
+  height: 260px;
+}
+
+.tip {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.tip p {
+  margin: 0;
+}
+
+.tip-head {
+  font-weight: 600;
+}
+
+.hint-touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .hint-mouse {
+    display: none;
+  }
+
+  .hint-touch {
+    display: inline;
+  }
+}
+
+/* ─── Footer ─── */
+.demo-footer {
+  width: calc(100% - 3rem);
+  max-width: calc(72rem - 3rem);
+  margin-inline: auto;
+  padding: 1rem 0 2rem;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+
+/* ─── Narrow screens ─── */
+@media (max-width: 40rem) {
+  .climate {
+    padding-inline: 1rem;
+  }
+
+  .intro {
+    padding-top: 2rem;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .answer {
+    font-size: 1.125rem;
+  }
+
+  .stripes {
+    height: 130px;
+  }
+
+  .chart-lines {
+    height: 320px;
+  }
+
+  .demo-footer {
+    width: calc(100% - 2rem);
+  }
+}

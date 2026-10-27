@@ -1,34 +1,37 @@
 import { type CursorSnapshot, createChart } from 'snaplot';
-import { type SummerDay, summer2025 } from '../data/central-park';
+import {
+  type GlobalDay,
+  summer2024,
+} from '../data/global-temperature';
 
-// The daily high against its 1991–2020 normal range, with a line of text that follows the cursor.
-export default function highsReadout(el: HTMLElement) {
+// 2024 against each date's 1991–2020 range, with a line of text that follows the cursor.
+export default function summerReadout(el: HTMLElement) {
   const plot = document.createElement('div');
   const readout = document.createElement('p');
   el.append(plot, readout);
 
-  const chart = createChart<SummerDay>(plot, {
-    data: summer2025,
+  const chart = createChart<GlobalDay>(plot, {
+    data: summer2024,
     x: 'date',
     series: [
       {
         type: 'band',
-        y: 'high',
-        lower: 'normalLow',
-        upper: 'normalHigh',
-        label: 'High',
+        y: 'temp',
+        lower: 'low',
+        upper: 'high',
+        label: '2024',
       },
     ],
-    axes: { y: { format: { suffix: ' °F' } } },
+    axes: { y: { format: { suffix: ' °C' } } },
     height: 220,
     ariaLabel:
-      'Daily high in Central Park, summer 2025, against the normal range',
+      'Daily global mean temperature in summer 2024 against its 1991–2020 range',
   });
 
-  const show = (cursor: CursorSnapshot<SummerDay>) => {
+  const show = (cursor: CursorSnapshot<GlobalDay>) => {
     const row = cursor.points[0]?.row;
     readout.textContent = row
-      ? `${cursor.formattedX}: ${row.high} °F, normal ${row.normalLow}–${row.normalHigh} °F`
+      ? `${cursor.formattedX}: ${row.temp} °C, 1991–2020 ${row.low}–${row.high} °C`
       : 'Point at a day to read it.';
   };
   show(chart.getCursor());
