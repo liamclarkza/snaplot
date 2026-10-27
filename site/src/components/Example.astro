@@ -161,6 +161,31 @@ const tabs = FRAMEWORKS.map((framework) => ({
     display: block;
     height: var(--chartHeight);
   }
+  /* Controls an example adds of its own (month buttons, Back to live) take the site's quiet
+     style rather than the browser's; snaplot's own buttons keep theirs. */
+  .example-output :global([role='group']) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .example-output :global(button:not([class*='snaplot'])) {
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--snaplot-ink);
+    background: var(--snaplot-surface);
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius);
+    padding: 0.25rem 0.75rem;
+    margin: 0 0 0.75rem;
+    cursor: pointer;
+  }
+  .example-output :global([role='group'] > button:not([class*='snaplot'])) {
+    margin: 0;
+  }
+  .example-output :global(button:not([class*='snaplot']):hover) {
+    border-color: var(--snaplot-ink-secondary);
+  }
 </style>
 
 <script>

@@ -43,7 +43,7 @@ export default function validationLoss(el: HTMLElement) {
       y: { format: { maximumFractionDigits: 3 } },
     },
     legend: false,
-    height: 180,
+    height: 160,
     ariaLabel:
       'Validation loss per epoch, baseline and regularised runs',
   });

@@ -29,6 +29,7 @@
 
 .snaplot-legend-step {
   color: var(--snaplot-legend-step-color, var(--snaplot-legend-muted, var(--snaplot-theme-muted)));
+  padding: 6px 8px 2px;
 }
 
 .snaplot-legend-table {
@@ -41,6 +42,8 @@
 
 .snaplot-legend-header {
   color: var(--snaplot-legend-muted, var(--snaplot-theme-muted));
+  font-weight: 500;
+  text-align: left;
   user-select: none;
 }
 
@@ -63,6 +66,11 @@
 
 .snaplot-legend-cell--value {
   font-variant-numeric: tabular-nums;
+}
+
+/* The name takes the spare width, so the value columns sit together at the right. */
+.snaplot-legend-cell--name {
+  width: 100%;
 }
 
 .snaplot-legend-swatch {

@@ -321,7 +321,8 @@ export function createLegendTable<Row = Record<string, any>>(
     const tr = document.createElement('tr');
     for (const column of current.columns) {
       const th = document.createElement('th');
-      th.className = 'snaplot-legend-header';
+      // The cells' classes too, so a header lines up with its column's padding and width.
+      th.className = `snaplot-legend-header snaplot-legend-cell snaplot-legend-cell--${typeof column === 'string' ? column : 'custom'}`;
       th.textContent = typeof column === 'string' ? HEADERS[column] : column.header;
       if (align(column)) th.style.textAlign = align(column);
       tr.append(th);
