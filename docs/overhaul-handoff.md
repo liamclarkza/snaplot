@@ -7,9 +7,30 @@ what a maintainer needs to review it and ship `1.0.0-beta.0`; the milestone hand
 ## Stop point
 
 Every milestone of the plan merged: M0–M9b, M10, M11 (and M11d), M12a, M12b, M13, M14, M15a, M15b, M16a–c, M16s,
-the M16 polish and M17. `node scripts/overhaul/trace-check.mjs` locks 224 of 224 closed units. The expected-failure ledger
-holds 6 markers: the five §6 won't-do parts, plus `perf:density-cache`, which M17 deferred. Three perf units
-that missed their gates are deferred, not claimed (see Known gaps).
+the M16 polish, M17 and a final polish pass. `node scripts/overhaul/trace-check.mjs` locks 226 of 226 closed
+units, and the expected-failure ledger holds only the five §6 won't-do parts. One perf unit that missed its gate,
+gap-perf-gate-03, is deferred, not claimed (see Known gaps).
+
+## Final pass
+
+After M17 a last review covered:
+- the homepage, the hub and the six demos at 1280, 1440, 1920 and 390 px;
+- every docs page in dark;
+- the search dialog, the 404 page and the API reference on a phone.
+
+Its commits (`ovh-polish-final-done`, then `ovh-polish-2-done`):
+
+- `7a75700` epoch numbers and ISO times on one axis make a time axis in either order
+- `9225155` a two-column examples gallery on wide screens, whole edge days in Central Park, no shortcut hint on
+  phones
+- `846adc0` wide screens use their width, sharp thumbnails on high-density screens, a taller traffic panel on
+  phones
+- `d4efa98` and `67906b5` sorted X extents from their ends, cached column extents, and density maps that pan
+  without rebinning (gap-perf-gate-05 and `perf:density-cache` closed; V62)
+- `fdf47bb` search excerpts without the beta banner or the footer; no Ctrl+K on the 404 page
+- `38ba656` the Linux visual baselines, and `scripts/visual-docker.sh` working under colima
+
+The final bench A/B passes: no required scenario is slower than 1.5× `overhaul-baseline`.
 
 ## What changed
 
@@ -45,7 +66,8 @@ baseline metrics (§4), the approved baselines (§5) and the outcome, bench tabl
   - The chart is one tab stop: a keyboard cursor, a live region, a figure name.
   - Touch follows page-friendly rules (D19), with the tooltip portalled into dialogs and fullscreen.
 - **Performance** (bench A/B against `overhaul-baseline`, desktop):
-  - a 1M-point line first-paints in 26.9 ms (was 122.5);
+  - a 1M-point line first-paints in 23 ms (was 124);
+  - a title-only update of 200k rows takes 0.23 ms (was 53), and a density map pans at 0.10× the baseline;
   - a hover on a 200k scatter costs 0.24× the baseline;
   - mounting 24 charts takes 0.52× and theme churn 0.22×;
   - no required scenario regresses (limit 1.5×).
@@ -58,7 +80,7 @@ Measured outcome against the plan's §0 targets (ADR 0002 §6):
 
 - **Met:** 3 entry points; runtime exports 4 / 6 / 6; option leaves 106 (target ≤ 110); handle 14 members and
   7 events; 1 legend implementation; largest file 850 lines (target ≤ 850).
-- **Missed:** library code lines 17,258 (target 10,500) and `createChart` 79.3 KiB gzip (target 50). ADR 0002
+- **Missed:** library code lines about 17,300 (target 10,500) and `createChart` 80.2 KiB gzip (target 50). ADR 0002
   §6 explains why. The size budgets are ratcheted to the measured size + 2%.
 
 ## Decisions to revisit
@@ -103,6 +125,7 @@ Every intentional pixel change since `overhaul-baseline`, with the commit to rev
 | V59 | scatter markers inside the plot, labelled short log axes, region labels that show | `4a09feb` | `git revert 4a09feb` |
 | V60 | the legend sits with its plot | `d5066c4` | `git revert d5066c4` |
 | V61 | time axes label every month on a phone | `31f4f40` | `git revert 31f4f40` |
+| V62 | density maps bin on a data-space lattice | `d4efa98` | `git revert d4efa98` |
 | V90 | reference lines, regions and plugins given at creation draw at mount again | `4a042b7` | `git revert 4a042b7` |
 
 A revert can conflict with later commits that build on the change. Revert one row at a time and rerun
@@ -112,29 +135,28 @@ A revert can conflict with later commits that build on the change. Revert one ro
 
 From `docs/backlog.md` §11 and the milestone handoffs:
 
-- **Deferred perf units.** Each is marked `wont-do` in `scripts/overhaul/trace-ids.json`, with its
-  measurement:
-  - **gap-perf-gate-03:** a hover at most 0.2 ms per move on a phone. Desktop measures 0.31–0.38 ms, and the
-    mobile profile was not run.
-  - **gap-perf-gate-05:** a title-only update of 200k rows under 2 ms. It measures 2.47 ms; the React inline
-    half is met.
-  - **`perf:density-cache`:** the density cache was not built. Its guard stays an expected failure.
-- **Other bench budgets missed** (non-blocking): streaming heap about 550 KB gross per append (budget 50); 20
-  offscreen charts paint at mount (budget 0); pinch fidelity 0.72 (budget 0.8).
-- **Size.** Code lines and the gzip size miss the §0 targets. One option-schema table in `public/` would remove
-  about 1,000 lines.
+- **Deferred perf unit:** gap-perf-gate-03, a hover at most 0.2 ms per move on a phone. Desktop measures
+  0.37–0.39 ms, and the mobile profile was not run. It is marked `wont-do` in `scripts/overhaul/trace-ids.json`
+  with that measurement.
+- **Other bench budgets missed** (non-blocking):
+  - streaming heap about 300–350 KB gross per append (budget 50);
+  - 20 offscreen charts paint at mount (budget 0);
+  - the offscreen share of 24 streaming charts is 0.29 (0.15);
+  - pinch fidelity 0.72 (0.8).
+- **Size.** About 17,300 code lines and 80.2 KiB gzip miss the §0 targets (10,500 and 50 KiB). One option-schema
+  table in `public/` would remove about 1,000 lines.
 - **Smaller gaps.**
   - Reference lines and regions do not extend the auto domain.
-  - The 44 px bottom gutter leaves 15–20 px under x labels when an axis has no title.
-  - The homepage and the hub keep a 1,176 px measure anchored left with the header, so a 1920 px screen
-    shows an empty band on the right (deliberate: nav, page and footer share one left edge).
-- **Tooling.** `check-visual-ledger` over the full range fails on V51–V53, which were committed in a docs commit;
-  from `ovh-m11-part2` on it passes.
-- **Fixed after M17** (`ovh/polish-final`): the hub is a two-column gallery on wide screens, Central Park's edge
-  days sit under the bands like the rest, the search shortcut hint is hidden on phones, and epoch numbers and ISO
-  times may share an axis in either order.
-- **Not run.** The bench mobile profile and the `--base v0.12.0 --filter legacy` comparison were not repeated
-  after M14. No real Android or iOS device was used: every touch check ran in Playwright emulation.
+  - An option update repaints the data layer even when the plot did not move (about 1 ms a frame on 200k
+    points).
+  - TypeDoc lists the React and Solid `ChartProps` as two identical "Extended by" links.
+- **Tooling.**
+  - `check-visual-ledger` over the full range fails on V51–V53, which were committed in a docs commit; from
+    `ovh-m11-part2` on it passes.
+  - The Linux baselines were rendered on linux/arm64. An amd64 run under emulation was killed for memory in the
+    2 GiB colima VM, so if CI's amd64 runners differ, refresh them there with the `update-snapshots` workflow.
+- **Not run.** The bench mobile profile and the `--base v0.12.0 --filter legacy` comparison. No real Android or
+  iOS device was used: every touch check ran in Playwright emulation.
 
 ## Draft PR description
 
@@ -183,13 +205,13 @@ From `docs/backlog.md` §11 and the milestone handoffs:
 > - Gates on the final tree: verify, browser 78, conformance 110, visual 706 (0 changed against the M16 tip),
 >   site 262, consumers, API, size, palettes, migration and `trace-check` (224 of 224 locked).
 >
-> **Not in this PR:** the deferred perf units and budgets in `docs/backlog.md` §11.
+> **Not in this PR:** the deferred mobile hover target and the budgets in `docs/backlog.md` §11.
 
 ## Human steps, in order
 
 1. Review the visual ledger above and revert anything disliked: `git revert <sha>`, then `npm run test:visual`.
-2. Push `overhaul` and watch the first CI run. Refresh the Linux visual baselines with the `update-snapshots`
-   workflow if the amd64 run was unavailable: local baselines are darwin.
+2. Push `overhaul` and watch the first CI run. The Linux visual baselines were rendered on linux/arm64; if the
+   amd64 visual job differs, refresh them with the `update-snapshots` workflow.
 3. Open a draft PR with the description above.
 4. Run `scripts/release.sh 1.0.0-beta.0`. It publishes on the `next` dist-tag, so `npm i snaplot` keeps
    installing 0.12.0.
@@ -204,7 +226,7 @@ From `docs/backlog.md` §11 and the milestone handoffs:
 
 Local backups: `/Users/liam/Projects/snaplot/.claude/backups/` holds:
 - `overhaul-baseline.bundle` and the per-milestone bundles;
-- `overhaul-final.bundle`: every branch and tag at M17;
+- `overhaul-final.bundle`: every branch and tag after the final pass;
 - `overhaul-audit.tar.gz`: the gitignored audit notes.
 
 ---
@@ -8085,7 +8107,7 @@ are compared with vanilla's by conformance #20).
   (pinch 2.34× → 1.14× after the visible-range hit grid) and ADR 0002 §5–§6 (`efb90cd`, `eead3cb`). M17 split
   `public/chart.ts` and `interaction/gestures.ts` again so the largest file is 850 lines.
 
-Closes: arch-14 (with M9b).
+Closes: arch-14 (with M9b), gap-perf-gate-05 (met after M17: 0.23 ms against 2 on desktop).
 
 ### Gates
 
@@ -8102,9 +8124,9 @@ None.
 
 ### Known gaps
 
-gap-perf-gate-05 is deferred: `reingest-rows-200k-title` measures 2.47 ms against 2 (its React half, 0.115 ms
-against 3, is met). The density cache (`perf:density-cache`) was not built; its guard stays an expected failure.
-Both are in `docs/backlog.md`.
+At M14, gap-perf-gate-05 missed (`reingest-rows-200k-title` 2.47 ms against 2) and the density cache
+(`perf:density-cache`) was not built. Both landed after M17: the auto-range reads a sorted X from its ends and
+caches whole-column extents (0.23 ms), and density maps bin on a data-space lattice.
 
 ### Data notes
 

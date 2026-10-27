@@ -213,23 +213,25 @@ right.
 | Light palette members below 3:1 | visuals-13:light | D9 and D22: the Okabe–Ito order is the approved look; legend, tooltip swatches and mark shape carry series identity; `lineWidth` 2 is the recorded proposal. | `check:palettes` enforcing the light palette | `:dark`, M11 |
 | PNG export | gap-environments-04, gap-annotations-extensibility-10 | D28: one text path; not asked for. | see D36 | — |
 
-## 11. Left open at M17
+## 11. Left open after the overhaul
 
-The overhaul closed every required finding except these. The three perf rows were deferred at M17 rather than
-claimed: `scripts/overhaul/trace-ids.json` marks them `wont-do` with the measurement in `lockNote`, so
-`trace-check` passes, and the overhaul handoff lists them for review. The `planned:M<N>` statuses above are the
-plan's; every finding id they name is now closed or deferred here.
+The overhaul closed every required finding except gap-perf-gate-03, which is deferred rather than claimed:
+`scripts/overhaul/trace-ids.json` marks it `wont-do` with the measurement in `lockNote`, so `trace-check` passes,
+and the overhaul handoff lists it for review. gap-perf-gate-05 and `perf:density-cache`, deferred at M17, were
+closed in the final pass (`perf(engine): sorted X extents…`). The `planned:M<N>` statuses above are the plan's;
+every finding id they name is now closed or listed here. Figures are the final
+`npm run bench:ab -- --base overhaul-baseline --profile desktop`.
 
 | Item | Finding | Status | Measured | Acceptance |
 |---|---|---|---|---|
-| A hover at most 0.2 ms per move on a mid-range phone | gap-perf-gate-03 | open | 0.31–0.38 ms on desktop (M16 bench); mobile not run | `bench hover-sync-{line,scatter,unsorted}-200k` on the mobile profile |
-| A title-only update of a 200k-row chart under 2 ms | gap-perf-gate-05 | open | 2.47 ms (the React inline half, 0.115 ms against 3, is met) | `bench reingest-rows-200k-title` ≤ 2 ms |
-| A density cache: a pan inside the cached bucket rebins nothing | perf:density-cache | open | the guard is an expected failure | `test/perf-guards.test.ts` › `[perf:density-cache]` passes |
-| Streaming heap per append about 550 KB gross (budget 50) | — | open | `stream20hz-50k-*` heap | `bench/gate.json` heap budgets met |
+| A hover at most 0.2 ms per move on a mid-range phone | gap-perf-gate-03 | open | 0.37–0.39 ms on desktop; the mobile profile was not run | `bench hover-sync-{line,scatter,unsorted}-200k` on the mobile profile |
+| Streaming heap per append about 300–350 KB gross (budget 50) | — | open | `stream20hz-50k-*` heap (550 KB at M14) | `bench/gate.json` heap budgets met |
 | 20 offscreen charts paint at mount (budget 0) | — | open | `mount-24-charts` | `mount-24-charts-offscreen-paints` ≤ 0 |
+| Offscreen share of 24 streaming charts 0.29 (budget 0.15) | — | open | `offscreen-stream-24` | `offscreen-stream-24-share` ≤ 0.15 |
 | Pinch-zoom fidelity 0.72 (budget 0.8) | — | open | `pinch-zoom-gesture-50k` | fidelity ≥ 0.8 |
+| An option update repaints the data layer even when the plot did not move | — | open | about 1 ms a frame on 200k points | a data-layer signature that skips the repaint |
 | Reference lines and regions do not extend the auto domain | — | open | — | an engine test: a line past the data stays in view |
-| Library size: 17,016 code lines and 78.7 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `node scripts/overhaul/metrics.mjs`; one option-schema table would remove about 1,000 lines |
+| Library size: about 17,300 code lines and 80.2 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `node scripts/overhaul/metrics.mjs`; one option-schema table would remove about 1,000 lines |
 
 ## Sources
 

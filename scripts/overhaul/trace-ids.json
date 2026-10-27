@@ -3074,12 +3074,12 @@
       "required": true,
       "owners": ["M8", "M14"],
       "rootCauses": ["RC1"],
-      "status": "wont-do",
+      "status": "tracked",
       "lock": {
         "kind": "gate",
         "name": "bench reingest-rows-200k-title ≤ 2/8 ms and react-rerender-200k-inline ≤ 3 ms"
       },
-      "lockNote": "deferred at M17 (docs/backlog.md): missed at the M14 and M16 bench runs; recorded in ADR 0002 §6 and the overhaul handoff for review (reingest-rows-200k-title 2.47 ms against 2; react-rerender-200k-inline 0.115 ms met its 3 ms)"
+      "lockNote": "Met after M17 (desktop): reingest-rows-200k-title 0.230 ms against 2, react-rerender-200k-inline 0.115 ms against 3 (npm run bench:ab -- --base overhaul-baseline --profile desktop). The mobile 8 ms half was not run."
     },
     "gap-perf-gate-06": {
       "severity": "medium",

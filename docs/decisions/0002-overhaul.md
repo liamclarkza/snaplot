@@ -1419,11 +1419,29 @@ $ npm run check:size
 - **Visual ledger over the full range.** `check-visual-ledger` from `overhaul-baseline` fails on V51–V53 only:
   those rows were committed in `docs(decisions): visual-ledger rows V51-V53 for M11 part 2` instead of in
   their fixing commit, and the check reads each row as of its commit. From `ovh-m11-part2` on it passes.
-- **Deferred at M17**, not claimed: gap-perf-gate-03 (hover per move on mobile), gap-perf-gate-05 (the title-only
-  re-ingest, 2.47 ms against 2) and `perf:density-cache`. `trace-ids.json` marks them `wont-do` with the
-  measurement, and `docs/backlog.md` §11 carries them with the other budget misses above.
+- **Deferred**, not claimed: gap-perf-gate-03 (hover per move on mobile). `trace-ids.json` marks it `wont-do` with
+  the measurement, and `docs/backlog.md` §11 carries it with the other budget misses above. gap-perf-gate-05 and
+  `perf:density-cache`, deferred at M17, closed in the final pass (below).
 - **Largest file.** M17 split `public/chart.ts` (the public handle and the event tables moved out) and
   `interaction/gestures.ts` (pointer geometry in `interaction/pointer.ts`), so the largest is 850 lines and the
   §0 target is met. Code lines are 17,258 (still missed).
 - **M16** (`ovh-m16-done`) was the site and example polish: V58–V61 and `docs/handoff/m16.md`. Its bench
   re-run passed (`firstpaint-line-1m` 26.9 ms, `hover-sync-scatter-200k` 0.24× the baseline).
+
+### Final pass (after M17)
+
+The last review (`ovh-polish-final-done`, then `ovh/polish-2`) fixed the hub, Central Park's edge days, the search
+excerpts, the wide-screen measure and the phone traffic panel. It wrote the Linux visual baselines
+(`scripts/visual-docker.sh --platform linux/arm64 --update`: 141 PNGs, and a compare run passes, 706), and closed
+two perf units:
+
+- **gap-perf-gate-05.** An option update rescanned every X and Y of a 200k-row chart for the auto-range. A sorted X
+  now gives its extent from its ends, and whole-column Y extents are cached at their data version:
+  `reingest-rows-200k-title` 0.230 ms (was 2.47; budget 2).
+- **`perf:density-cache`.** Density maps bin on a lattice fixed in data space with a margin, so a pan at the same
+  zoom draws a window of the cached bitmap (V62): `heatmap-pan-300k` 0.34 ms (0.10× the baseline).
+
+Bench A/B on the final tree, `npm run bench:ab -- --base overhaul-baseline --profile desktop`: **PASS**, no
+blocking failure. Budgets still missed (non-blocking): streaming heap about 300–350 KB gross per append (was 550;
+budget 50), the offscreen share 0.29 (0.15), offscreen paints at mount 20 (0) and pinch fidelity 0.72 (0.8).
+
