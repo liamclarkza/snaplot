@@ -217,15 +217,15 @@ test.describe('the homepage', () => {
     await expect(tooltip.first()).toBeVisible();
   });
 
-  // M12a: index tooltips anywhere along X (the 12 × 8 hover sweep shows 96 of 96); flip this when
-  // it merges.
+  // Index tooltips anywhere along X (M12a): the 12 × 8 hover sweep shows 96 of 96.
   test('[uisite-03:library] the hero tooltip shows anywhere over its plot', async ({ page }) => {
-    test.fail(true, '[uisite-03:library] M12a: tooltips only within 32 px of a line');
     await page.goto(BASE);
     await page.locator(HERO).scrollIntoViewIfNeeded();
     await page.locator('[data-hero-toggle]').click();
+    // The chart's canvases: the plot and its gutters, below the legend.
     const plot = await page
-      .locator(`${HERO} [role="tabpanel"][data-framework="vanilla"] [data-example-output]`)
+      .locator(`${HERO} [role="tabpanel"][data-framework="vanilla"] [data-example-output] canvas`)
+      .first()
       .boundingBox();
     if (!plot) throw new Error('no hero');
     let shown = 0;

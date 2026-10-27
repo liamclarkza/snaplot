@@ -112,8 +112,9 @@ describe('engine runtime options', () => {
 
     expect(layer.style.left).toBe(`${plot.left}px`);
     expect(layer.style.top).toBe(`${plot.top}px`);
-    expect(layer.style.width).toBe(`${plot.width}px`);
-    expect(layer.style.height).toBe(`${plot.height}px`);
+    // The right and bottom edge pixels are inside too.
+    expect(layer.style.width).toBe(`${plot.width + 1}px`);
+    expect(layer.style.height).toBe(`${plot.height + 1}px`);
   });
 
   it('expands the input layer over axes only when axis controls are enabled', () => {

@@ -5,6 +5,11 @@ import type { InteractionMode, Layout, PanConfig, TouchConfig, ZoomConfig } from
 
 class FakeTarget {
   readonly style: Record<string, string> = {};
+  /** The document a persisted tap tooltip listens on for a tap outside. */
+  readonly ownerDocument = { addEventListener() {}, removeEventListener() {}, defaultView: null };
+  contains(): boolean {
+    return true;
+  }
   private handlers = new Map<string, (event: Event) => void>();
   private keyHandlers = new Map<string, (event: Event) => void>();
   // Keyboard events are attached to the parent container, not the target.
@@ -27,6 +32,7 @@ class FakeTarget {
 
   setPointerCapture(): void {}
   releasePointerCapture(): void {}
+  focus(): void {}
 
   getBoundingClientRect(): DOMRect {
     return {
@@ -74,6 +80,7 @@ class FakeTarget {
 
   dispatchTouch(type: string, event: Partial<TouchEvent> = {}): TouchEvent {
     const dispatched = {
+      touches: [] as unknown as TouchList,
       preventDefault: vi.fn(),
       ...event,
     } as TouchEvent;
@@ -197,15 +204,21 @@ describe('GestureManager cursor emission', () => {
     manager.detach();
   });
 
-  it('prevents native touch gestures on interactive plot input', () => {
-    const { target, manager } = createGesture('analytical');
+  it('takes native touch gestures when one finger pans, and leaves them to the page under pan-y', () => {
+    const pans = createGesture('analytical', { touch: { drag: 'pan' } });
+    expect(pans.target.style.touchAction).toBe('none');
+    expect(pans.target.dispatchTouch('touchstart').preventDefault).toHaveBeenCalled();
+    expect(pans.target.dispatchTouch('touchmove').preventDefault).toHaveBeenCalled();
+    pans.manager.detach();
 
-    const touchStart = target.dispatchTouch('touchstart');
-    const touchMove = target.dispatchTouch('touchmove');
-
-    expect(touchStart.preventDefault).toHaveBeenCalled();
-    expect(touchMove.preventDefault).toHaveBeenCalled();
-    manager.detach();
+    const scrubs = createGesture('timeseries');
+    expect(scrubs.target.style.touchAction).toBe('pan-y');
+    expect(scrubs.target.dispatchTouch('touchmove').preventDefault).not.toHaveBeenCalled();
+    const pinch = scrubs.target.dispatchTouch('touchmove', {
+      touches: [{}, {}] as unknown as TouchList,
+    });
+    expect(pinch.preventDefault).toHaveBeenCalled();
+    scrubs.manager.detach();
   });
 
   it('supports opt-in one-finger touch panning', () => {
@@ -888,13 +901,14 @@ describe('GestureManager wheel axis anchoring', () => {
 });
 
 describe('GestureManager keyboard', () => {
-  it('does not preventDefault navigation keys when pan and zoom are disabled', () => {
+  it('does not preventDefault pan and zoom keys when pan and zoom are disabled', () => {
     const { target, manager } = createGesture('analytical', {
       zoom: { enabled: false },
       pan: { enabled: false },
     });
 
-    const left = target.dispatchKey('ArrowLeft');
+    // A plain arrow moves the keyboard cursor, which every interactive chart has.
+    const left = target.dispatchKey('ArrowLeft', { shiftKey: true });
     const plus = target.dispatchKey('+');
 
     expect(left.preventDefault).not.toHaveBeenCalled();

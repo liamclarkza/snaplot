@@ -32,7 +32,7 @@ import type { ColumnRangeIndex, ScatterColumnRangeIndex } from './data/columnRan
 import { axisReadout } from './format';
 import { deepMerge } from './merge';
 import { DEFAULT_CONFIG } from './defaults';
-import { applyThemeToElement, resolveTheme } from './theme/resolve';
+import { applyThemeToElement, clearThemeFromElement, resolveTheme } from './theme/resolve';
 import { cssColor, resolveColor } from './theme/color';
 import { type HostedPlugin, PluginHost } from './plugins';
 import { EngineEvents } from './events';
@@ -59,7 +59,12 @@ import {
   scrollToLatest,
 } from './viewport';
 import { getSelection, setSelection } from './selection';
-import { setCursorDataX, cancelPendingTouchCursor, getCursorSnapshot } from './cursor';
+import {
+  setCursorDataX,
+  cancelPendingTouchCursor,
+  getCursorSnapshot,
+  refreshCursor,
+} from './cursor';
 import { setHighlight } from './highlight';
 import { HitTester } from './hit';
 import { computeCustomXTicks } from './axes/ticks';
@@ -103,6 +108,8 @@ export class ChartCore implements EngineHost {
 
   // Public
   readonly container: HTMLElement;
+  /** Whether the host had a style attribute before mount. */
+  private readonly hostHadStyle: boolean;
 
   // Internal modules
   canvasManager: CanvasManager;
@@ -255,6 +262,7 @@ export class ChartCore implements EngineHost {
     trusted = false,
   ) {
     this.container = parent;
+    this.hostHadStyle = parent.hasAttribute?.('style') ?? true;
 
     // 1. Merge config with defaults
     this.config = deepMerge(
@@ -317,7 +325,8 @@ export class ChartCore implements EngineHost {
     // the global override (applies to both touch and mouse). Otherwise
     // HitTester picks per-pointer defaults: 44 px for touch, 32 for mouse.
     this.hitTester = new HitTester(this.config.touch?.hitRadius);
-    this.tooltipManager = new TooltipManager(this.theme);
+    this.tooltipManager = new TooltipManager(this.theme, parent);
+    this.canvasManager.setInteractive(this.config.mode !== 'readonly');
 
     this.gestureManager = new GestureManager(
       this.canvasManager.interactionLayer,
@@ -328,6 +337,10 @@ export class ChartCore implements EngineHost {
       () => this.config.pan ?? { enabled: true, x: true },
       () => this.config.touch ?? {},
       this.canvasManager.container,
+      () => ({
+        cursorActive: this.cursorDataX !== null,
+        selectionActive: this.selection !== null || this.selectionBox !== null,
+      }),
     );
 
     // 9. Plugins are added after construction: the built-in annotations through use(), the
@@ -506,6 +519,7 @@ export class ChartCore implements EngineHost {
     if (fullReplace || partial.mode) {
       applyModePresets(this.config, partial);
       this.gestureManager.updateTouchAction();
+      this.canvasManager.setInteractive(this.config.mode !== 'readonly');
     }
 
     if (fullReplace || 'height' in partial) {
@@ -530,6 +544,8 @@ export class ChartCore implements EngineHost {
     // extent, so a config update does not knock a following chart off its
     // trailing window (matches initAxes).
     if (this.following) applyFollowWindow(this);
+    // The hover model under a still pointer: hidden series leave the tooltip.
+    refreshCursor(this);
     this.scheduler.markDirty(DirtyFlag.ALL);
     this.emitEvent('options:update', this.config);
     if (themeChanged) this.emitEvent('theme:update', this.theme);
@@ -581,6 +597,33 @@ export class ChartCore implements EngineHost {
     this.emitEvent('theme:update', next);
   }
 
+  /** The chart's accessible name (plan D20), shown on its interactive element. */
+  setAccessibleName(name: string): void {
+    this.canvasManager.setAccessibleName(name);
+  }
+
+  /**
+   * Read `text` in the chart's polite live region: the keyboard cursor's tooltip. Throttled to one
+   * announcement per 250 ms; the last text in a burst is the one read.
+   */
+  announce(text: string): void {
+    this.pendingAnnouncement = text;
+    if (this.announceTimer !== null) return;
+    const flush = () => {
+      this.announceTimer = null;
+      if (this.destroyed || this.pendingAnnouncement === null) return;
+      this.canvasManager.liveRegion.textContent = this.pendingAnnouncement;
+      this.pendingAnnouncement = null;
+      this.announceTimer = setTimeout(() => {
+        this.announceTimer = null;
+        if (this.pendingAnnouncement !== null) flush();
+      }, 250);
+    };
+    flush();
+  }
+  private pendingAnnouncement: string | null = null;
+  private announceTimer: ReturnType<typeof setTimeout> | null = null;
+
   getLayout(): Layout {
     return this.layout;
   }
@@ -627,6 +670,7 @@ export class ChartCore implements EngineHost {
     if (this.destroyed) return;
     this.destroyed = true;
 
+    if (this.announceTimer !== null) clearTimeout(this.announceTimer);
     cancelPendingTouchCursor(this);
     if (this.refineTimer !== null) {
       clearTimeout(this.refineTimer);
@@ -642,6 +686,12 @@ export class ChartCore implements EngineHost {
     this.eventBus.destroy();
     this.plugins.destroy(this);
     this.canvasManager.destroy();
+    // Leave the host's attributes as they were (plan D20): the theme tokens go, and a style
+    // attribute only they made.
+    clearThemeFromElement(this.container);
+    if (!this.hostHadStyle && this.container.getAttribute?.('style') === '') {
+      this.container.removeAttribute('style');
+    }
     this.events.clear();
   }
 

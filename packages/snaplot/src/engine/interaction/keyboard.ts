@@ -1,14 +1,17 @@
 /**
- * Keyboard shortcuts as a key → action table (plan §3.1): what each key emits on the gesture bus
- * while the chart container has focus. The GestureManager listens and calls `handleChartKey`; M12a
- * adds the keyboard cursor and the live region here.
+ * Keyboard shortcuts as a key → action table (plan §3.1, D20): what each key emits on the gesture
+ * bus while the chart has focus. The GestureManager listens and calls `handleChartKey`.
  *
- *   ArrowLeft / ArrowRight   pan X by PAN_STEP
- *   ArrowUp / ArrowDown      pan Y by PAN_STEP (if pan.y is enabled)
- *   Shift + Arrow            a larger step (PAN_STEP_FAST)
+ *   ArrowLeft / ArrowRight   move the cursor to the previous or next point
+ *   Home / End               the first or last point, once the cursor is on the chart
+ *   Shift + ArrowLeft/Right  pan X
+ *   ArrowUp / ArrowDown      pan Y (if pan.y is enabled)
  *   `+` / `=`                zoom in at the plot centre
  *   `-` / `_`                zoom out at the plot centre
- *   `0` / `Home`             reset zoom
+ *   `0`                      reset zoom
+ *   Escape                   clear the selection and hide the tooltip
+ *
+ * Ctrl, ⌘ and Alt combinations always reach the browser.
  */
 import type { Layout, PanConfig, ZoomConfig } from '../spec';
 import type { EventBus } from './bus';
@@ -18,13 +21,17 @@ const PAN_STEP_FAST = 120;
 /** 20% per key press, matching the wheel's feel. */
 const ZOOM_FACTOR = 1.2;
 
-/** What a key binding reads: the key event and the chart's layout, pan and zoom options. */
+/** What a key binding reads: the key event and the chart's layout, pan, zoom and state. */
 export interface KeyContext {
   readonly event: KeyboardEvent;
   readonly bus: EventBus;
   readonly layout: Layout;
   readonly pan: PanConfig;
   readonly zoom: ZoomConfig;
+  /** The cursor is on the chart (a hover or a key put it there). */
+  readonly cursorActive: boolean;
+  /** A brush or box selection is shown. */
+  readonly selectionActive: boolean;
 }
 
 /**
@@ -34,13 +41,11 @@ export interface KeyContext {
  */
 type KeyBinding = (context: KeyContext) => boolean;
 
-const step = (event: KeyboardEvent) => (event.shiftKey ? PAN_STEP_FAST : PAN_STEP);
-
 const panX =
   (sign: 1 | -1): KeyBinding =>
-  ({ event, bus, pan }) => {
+  ({ bus, pan }) => {
     if (!pan.enabled || pan.x === false) return false;
-    bus.emit('action:pan', { dx: sign * step(event), dy: 0 });
+    bus.emit('action:pan', { dx: sign * PAN_STEP_FAST, dy: 0 });
     return true;
   };
 
@@ -48,7 +53,25 @@ const panY =
   (sign: 1 | -1): KeyBinding =>
   ({ event, bus, pan }) => {
     if (!pan.enabled || !pan.y) return false;
-    bus.emit('action:pan', { dx: 0, dy: sign * step(event) });
+    bus.emit('action:pan', { dx: 0, dy: sign * (event.shiftKey ? PAN_STEP_FAST : PAN_STEP) });
+    return true;
+  };
+
+/** An arrow moves the cursor point by point; with Shift it pans. */
+const arrow =
+  (to: 'prev' | 'next'): KeyBinding =>
+  (context) => {
+    if (context.event.shiftKey) return panX(to === 'prev' ? 1 : -1)(context);
+    context.bus.emit('action:step-cursor', { to });
+    return true;
+  };
+
+/** Home and End jump to the ends once the cursor is on the chart; before that they scroll. */
+const end =
+  (to: 'first' | 'last'): KeyBinding =>
+  ({ bus, cursorActive }) => {
+    if (!cursorActive) return false;
+    bus.emit('action:step-cursor', { to });
     return true;
   };
 
@@ -66,9 +89,15 @@ const zoomBy =
     return true;
   };
 
-/** Reset always acts (the engine's resetZoom has no enable guard). */
-const resetZoom: KeyBinding = ({ bus }) => {
+const resetZoom: KeyBinding = ({ bus, zoom, pan }) => {
+  if (!zoom.enabled && !pan.enabled) return false;
   bus.emit('action:reset-zoom', undefined);
+  return true;
+};
+
+const clearShown: KeyBinding = ({ bus, cursorActive, selectionActive }) => {
+  if (!cursorActive && !selectionActive) return false;
+  bus.emit('action:escape', undefined);
   return true;
 };
 
@@ -77,8 +106,10 @@ const zoomOut = zoomBy(ZOOM_FACTOR);
 
 /** The key table, by `KeyboardEvent.key`. */
 export const KEY_BINDINGS: ReadonlyMap<string, KeyBinding> = new Map([
-  ['ArrowLeft', panX(1)],
-  ['ArrowRight', panX(-1)],
+  ['ArrowLeft', arrow('prev')],
+  ['ArrowRight', arrow('next')],
+  ['Home', end('first')],
+  ['End', end('last')],
   ['ArrowUp', panY(1)],
   ['ArrowDown', panY(-1)],
   ['+', zoomIn],
@@ -86,14 +117,16 @@ export const KEY_BINDINGS: ReadonlyMap<string, KeyBinding> = new Map([
   ['-', zoomOut],
   ['_', zoomOut],
   ['0', resetZoom],
-  ['Home', resetZoom],
+  ['Escape', clearShown],
 ]);
 
 /**
  * Run the binding of the event's key. Returns whether the chart acted, in which case the caller
- * prevents the key's default.
+ * prevents the key's default. A Ctrl, ⌘ or Alt combination is the browser's.
  */
 export function handleChartKey(context: KeyContext): boolean {
-  const binding = KEY_BINDINGS.get(context.event.key);
+  const { event } = context;
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  const binding = KEY_BINDINGS.get(event.key);
   return binding ? binding(context) : false;
 }

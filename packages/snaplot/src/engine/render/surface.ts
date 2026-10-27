@@ -1,4 +1,5 @@
 import { warnOnce } from '../errors';
+import { adoptStyles, styleRootOf } from '../../dom/styles';
 import { shared } from './scheduler';
 
 /** A side of the chart's root that chrome (the built-in legend) can take space from. */
@@ -96,6 +97,20 @@ function contentHeight(element: HTMLElement): number {
   );
 }
 
+/** The keys the chart's interactive element handles (plan D20). */
+const KEY_SHORTCUTS = 'ArrowLeft ArrowRight Home End Shift+ArrowLeft Shift+ArrowRight + - 0 Escape';
+const KEY_HINT = 'Arrow keys move between points, Shift and an arrow pans, + and − zoom, 0 resets.';
+const VISUALLY_HIDDEN =
+  'position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;';
+
+/**
+ * The focus ring (plan D20): a 2 px outline in the theme's accent, shown for keyboard focus only;
+ * the system highlight colour in forced colours.
+ */
+export const SURFACE_CSS = `.snaplot-surface{outline:none}
+.snaplot-surface:focus-visible{outline:2px solid var(--snaplot-theme-accent,#2563eb);outline-offset:2px}
+@media (forced-colors:active){.snaplot-surface:focus-visible{outline-color:Highlight}}`;
+
 /**
  * Creates and manages the 3-layer canvas stack + DOM overlay, and the space chrome reserves at
  * the top and bottom of the root (`reserveChrome`, a W5 contract: plan §3.2).
@@ -146,14 +161,16 @@ export class CanvasManager {
 
     // Container. `isolation: isolate` keeps the layers' z-indices inside the chart, so page
     // content above it is never painted under a canvas; `break-inside: avoid` keeps a printed
-    // chart on one page. `tabindex="0"` makes the chart keyboard-focusable,    // arrow-key pan / +/- zoom / 0-reset get wired up by GestureManager.
-    // We don't set `:focus-visible` styling here; consumers can target
-    // the container with their own CSS.
+    // chart on one page. It is the chart's interactive element (plan D20): a named
+    // `role="application"` tab stop with a focus ring from the injected stylesheet
+    // (`setInteractive`, `setAccessibleName`); the canvases and the label layer are hidden from
+    // assistive tech, and a polite live region reads the keyboard cursor.
+    adoptStyles(styleRootOf(parent), 'surface', SURFACE_CSS);
     this.container = document.createElement('div');
-    this.container.tabIndex = 0;
-    this.container.setAttribute('role', 'application');
+    this.container.className = 'snaplot-surface';
     this.container.style.cssText =
-      'position:relative;isolation:isolate;break-inside:avoid;max-width:100%;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:auto;border-radius:6px;outline:none;';
+      'position:relative;isolation:isolate;break-inside:avoid;max-width:100%;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:auto;border-radius:6px;';
+    this.setInteractive(true);
     parent.appendChild(this.container);
 
     // Create canvases
@@ -170,6 +187,7 @@ export class CanvasManager {
 
     // DOM overlay for text (P2: hybrid rendering)
     this.domLayer = document.createElement('div');
+    this.domLayer.setAttribute('aria-hidden', 'true');
     this.domLayer.style.cssText =
       'position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden;';
     this.container.appendChild(this.domLayer);
@@ -181,6 +199,48 @@ export class CanvasManager {
     this.interactionLayer.style.cssText =
       'position:absolute;z-index:4;background:transparent;pointer-events:auto;touch-action:none;';
     this.container.appendChild(this.interactionLayer);
+
+    this.liveRegion = document.createElement('div');
+    this.liveRegion.setAttribute('aria-live', 'polite');
+    this.liveRegion.setAttribute('aria-atomic', 'true');
+    this.liveRegion.style.cssText = VISUALLY_HIDDEN;
+    this.container.appendChild(this.liveRegion);
+  }
+
+  /** A polite live region inside the chart (`announce`). */
+  readonly liveRegion: HTMLDivElement;
+  private name = '';
+  private interactive = true;
+
+  /**
+   * Whether the chart takes keyboard input: an interactive chart is a named `application` tab
+   * stop; a readonly one is neither (plan D20).
+   */
+  setInteractive(interactive: boolean): void {
+    this.interactive = interactive;
+    if (interactive) {
+      this.container.tabIndex = 0;
+      this.container.setAttribute('role', 'application');
+      this.container.setAttribute('aria-roledescription', 'interactive chart');
+      this.container.setAttribute('aria-keyshortcuts', KEY_SHORTCUTS);
+    } else {
+      for (const name of ['tabindex', 'role', 'aria-roledescription', 'aria-keyshortcuts']) {
+        this.container.removeAttribute(name);
+      }
+    }
+    this.applyName();
+  }
+
+  /** The chart's accessible name; the interactive element adds how to use the keys. */
+  setAccessibleName(name: string): void {
+    this.name = name;
+    this.applyName();
+  }
+
+  private applyName(): void {
+    if (this.interactive && this.name) {
+      this.container.setAttribute('aria-label', `${this.name}. ${KEY_HINT}`);
+    } else this.container.removeAttribute('aria-label');
   }
 
   get dpr(): number {
@@ -395,6 +455,7 @@ export class CanvasManager {
 
   private createCanvas(zIndex: number): HTMLCanvasElement {
     const canvas = document.createElement('canvas');
+    canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = `position:absolute;inset:0;z-index:${zIndex};pointer-events:none;`;
     this.container.appendChild(canvas);
     return canvas;

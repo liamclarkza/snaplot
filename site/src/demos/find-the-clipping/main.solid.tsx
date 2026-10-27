@@ -132,7 +132,7 @@ export default function Editor() {
       toggle();
     } else if (
       (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
-      !target.closest('[role="group"]')
+      !target.closest('[role="application"]')
     ) {
       e.preventDefault();
       seek(position() + (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 0.1 : 1));

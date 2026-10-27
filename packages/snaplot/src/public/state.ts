@@ -63,6 +63,8 @@ export class Dispatcher<Events extends object> {
     private readonly read: (key: ReportedKey) => unknown,
     /** Delivers an event to its on<Key>Change option first. */
     private readonly option: (event: keyof Events, value: unknown) => void,
+    /** The event value of a changed key, when it says more than the state (a selection's points). */
+    private readonly present: (key: ReportedKey, value: unknown) => unknown = (_, value) => value,
   ) {}
 
   /**
@@ -168,7 +170,7 @@ export class Dispatcher<Events extends object> {
       if (equivalent(value, this.reported.get(key))) continue;
       this.reported.set(key, value);
       this.committed = true;
-      if (!this.silent.has(key)) changed.push([key, value]);
+      if (!this.silent.has(key)) changed.push([key, this.present(key, value)]);
     }
     this.pending.clear();
     this.silent.clear();

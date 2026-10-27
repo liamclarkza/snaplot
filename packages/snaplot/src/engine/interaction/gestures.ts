@@ -70,6 +70,11 @@ export class GestureManager {
     private getPanConfig: () => PanConfig,
     private getTouchConfig: () => TouchConfig,
     private coordinateTarget: HTMLElement = target,
+    /** What Home, End and Escape need to know: is the cursor on the chart, is a selection shown. */
+    private getKeyState: () => { cursorActive: boolean; selectionActive: boolean } = () => ({
+      cursorActive: false,
+      selectionActive: false,
+    }),
   ) {
     this.momentum = new PanMomentum(eventBus);
     this.boundPointerDown = this.onPointerDown.bind(this);
@@ -125,27 +130,69 @@ export class GestureManager {
     this.target.removeEventListener('touchcancel', this.boundTouchPreventDefault);
     this.keyboardTarget?.removeEventListener('keydown', this.boundKeyDown);
     this.keyboardTarget = null;
+    this.releaseTouchTooltip?.();
     this.clearLongPress();
     this.momentum.cancel();
     if (this.scrollResetTimer) clearTimeout(this.scrollResetTimer);
   }
 
   /** Update touch-action CSS based on current mode */
+  /**
+   * The touch rules (plan D19): a chart whose one-finger drag pans (`zoom: 'xy'`, `drag: 'pan'`)
+   * takes every touch (`none`); any other leaves vertical swipes to the page (`pan-y`), so a
+   * one-finger horizontal drag scrubs the cursor and two fingers pinch.
+   */
   updateTouchAction(): void {
-    const mode = this.getMode();
-    this.target.style.touchAction = mode === 'readonly' ? 'auto' : 'none';
+    const pans = this.getMode() !== 'readonly' && this.touchDragMode() === 'pan';
+    this.target.style.touchAction = pans ? 'none' : 'pan-y';
   }
 
   private onTouchPreventDefault(e: TouchEvent): void {
     if (this.getMode() === 'readonly') return;
-    e.preventDefault();
+    // Under pan-y the page keeps its vertical scroll; a pinch is always the chart's.
+    if (this.touchDragMode() === 'pan' || e.touches.length >= 2) e.preventDefault();
   }
+
+  /**
+   * A tap's tooltip stays after the finger lifts (plan D19), until a tap outside the chart or a
+   * scroll of the page.
+   */
+  private persistTouchTooltip(): void {
+    if (this.releaseTouchTooltip) return;
+    const doc = this.target.ownerDocument;
+    const view = doc.defaultView;
+    const dismiss = (event: Event) => {
+      if (event.type === 'pointerdown' && this.coordinateTarget.contains(event.target as Node)) {
+        return;
+      }
+      this.releaseTouchTooltip?.();
+      this.eventBus.emit('action:cursor-leave', undefined);
+    };
+    doc.addEventListener('pointerdown', dismiss, true);
+    view?.addEventListener('scroll', dismiss, { passive: true });
+    this.releaseTouchTooltip = () => {
+      doc.removeEventListener('pointerdown', dismiss, true);
+      view?.removeEventListener('scroll', dismiss);
+      this.releaseTouchTooltip = null;
+    };
+  }
+  private releaseTouchTooltip: (() => void) | null = null;
 
   // ─── Helpers ──────────────────────────────────────────────
 
+  /**
+   * The pointer in the chart's own CSS pixels: corrected for a CSS transform or `zoom` on an
+   * ancestor, which scale the on-screen box but not the layout (interact-12).
+   */
   private localCoords(e: PointerEvent | WheelEvent | MouseEvent): { x: number; y: number } {
-    const rect = this.coordinateTarget.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const target = this.coordinateTarget;
+    const rect = target.getBoundingClientRect();
+    // offsetWidth is a whole number and the box fractional: within a pixel there is no transform.
+    const scale = (box: number, layout: number) =>
+      layout > 0 && Math.abs(box - layout) > 1 ? box / layout : 1;
+    const sx = scale(rect.width, target.offsetWidth);
+    const sy = scale(rect.height, target.offsetHeight);
+    return { x: (e.clientX - rect.left) / sx, y: (e.clientY - rect.top) / sy };
   }
 
   private inPlotArea(x: number, y: number): boolean {
@@ -293,9 +340,10 @@ export class GestureManager {
     const area = this.getAxisArea(x, y);
     if (area.type === 'outside') return;
 
-    // Pointer interaction should not paint the browser's keyboard-focus ring.
-    // The element remains tabbable, so keyboard users retain the focus cue.
+    // Pointer interaction should not paint the browser's keyboard-focus ring, but it does focus
+    // the chart, so the keys work next (plan D20); :focus-visible keeps the ring for keyboard focus.
     if (!this.isTouchLike(e)) e.preventDefault();
+    if (mode !== 'readonly') this.coordinateTarget.focus({ preventScroll: true });
 
     if (this.isTouchLike(e) && area.type === 'plot') {
       if (mode !== 'readonly') e.preventDefault();
@@ -659,7 +707,8 @@ export class GestureManager {
       (state.kind === 'press' || state.kind === 'long-press-ready') &&
       state.pointerId === e.pointerId &&
       dist < MIN_DRAG_DISTANCE &&
-      elapsed < TAP_TIMEOUT
+      // A mouse click is a click however long it is held; a long touch is a press.
+      (ptr.pointerType === 'mouse' || elapsed < TAP_TIMEOUT)
     ) {
       const now = Date.now();
       if (this.isDoubleTapCandidate(x, y, now)) {
@@ -667,6 +716,7 @@ export class GestureManager {
         this.resetTapMemory();
       } else {
         this.eventBus.emit('action:tap', { x, y, pointerType: ptr.pointerType });
+        if (ptr.pointerType !== 'mouse') this.persistTouchTooltip();
         this.lastTapTime = now;
         this.lastTapX = x;
         this.lastTapY = y;
@@ -676,7 +726,9 @@ export class GestureManager {
     this.resetState();
   }
 
-  private onPointerLeave(_e: PointerEvent): void {
+  private onPointerLeave(e: PointerEvent): void {
+    // A finger lifting leaves the element too: a tap's tooltip persists (persistTouchTooltip).
+    if (this.isTouchLike(e) && this.releaseTouchTooltip) return;
     // Suppress cursor-leave while a gesture is in flight, pointer capture
     // keeps the drag alive even when the pointer briefly leaves the canvas
     // bounds. Without this guard the crosshair/tooltip flickers mid-pan.
@@ -719,6 +771,9 @@ export class GestureManager {
   private onWheel(e: WheelEvent): void {
     const mode = this.getMode();
     if (mode === 'readonly') return;
+    // A line- or page-mode notch zooms as much as a pixel-mode one (Firefox, some mice).
+    const deltaY =
+      e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
 
     const { x, y } = this.localCoords(e);
     const area = this.getAxisArea(x, y);
@@ -749,8 +804,8 @@ export class GestureManager {
         // Negative values are clamped to 0 (disabled); there's no
         // legitimate use for an inverted wheel.
         const strength = Math.max(0, zoom.wheelStep ?? DEFAULT_WHEEL_STEP);
-        const delta = Math.min(Math.abs(e.deltaY), 20) * 0.005;
-        const factor = e.deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
+        const delta = Math.min(Math.abs(deltaY), 20) * 0.005;
+        const factor = deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
         // Anchor and axis must agree: use the axis under the pointer now, not
         // the gesture-start axis. Crossing from one gutter into another within
         // the 200ms window would otherwise zoom the start axis anchored at a
@@ -772,13 +827,13 @@ export class GestureManager {
       if (area.type !== 'axis' || zoom.axis !== true) return;
     }
 
+    // Without zoom, Ctrl+wheel is the page's (the browser zoom).
+    if (!zoom.enabled) return;
     e.preventDefault();
 
-    if (!zoom.enabled) return;
-
     const strength = Math.max(0, zoom.wheelStep ?? DEFAULT_WHEEL_STEP);
-    const delta = Math.min(Math.abs(e.deltaY), 20) * 0.005;
-    const factor = e.deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
+    const delta = Math.min(Math.abs(deltaY), 20) * 0.005;
+    const factor = deltaY > 0 ? 1 + delta * strength * 10 : 1 / (1 + delta * strength * 10);
 
     let axis: string = 'xy';
     if (zoom.x && !zoom.y) axis = 'x';
@@ -824,6 +879,7 @@ export class GestureManager {
       layout: this.getLayout(),
       pan: this.getPanConfig(),
       zoom: this.getZoomConfig(),
+      ...this.getKeyState(),
     });
     if (handled) e.preventDefault();
   }

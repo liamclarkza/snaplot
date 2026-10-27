@@ -273,7 +273,7 @@ describe('marks', () => {
 });
 
 describe('hit testing', () => {
-  it.fails('[perf:hover-visits][gap-perf-gate-01:hover][arch-06:cursor] a hover on a sorted 200k scatter visits ≤ 64 points', () => {
+  it('[perf:hover-visits][gap-perf-gate-01:hover][arch-06:cursor] a hover on a sorted 200k scatter visits ≤ 64 points', () => {
     const n = 200_000;
     const chart = fakes.mount({
       data: columns(n, (i) => (i * 7919) % 1000),

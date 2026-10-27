@@ -10,6 +10,7 @@ import { formatValue, formatX } from '../engine/format';
 import type { ScaleRange, SelectionRange, TooltipPoint } from '../engine/spec';
 import { createReferenceLinesPlugin, createReferenceRegionsPlugin } from '../engine/annotations';
 import { createScale } from '../engine/scales/createScale';
+import { pointsInSelection } from '../engine/selection';
 import { categoryLabels, commitAppend, planAppend, refreshCategoryAxis } from './append';
 import { classify, sameData, STATE_KEYS, type StateKey, type Work } from './classify';
 import {
@@ -24,6 +25,7 @@ import {
   validateGroup,
 } from './group';
 import { companions } from './companion';
+import { accessibleName } from '../adapters/name';
 import { describeOptions, ingest } from './ingest';
 import { mountLegend } from './legend';
 import { type NormalizedOptions, type NormalizedState, normalize } from './normalize';
@@ -50,6 +52,7 @@ import type {
   CursorSnapshot,
   DataSource,
   Selection,
+  SelectionChange,
   SeriesState,
   CursorOptions,
   Viewport,
@@ -137,6 +140,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       EVENTS,
       (key) => this.read(key),
       (event, value) => this.callback(event, value),
+      (key, value) => (key === 'selection' && value ? this.withPoints(value as Selection) : value),
     );
     // User plugin install hooks need the completed public handle, not a half-built engine,
     // so plugins are installed below, and the engine's first paint waits for them.
@@ -776,6 +780,28 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   /**
+   * A `selection:change` value: the selection and the points it covers (plan §4.4). `points` is a
+   * getter, so a brush over a long stream costs nothing unless a listener reads it.
+   */
+  private withPoints(selection: Selection): SelectionChange<Row> {
+    const range = this.engine.getSelection();
+    let points: readonly ChartPoint<Row>[] | undefined;
+    const value = { ...selection } as SelectionChange<Row>;
+    Object.defineProperty(value, 'points', {
+      enumerable: true,
+      get: () =>
+        (points ??= Object.freeze(
+          range
+            ? pointsInSelection(this.engine, range.x, range.y).map((point) =>
+                this.point(point.seriesIndex, point.dataIndex, point),
+              )
+            : [],
+        )),
+    });
+    return Object.freeze(value);
+  }
+
+  /**
    * Show or hide the built-in legend as the `legend` option asks (plan D6): `'auto'` shows it
    * for two or more series. A change of the space it takes resizes the plot before the next paint.
    */
@@ -1120,14 +1146,29 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.off.push(this.engine.on('point:click', onPoint));
   }
 
+  /**
+   * The host is a figure named by `ariaLabel` or a summary of the series (plan D20). A role or
+   * name the host already had (a component renders its own) is never overwritten; `destroy`
+   * removes only what the chart added. The interactive element inside carries the same name.
+   */
   private applyAccessibleName(): void {
-    if (this.options.ariaLabel) {
-      this.container.setAttribute('aria-label', this.options.ariaLabel);
-      this.container.setAttribute('role', 'group');
-    } else this.container.removeAttribute('aria-label');
+    const name = accessibleName(this.options);
+    this.engine.setAccessibleName(name);
+    if (!this.added) {
+      this.added = {
+        role: !this.container.hasAttribute('role'),
+        label: !this.container.hasAttribute('aria-label'),
+      };
+      if (this.added.role) this.container.setAttribute('role', 'figure');
+    }
+    if (this.added.label) this.container.setAttribute('aria-label', name);
   }
+  /** The host attributes the chart added, which `destroy` removes. */
+  private added: { role: boolean; label: boolean } | undefined;
   destroy(): void {
     if (this.destroyed) return;
+    if (this.added?.role) this.container.removeAttribute('role');
+    if (this.added?.label) this.container.removeAttribute('aria-label');
     this.legend?.unmount();
     this.legend = undefined;
     companions.delete(this.handle);

@@ -63,6 +63,20 @@ export function applyFollowWindow(engine: ChartCore): boolean {
   return scaleSignature(engine) !== before;
 }
 
+/**
+ * A press on a following chart stops following and keeps the X window it shows, as a pan does,
+ * so appends during the gesture do not move what is under the pointer (interact-14).
+ */
+export function pauseFollowing(engine: ChartCore): void {
+  if (!engine.following) return;
+  const axisConfigs = engine.config.axes ?? {};
+  for (const key of engine.scales.keys()) {
+    const pos = inferPosition(key, axisConfigs[key]?.position);
+    if (pos === 'bottom' || pos === 'top') engine.userZoomedAxes.add(key);
+  }
+  setFollowing(engine, false);
+}
+
 /** Set follow state and emit `follow:change` only on a real transition. */
 export function setFollowing(engine: ChartCore, next: boolean): void {
   if (engine.following === next) return;
@@ -400,6 +414,17 @@ export function applyViewportChange(
   const pos = inferPosition(scaleKey, ac?.position);
   const isHoriz = pos === 'bottom' || pos === 'top';
 
+  // The one zoom constraint (plan D29): a viewport spans at least two adjacent data points on X,
+  // and never less than 1e-9 of the data extent.
+  if (scale.type !== 'log') {
+    const span = minimumSpan(engine, scaleKey, isHoriz, (min + max) / 2);
+    if (max - min < span) {
+      const centre = (min + max) / 2;
+      min = centre - span / 2;
+      max = centre + span / 2;
+    }
+  }
+
   // Clamp to configured bounds (defaults to data extent). Keeps pan at
   // the edge when you push past it, and stops zoom-out at the full extent.
   const clamped = clampViewportToBounds(engine, scaleKey, pos, min, max);
@@ -428,6 +453,26 @@ export function applyViewportChange(
   refreshCursor(engine);
   engine.scheduler.markDirty(DirtyFlag.DATA | DirtyFlag.GRID | DirtyFlag.OVERLAY);
   engine.emitEvent('viewport:change', scaleKey, { min, max });
+}
+
+/** The narrowest span a gesture may zoom `scaleKey` to around `centre` (plan D29). */
+function minimumSpan(
+  engine: ChartCore,
+  scaleKey: string,
+  isHoriz: boolean,
+  centre: number,
+): number {
+  const natural = engine.naturalExtent.get(scaleKey);
+  let span = natural ? Math.abs(natural[1] - natural[0]) * 1e-9 : 0;
+  const store = engine.sourceStores[0];
+  if (isHoriz && store && store.length >= 2) {
+    const i = Math.min(store.length - 1, Math.max(0, store.nearestXIndex(centre)));
+    const left = i > 0 ? store.xAt(i) - store.xAt(i - 1) : Infinity;
+    const right = i < store.length - 1 ? store.xAt(i + 1) - store.xAt(i) : Infinity;
+    const gap = Math.min(left > 0 ? left : Infinity, right > 0 ? right : Infinity);
+    if (Number.isFinite(gap)) span = Math.max(span, gap);
+  }
+  return span;
 }
 
 /**
@@ -488,6 +533,13 @@ export function resolveBounds(
   // which already honors axis pins and any explicit `nice: true` expansion).
   // Falls back to the raw data range if autoRange hasn't run yet for this axis.
   const natural = engine.naturalExtent.get(scaleKey);
+  // A followed axis' natural extent is its window: the bounds are every retained sample, so a
+  // pan can go back in time (interact-14).
+  const retained =
+    isHoriz && followWindow(engine) !== undefined ? engine.sourceExtent(scaleKey) : null;
+  if (natural && retained) {
+    return { min: Math.min(natural[0], retained[0]), max: Math.max(natural[1], retained[1]) };
+  }
   if (natural) return { min: natural[0], max: natural[1] };
 
   if (!engine.hasData()) return null;

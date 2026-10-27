@@ -74,7 +74,7 @@ export class HitTester {
    * series: a single shared slot made two scatter series evict each other
    * on every pointer move, degrading each move to an O(n) rebuild.
    */
-  private scatterGridCaches = new Map<number, ScatterGridCache>();
+  private scatterGridCaches = new Map<number, ScatterGrid>();
 
   constructor(proximityThreshold?: number) {
     this.proximityOverride = proximityThreshold ?? null;
@@ -128,10 +128,8 @@ export class HitTester {
         scales,
         seriesConfigs,
         pixelX,
-        pixelY,
         mode,
         palette,
-        proximity,
         formatters,
         getStore,
       );
@@ -158,17 +156,12 @@ export class HitTester {
     scales: Map<string, Scale>,
     seriesConfigs: SeriesSpec[],
     pixelX: number,
-    pixelY: number,
     mode: 'index' | 'x',
     palette: string[],
-    proximity: number,
     formatters?: TooltipFormatters,
     getStore?: (seriesIndex: number) => DataStore,
   ): TooltipPoint[] {
     const points: TooltipPoint[] = [];
-
-    // Check proximity: cursor must be close to at least one series line (Y distance)
-    let closestYDist = Infinity;
 
     for (let si = 0; si < seriesConfigs.length; si++) {
       const store = getStore?.(si) ?? defaultStore;
@@ -184,6 +177,17 @@ export class HitTester {
 
       const targetX = xScale.pixelToData(pixelX);
       const xColumn = xColumnOf(sc);
+      // Index mode answers anywhere along X inside the series' extent, plus half its mean sample
+      // spacing at either end (plan §5.5); 'x' answers everywhere.
+      if (mode === 'index') {
+        const first = store.valueAt(xColumn, 0);
+        const last = store.valueAt(xColumn, store.length - 1);
+        const lo = Math.min(first, last);
+        const hi = Math.max(first, last);
+        const half = store.length > 1 ? (hi - lo) / (store.length - 1) / 2 : 0;
+        const edge = Math.abs(xScale.pixelToData(pixelX + 1) - targetX);
+        if (targetX < lo - half - edge || targetX > hi + half + edge) continue;
+      }
       let idx = store.nearestXIndex(targetX);
       if (xColumn !== 0) {
         let closest = Infinity;
@@ -200,11 +204,7 @@ export class HitTester {
 
       const yAxisKey = sc.yAxis ?? 'y';
       const yScale = scales.get(yAxisKey);
-      if (yScale) {
-        const py = yScale.dataToPixel(yVal);
-        if (!Number.isFinite(py)) continue;
-        closestYDist = Math.min(closestYDist, Math.abs(py - pixelY));
-      }
+      if (yScale && !Number.isFinite(yScale.dataToPixel(yVal))) continue;
 
       const xVal = store.valueAt(xColumn, idx);
 
@@ -219,9 +219,6 @@ export class HitTester {
         formattedY: formatY(formatters, yScale, yVal, si),
       });
     }
-
-    // Only show tooltip if cursor is near a series line (`x` lists every series at the X).
-    if (mode !== 'x' && closestYDist > proximity) return [];
 
     return points;
   }
@@ -240,8 +237,9 @@ export class HitTester {
     formatters?: TooltipFormatters,
     getStore?: (seriesIndex: number) => DataStore,
   ): TooltipPoint[] {
-    let bestDist = Infinity;
-    let bestPoint: TooltipPoint | null = null;
+    // Each series' nearest point; every one as near as the nearest (within a pixel) is listed,
+    // so coincident points of several series all show.
+    const nearest: Array<{ dist: number; point: TooltipPoint }> = [];
 
     for (let si = 0; si < seriesConfigs.length; si++) {
       const store = getStore?.(si) ?? defaultStore;
@@ -265,11 +263,8 @@ export class HitTester {
           formatters,
         );
         if (scatterPoint) {
-          const dist = (scatterPoint.pixelX - pixelX) ** 2 + (scatterPoint.pixelY - pixelY) ** 2;
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestPoint = scatterPoint.point;
-          }
+          const dist = Math.hypot(scatterPoint.pixelX - pixelX, scatterPoint.pixelY - pixelY);
+          nearest.push({ dist, point: scatterPoint.point });
         }
         continue;
       }
@@ -291,37 +286,42 @@ export class HitTester {
       const startIdx = Math.max(0, store.lowerBoundX(xDataLeft));
       const endIdx = Math.min(store.length - 1, store.upperBoundX(xDataRight));
 
+      let best = -1;
+      let bestDist = Infinity;
       for (let i = startIdx; i <= endIdx; i++) {
         const yVal = store.yAt(colIdx - 1, i);
         if (!Number.isFinite(yVal)) continue;
-
-        const xVal = store.xAt(i);
-        const px = xScale.dataToPixel(xVal);
+        const px = xScale.dataToPixel(store.xAt(i));
         const py = yScale.dataToPixel(yVal);
         if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
-
-        const dist = (px - pixelX) ** 2 + (py - pixelY) ** 2;
+        const dist = Math.hypot(px - pixelX, py - pixelY);
         if (dist < bestDist) {
           bestDist = dist;
-          bestPoint = {
-            seriesIndex: si,
-            dataIndex: i,
-            label: sc.label,
-            x: xVal,
-            y: yVal,
-            color: sc.color ?? palette[(sc.paletteIndex ?? si) % palette.length],
-            formattedX: formatters?.x ? formatters.x(xVal, si) : scaleReadout(xScale, xVal),
-            formattedY: formatY(formatters, yScale, yVal, si),
-          };
+          best = i;
         }
       }
+      if (best < 0) continue;
+      const xVal = store.xAt(best);
+      const yVal = store.yAt(colIdx - 1, best);
+      nearest.push({
+        dist: bestDist,
+        point: {
+          seriesIndex: si,
+          dataIndex: best,
+          label: sc.label,
+          x: xVal,
+          y: yVal,
+          color: sc.color ?? palette[(sc.paletteIndex ?? si) % palette.length],
+          formattedX: formatters?.x ? formatters.x(xVal, si) : scaleReadout(xScale, xVal),
+          formattedY: formatY(formatters, yScale, yVal, si),
+        },
+      });
     }
 
-    // Only return if within proximity threshold
-    if (bestPoint && Math.sqrt(bestDist) <= proximity) {
-      return [bestPoint];
-    }
-    return [];
+    let closest = Infinity;
+    for (const candidate of nearest) closest = Math.min(closest, candidate.dist);
+    if (closest > proximity) return [];
+    return nearest.filter((candidate) => candidate.dist <= closest + 1).map(({ point }) => point);
   }
 
   private nearestScatterPoint(
@@ -346,37 +346,11 @@ export class HitTester {
     const xCol = xColumnOf(sc);
     if (xCol < 0 || xCol > store.seriesCount || yCol < 1 || yCol > store.seriesCount) return null;
 
-    const grid = this.getScatterGrid(
-      store,
-      sc,
-      seriesIndex,
-      xScale,
-      yScale,
-      proximity,
-      dataVersion,
-    );
-    const cx = Math.floor(pixelX / proximity);
-    const cy = Math.floor(pixelY / proximity);
-    let bestIdx: number | null = null;
-    let bestDist = Infinity;
+    const grid = this.getScatterGrid(store, sc, seriesIndex, xScale, yScale, dataVersion);
+    const { bestIdx, bestDist } = nearestInGrid(grid, pixelX, pixelY, proximity);
+    this.lastVisits = grid.visits;
 
-    for (let gx = cx - 1; gx <= cx + 1; gx++) {
-      for (let gy = cy - 1; gy <= cy + 1; gy++) {
-        const indices = grid.cells.get(gx * CELL_STRIDE + gy);
-        if (!indices) continue;
-        for (const idx of indices) {
-          const px = grid.pixelX[idx];
-          const py = grid.pixelY[idx];
-          const dist = (px - pixelX) ** 2 + (py - pixelY) ** 2;
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestIdx = idx;
-          }
-        }
-      }
-    }
-
-    if (bestIdx === null || Math.sqrt(bestDist) > proximity) return null;
+    if (bestIdx < 0 || bestDist > proximity) return null;
 
     const xVal = store.valueAt(xCol, bestIdx);
     const yVal = store.valueAt(yCol, bestIdx);
@@ -408,88 +382,155 @@ export class HitTester {
         fields: scatterTooltipFields(sc, bestIdx, store.seriesCount + 1, (columnIdx, index) =>
           store.valueAt(columnIdx, index),
         ),
+        xName: sc.xName,
+        yName: sc.yName,
       },
     };
   }
 
+  /**
+   * The screen-space grid of a point cloud (cached per series until the data, the scales or the
+   * plot change): every visible point's pixel position, bucketed by cell in flat typed arrays
+   * (counting sort), so a hover visits a few cells' points (gap-perf-gate-01:hover).
+   */
   private getScatterGrid(
     store: DataStore,
     sc: SeriesSpec,
     seriesIndex: number,
     xScale: Scale,
     yScale: Scale,
-    cellSize: number,
     dataVersion: number,
-  ): ScatterGridCache {
+  ): ScatterGrid {
     const xCol = xColumnOf(sc);
     const yCol = seriesYColumn(sc);
-    const key = [
-      dataVersion,
-      seriesIndex,
-      xCol,
-      yCol,
-      store.length,
-      xScale.min,
-      xScale.max,
-      xScale.dataToPixel(xScale.min),
-      xScale.dataToPixel(xScale.max),
-      yScale.min,
-      yScale.max,
-      yScale.dataToPixel(yScale.min),
-      yScale.dataToPixel(yScale.max),
-      cellSize,
-    ].join('|');
+    const x0 = Math.min(xScale.dataToPixel(xScale.min), xScale.dataToPixel(xScale.max));
+    const x1 = Math.max(xScale.dataToPixel(xScale.min), xScale.dataToPixel(xScale.max));
+    const y0 = Math.min(yScale.dataToPixel(yScale.min), yScale.dataToPixel(yScale.max));
+    const y1 = Math.max(yScale.dataToPixel(yScale.min), yScale.dataToPixel(yScale.max));
+    const key = [dataVersion, xCol, yCol, store.length, xScale.min, xScale.max, x0, x1]
+      .concat([yScale.min, yScale.max, y0, y1])
+      .join('|');
 
     const cached = this.scatterGridCaches.get(seriesIndex);
-    if (cached?.store === store && cached.key === key) {
-      return cached;
-    }
+    if (cached?.store === store && cached.key === key) return cached;
 
-    const cells = new Map<number, number[]>();
+    // About one point per cell: a few points per searched cell, and as many cells as points.
+    const cellSize = Math.min(
+      16,
+      Math.max(1, Math.sqrt(((x1 - x0 + 1) * (y1 - y0 + 1)) / Math.max(1, store.length))),
+    );
+    const columns = Math.max(1, Math.ceil((x1 - x0 + 1) / cellSize));
+    const rows = Math.max(1, Math.ceil((y1 - y0 + 1) / cellSize));
     const pixelX = new Float64Array(store.length);
     const pixelY = new Float64Array(store.length);
-
+    const cellOf = new Int32Array(store.length);
+    const start = new Int32Array(columns * rows + 1);
     for (let i = 0; i < store.length; i++) {
-      const x = store.valueAt(xCol, i);
-      const y = store.valueAt(yCol, i);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) {
-        pixelX[i] = Number.NaN;
-        pixelY[i] = Number.NaN;
-        continue;
-      }
-      const px = xScale.dataToPixel(x);
-      const py = yScale.dataToPixel(y);
+      const px = xScale.dataToPixel(store.valueAt(xCol, i));
+      const py = yScale.dataToPixel(store.valueAt(yCol, i));
       pixelX[i] = px;
       pixelY[i] = py;
-      const cellKey = Math.floor(px / cellSize) * CELL_STRIDE + Math.floor(py / cellSize);
-      let bucket = cells.get(cellKey);
-      if (!bucket) {
-        bucket = [];
-        cells.set(cellKey, bucket);
+      // Only points on the plot can be under the pointer.
+      if (!(px >= x0 && px <= x1 + 1 && py >= y0 && py <= y1 + 1)) {
+        cellOf[i] = -1;
+        continue;
       }
-      bucket.push(i);
+      const cell =
+        Math.min(rows - 1, Math.floor((py - y0) / cellSize)) * columns +
+        Math.min(columns - 1, Math.floor((px - x0) / cellSize));
+      cellOf[i] = cell;
+      start[cell + 1]++;
     }
+    for (let c = 0; c < columns * rows; c++) start[c + 1] += start[c];
+    const fill = start.slice(0, columns * rows);
+    const points = new Int32Array(start[columns * rows]);
+    for (let i = 0; i < store.length; i++) if (cellOf[i] >= 0) points[fill[cellOf[i]]++] = i;
 
-    const entry: ScatterGridCache = { store, key, cells, pixelX, pixelY };
+    const entry: ScatterGrid = {
+      store,
+      key,
+      x0,
+      y0,
+      cellSize,
+      columns,
+      rows,
+      start,
+      points,
+      pixelX,
+      pixelY,
+      visits: 0,
+    };
     this.scatterGridCaches.set(seriesIndex, entry);
     return entry;
   }
+
+  /** Points the last point-cloud hit examined (the debug hook's `hitVisits`). */
+  lastVisits = 0;
+}
+
+interface ScatterGrid {
+  store: DataStore;
+  key: string;
+  /** The plot's top-left pixel, the grid's origin, the side of a cell, and its size in cells. */
+  x0: number;
+  y0: number;
+  cellSize: number;
+  columns: number;
+  rows: number;
+  /** Cell c holds `points[start[c] .. start[c + 1])`. */
+  start: Int32Array;
+  points: Int32Array;
+  pixelX: Float64Array;
+  pixelY: Float64Array;
+  /** Points the last search examined. */
+  visits: number;
 }
 
 /**
- * Packs (gx, gy) cell coordinates into one integer Map key, avoiding a
- * string allocation per point on rebuild and per neighbor cell on query.
- * Cell coordinates are pixel positions divided by the hit radius, so their
- * magnitude stays far below the stride.
+ * The point nearest (px, py) within `radius`: cells in rings outward from the pointer's, stopping
+ * once a ring can hold nothing nearer than the best so far.
  */
-const CELL_STRIDE = 1 << 20;
-
-interface ScatterGridCache {
-  store: DataStore;
-  key: string;
-  cells: Map<number, number[]>;
-  pixelX: Float64Array;
-  pixelY: Float64Array;
+function nearestInGrid(
+  grid: ScatterGrid,
+  px: number,
+  py: number,
+  radius: number,
+): { bestIdx: number; bestDist: number } {
+  const cell = grid.cellSize;
+  const cx = Math.floor((px - grid.x0) / cell);
+  const cy = Math.floor((py - grid.y0) / cell);
+  const rings = Math.ceil(radius / cell) + 1;
+  let bestIdx = -1;
+  let bestDist = Infinity;
+  let visits = 0;
+  const visit = (gx: number, gy: number) => {
+    if (gx < 0 || gy < 0 || gx >= grid.columns || gy >= grid.rows) return;
+    const cell = gy * grid.columns + gx;
+    for (let k = grid.start[cell]; k < grid.start[cell + 1]; k++) {
+      const i = grid.points[k];
+      visits++;
+      const dist = Math.hypot(grid.pixelX[i] - px, grid.pixelY[i] - py);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
+      }
+    }
+  };
+  for (let r = 0; r <= rings; r++) {
+    // Every point of ring r is at least (r - 1) cells away.
+    if (bestDist <= (r - 1) * cell) break;
+    if (r === 0) visit(cx, cy);
+    for (let d = -r; d <= r && r > 0; d++) {
+      visit(cx + d, cy - r);
+      visit(cx + d, cy + r);
+      if (d !== -r && d !== r) {
+        visit(cx - r, cy + d);
+        visit(cx + r, cy + d);
+      }
+    }
+  }
+  grid.visits = visits;
+  return { bestIdx, bestDist };
 }
 
 // ─── The mark hit contract ────────────────────────────────────

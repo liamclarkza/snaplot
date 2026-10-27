@@ -12,7 +12,6 @@ test.describe('hover sweep', () => {
   test('[uisite-03:library] a 12×8 probe grid inside the plot shows the tooltip at 96 of 96 points', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[uisite-03:library]');
     // The home hero's shape: four CPU cores between 15% and 40% on a 0–100% axis.
     await page.evaluate(() => {
       const start = Date.UTC(2026, 2, 1, 9);

@@ -311,12 +311,13 @@ export function axisReadout(ctx: FormatContext, axis: string, value: number): st
   return formatValue(value, { stepDecimals: step.decimals, locale });
 }
 
-/** A scatter tooltip field's value without a `format`: integers as is, else four significant places. */
+/**
+ * A scatter tooltip field's value without a `format`: grouped, integers whole, else up to four
+ * decimals; a tiny value keeps four significant digits.
+ */
 export function formatFieldValue(value: number): string {
   if (value !== value) return '';
   if (!Number.isFinite(value)) return String(value);
-  if (Number.isInteger(value)) return String(value);
-  const abs = Math.abs(value);
-  if ((abs !== 0 && abs < 0.001) || abs >= 10_000) return value.toPrecision(4);
-  return value.toFixed(4).replace(/\.?0+$/, '');
+  if (value !== 0 && Math.abs(value) < 0.001) return value.toPrecision(4);
+  return formatValue(value, { stepDecimals: Number.isInteger(value) ? 0 : 2 });
 }

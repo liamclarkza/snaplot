@@ -28,7 +28,6 @@ async function mountCpu(page: Page, extra: Record<string, unknown> = {}): Promis
 
 test.describe('accessibility', () => {
   test('[interact-07] the host is a figure named by ariaLabel', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-07]');
     await mountCpu(page);
     await expect(page.getByRole('figure', { name: 'CPU load' })).toHaveCount(1, { timeout: 1000 });
   });
@@ -36,7 +35,6 @@ test.describe('accessibility', () => {
   test('[interact-07] the interactive element is named by the chart, not by its tick text', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-07]');
     await mountCpu(page);
     const application = page.getByRole('application');
     await expect(application).toHaveCount(1);
@@ -47,7 +45,6 @@ test.describe('accessibility', () => {
   test('[interact-07] tick labels and canvases are hidden from assistive tech', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-07]');
     await mountCpu(page);
     const tree = await page.locator('#chart-0').ariaSnapshot();
     expect(tree).not.toMatch(/\b(0|10|20|30)\b.*\b(10|20|30|40)\b/);
@@ -56,7 +53,6 @@ test.describe('accessibility', () => {
   test('[interact-07] arrow keys move the cursor and a polite live region reads it', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-07]');
     await mountCpu(page);
     await page.locator('#before').focus();
     await page.keyboard.press('Tab');
@@ -72,7 +68,6 @@ test.describe('accessibility', () => {
   });
 
   test('[interact-07] a readonly chart is not a tab stop', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-07]');
     await mountCpu(page, { interaction: 'readonly' });
     await page.locator('#before').focus();
     await page.keyboard.press('Tab');
@@ -82,7 +77,6 @@ test.describe('accessibility', () => {
   test('[interact-08] a pointer down on the plot focuses the chart', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-08]');
     await mountCpu(page);
     const plot = await page.evaluate(() => window.harness.plotRect('chart-0'));
     await page.mouse.click(plot.left + plot.width / 2, plot.top + plot.height / 2);
@@ -96,7 +90,6 @@ test.describe('accessibility', () => {
   test('[interact-08][backlog-14] keyboard focus shows a visible focus ring', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[backlog-14]');
     await mountCpu(page);
     await page.locator('#before').focus();
     await page.keyboard.press('Tab');
@@ -113,7 +106,6 @@ test.describe('accessibility', () => {
   test('[gap-environments-05:focus] the focus ring stays visible in forced colours', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[gap-environments-05:focus]');
     await page.emulateMedia({ forcedColors: 'active' });
     await mountCpu(page);
     await page.locator('#before').focus();
@@ -130,7 +122,6 @@ test.describe('accessibility', () => {
   test('[interact-23] createChart and destroy leave the host attributes as they were', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-23]');
     const result = await page.evaluate(() => {
       const host = document.createElement('div');
       host.id = 'own';

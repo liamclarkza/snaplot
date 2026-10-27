@@ -157,11 +157,57 @@ export function updateLocalCursorFromPoint(
   engine.emitEvent('cursor:move', engine.cursorDataX, engine.cursorDataIdx, 'local');
 }
 
-/** Re-run tooltip hit-test at current cursor position (called on data change) */
+/**
+ * The hover model under a still pointer (plan §5.5): after any data, viewport, layout, option or
+ * visibility change, the cursor and tooltip are recomputed from where the pointer is.
+ */
 export function refreshCursor(engine: ChartCore): void {
   if (engine.mouseX === null || engine.mouseY === null || !engine.cursorIsLocal) return;
-  updateTooltipPoints(engine);
-  engine.scheduler.markDirty(DirtyFlag.OVERLAY);
+  updateLocalCursorFromPoint(engine, engine.mouseX, engine.mouseY, engine.lastPointerType);
+}
+
+/**
+ * The keyboard cursor (plan D20): to the previous, next, first or last visible point of the first
+ * visible series with data, through the same path as a pointer at that point, then read aloud.
+ */
+export function stepCursor(engine: ChartCore, to: 'prev' | 'next' | 'first' | 'last'): void {
+  const { plot } = engine.layout;
+  for (let si = 0; si < engine.config.series.length; si++) {
+    const sc = engine.config.series[si];
+    const store = engine.storeForSeries(si);
+    if (sc.visible === false || !store.length || xColumnOf(sc) !== 0) continue;
+    const xScale = engine.scales.get(sc.xAxis ?? 'x');
+    const yScale = engine.scales.get(sc.yAxis ?? 'y');
+    if (!xScale || !yScale) continue;
+    const lo = Math.max(0, store.lowerBoundX(Math.min(xScale.min, xScale.max)));
+    const hi = Math.min(store.length - 1, store.upperBoundX(Math.max(xScale.min, xScale.max)));
+    if (hi < lo) continue;
+    const current = engine.cursorDataX === null ? null : store.nearestXIndex(engine.cursorDataX);
+    const index =
+      to === 'first'
+        ? lo
+        : to === 'last'
+          ? hi
+          : current === null
+            ? to === 'next'
+              ? lo
+              : hi
+            : Math.max(lo, Math.min(hi, current + (to === 'next' ? 1 : -1)));
+    const x = xScale.dataToPixel(store.xAt(index));
+    const column = seriesYColumn(sc);
+    const value = column >= 1 && column <= store.seriesCount ? store.yAt(column - 1, index) : NaN;
+    const y = Number.isFinite(value)
+      ? Math.max(plot.top, Math.min(plot.top + plot.height, yScale.dataToPixel(value)))
+      : plot.top + plot.height / 2;
+    updateLocalCursorFromPoint(engine, x, y, 'keyboard');
+    const points = engine.tooltipPoints;
+    if (points.length > 0) {
+      engine.announce(
+        `${points[0].formattedX}: ${points.map((p) => `${p.label} ${p.formattedY}`).join(', ')}`,
+      );
+    }
+    return;
+  }
 }
 
 export function canUseGlobalXCursor(engine: ChartCore): boolean {

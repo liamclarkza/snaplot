@@ -43,7 +43,6 @@ test.describe('hover model', () => {
   test('[interact-09] the cursor is recomputed under a still pointer after a viewport change', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-09]');
     await mountLines(page);
     await hoverData(page, 'chart-0', 13, 50);
     await page.evaluate(() =>
@@ -56,7 +55,6 @@ test.describe('hover model', () => {
   });
 
   test('[interact-09] hiding every series empties the tooltip', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-09]');
     await mountLines(page);
     await hoverData(page, 'chart-0', 30, 50);
     expect(await tooltipText(page)).toContain('A');
@@ -82,7 +80,6 @@ test.describe('brush selection', () => {
   }
 
   test('[interact-10] Escape clears a brush selection', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-10]');
     await mountLines(page, brush);
     await select(page);
     expect(
@@ -96,7 +93,6 @@ test.describe('brush selection', () => {
   });
 
   test('[interact-10] a click outside the brush clears it', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-10]');
     await mountLines(page, brush);
     await select(page);
     const plot = await plotRect(page);
@@ -110,7 +106,6 @@ test.describe('brush selection', () => {
   test('[interact-10] a brush dragged past the plot edge is clamped to the domain', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-10]');
     await mountLines(page, brush);
     const plot = await plotRect(page);
     const y = plot.top + plot.height / 2;
@@ -124,23 +119,25 @@ test.describe('brush selection', () => {
 
 test.describe('box zoom', () => {
   test('[interact-13] a box zoom respects the minimum span', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-13]');
-    // zoom.minRange left the public options in M7; M12a restates this test against the internal
-    // minimum span (D29).
+    // The internal minimum span (plan D29): two adjacent data points, here 1 unit apart. Zoomed to
+    // two units first, a drag over 0.4 of a unit widens to one.
     await mountLines(page);
+    await page.evaluate(() =>
+      window.harness.chart('chart-0').update({ viewport: { x: [29, 31] } }),
+    );
+    await settle(page);
     const plot = await plotRect(page);
     const y = plot.top + plot.height / 2;
     await drag(
       page,
-      { x: plot.left + plot.width * (30 / 60), y },
-      { x: plot.left + plot.width * (35 / 60), y },
+      { x: plot.left + plot.width * 0.4, y },
+      { x: plot.left + plot.width * 0.6, y },
     );
     const x = await domain(page);
-    expect((x?.max ?? 0) - (x?.min ?? 0)).toBeGreaterThanOrEqual(19.9);
+    expect((x?.max ?? 0) - (x?.min ?? 0)).toBeGreaterThanOrEqual(0.999);
   });
 
   test('[interact-13] a 2 px wide vertical drag does not zoom', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-13]');
     await mountLines(page);
     const before = await domain(page);
     const plot = await plotRect(page);
@@ -152,7 +149,6 @@ test.describe('box zoom', () => {
   test('[interact-13] a box zoom on a category axis keeps whole categories', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-13]');
     await page.evaluate(() => {
       window.harness.mount({
         data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => ({ d, v: 3 + i })),
@@ -177,7 +173,6 @@ test.describe('box zoom', () => {
   test('[interact-14] a box zoom while following selects the range under the pointer at press time', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-14]');
     await page.evaluate(() => {
       window.harness.mount({
         data: Array.from({ length: 200 }, (_, t) => ({ t, v: 10 + (t % 9) })),
@@ -217,7 +212,6 @@ test.describe('clicks, wheel and keys', () => {
   test('[interact-17] a click held for 600 ms still fires point:click', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-17]');
     await mountLines(page);
     await page.evaluate(() => window.harness.record('chart-0', 'point:click'));
     const point = await page.evaluate(() => window.harness.toClient('chart-0', 30, 20));
@@ -247,7 +241,6 @@ test.describe('clicks, wheel and keys', () => {
   test('[interact-18] Ctrl+wheel reaches the page when zoom is disabled', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-18]');
     await mountLines(page, { interaction: { zoom: 'none' } });
     await page.evaluate(() => {
       (window as unknown as { wheelPrevented: boolean[] }).wheelPrevented = [];
@@ -273,7 +266,6 @@ test.describe('clicks, wheel and keys', () => {
   test('[interact-18] a line-mode wheel notch zooms as much as a pixel-mode notch', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-18]');
     await mountLines(page);
     const zoomBy = async (deltaMode: number, deltaY: number) => {
       await page.evaluate(() => window.harness.chart('chart-0').resetViewport());
@@ -308,7 +300,6 @@ test.describe('clicks, wheel and keys', () => {
   test('[interact-18] Home passes through to the page when zoom and pan are disabled', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-18]');
     await mountLines(page, { interaction: { zoom: 'none' } });
     const prevented = await page.evaluate(() => {
       const target = document.querySelector('#chart-0 [tabindex]') as HTMLElement | null;
@@ -325,7 +316,6 @@ test.describe('containers', () => {
   test('[interact-11] the tooltip shows on top inside a modal dialog', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-11]');
     await page.evaluate(() => {
       const dialog = document.createElement('dialog');
       dialog.id = 'dialog';
@@ -366,7 +356,6 @@ test.describe('containers', () => {
   test('[interact-12] hit testing is correct inside a transform: scale(0.5) wrapper', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-12]');
     await page.evaluate(() => {
       const wrapper = document.createElement('div');
       wrapper.id = 'wrapper';

@@ -74,12 +74,12 @@ describe('[frameworks-12] the adapters use the public handle only', () => {
     );
   }
 
-  it('[frameworks-12] React and Solid import the core as snaplot, besides their own modules and the binding', () => {
+  it('[frameworks-12] React and Solid import the core as snaplot, besides their own modules, the binding and the shared name', () => {
     const imports = adapterImports();
     expect(imports).toContain('snaplot');
     for (const target of imports)
       expect(target).toMatch(
-        /^(snaplot|react|react-dom|solid-js(\/web)?|react\/[^/]+|solid\/[^/]+|adapters\/bind|public\/types)$/,
+        /^(snaplot|react|react-dom|solid-js(\/web)?|react\/[^/]+|solid\/[^/]+|adapters\/(bind|name)|public\/types)$/,
       );
     // public/types only as the entries' type-only re-export of every public type.
     const src = join(pkg, 'src');

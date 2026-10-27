@@ -228,7 +228,11 @@ describe('engine auto-range and log interactions', () => {
         },
         series: [{ label: 'points', yColumn: 1 }],
       },
-      [f([0, 100]), f([0, 10])],
+      // A point per unit: the minimum zoom span is two adjacent points (plan D29).
+      [
+        f(Array.from({ length: 101 }, (_, i) => i)),
+        f(Array.from({ length: 101 }, (_, i) => i / 10)),
+      ],
     );
 
     chart.setAxis('x', { min: 25, max: 75 });
@@ -250,7 +254,10 @@ describe('engine auto-range and log interactions', () => {
         zoom: { enabled: true, x: true, bounds: 'unbounded' },
         series: [{ label: 'value', yColumn: 1 }],
       },
-      [f([0, 100]), f([0, 10])],
+      [
+        f(Array.from({ length: 101 }, (_, i) => i)),
+        f(Array.from({ length: 101 }, (_, i) => i / 10)),
+      ],
     );
     const xScale = chart.getAxis('x')!;
     const { plot } = chart.getLayout();

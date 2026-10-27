@@ -78,6 +78,7 @@ describe('tooltipMeasurementKey', () => {
       style: { cssText: '' } as Record<string, string>,
       innerHTML: '',
       appendChild: vi.fn(),
+      setAttribute: vi.fn(),
       remove: vi.fn(),
       get offsetWidth() {
         widthReads++;
@@ -92,6 +93,7 @@ describe('tooltipMeasurementKey', () => {
       createElement: () => element,
       body: { appendChild: vi.fn() },
       documentElement: { clientWidth: 390, clientHeight: 844 },
+      fullscreenElement: null,
     });
     vi.stubGlobal('window', { innerWidth: 390, innerHeight: 844 });
 

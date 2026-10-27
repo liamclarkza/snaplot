@@ -108,7 +108,8 @@ export async function darkSchemeInk(browser: Browser, slug: string): Promise<num
     const page = await context.newPage();
     await openDemo(page, slug);
     const ink = await page
-      .locator('main [role="application"] span')
+      // An axis label: the chart's text layer sits beside its canvases.
+      .locator('main canvas ~ div[aria-hidden="true"] span')
       .first()
       .evaluate((label) => getComputedStyle(label).color);
     const [r = 0, g = 0, b = 0] = (ink.match(/[\d.]+/g) ?? []).map(Number);

@@ -18,8 +18,7 @@ export const TOOLTIP_CSS = `.snaplot-tooltip{padding:7px 10px;border-radius:6px;
 .snaplot-tooltip-fields{display:grid;grid-template-columns:auto auto;gap:2px 12px;margin-top:6px;font-variant-numeric:tabular-nums}
 .snaplot-tooltip-key{opacity:0.7}
 .snaplot-tooltip-value{font-weight:600;text-align:right}
-.snaplot-tooltip-point{display:flex;align-items:center;gap:8px}
-.snaplot-tooltip-coords{font-variant-numeric:tabular-nums}
+.snaplot-tooltip-block+.snaplot-tooltip-block{margin-top:8px}
 .snaplot-tooltip-header{margin-bottom:4px;opacity:0.7;font-size:11px}
 .snaplot-tooltip-row{display:flex;align-items:center;gap:12px}
 .snaplot-tooltip-name{display:flex;align-items:center;min-width:0;flex:1}
@@ -34,6 +33,8 @@ export const TOOLTIP_CSS = `.snaplot-tooltip{padding:7px 10px;border-radius:6px;
  * renderer only; a caller's `render` override is free to show every row.
  */
 const MAX_TOOLTIP_ROWS = 12;
+/** Cap on point blocks (coincident scatter points) in the default tooltip. */
+const MAX_TOOLTIP_POINTS = 4;
 const TOOLTIP_VIEWPORT_MARGIN = 8;
 
 interface TooltipPositionInput {
@@ -114,7 +115,11 @@ export class TooltipManager {
   private lastHeight = 0;
   private lastMeasurementKey: string | null = null;
 
-  constructor(theme: ThemeConfig) {
+  constructor(
+    theme: ThemeConfig,
+    /** The chart's host: the tooltip mounts in the open dialog or fullscreen element around it. */
+    private readonly anchor?: HTMLElement,
+  ) {
     adoptStyles(document, 'tooltip', TOOLTIP_CSS);
     this.el = document.createElement('div');
     this.el.className = 'snaplot-tooltip';
@@ -123,8 +128,21 @@ export class TooltipManager {
     // query, never per show().
     const transition = prefersReducedMotion() ? 'none' : 'opacity 0.1s ease';
     this.el.style.cssText = `position:fixed;left:0;top:0;z-index:10000;pointer-events:none;opacity:0;transition:${transition};`;
+    this.el.setAttribute('aria-hidden', 'true');
     this.applyTheme(theme);
     document.body.appendChild(this.el);
+  }
+
+  /**
+   * Where the tooltip lives (plan §5.5): in the nearest open `<dialog>` or fullscreen element
+   * around the chart, which sit in the top layer above `document.body`, else in the body.
+   */
+  private mountPoint(): HTMLElement {
+    const dialog = this.anchor?.closest('dialog');
+    if (dialog?.open) return dialog;
+    const fullscreen = document.fullscreenElement as HTMLElement | null;
+    if (fullscreen && this.anchor && fullscreen.contains(this.anchor)) return fullscreen;
+    return document.body;
   }
 
   applyTheme(theme: ThemeConfig): void {
@@ -161,6 +179,8 @@ export class TooltipManager {
       this.hide();
       return;
     }
+    const parent = this.mountPoint();
+    if (this.el.parentElement !== parent) parent.appendChild(this.el);
 
     // Render content. When the caller returns a string it is treated as
     // trusted HTML (fast path, matches ChartSpec.tooltip.render's documented
@@ -263,24 +283,26 @@ export class TooltipManager {
         </div>`;
     }
 
-    // Single point (nearest mode, e.g. scatter): show x, y as coordinate pair
-    if (points.length === 1) {
-      const p = points[0];
-      const fields =
-        p.fields && p.fields.length > 0
-          ? `<div class="snaplot-tooltip-fields">${p.fields
-              .map(
-                (field) => `
-          <span class="snaplot-tooltip-key">${escapeHtml(field.label)}</span>
-          <span class="snaplot-tooltip-value">${escapeHtml(field.formatted)}</span>
-        `,
-              )
-              .join('')}</div>`
-          : '';
-      return `<div class="snaplot-tooltip-point">${dot(p.color)}<span class="snaplot-tooltip-coords"><b>x</b> ${escapeHtml(p.formattedX)}&nbsp;&nbsp;<b>y</b> ${escapeHtml(p.formattedY)}</span></div>${fields}`;
+    // Point-cloud points (nearest mode): one block per point, the series named above its rows,
+    // each value named by its axis title or field (then the colour category and tooltipFields in
+    // order). Coincident points are all listed.
+    if (points.every((p) => p.radius !== undefined)) {
+      const pair = (key: string, value: string) =>
+        `<span class="snaplot-tooltip-key">${escapeHtml(key)}</span>\n<span class="snaplot-tooltip-value">${escapeHtml(value)}</span>\n`;
+      const shown = points.slice(0, MAX_TOOLTIP_POINTS);
+      let html = '';
+      for (const p of shown) {
+        const fields = (p.fields ?? []).map((field) => pair(field.label, field.formatted)).join('');
+        html += `<div class="snaplot-tooltip-block"><div class="snaplot-tooltip-title">${dot(p.color)}<span class="snaplot-tooltip-strong">${escapeHtml(p.label)}</span></div>
+        <div class="snaplot-tooltip-grid">${pair(p.xName ?? 'x', p.formattedX)}${pair(p.yName ?? 'y', p.formattedY)}${fields}</div></div>`;
+      }
+      if (points.length > shown.length) {
+        html += `<div class="snaplot-tooltip-more">+${points.length - shown.length} more</div>`;
+      }
+      return html;
     }
 
-    // Multiple points (index mode, e.g. time series): header + rows
+    // Every other mark: the formatted X, then a row per series in series order (one row too).
     const header = `<div class="snaplot-tooltip-header">${escapeHtml(points[0].formattedX)}</div>`;
 
     // Truncate long series lists so the box cannot outgrow the viewport. The

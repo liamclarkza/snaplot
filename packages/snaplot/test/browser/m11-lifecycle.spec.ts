@@ -310,8 +310,7 @@ test.describe('lifecycle', () => {
   test('[gap-environments-02:print-basics] printing hides the tooltip', async ({
     harnessPage: page,
   }) => {
-    // beforeprint hides the tooltip (M11); hovering a one-series line shows none yet (M12a).
-    test.fail(true, '[interact-04]');
+    // beforeprint hides the tooltip (M11); a one-series line shows one on hover (M12a).
     await mountLine(page);
     await hoverData(page, 'chart-0', 100, 50);
     expect(await page.evaluate(() => window.harness.tooltip())).not.toBeNull();

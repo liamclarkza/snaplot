@@ -70,7 +70,6 @@ test.describe('touch', () => {
   test('[interact-05] a tap keeps the tooltip after the finger lifts', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-05]');
     await mountLine(page);
     const plot = await plotRect(page);
     await page.touchscreen.tap(plot.left + plot.width / 2, plot.top + plot.height / 2);
@@ -82,7 +81,6 @@ test.describe('touch', () => {
   test('[interact-06] a vertical swipe on a line chart scrolls the page', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-06]');
     await mountLine(page);
     const plot = await plotRect(page);
     const cdp = await touch(page);
@@ -103,7 +101,6 @@ test.describe('touch', () => {
   });
 
   test('[interact-06] a one-finger drag pans an xy scatter', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-06]');
     await page.evaluate(() => {
       window.harness.mount(
         {
@@ -116,6 +113,8 @@ test.describe('touch', () => {
         },
         { width: 360, height: 280 },
       );
+      // Zoomed in, so the data bounds leave room to pan.
+      window.harness.chart('chart-0').update({ viewport: { x: [20, 60] } });
     });
     await settle(page);
     const before = await page.evaluate(() => window.harness.domain('chart-0', 'x'));

@@ -258,7 +258,7 @@ test.describe('desktop, 1280 px', () => {
     const counts = await page.evaluate(() =>
       [...document.querySelectorAll('.r1-chart')].map((host) => ({
         canvases: host.querySelectorAll('canvas').length,
-        charts: host.querySelectorAll('[role="group"]').length,
+        charts: host.querySelectorAll('[aria-roledescription="interactive chart"]').length,
       })),
     );
     expect(counts).toHaveLength(3);

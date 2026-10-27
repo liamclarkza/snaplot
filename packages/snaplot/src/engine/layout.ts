@@ -420,10 +420,18 @@ export function reserveChrome(engine: ChartCore, side: 'top' | 'bottom', px: num
 
 export function updateInteractionLayer(engine: ChartCore): void {
   const axisControls = engine.config.pan?.axis === true || engine.config.zoom?.axis === true;
+  const { plot, width, height } = engine.layout;
+  // The plot's right and bottom edges are inclusive: a pointer on the edge pixel (a value at the
+  // domain's minimum) is inside.
   engine.canvasManager.setInteractionRect(
     axisControls
-      ? { left: 0, top: 0, width: engine.layout.width, height: engine.layout.height }
-      : engine.layout.plot,
+      ? { left: 0, top: 0, width, height }
+      : {
+          left: plot.left,
+          top: plot.top,
+          width: Math.min(plot.width + 1, width - plot.left),
+          height: Math.min(plot.height + 1, height - plot.top),
+        },
   );
 }
 

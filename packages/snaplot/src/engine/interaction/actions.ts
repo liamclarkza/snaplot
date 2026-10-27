@@ -7,7 +7,12 @@
  */
 import type { ChartCore } from '../Engine';
 import type { EventMap } from './bus';
-import { queueTouchCursor, cancelPendingTouchCursor, updateLocalCursorFromPoint } from '../cursor';
+import {
+  queueTouchCursor,
+  cancelPendingTouchCursor,
+  stepCursor,
+  updateLocalCursorFromPoint,
+} from '../cursor';
 import { clearProximityHighlight } from '../highlight';
 import { DirtyFlag } from '../spec';
 import { inferPosition, isInPlotArea } from '../layout';
@@ -18,13 +23,16 @@ import {
   applyUniformZoom,
   zoomedScaleRange,
   scaleDomainSpan,
+  pauseFollowing,
 } from '../viewport';
 import {
   isBrushMode,
   brushStart,
   brushUpdate,
   brushEnd,
-  scatterPointsInSelection,
+  pointsInSelection,
+  setSelection,
+  brushPixelRange,
 } from '../selection';
 import { MIN_DRAG_DISTANCE } from '../../constants';
 import { emitPointClick } from '../hit';
@@ -63,6 +71,14 @@ export const ACTIONS: ActionTable = {
     // mouse-leave skips the "cursor outside plot area" path in
     // action:cursor and the legend table never blanks its values.
     engine.emitEvent('cursor:move', null, null, 'local');
+  },
+
+  // ── The keyboard cursor and Escape (plan D20) ──
+  'action:step-cursor': (engine, { to }) => stepCursor(engine, to),
+  'action:escape': (engine) => {
+    setSelection(engine, null);
+    engine.selectionBox = null;
+    ACTIONS['action:cursor-leave'](engine, undefined);
   },
 
   // ── Pan (incremental pixel delta) ──
@@ -140,6 +156,8 @@ export const ACTIONS: ActionTable = {
 
   // ── Box selection (start/update/end) ──
   'action:box-start': (engine, { x, y }) => {
+    // A press takes the X window from live follow, so appends do not move what is under it.
+    pauseFollowing(engine);
     if (isBrushMode(engine)) {
       brushStart(engine, x);
       engine.scheduler.markDirty(DirtyFlag.OVERLAY);
@@ -204,20 +222,27 @@ export const ACTIONS: ActionTable = {
     const dx = Math.abs(x2 - x1);
     const dy = Math.abs(y2 - y1);
 
-    // Check overall drag distance (not per-axis) to distinguish from a click
-    const totalDist = Math.sqrt(dx * dx + dy * dy);
-    if (totalDist < MIN_DRAG_DISTANCE) return;
+    // Each axis zooms only when the drag spans it: a tall, 2 px wide drag is not an X zoom.
+    const zoomX = dx >= MIN_DRAG_DISTANCE;
+    const zoomY = dy >= MIN_DRAG_DISTANCE;
+    if (!zoomX && !zoomY) return;
 
     const xScale = engine.scales.get('x');
     const yScale = engine.scales.get('y');
-    const selectionX = xScale
+    let selectionX = xScale
       ? {
           min: xScale.pixelToData(Math.min(x1, x2)),
           max: xScale.pixelToData(Math.max(x1, x2)),
         }
       : null;
+    // A category axis zooms to whole categories: the edges snap to the slots they touch.
+    if (selectionX && engine.config.axes?.x?.thinTicks) {
+      const min = Math.round(selectionX.min + 0.5) - 0.5;
+      const max = Math.max(min + 1, Math.round(selectionX.max - 0.5) + 0.5);
+      selectionX = { min, max };
+    }
     const selectionY =
-      yScale && zoom.y
+      yScale && zoom.y && zoomY
         ? {
             min: yScale.pixelToData(Math.max(y1, y2)),
             max: yScale.pixelToData(Math.min(y1, y2)),
@@ -228,14 +253,14 @@ export const ACTIONS: ActionTable = {
       const selection = {
         x: selectionX,
         ...(selectionY ? { y: selectionY } : {}),
-        points: selectionY ? scatterPointsInSelection(engine, selectionX, selectionY) : undefined,
+        points: selectionY ? pointsInSelection(engine, selectionX, selectionY) : undefined,
       };
       engine.emitEvent('select', selection);
       engine.config.selection?.onSelect?.(selection);
     }
 
     if (zoom.enabled !== false) {
-      if (zoom.x !== false && selectionX) {
+      if (zoom.x !== false && selectionX && zoomX) {
         applyViewportChange(engine, 'x', selectionX.min, selectionX.max);
       }
       if (zoom.y && selectionY) {
@@ -253,6 +278,11 @@ export const ACTIONS: ActionTable = {
   'action:tap': (engine, { x, y, pointerType }) => {
     cancelPendingTouchCursor(engine);
     const inPlot = isInPlotArea(engine, x, y);
+    // A click outside the brush clears it.
+    const brush = isBrushMode(engine) ? brushPixelRange(engine) : null;
+    if (brush && (x < Math.min(brush.min, brush.max) || x > Math.max(brush.min, brush.max))) {
+      setSelection(engine, null);
+    }
     updateLocalCursorFromPoint(engine, x, y, pointerType);
     if (inPlot) emitPointClick(engine, x, y);
     if (inPlot && pointerType !== 'mouse') {

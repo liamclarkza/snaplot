@@ -132,6 +132,8 @@ export const SNAPLOT_THEME_CSS_VARS = {
   highlight: '--snaplot-theme-highlight',
   /** The font family. */
   fontFamily: '--snaplot-theme-font-family',
+  /** The interaction accent: the focus ring. */
+  accent: '--snaplot-theme-accent',
 } as const;
 
 /** Apply a resolved canvas theme to a DOM companion's inheritable tokens. */
@@ -147,6 +149,12 @@ export function applyThemeToElement(element: HTMLElement, theme: ThemeConfig): v
   set(SNAPLOT_THEME_CSS_VARS.hover, withAlpha(theme.textColor, 0.08));
   set(SNAPLOT_THEME_CSS_VARS.highlight, withAlpha(theme.textColor, 0.14));
   set(SNAPLOT_THEME_CSS_VARS.fontFamily, theme.fontFamily);
+  set(SNAPLOT_THEME_CSS_VARS.accent, theme.crosshairColor);
+}
+
+/** Remove the companion tokens `applyThemeToElement` set (a chart's destroy). */
+export function clearThemeFromElement(element: HTMLElement): void {
+  for (const name of Object.values(SNAPLOT_THEME_CSS_VARS)) element.style.removeProperty?.(name);
 }
 
 /** Theme fields that hold a single CSS color and participate in resolution. */

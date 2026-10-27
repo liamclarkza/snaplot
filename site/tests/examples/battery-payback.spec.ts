@@ -301,7 +301,6 @@ test.describe('phone, 390 px with touch', () => {
   // The cost chart zooms, so the library sets `touch-action: none` on it and a reader who
   // starts a swipe on it cannot scroll the article: M12a (interact-06, D19), handoff request.
   test('a swipe over the zoomable cost chart scrolls the article', async ({ page }) => {
-    test.fail(true, '[interact-06] a zoomable chart traps one-finger page scrolling');
     await open(page);
     expect(await swipeUpOn(page, '.r2-chart--cost')).toBeGreaterThan(100);
   });

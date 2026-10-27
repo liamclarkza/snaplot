@@ -46,3 +46,15 @@ it('a dense scatter reads the point nearest the pointer, not the nearest X', () 
   expect(tooltipText()).toMatch(/\b9\b/);
   expect(tooltipText()).not.toMatch(/\by 1\b/);
 });
+
+it('[interact-04] a single-series line tooltip shows the X and names its series', () => {
+  const chart = fakes.mount({
+    data: Array.from({ length: 20 }, (_, t) => ({ t, cpu: 40 + (t % 5) * 3 })),
+    x: 't',
+    series: [{ y: 'cpu', label: 'CPU' }],
+  });
+  fakes.frames.flush();
+  hover(chart, 10, 40);
+  fakes.frames.flush();
+  expect(tooltipText()).toContain('CPU');
+});

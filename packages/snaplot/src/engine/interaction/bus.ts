@@ -13,6 +13,10 @@ export interface EventMap {
   'action:box-end': { x1: number; y1: number; x2: number; y2: number };
   'action:reset-zoom': undefined;
   'action:tap': { x: number; y: number; pointerType: string };
+  /** The keyboard cursor: the previous, next, first or last point. */
+  'action:step-cursor': { to: 'prev' | 'next' | 'first' | 'last' };
+  /** Escape: clear the selection and hide the tooltip. */
+  'action:escape': undefined;
 }
 
 type Handler<T> = (payload: T) => void;

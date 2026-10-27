@@ -357,6 +357,9 @@ export interface SeriesSpec<TMeta = unknown> {
   sizeBy?: number | ScatterSizeEncoding;
   /** Extra columns to show in the default nearest-point tooltip. */
   tooltipFields?: Array<number | ScatterTooltipField>;
+  /** The names of the X and Y values in a point's tooltip: an axis title or the field read. */
+  xName?: string;
+  yName?: string;
   /** Force heatmap (density) rendering for scatter plots regardless of point count */
   heatmap?: boolean;
   /** Heatmap bin size in CSS pixels (default: 1 = one bin per physical pixel) */
@@ -789,6 +792,10 @@ export interface TooltipPoint {
   radius?: number;
   /** Extra scatter columns requested via `series.tooltipFields`. */
   fields?: TooltipFieldValue[];
+  /** The name of the X value in a point's tooltip (its axis title or field); scatter only. */
+  xName?: string;
+  /** The name of the Y value in a point's tooltip (its axis title or field); scatter only. */
+  yName?: string;
 }
 
 /** One extra scatter column value in a tooltip row. */

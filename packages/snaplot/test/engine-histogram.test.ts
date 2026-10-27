@@ -79,8 +79,8 @@ describe('engine histogram cursor', () => {
     tapAt(chart, { x: xScale.dataToPixel(1), y: plot.top + plot.height / 2 });
     fakes.frames.flush();
 
-    // One bar row reads "x <formattedX>  y <formattedY>".
-    expect(tooltipText()).toMatch(/x Recall/);
+    // The header is the category; the row names the series.
+    expect(tooltipText()?.trim().split(/\s+/)[0]).toBe('Recall');
   });
 
   it('keeps the zero baseline with nice off when x zoom shows only positive histogram bins', () => {

@@ -58,6 +58,8 @@ export interface DebugSnapshot {
   readonly theme: Readonly<ThemeConfig>;
   /** Axis labels from the last grid paint, in paint order. */
   labelBoxes(): DebugLabelBox[];
+  /** Points the last point-cloud hit test examined. */
+  hitVisits: number;
 }
 
 function countDataPass(pass: readonly DataPassSeries[]): { drawn: number; inView: number } {
@@ -133,6 +135,7 @@ export function debugSnapshot(engine: ChartCore): DebugSnapshot {
       return count().inView;
     },
     materializeCount: engine.debugCounters.materializeCount,
+    hitVisits: engine.hitTester.lastVisits,
     plot: Object.freeze({ ...engine.layout.plot }),
     layout: engine.layout,
     theme: Object.freeze({ ...engine.theme }),

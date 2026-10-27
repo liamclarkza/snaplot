@@ -14,22 +14,52 @@ const layout = {
 
 function press(
   key: string,
-  { pan, zoom, shiftKey = false }: { pan: PanConfig; zoom: ZoomConfig; shiftKey?: boolean },
+  {
+    pan,
+    zoom,
+    shiftKey = false,
+    ctrlKey = false,
+    cursorActive = false,
+    selectionActive = false,
+  }: {
+    pan: PanConfig;
+    zoom: ZoomConfig;
+    shiftKey?: boolean;
+    ctrlKey?: boolean;
+    cursorActive?: boolean;
+    selectionActive?: boolean;
+  },
 ) {
   const bus = new EventBus();
   const emitted: Array<[string, unknown]> = [];
   for (const action of Object.keys(ACTIONS) as Array<keyof EventMap>)
     bus.on(action, (payload) => emitted.push([action, payload]));
-  const event = { key, shiftKey } as KeyboardEvent;
-  const handled = handleChartKey({ event, bus, layout, pan, zoom });
+  const event = { key, shiftKey, ctrlKey } as KeyboardEvent;
+  const handled = handleChartKey({ event, bus, layout, pan, zoom, cursorActive, selectionActive });
   return { handled, emitted };
 }
 
 const all = { pan: { enabled: true, x: true, y: true }, zoom: { enabled: true, x: true } };
 
 describe('the key table (keyboard.ts)', () => {
-  it('pans by 40 px, 120 with shift, and only along enabled axes', () => {
-    expect(press('ArrowLeft', all).emitted).toEqual([['action:pan', { dx: 40, dy: 0 }]]);
+  it('moves the cursor point by point; Home and End once it is on the chart', () => {
+    expect(press('ArrowLeft', all).emitted).toEqual([['action:step-cursor', { to: 'prev' }]]);
+    expect(press('ArrowRight', all).emitted).toEqual([['action:step-cursor', { to: 'next' }]]);
+    expect(press('Home', all)).toEqual({ handled: false, emitted: [] });
+    expect(press('End', { ...all, cursorActive: true }).emitted).toEqual([
+      ['action:step-cursor', { to: 'last' }],
+    ]);
+  });
+
+  it('leaves Ctrl, ⌘ and Alt combinations to the browser', () => {
+    expect(press('ArrowRight', { ...all, ctrlKey: true })).toEqual({ handled: false, emitted: [] });
+    expect(press('+', { ...all, ctrlKey: true })).toEqual({ handled: false, emitted: [] });
+  });
+
+  it('pans X by 120 px with shift, Y by 40, and only along enabled axes', () => {
+    expect(press('ArrowLeft', { ...all, shiftKey: true }).emitted).toEqual([
+      ['action:pan', { dx: 120, dy: 0 }],
+    ]);
     expect(press('ArrowRight', { ...all, shiftKey: true }).emitted).toEqual([
       ['action:pan', { dx: -120, dy: 0 }],
     ]);
@@ -37,7 +67,7 @@ describe('the key table (keyboard.ts)', () => {
     expect(press('ArrowDown', all).emitted).toEqual([['action:pan', { dx: 0, dy: -40 }]]);
     const noY = { ...all, pan: { enabled: true, x: true } };
     expect(press('ArrowUp', noY)).toEqual({ handled: false, emitted: [] });
-    const off = { ...all, pan: { enabled: false } };
+    const off = { ...all, pan: { enabled: false }, shiftKey: true };
     expect(press('ArrowLeft', off)).toEqual({ handled: false, emitted: [] });
   });
 
@@ -58,15 +88,21 @@ describe('the key table (keyboard.ts)', () => {
     });
   });
 
-  it('resets on 0 and Home whatever the options, and ignores other keys', () => {
+  it('resets on 0 unless zoom and pan are off; Escape clears what is shown; ignores other keys', () => {
     const off = { pan: { enabled: false }, zoom: { enabled: false } };
-    expect(press('0', off)).toEqual({ handled: true, emitted: [['action:reset-zoom', undefined]] });
-    expect(press('Home', off).handled).toBe(true);
+    expect(press('0', all)).toEqual({ handled: true, emitted: [['action:reset-zoom', undefined]] });
+    expect(press('0', off).handled).toBe(false);
+    expect(press('Escape', all).handled).toBe(false);
+    expect(press('Escape', { ...all, selectionActive: true }).emitted).toEqual([
+      ['action:escape', undefined],
+    ]);
     for (const key of ['a', 'Enter', 'constructor', 'toString'])
       expect(press(key, all)).toEqual({ handled: false, emitted: [] });
     expect([...KEY_BINDINGS.keys()]).toEqual([
       'ArrowLeft',
       'ArrowRight',
+      'Home',
+      'End',
       'ArrowUp',
       'ArrowDown',
       '+',
@@ -74,7 +110,7 @@ describe('the key table (keyboard.ts)', () => {
       '-',
       '_',
       '0',
-      'Home',
+      'Escape',
     ]);
   });
 });
@@ -84,6 +120,8 @@ describe('the action table (actions.ts)', () => {
     expect(Object.keys(ACTIONS)).toEqual([
       'action:cursor',
       'action:cursor-leave',
+      'action:step-cursor',
+      'action:escape',
       'action:pan',
       'action:zoom',
       'action:box-start',

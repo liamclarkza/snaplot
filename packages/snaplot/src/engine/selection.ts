@@ -123,7 +123,9 @@ export function brushStart(engine: ChartCore, px: number): void {
 export function brushUpdate(engine: ChartCore, px: number): void {
   const xScale = engine.scales.get('x');
   if (!xScale || !engine.brushDrag) return;
-  const dataX = xScale.pixelToData(px);
+  // A drag past the plot edge stops at the edge of the domain.
+  const { plot } = engine.layout;
+  const dataX = xScale.pixelToData(Math.max(plot.left, Math.min(plot.left + plot.width, px)));
   const { mode, anchorDataX, orig } = engine.brushDrag;
 
   let proposed: SelectionRange;
@@ -152,47 +154,46 @@ export function brushEnd(engine: ChartCore): void {
   emitSelectionChange(engine);
 }
 
-export function scatterPointsInSelection(
-  engine: ChartCore,
-  xRange: ScaleRange,
-  yRange: ScaleRange,
-) {
+/**
+ * The points inside a selection: every visible series' points with X in `xRange` (and Y in
+ * `yRange` when given). Sorted series are searched by X; point clouds are scanned.
+ */
+export function pointsInSelection(engine: ChartCore, xRange: ScaleRange, yRange?: ScaleRange) {
   const points = [];
   const palette = engine.categoricalPalette();
 
   for (let si = 0; si < engine.config.series.length; si++) {
     const series = engine.config.series[si];
     const store = engine.storeForSeries(si);
-    if (store.length === 0) continue;
-    if (series.visible === false || !markOf(series).draw.cloud) continue;
+    if (store.length === 0 || series.visible === false) continue;
+    const cloud = markOf(series).draw.cloud;
     const xColumnIdx = xColumnOf(series);
     const yColumnIdx = seriesYColumn(series);
     if (!engine.isValidColumn(xColumnIdx, store) || !engine.isValidColumn(yColumnIdx, store))
       continue;
 
     const fallbackColor = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
-    const style = scatterResolvers(engine, si, series, fallbackColor).logicalResolver;
+    const style = cloud
+      ? scatterResolvers(engine, si, series, fallbackColor).logicalResolver
+      : null;
+    const sorted = xColumnIdx === 0;
+    const from = sorted ? Math.max(0, store.lowerBoundX(xRange.min)) : 0;
+    const to = sorted
+      ? Math.min(store.length - 1, store.upperBoundX(xRange.max))
+      : store.length - 1;
 
-    for (let i = 0; i < store.length; i++) {
+    for (let i = from; i <= to; i++) {
       const x = store.valueAt(xColumnIdx, i);
       const y = store.valueAt(yColumnIdx, i);
-      if (
-        !Number.isFinite(x) ||
-        !Number.isFinite(y) ||
-        x < xRange.min ||
-        x > xRange.max ||
-        y < yRange.min ||
-        y > yRange.max
-      ) {
-        continue;
-      }
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < xRange.min || x > xRange.max) continue;
+      if (yRange && (y < yRange.min || y > yRange.max)) continue;
       points.push({
         seriesIndex: si,
         dataIndex: i,
         label: series.label,
         x,
         y,
-        color: style.colorAt(i),
+        color: style ? style.colorAt(i) : fallbackColor,
         meta: series.meta,
       });
     }

@@ -616,7 +616,10 @@ function normalizeInteraction(
     }
     if (bounds === 'none') engine.zoom = { ...engine.zoom, bounds: false };
     if (drag === 'select') engine.selection = { ...engine.selection, mode: 'brush' };
-    if (drag === 'pan') engine.touch = { ...engine.touch, drag: 'pan' };
+    // One finger pans an xy chart, as `drag: 'pan'` asks (plan D19).
+    if (drag === 'pan' || (zoom === 'xy' && drag === 'zoom')) {
+      engine.touch = { ...engine.touch, drag: 'pan' };
+    }
   } else fail(`interaction must be 'readonly' or { zoom, drag, bounds }, not ${describe(value)}.`);
 }
 

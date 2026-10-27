@@ -245,11 +245,11 @@ describe('axisReadout and formatFieldValue', () => {
     expect(axisReadout(ctx, 'y', 1.23456)).toBe('1.23');
   });
 
-  it('writes field values to four places, or four significant digits when tiny or huge', () => {
+  it('writes field values grouped to four places, or four significant digits when tiny', () => {
     expect(formatFieldValue(3)).toBe('3');
     expect(formatFieldValue(1.5)).toBe('1.5');
     expect(formatFieldValue(0.000123456)).toBe('0.0001235');
-    expect(formatFieldValue(123456.7)).toBe('1.235e+5');
+    expect(formatFieldValue(123456.7)).toBe('123,456.7');
     expect(formatFieldValue(Number.NaN)).toBe('');
   });
 });

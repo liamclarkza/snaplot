@@ -232,26 +232,25 @@ describe('[interact-23] the host keeps its own attributes (M12a, plan D20)', () 
     expect(element.querySelector('canvas')).toBeNull();
   });
 
-  it.fails('[interact-23] destroy restores the host attributes', () => {
+  it('[interact-23] destroy restores the host attributes', () => {
     const element = host();
     const before = attributes(element);
     createChart(element, named).destroy();
     expect(attributes(element)).toEqual(before);
   });
 
-  it.fails('[interact-23] removing ariaLabel removes the role the chart added', () => {
+  it('[interact-23] removing ariaLabel names the figure by its series, and destroy removes both', () => {
     const element = host();
     const chart = createChart(element, named);
-    try {
-      chart.setOptions(base as ChartOptions<Row>);
-      expect(element.hasAttribute('aria-label')).toBe(false);
-      expect(element.hasAttribute('role')).toBe(false);
-    } finally {
-      chart.destroy();
-    }
+    chart.setOptions(base as ChartOptions<Row>);
+    expect(element.getAttribute('role')).toBe('figure');
+    expect(element.getAttribute('aria-label')).toMatch(/^Line chart, 2 series/);
+    chart.destroy();
+    expect(element.hasAttribute('aria-label')).toBe(false);
+    expect(element.hasAttribute('role')).toBe(false);
   });
 
-  it.fails("[interact-23] a host's own aria-label stays while the chart lives", () => {
+  it("[interact-23] a host's own aria-label stays while the chart lives", () => {
     const element = host();
     element.setAttribute('aria-label', 'Mine');
     const chart = createChart(element, base as ChartOptions<Row>);

@@ -104,7 +104,7 @@ export function describeOptions<Row>(
 
   const seriesIds = n.series.map((s) => s.id);
   const seriesSpecs = n.series.map((s) =>
-    seriesSpec(s, sources[seriesSources[s.index]], encodings),
+    seriesSpec(s, sources[seriesSources[s.index]], encodings, n),
   );
   const spec: Omit<ChartSpec, 'plugins'> = {
     ...n.engine,
@@ -892,6 +892,7 @@ function seriesSpec<Row>(
   s: NormalizedSeries,
   source: SourceState<Row>,
   encodings: Map<string, string[]>,
+  n: NormalizedOptions<any>,
 ): SeriesSpec {
   const spec: SeriesSpec = { ...s.spec, label: s.label, type: s.type };
   if (s.format) spec.format = s.format;
@@ -908,6 +909,11 @@ function seriesSpec<Row>(
   }
   if (s.type === 'scatter') {
     spec.xColumn = source.sortedX ? 0 : xColumnIndex(source);
+    // A point's tooltip names its values by axis title, else by the field read.
+    const fieldName = (accessor: AccessorLike | undefined) =>
+      typeof accessor === 'string' ? accessor : undefined;
+    spec.xName = n.axes[s.xAxis]?.spec.title ?? fieldName(source.x);
+    spec.yName = n.axes[s.yAxis]?.spec.title ?? fieldName(s.y);
     const encode = (
       value: { field: AccessorLike; options: Record<string, unknown> },
       role: string,

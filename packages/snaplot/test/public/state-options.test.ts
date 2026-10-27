@@ -262,7 +262,7 @@ describe('[dataapi-16][backlog-02] selection', () => {
 
   // M12a's (plan §4.4: the payload is { x, y?, points }); conformance scenario #9 (M13) waits
   // on it.
-  it.fails('[gap-annotations-extensibility-14] a brush reports the points it covers in selection:change', () => {
+  it('[gap-annotations-extensibility-14] a brush reports the points it covers in selection:change', () => {
     const chart = mount<Row>(fakes, brush);
     fakes.frames.flush();
     const seen: Array<{ points?: unknown[] } | null> = [];
@@ -384,10 +384,12 @@ describe('[research-14][frameworks-04] a state option given at creation does not
     brushAcross(chart, [30, 24], [60, 24]);
     const selection = chart.getState().selection;
     expect(selection).not.toBeNull();
-    expect(seen.filter(([event]) => event === 'selection:change')).toEqual([
-      ['selection:change', selection],
-    ]);
-    expect(onSelectionChange.mock.calls).toEqual([[selection]]);
+    // The event is the selection plus the points it covers.
+    const changes = seen.filter(([event]) => event === 'selection:change');
+    expect(changes).toHaveLength(1);
+    expect(changes[0][1]).toMatchObject(selection!);
+    expect(onSelectionChange.mock.calls).toHaveLength(1);
+    expect(onSelectionChange.mock.calls[0][0]).toMatchObject(selection!);
   });
 
   it('[research-14][frameworks-04] the first legend hover after highlight: null emits highlight:change once', () => {

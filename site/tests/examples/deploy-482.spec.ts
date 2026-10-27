@@ -202,7 +202,6 @@ test.describe('deploy-482', () => {
   test('a pan stops following; Back to live resumes it', async ({ page }) => {
     // Shift-drag does not pan a chart that is following its stream yet (docs/handoff/m16c.md,
     // a request to M12a). Flip this when M12a merges.
-    test.fail(true, '[interact-14:follow-pan] M12a: Shift-drag does not pan a following chart');
     await page.setViewportSize({ width: 1280, height: 1000 });
     await open(page);
     const box = await page.locator('[data-chart="latency"]').boundingBox();

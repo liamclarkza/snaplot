@@ -10,10 +10,7 @@ const run =
     body(await scenario.open(page, 'react19'));
 
 test('#1 mount: one live chart, host attributes passed through', run(scenario.mount));
-test('#1 mount: the host is a figure named by a summary of its series', async ({ page }) => {
-  test.fail(true, '[interact-23]');
-  await run(scenario.figure)({ page });
-});
+test('#1 mount: the host is a figure named by a summary of its series', run(scenario.figure));
 test('#2 a paint-only change does not ingest and draws the new title', run(scenario.paintOnly));
 test(
   '#3 30 re-renders with inline handlers do not ingest; a click calls the latest once',
@@ -36,15 +33,12 @@ test(
   '#8 a legend click emits hiddenSeries:change; the same prop again is a no-op',
   run(scenario.legendClick),
 );
-test('#9 drag select emits one selection:change with points', async ({ page }) => {
-  test.fail(true, '[gap-annotations-extensibility-14]');
-  await run(scenario.brush)({ page });
-});
+test('#9 drag select emits one selection:change with points', run(scenario.brush));
 test('#10 append, zoom, resumeFollow: following goes true, false, true', run(scenario.followZoom));
-test('#10 append, pan back, resumeFollow: following goes true, false, true', async ({ page }) => {
-  test.fail(true, '[interact-14]');
-  await run(scenario.followPan)({ page });
-});
+test(
+  '#10 append, pan back, resumeFollow: following goes true, false, true',
+  run(scenario.followPan),
+);
 test('#11 20 cursor moves cost a highlight selector no render', run(scenario.selectorRenders));
 test(
   '#12 the cursor hook and the legend table show new values after a data change',

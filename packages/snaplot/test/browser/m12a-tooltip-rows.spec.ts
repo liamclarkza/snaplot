@@ -53,7 +53,6 @@ test.describe('tooltip rows', () => {
   });
 
   test('[interact-04] a single-series tooltip names its series', async ({ harnessPage: page }) => {
-    test.fail(true, '[interact-04]');
     await page.evaluate(() => {
       window.harness.mount({
         data: Array.from({ length: 20 }, (_, t) => ({ t, cpu: 40 + (t % 5) * 3 })),
@@ -70,7 +69,6 @@ test.describe('tooltip rows', () => {
   test('[interact-04] two coincident points in nearest mode list both series', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-04]');
     await page.evaluate(() => {
       window.harness.mount({
         x: 'x',
@@ -91,7 +89,6 @@ test.describe('tooltip rows', () => {
   test('[visuals-05] a multi-series scatter shows only the point under the pointer', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[visuals-05]');
     await page.evaluate(() => {
       const group = (shift: number) =>
         Array.from({ length: 30 }, (_, i) => ({ h: 150 + i, w: 40 + shift + ((i * 7) % 11) }));
@@ -115,7 +112,6 @@ test.describe('tooltip rows', () => {
   test('[dxtrial-07] a scatter tooltip shows its colour category and tooltipFields in order', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[dxtrial-07]');
     await page.evaluate(() => {
       const makers = ['Tesla', 'Ford', 'Kia'];
       window.harness.mount({
@@ -150,7 +146,6 @@ test.describe('tooltip rows', () => {
   test('[interact-02:hit] a category X tooltip header shows the category label', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[interact-02:hit]');
     await page.evaluate(() => {
       window.harness.mount({
         data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((m, i) => ({
