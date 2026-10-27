@@ -52,7 +52,8 @@ Without `axes.x.type`, the x values decide the axis:
 
 A date-only string, or one without an offset, is a wall time in the chart's `timeZone` (`'local'`
 by default, or `'UTC'`); a string with `Z` or an offset is an instant. Numbers that look like
-epoch milliseconds warn once and suggest `axes.x: { type: 'time' }`.
+epoch milliseconds warn once and suggest `axes.x: { type: 'time' }`. When series share an axis,
+numbers and times together make a time axis, and the numbers read as epoch milliseconds.
 
 <Example name="data-guide/categories" />
 

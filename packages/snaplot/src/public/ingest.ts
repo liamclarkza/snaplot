@@ -403,7 +403,8 @@ function ingestBins<Row>(
 
 function noteKind(kinds: Map<string, XKind>, axis: string, kind: XKind, path: string): void {
   const prior = kinds.get(axis);
-  if (prior && prior !== kind)
+  // Numbers then times: the axis is a time axis and the numbers are epoch milliseconds.
+  if (prior && prior !== kind && !(prior === 'number' && kind === 'date'))
     fail(
       `${path}: axis "${axis}" would hold both ${kindWords(prior)} and ${kindWords(kind)}. Use one kind of X per axis.`,
     );
@@ -564,9 +565,9 @@ function ingestRows<Row>(
   if (type === 'time') kind = 'date';
   else if (type === 'category' || prior === 'category') kind = 'category';
   else if (type === 'linear' || type === 'log') kind = 'number';
-  // D18: an X of only ISO-8601 strings (with Dates or alone) is a time axis.
-  else if (strings > 0 && iso === strings && (dates > 0 || numbers === 0) && prior !== 'number')
-    kind = 'date';
+  // D18: an X of only ISO-8601 strings (with Dates or alone) is a time axis, even after a source
+  // of numbers, which then read as epoch milliseconds (as numbers after times already do).
+  else if (strings > 0 && iso === strings && (dates > 0 || numbers === 0)) kind = 'date';
   else if (strings > 0) kind = 'category';
   else if (dates > 0) kind = 'date';
   else kind = prior ?? 'number';

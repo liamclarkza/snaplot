@@ -258,6 +258,22 @@ describe('ingest (plan §3.2, D18, D23)', () => {
     ).toThrow(/axis "x" would hold both numbers and category labels/);
   });
 
+  it('reads epoch numbers and ISO strings on one axis as times, in either order', () => {
+    for (const [first, second] of [
+      [1_717_200_000_000, '2024-06-02'],
+      ['2024-06-02', 1_717_200_000_000],
+    ]) {
+      const ingested = run({
+        x: 'x',
+        series: [
+          { id: 'a', data: [{ x: first, y: 1 }], y: 'y' },
+          { id: 'b', data: [{ x: second, y: 1 }], y: 'y' },
+        ],
+      } as ChartOptions<any>);
+      expect(ingested.spec.axes?.x?.type).toBe('time');
+    }
+  });
+
   it('treats missing Y as gaps and rejects values that are not numbers', () => {
     const result = run<{ x: number; y?: number | null }>({
       data: [{ x: 0 }, { x: 1, y: null }, { x: 2, y: Number.NaN }],

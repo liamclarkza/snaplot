@@ -308,6 +308,8 @@ what to use instead, and the chart keeps its default:
   labels thin to every nth that fits, edge labels never touch their neighbours, adjacent labels
   never repeat, values under 1e-4 or past 1e15 read in exponent form, and a long title is cut to
   its edge with an ellipsis (V54).
+- Series that share an axis may mix epoch numbers with `Date`s or ISO-8601 strings: the axis is
+  a time axis and the numbers read as epoch milliseconds, whichever series comes first.
 - A reference region on a category axis covers whole slots; a region from 0 on a log axis starts
   at the domain.
 - Value axes keep about two and a half lines between labels; log ticks across decades keep every
