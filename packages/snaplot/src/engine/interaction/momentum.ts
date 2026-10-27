@@ -3,16 +3,19 @@
  * with an exponential decay, one `action:pan` per animation frame, until the velocity fades or a
  * new gesture cancels it.
  */
+import { nextFrame, prefersReducedMotion } from '../render/scheduler';
 import type { EventBus } from './bus';
 
 export class PanMomentum {
-  private frame: number | null = null;
+  /** Cancels the next momentum frame. */
+  private frame: (() => void) | null = null;
 
   constructor(private readonly eventBus: EventBus) {}
 
   /** Start from a release velocity in CSS px per ms, on `axis` (an axis drag) or the plot. */
   start(velocityX: number, velocityY: number, axis: string | undefined): void {
-    if (typeof requestAnimationFrame === 'undefined') return;
+    // Reduced motion stops a pan where the finger lifts (plan D19).
+    if (prefersReducedMotion()) return;
 
     // Threshold of 0.1 px/ms ≈ 100 px/s, below this it's just a static release.
     const vMag = Math.hypot(velocityX, velocityY);
@@ -29,7 +32,8 @@ export class PanMomentum {
     }
 
     let lastT = performance.now();
-    const step = (now: number) => {
+    const step = () => {
+      const now = performance.now();
       const dt = Math.min(32, now - lastT); // clamp frame to avoid teleporting after tab blur
       lastT = now;
 
@@ -46,15 +50,13 @@ export class PanMomentum {
         this.frame = null;
         return;
       }
-      this.frame = requestAnimationFrame(step);
+      this.frame = nextFrame(step);
     };
-    this.frame = requestAnimationFrame(step);
+    this.frame = nextFrame(step);
   }
 
   cancel(): void {
-    if (this.frame !== null) {
-      if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(this.frame);
-      this.frame = null;
-    }
+    this.frame?.();
+    this.frame = null;
   }
 }

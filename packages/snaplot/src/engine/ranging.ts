@@ -259,6 +259,8 @@ export function autoRangeHorizontal(engine: ChartCore): void {
  * because their data version bump would invalidate any index anyway.
  */
 export function autoRangeVertical(engine: ChartCore, fromViewport = false): void {
+  // The points this pass reads, the debug hook's `rangeScanPoints`.
+  engine.debugCounters.rangeScanPoints = 0;
   if (!engine.hasData()) return;
 
   const axisConfigs = engine.config.axes ?? {};
@@ -435,6 +437,7 @@ export function columnRange(
     let min = Infinity;
     let max = -Infinity;
     for (const segment of store.getSegments(start, end)) {
+      engine.debugCounters.rangeScanPoints++;
       const range = index.query(segment.physicalStart, segment.physicalEnd, positiveOnly);
       if (!range) continue;
       if (range[0] < min) min = range[0];
@@ -445,6 +448,7 @@ export function columnRange(
 
   let min = Infinity;
   let max = -Infinity;
+  engine.debugCounters.rangeScanPoints += end - start + 1;
   for (let i = start; i <= end; i++) {
     const v = store.yAt(columnIdx, i);
     if (!Number.isFinite(v) || (positiveOnly && v <= 0)) continue;

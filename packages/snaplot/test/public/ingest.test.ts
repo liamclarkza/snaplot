@@ -102,8 +102,8 @@ describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X orde
   const n = 20_000;
   /**
    * Points drawn during a gesture over 10 % of X, over min(in view, max(400, 1.5 × plot width)):
-   * about 1 for a source culled by X, whose stride runs over the points in view, and another
-   * ratio for one sampled over its whole length. (The wheel step that starts the gesture moves
+   * about 1 for a source culled by X, whose stride runs over the points in view, and close to it
+   * for one strided over its whole length by its in-view share. (The wheel step that starts the gesture moves
    * the range off whole numbers, so the stride's rounding leaves a sorted source just under 1.)
    */
   function gestureFidelity(chart: ChartHandle<any>): number {
@@ -128,9 +128,10 @@ describe('[arch-06:ingest][gap-perf-gate-01:storage] sorted scatter keeps X orde
 
   it('[arch-06:ingest] a scatter stored unsorted by an append is culled again once its data is replaced', () => {
     const chart = scatter((i) => i);
-    // An append before the last X stores the source unsorted.
+    // An append before the last X stores the source unsorted: it is strided over its whole
+    // length, by the share of it in view, so it keeps its fidelity too.
     chart.appendData({ columns: { x: Float64Array.of(-1), y: Float64Array.of(0) } });
-    expect(gestureFidelity(chart)).not.toBeCloseTo(1, 1);
+    expect(gestureFidelity(chart)).toBeGreaterThanOrEqual(0.8);
     chart.update({ data: { columns: columns(n) } });
     expect(gestureFidelity(chart)).toBeGreaterThanOrEqual(0.99);
     // Appended in order and read again from what it retains, it stays sorted.

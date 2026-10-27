@@ -65,7 +65,7 @@ jobs:
         run: npm test -w packages/snaplot -- --coverage
       - name: Time tests under three time zones
         run: npm run test:tz
-      - name: Architecture rules (warn mode until M14)
+      - name: Architecture rules
         run: node scripts/check-architecture.mjs
       - uses: actions/upload-artifact@v7
         if: always()

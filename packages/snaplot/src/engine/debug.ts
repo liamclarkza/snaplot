@@ -60,6 +60,8 @@ export interface DebugSnapshot {
   labelBoxes(): DebugLabelBox[];
   /** Points the last point-cloud hit test examined. */
   hitVisits: number;
+  /** Points the last vertical auto-range read. */
+  rangeScanPoints: number;
 }
 
 function countDataPass(pass: readonly DataPassSeries[]): { drawn: number; inView: number } {
@@ -136,6 +138,7 @@ export function debugSnapshot(engine: ChartCore): DebugSnapshot {
     },
     materializeCount: engine.debugCounters.materializeCount,
     hitVisits: engine.hitTester.lastVisits,
+    rangeScanPoints: engine.debugCounters.rangeScanPoints,
     plot: Object.freeze({ ...engine.layout.plot }),
     layout: engine.layout,
     theme: Object.freeze({ ...engine.theme }),

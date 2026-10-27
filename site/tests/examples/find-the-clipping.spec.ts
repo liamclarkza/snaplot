@@ -220,9 +220,7 @@ test.describe('find-the-clipping', () => {
   });
 
   test('the overview paints within 300 ms of the decode', async ({ page }) => {
-    // Lines draw every sample at rest until M11 decimates them (M4 at rest); 4.5M samples in two
-    // channels take about 700 ms here. Flip this when M11 merges (docs/handoff/m16c.md).
-    test.fail(true, '[gap-perf-gate-10] M11: lines are not decimated at rest');
+    // Lines are M4-decimated per device column at rest (M11d), in one closure-free pass (M14).
     await page.setViewportSize({ width: 1280, height: 900 });
     await open(page);
     const ms = await page.evaluate(

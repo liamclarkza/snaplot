@@ -19,6 +19,7 @@ import { markOf, xColumnOf } from './marks/index';
 import { applyProximityHighlight, clearProximityHighlight } from './highlight';
 import { updateTooltipPoints, hasOnlyVisibleHistograms, resolveHistogramCursor } from './hit';
 import { isInPlotArea } from './layout';
+import { nextFrame } from './render/scheduler';
 
 export function setCursorDataX(
   engine: ChartCore,
@@ -237,12 +238,7 @@ export function queueTouchCursor(
   engine.pendingTouchCursor = { x, y, pointerType };
   if (engine.touchCursorFrame !== null) return;
 
-  if (typeof requestAnimationFrame === 'undefined') {
-    flushPendingTouchCursor(engine);
-    return;
-  }
-
-  engine.touchCursorFrame = requestAnimationFrame(() => {
+  engine.touchCursorFrame = nextFrame(() => {
     engine.touchCursorFrame = null;
     flushPendingTouchCursor(engine);
   });
@@ -257,8 +253,8 @@ export function flushPendingTouchCursor(engine: ChartCore): void {
 
 export function cancelPendingTouchCursor(engine: ChartCore): void {
   engine.pendingTouchCursor = null;
-  if (engine.touchCursorFrame !== null && typeof cancelAnimationFrame !== 'undefined') {
-    cancelAnimationFrame(engine.touchCursorFrame);
+  if (engine.touchCursorFrame !== null) {
+    engine.touchCursorFrame();
   }
   engine.touchCursorFrame = null;
 }

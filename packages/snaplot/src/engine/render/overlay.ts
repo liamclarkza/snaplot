@@ -1,5 +1,5 @@
 import type { Layout, CursorConfig } from '../spec';
-import { prefersReducedMotion } from '../../utils/motion';
+import { prefersReducedMotion } from './scheduler';
 import type { ChartCore } from '../Engine';
 import { brushPixelRange } from '../selection';
 import { DirtyFlag } from '../spec';

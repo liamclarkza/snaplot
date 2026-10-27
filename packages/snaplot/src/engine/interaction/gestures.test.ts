@@ -263,6 +263,7 @@ describe('GestureManager cursor emission', () => {
   it('starts touch momentum only after a pan gesture', () => {
     const requestAnimationFrame = vi.fn(() => 1);
     vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
     const { target, manager } = createGesture('analytical', {
       pan: { enabled: true, x: true, y: true },
       touch: { drag: 'pan' },
@@ -280,6 +281,7 @@ describe('GestureManager cursor emission', () => {
   it('does not start touch momentum after cursor drag or selection', () => {
     const requestAnimationFrame = vi.fn(() => 1);
     vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
     const cursorGesture = createGesture('analytical');
 
     cursorGesture.target.dispatch('pointerdown', {

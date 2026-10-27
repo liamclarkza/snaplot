@@ -193,3 +193,32 @@ export const watchPrint = shared((notify) => {
   window.addEventListener('beforeprint', notify);
   return () => window.removeEventListener('beforeprint', notify);
 });
+
+/**
+ * Cached `prefers-reduced-motion` (tap feedback, the tooltip fade, touch momentum): the query is
+ * made once and a change listener keeps the answer, so no hot path calls `matchMedia`.
+ */
+let reducedMotion: boolean | null = null;
+
+export function prefersReducedMotion(): boolean {
+  if (reducedMotion !== null) return reducedMotion;
+
+  // SSR / non-DOM environments: default to allowing motion, matching how the
+  // renderers behave when no OS hint is available.
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    reducedMotion = false;
+    return reducedMotion;
+  }
+
+  const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+  reducedMotion = mql.matches;
+  // `addEventListener` over the deprecated `addListener`; older Safari lacks
+  // it, hence the guard. The listener only ever writes the cache, so it costs
+  // nothing until the user actually changes the setting.
+  if (typeof mql.addEventListener === 'function') {
+    mql.addEventListener('change', (e) => {
+      reducedMotion = e.matches;
+    });
+  }
+  return reducedMotion;
+}

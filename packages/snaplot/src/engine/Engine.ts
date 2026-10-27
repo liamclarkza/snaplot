@@ -173,7 +173,8 @@ export class ChartCore implements EngineHost {
   /** Pointer type of the most recent cursor event, drives hit-test radius. */
   lastPointerType: 'mouse' | 'touch' | 'pen' = 'mouse';
   pendingTouchCursor: { x: number; y: number; pointerType: 'touch' | 'pen' } | null = null;
-  touchCursorFrame: number | null = null;
+  /** Cancels the frame that applies the pending touch cursor. */
+  touchCursorFrame: (() => void) | null = null;
   /**
    * Stops re-resolving the theme when the document's theming context changes (render/scheduler.ts
    * `watchTheme`). Only a theme that actually differs repaints, so the watch is effectively free
@@ -226,6 +227,8 @@ export class ChartCore implements EngineHost {
     ingestCount: 0,
     materializeCount: 0,
     renderCount: { grid: 0, data: 0, overlay: 0 },
+    /** Points the last vertical auto-range read. */
+    rangeScanPoints: 0,
   };
   lastDataPass: DataPassSeries[] = [];
   /** The labels of the last grid paint (the debug hook's `labelBoxes()`). */

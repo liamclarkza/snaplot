@@ -345,8 +345,8 @@ export function setPlotInsets(engine: ChartCore, insets: PlotInsets): void {
  * measured axes take. Cached with the layout inputs.
  */
 export function naturalGutters(engine: ChartCore): { left: number; right: number } {
-  const width = engine.canvasManager.cssWidth || 600;
-  const height = engine.canvasManager.cssHeight || 400;
+  const width = engine.canvasManager.boxWidth || 600;
+  const height = engine.canvasManager.boxHeight || 400;
   const key = `${createLayoutCacheKey(engine, width, height)}|natural`;
   if (engine.natural?.key !== key) {
     const layout = computeLayout(
@@ -369,14 +369,14 @@ export function naturalGutters(engine: ChartCore): { left: number; right: number
 
 /** Whether the layout was computed for another box, options or scales than the current ones. */
 export function layoutIsStale(engine: ChartCore): boolean {
-  const w = engine.canvasManager.cssWidth || 600;
-  const h = engine.canvasManager.cssHeight || 400;
+  const w = engine.canvasManager.boxWidth || 600;
+  const h = engine.canvasManager.boxHeight || 400;
   return !engine.layout || createLayoutCacheKey(engine, w, h) !== engine.layoutCacheKey;
 }
 
 export function updateLayout(engine: ChartCore): void {
-  const w = engine.canvasManager.cssWidth || 600;
-  const h = engine.canvasManager.cssHeight || 400;
+  const w = engine.canvasManager.boxWidth || 600;
+  const h = engine.canvasManager.boxHeight || 400;
   const cacheKey = createLayoutCacheKey(engine, w, h);
   if (engine.layout && cacheKey === engine.layoutCacheKey) {
     updateInteractionLayer(engine);

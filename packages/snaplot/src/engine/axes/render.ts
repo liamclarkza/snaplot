@@ -336,7 +336,7 @@ export function renderAxes(
   // Release the plot clip used for gridlines.
   ctx.restore();
 
-  resolveAxisCornerCollisions(result, layout, theme, ctx);
+  resolveAxisCornerCollisions(result, layout, theme);
 
   // Tick marks deliberately paint outside the plot clip. Bar marks follow
   // slot boundaries; other axes share the final label tick set.

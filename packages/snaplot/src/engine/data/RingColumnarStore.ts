@@ -1,3 +1,4 @@
+import { fail } from '../errors';
 import type { ColumnarData } from '../spec';
 import type { ColumnarSegment, DataStore } from './DataStore';
 import { validateMaxLen } from './DataStore';
@@ -79,7 +80,7 @@ export class RingColumnarStore implements DataStore {
     if (addLen === 0) return false;
 
     if (this.len > 0 && data[0][0] < this.xAt(this.len - 1)) {
-      throw new Error(
+      fail(
         `append() X values must continue in non-decreasing order, but ` +
           `new x[0] = ${data[0][0]} < current last X = ${this.xAt(this.len - 1)}. ` +
           `Append only newer points, or replace the data with a sorted dataset.`,
@@ -113,19 +114,19 @@ export class RingColumnarStore implements DataStore {
 
   replaceLast(row: number[]): void {
     if (this.len === 0) {
-      throw new Error('replaceLast() requires at least one existing data point.');
+      fail('replaceLast() requires at least one existing data point.');
     }
     if (row.length !== this.columns.length) {
-      throw new Error(
+      fail(
         `replaceLast() expects ${this.columns.length} values (one per column), ` +
           `but got ${row.length}.`,
       );
     }
     if (!Number.isFinite(row[0])) {
-      throw new Error(`replaceLast() X value must be finite, received ${row[0]}.`);
+      fail(`replaceLast() X value must be finite, received ${row[0]}.`);
     }
     if (this.len >= 2 && row[0] < this.xAt(this.len - 2)) {
-      throw new Error(
+      fail(
         `replaceLast() X value must keep the column sorted, but ` +
           `${row[0]} < previous x = ${this.xAt(this.len - 2)}.`,
       );
@@ -273,7 +274,7 @@ export class RingColumnarStore implements DataStore {
 
   private validateShape(data: ColumnarData): void {
     if (data.length !== this.columns.length) {
-      throw new Error(
+      fail(
         `append() expects ${this.columns.length} columns to match the initial ` +
           `data shape, but got ${data.length}. Pass the same number of ` +
           `Float64Arrays the store was created with, one X column ` +

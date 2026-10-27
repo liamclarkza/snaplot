@@ -1,3 +1,4 @@
+import { cachedDateFormat, runtimeTimeZone } from '../format';
 import type { Scale, ScaleType } from '../spec';
 
 /**
@@ -94,24 +95,15 @@ function make(zone: TimeZoneMode, y: number, mo: number, d = 1, h = 0, mi = 0): 
   return zone === 'UTC' ? Date.UTC(y, mo, d, h, mi) : new Date(y, mo, d, h, mi).getTime();
 }
 
-const formats = new Map<string, Intl.DateTimeFormat>();
-
 function dateFormat(
   locale: string | undefined,
   zone: TimeZoneMode,
   zoneKey: string,
   options: Intl.DateTimeFormatOptions,
 ): Intl.DateTimeFormat {
-  const key = `${locale ?? ''}|${zone === 'UTC' ? 'UTC' : zoneKey}|${JSON.stringify(options)}`;
-  let format = formats.get(key);
-  if (!format) {
-    format = new Intl.DateTimeFormat(
-      locale,
-      zone === 'UTC' ? { ...options, timeZone: 'UTC' } : options,
-    );
-    formats.set(key, format);
-  }
-  return format;
+  return zone === 'UTC'
+    ? cachedDateFormat(locale, { ...options, timeZone: 'UTC' }, 'UTC')
+    : cachedDateFormat(locale, options, zoneKey);
 }
 
 const HM: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
@@ -381,6 +373,4 @@ export class TimeScale implements Scale {
 }
 
 /** The runtime's IANA zone (a cache key for local formats; read once per tick pass). */
-function localZone(): string {
-  return new Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'local';
-}
+const localZone = runtimeTimeZone;

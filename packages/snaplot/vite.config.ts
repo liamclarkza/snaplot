@@ -179,7 +179,11 @@ export default defineConfig({
         // the chart chunk and the top-level constants it cannot tree-shake.
         manualChunks: (id) => {
           if (id.endsWith('/src/public/histogram.ts')) return 'histogram';
-          if (/\/src\/(public\/(legend|companion)\.ts|engine\/errors\.ts|styles\/)/.test(id))
+          if (
+            /\/src\/(public\/(legend|companion)\.ts|engine\/errors\.ts|dom\/styles\.ts|styles\/)/.test(
+              id,
+            )
+          )
             return 'legend';
           // The chart stays a chunk of its own, apart from dist/index.js: the adapters import it
           // through 'snaplot' now, and inlined into the entry it would cost every import.

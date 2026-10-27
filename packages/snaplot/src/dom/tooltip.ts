@@ -1,7 +1,7 @@
 import type { TooltipPoint, TooltipConfig, ThemeConfig } from '../engine/spec';
 import { TOOLTIP_OFFSET } from '../constants';
 import { isDarkColor } from '../engine/theme/color';
-import { prefersReducedMotion } from '../utils/motion';
+import { prefersReducedMotion } from '../engine/render/scheduler';
 import { adoptStyles } from './styles';
 
 /**

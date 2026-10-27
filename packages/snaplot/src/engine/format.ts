@@ -129,6 +129,58 @@ export function numberFormatter(
   return (value) => (Number.isNaN(value) ? '' : `${prefix}${format.format(value)}${suffix}`);
 }
 
+/** Cached `Intl.NumberFormat`s: one per locale and options, for every number this engine writes. */
+const numberFormats = new Map<string, Intl.NumberFormat>();
+
+export function cachedNumberFormat(
+  locale: string | undefined,
+  options: Intl.NumberFormatOptions,
+): Intl.NumberFormat {
+  const key = `${locale ?? ''}|${JSON.stringify(options)}`;
+  let format = numberFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(locale, options);
+    numberFormats.set(key, format);
+  }
+  return format;
+}
+
+/**
+ * Cached `Intl.DateTimeFormat`s, by locale, options and `zone` (a format without a `timeZone`
+ * binds the runtime's zone when built, so the key names it: `runtimeTimeZone()`).
+ */
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+
+export function cachedDateFormat(
+  locale: string | undefined,
+  options: Intl.DateTimeFormatOptions,
+  zone: string,
+): Intl.DateTimeFormat {
+  const key = `${locale ?? ''}|${zone}|${JSON.stringify(options)}`;
+  let format = dateFormats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, options);
+    dateFormats.set(key, format);
+  }
+  return format;
+}
+
+/**
+ * The runtime's time zone, read again only when its offsets in January and July change (a TZ
+ * change), so labelling every frame constructs no formatter (gap-perf-gate-09).
+ */
+let runtimeZone: { offsets: string; name: string } | null = null;
+export function runtimeTimeZone(): string {
+  const offsets = `${new Date(2026, 0, 1).getTimezoneOffset()}|${new Date(2026, 6, 1).getTimezoneOffset()}`;
+  if (runtimeZone?.offsets !== offsets) {
+    runtimeZone = {
+      offsets,
+      name: new Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'local',
+    };
+  }
+  return runtimeZone.name;
+}
+
 /**
  * A formatter for a time `format` object (`Intl.DateTimeFormat` options) of
  * epoch milliseconds, in the viewer's zone or in UTC.

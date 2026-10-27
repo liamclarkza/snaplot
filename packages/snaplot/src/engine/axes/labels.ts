@@ -4,6 +4,7 @@
  */
 import type { AxisPosition, Layout, ThemeConfig } from '../spec';
 import { AXIS_CORNER_GAP } from '../../constants';
+import { measureLabel } from '../layout';
 
 /**
  * One axis label as a grid paint lays it out: the W5 layout type (plan §3.2). `axes/render.ts`
@@ -37,13 +38,11 @@ export function resolveAxisCornerCollisions(
   result: AxesRenderResult,
   layout: Layout,
   theme: ThemeConfig,
-  ctx: CanvasRenderingContext2D,
 ): void {
   const lineHeight = theme.fontSize * 1.4;
   const horizontal: Array<{ label: LabelBox; position: 'top' | 'bottom' }> = [];
   const vertical: Array<{ label: LabelBox; position: 'left' | 'right' }> = [];
 
-  ctx.font = `${theme.fontSize}px ${theme.fontFamily}`;
   for (const label of result.labels) {
     const position = layout.axes[label.axis]?.position;
     if (!position) continue;
@@ -53,7 +52,7 @@ export function resolveAxisCornerCollisions(
   }
 
   for (const h of horizontal) {
-    const hWidth = ctx.measureText(h.label.text).width;
+    const hWidth = measureLabel(h.label.text, theme.fontFamily, theme.fontSize);
     for (const v of vertical) {
       const sameCorner =
         (v.position === 'left' && h.label.x <= layout.plot.left + hWidth) ||

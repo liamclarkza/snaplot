@@ -1,3 +1,4 @@
+import { fail } from '../errors';
 import type { ColumnarData } from '../spec';
 import type { ColumnarSegment, DataStore } from './DataStore';
 import { lowerBound, nearestIndex, upperBound, viewportIndices } from './binarySearch';
@@ -57,7 +58,7 @@ export class ColumnarStore implements DataStore {
       !Array.isArray(data) &&
       !(data && typeof (data as unknown as { length: number }).length === 'number')
     ) {
-      throw new Error(
+      fail(
         'ColumnarData must be an array of Float64Arrays, received ' +
           describeType(data) +
           '. Expected: [xValues, ...ySeries] where each column is a Float64Array.',
@@ -65,7 +66,7 @@ export class ColumnarStore implements DataStore {
     }
 
     if (data.length === 0) {
-      throw new Error(
+      fail(
         'ColumnarData must have at least one column (the X values). ' +
           'Shape: [xValues, ...ySeries] where index 0 is X and 1+ are Y series.',
       );
@@ -75,7 +76,7 @@ export class ColumnarStore implements DataStore {
     // passing a plain `number[]` or the wrong typed array (Int32, Uint8, …).
     for (let c = 0; c < data.length; c++) {
       if (!(data[c] instanceof Float64Array)) {
-        throw new Error(
+        fail(
           `Column ${c} is a ${describeType(data[c])}, snaplot expects ` +
             `Float64Array for every column. If you have a plain array, ` +
             `wrap it with \`new Float64Array(arr)\`.`,
@@ -86,7 +87,7 @@ export class ColumnarStore implements DataStore {
     const len = data[0].length;
     for (let c = 1; c < data.length; c++) {
       if (data[c].length !== len) {
-        throw new Error(
+        fail(
           `Column length mismatch: X has ${len} values but column ${c} has ` +
             `${data[c].length}. All columns must have the same length, each ` +
             `Y value at index i pairs with the X value at index i.`,
@@ -100,7 +101,7 @@ export class ColumnarStore implements DataStore {
     const x = data[0];
     for (let i = 0; i < x.length; i++) {
       if (!Number.isFinite(x[i])) {
-        throw new Error(
+        fail(
           `X values must be finite numbers, but x[${i}] = ${x[i]}. ` +
             `NaN and Infinity are allowed only in Y columns where renderers ` +
             `can treat them as missing values.`,
@@ -109,7 +110,7 @@ export class ColumnarStore implements DataStore {
     }
     for (let i = 1; i < x.length; i++) {
       if (x[i] < x[i - 1]) {
-        throw new Error(
+        fail(
           `X values must be sorted in non-decreasing order, but ` +
             `x[${i}] = ${x[i]} < x[${i - 1}] = ${x[i - 1]}. ` +
             `Sort the X column (and move Y values in lockstep) before ` +
@@ -216,20 +217,20 @@ export class ColumnarStore implements DataStore {
 
   replaceLast(row: number[]): void {
     if (this.length === 0) {
-      throw new Error('replaceLast() requires at least one existing data point.');
+      fail('replaceLast() requires at least one existing data point.');
     }
     if (row.length !== this.columns.length) {
-      throw new Error(
+      fail(
         `replaceLast() expects ${this.columns.length} values (one per column), ` +
           `but got ${row.length}.`,
       );
     }
     if (!Number.isFinite(row[0])) {
-      throw new Error(`replaceLast() X value must be finite, received ${row[0]}.`);
+      fail(`replaceLast() X value must be finite, received ${row[0]}.`);
     }
     const last = this.length - 1;
     if (last >= 1 && row[0] < this.columns[0][last - 1]) {
-      throw new Error(
+      fail(
         `replaceLast() X value must keep the column sorted, but ` +
           `${row[0]} < previous x[${last - 1}] = ${this.columns[0][last - 1]}.`,
       );
@@ -252,7 +253,7 @@ export class ColumnarStore implements DataStore {
     ColumnarStore.validate(data);
 
     if (data.length !== this.columns.length) {
-      throw new Error(
+      fail(
         `append() expects ${this.columns.length} columns to match the initial ` +
           `data shape, but got ${data.length}. Pass the same number of ` +
           `Float64Arrays the store was created with, one X column ` +
@@ -261,7 +262,7 @@ export class ColumnarStore implements DataStore {
     }
 
     if (maxLen !== undefined && (!Number.isInteger(maxLen) || maxLen < 0)) {
-      throw new Error(`append() maxLen must be a non-negative integer, received ${maxLen}.`);
+      fail(`append() maxLen must be a non-negative integer, received ${maxLen}.`);
     }
 
     const addLen = data[0].length;
@@ -271,7 +272,7 @@ export class ColumnarStore implements DataStore {
     const newLen = curLen + addLen;
 
     if (curLen > 0 && data[0][0] < this.columns[0][curLen - 1]) {
-      throw new Error(
+      fail(
         `append() X values must continue in non-decreasing order, but ` +
           `new x[0] = ${data[0][0]} < current last X = ${this.columns[0][curLen - 1]}. ` +
           `Append only newer points, or replace the data with a sorted dataset.`,

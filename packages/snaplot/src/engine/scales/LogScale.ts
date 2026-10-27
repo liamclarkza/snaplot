@@ -1,3 +1,4 @@
+import { cachedNumberFormat } from '../format';
 import { niceTicks } from './niceNumbers';
 import type { Scale, ScaleType } from '../spec';
 
@@ -116,19 +117,11 @@ export class LogScale implements Scale {
   }
 }
 
-const logFormats = new Map<string, Intl.NumberFormat>();
-
 function logFormat(locale: string | undefined, scientific: boolean): Intl.NumberFormat {
-  const key = `${locale ?? ''}|${scientific}`;
-  let format = logFormats.get(key);
-  if (!format) {
-    format = new Intl.NumberFormat(
-      locale,
-      scientific
-        ? { notation: 'scientific', maximumFractionDigits: 1 }
-        : { maximumSignificantDigits: 3 },
-    );
-    logFormats.set(key, format);
-  }
-  return format;
+  return cachedNumberFormat(
+    locale,
+    scientific
+      ? { notation: 'scientific', maximumFractionDigits: 1 }
+      : { maximumSignificantDigits: 3 },
+  );
 }

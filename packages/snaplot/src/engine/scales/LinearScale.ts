@@ -1,4 +1,4 @@
-import { stepDecimals } from '../format';
+import { cachedNumberFormat, stepDecimals } from '../format';
 import type { Scale, ScaleType } from '../spec';
 import { niceTicks, niceRange, niceStep } from './niceNumbers';
 import { DEFAULT_TICK_COUNT } from '../../constants';
@@ -112,18 +112,10 @@ export class LinearScale implements Scale {
   }
 }
 
-const tickFormats = new Map<string, Intl.NumberFormat>();
-
 /** A cached fixed-decimals number format for tick labels. */
 export function tickNumberFormat(locale: string | undefined, decimals: number): Intl.NumberFormat {
-  const key = `${locale ?? ''}|${decimals}`;
-  let format = tickFormats.get(key);
-  if (!format) {
-    format = new Intl.NumberFormat(locale, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
-    tickFormats.set(key, format);
-  }
-  return format;
+  return cachedNumberFormat(locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
 }

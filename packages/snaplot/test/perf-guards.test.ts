@@ -8,7 +8,7 @@
 //
 // The plugin materialisation guard of §3.4 is `[arch-01]` in
 // test/debug-counters.test.ts (M8); the legend variant is below (M12b).
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import * as snaplot from '../src/index';
 import { createChartGroup } from '../src/index';
 import type { ChartHandle } from '../src/index';
@@ -87,7 +87,7 @@ describe('data and culling', () => {
     expect(future(chart).xValidations).toBe(2);
   });
 
-  it.fails('[perf:pan-no-scan] a pan frame does not scan the full column for the Y range', () => {
+  it('[perf:pan-no-scan] a pan frame does not scan the full column for the Y range', () => {
     const n = 200_000;
     const chart = fakes.mount({
       data: columns(n, (i) => Math.sin(i / 300)),
@@ -230,7 +230,7 @@ describe('marks', () => {
     expect(fidelity(true)).toBeGreaterThanOrEqual(0.8);
   });
 
-  it.fails('[perf:scatter-fidelity][gap-perf-gate-01:sampling] an unsorted 200k scatter keeps fidelity ≥ 0.8 during a gesture', () => {
+  it('[perf:scatter-fidelity][gap-perf-gate-01:sampling] an unsorted 200k scatter keeps fidelity ≥ 0.8 during a gesture', () => {
     expect(fidelity(false)).toBeGreaterThanOrEqual(0.8);
   });
 
@@ -296,7 +296,7 @@ describe('hit testing', () => {
 });
 
 describe('labels and layout', () => {
-  it.fails('[perf:labels-measured-once] unchanged labels are not re-measured', () => {
+  it('[perf:labels-measured-once] unchanged labels are not re-measured', () => {
     const chart = fakes.mount({ data: columns(500, (i) => i % 9), x: 'x', series: [{ y: 'y' }] });
     fakes.frames.flush();
     const measured = () =>
@@ -326,7 +326,7 @@ describe('labels and layout', () => {
     expect(after.every((node) => before.includes(node))).toBe(true);
   });
 
-  it.fails('[perf:no-layout-read][gap-scale-longevity-08] the render path reads no layout', () => {
+  it('[perf:no-layout-read][gap-scale-longevity-08] the render path reads no layout', () => {
     const chart = fakes.mount({
       data: columns(500, (i) => i % 9),
       x: 'x',
@@ -370,7 +370,7 @@ describe('labels and layout', () => {
     expect(reads).toBe(0);
   });
 
-  it.fails('[perf:intl-reuse][gap-perf-gate-09] formatting 1,000 time labels constructs ≤ 4 date formatters', () => {
+  it('[perf:intl-reuse][gap-perf-gate-09] formatting 1,000 time labels constructs ≤ 4 date formatters', () => {
     const start = Date.UTC(2026, 0, 1);
     const chart = fakes.mount(
       {
@@ -387,8 +387,22 @@ describe('labels and layout', () => {
     );
     fakes.frames.flush();
     // Each toLocale*String call builds a formatter internally, so count those
-    // with the Intl constructor.
-    const ctor = vi.spyOn(Intl, 'DateTimeFormat');
+    // with the Intl constructor (a pass-through proxy: a spy's instances cannot format).
+    const Original = Intl.DateTimeFormat;
+    let built = 0;
+    Intl.DateTimeFormat = new Proxy(Original, {
+      construct(target, args) {
+        built++;
+        return Reflect.construct(target, args);
+      },
+      apply(target, self, args) {
+        built++;
+        return Reflect.apply(target, self, args);
+      },
+    });
+    onTestFinished(() => {
+      Intl.DateTimeFormat = Original;
+    });
     const locale = [
       vi.spyOn(Date.prototype, 'toLocaleTimeString'),
       vi.spyOn(Date.prototype, 'toLocaleDateString'),
@@ -403,8 +417,7 @@ describe('labels and layout', () => {
         .labelBoxes()
         .filter((box) => box.axis === 'x').length;
     }
-    const constructions =
-      ctor.mock.calls.length + locale.reduce((sum, spy) => sum + spy.mock.calls.length, 0);
+    const constructions = built + locale.reduce((sum, spy) => sum + spy.mock.calls.length, 0);
     expect(labels).toBeGreaterThanOrEqual(400);
     expect(constructions).toBeLessThanOrEqual(4);
   });

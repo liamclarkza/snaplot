@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  */
 async function freshImport() {
   vi.resetModules();
-  return import('./motion');
+  return import('./scheduler');
 }
 
 afterEach(() => {

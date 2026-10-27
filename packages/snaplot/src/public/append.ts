@@ -3,9 +3,12 @@
  * validated and its columns built before anything changes; the commit then
  * grows the retained rows, ids and categories and evicts from the front.
  */
+import type { ChartCore } from '../engine/Engine';
 import { fail } from '../engine/errors';
-import type { AxisSpec, ColumnarData } from '../engine/spec';
-import { categoryAxisSpec, refreshColorCodes } from './ingest';
+import type { AxisSpec, ChartSpec, ColumnarData } from '../engine/spec';
+import { coordinate, type GroupMember, validateGroup } from './group';
+import { categoryAxisSpec, refreshColorCodes } from './describe';
+import { ingest } from './ingest';
 import type { NormalizedOptions } from './normalize';
 import {
   describe,
@@ -20,8 +23,144 @@ import {
   parseIso,
   read,
   type SourceState,
+  sourceKey,
 } from './sources';
-import type { AppendOptions, ColumnData, DataSource, RowId } from './types';
+import type { AppendOptions, ChartOptions, ColumnData, DataSource, RowId } from './types';
+
+// ─── The append path ─────────────────────────────────────────────────
+
+/** What an append reads and calls on its chart (the controller in chart.ts). */
+export interface AppendHost<Row> extends GroupMember {
+  readonly engine: ChartCore;
+  readonly options: ChartOptions<Row>;
+  readonly ingested: Ingested<Row>;
+  readonly normalized: NormalizedOptions<Row>;
+  context(normalized: NormalizedOptions<Row>, forceData: boolean): IngestContext<Row>;
+  commit(
+    normalized: NormalizedOptions<Row>,
+    ingested: Ingested<Row>,
+    after?: () => void,
+    quiet?: boolean,
+  ): void;
+  configFor(ingested: Ingested<Row>, normalized: NormalizedOptions<Row>): Partial<ChartSpec>;
+  publish(): void;
+}
+
+/**
+ * `appendData()` (plan D23): the target sources, a plan for each (every check runs first), then
+ * the commit: rows into the engine, retained rows and categories, and the options they change.
+ */
+export function appendRows<Row>(
+  chart: AppendHost<Row>,
+  data: DataSource<Row>,
+  options: AppendOptions,
+): void {
+  const { seriesIds, seriesSources, sources } = chart.ingested;
+  const id = options.seriesId;
+  const si = id === undefined ? -1 : seriesIds.indexOf(id);
+  if (id !== undefined && si < 0)
+    fail(`appendData() names series "${id}", which this chart does not have.`);
+  const targets = new Set<number>();
+  if (si >= 0) {
+    const source = seriesSources[si];
+    const sharing = seriesIds.filter(
+      (_other, index) => index !== si && seriesSources[index] === source,
+    );
+    if (sharing.length)
+      fail(
+        `appendData({ seriesId: "${id}" }): series "${id}" shares its data with ${sharing.map((other) => `"${other}"`).join(', ')}. Append without a seriesId to extend the shared data, or give "${id}" its own data.`,
+      );
+    targets.add(source);
+  } else {
+    chart.normalized.series.forEach((series, index) => {
+      if (series.data === undefined) targets.add(seriesSources[index]);
+    });
+  }
+  if (!targets.size)
+    fail(
+      'appendData() without a seriesId extends the chart data, but every series has its own data. Pass { seriesId }.',
+    );
+  const plan = () =>
+    planAppend(
+      chart.ingested,
+      chart.normalized,
+      [...targets],
+      data,
+      options,
+      chart.context(chart.normalized, false),
+      (source, back) => {
+        const length = chart.engine.getSourceLength(source);
+        return chart.engine.getSourceValue(source, 0, length - back);
+      },
+      (source) => chart.engine.getSourceLength(source),
+    );
+  let plans = plan();
+  const newLabels = plans.some((plan) => plan.newLabels.size);
+  if (newLabels) {
+    const categories = categoryLabels(chart.ingested);
+    for (const plan of plans) {
+      const axis = sources[plan.source].axis;
+      categories.set(axis, [...(categories.get(axis) ?? []), ...plan.newLabels.keys()]);
+    }
+    validateGroup(chart.options.group, { categories, axes: chart.ingested.spec.axes ?? {} }, chart);
+  }
+  // Every check has run. A scatter source whose X was sorted gets an append that is not: store
+  // it unsorted (the same data, so no event), then plan again, which passes the same checks.
+  const demoted = plans.filter((plan) => plan.demote);
+  if (demoted.length) {
+    const unsorted = new Set(
+      demoted.map((plan) => sourceKey(plan.source, sources[plan.source].axis)),
+    );
+    chart.commit(
+      chart.normalized,
+      ingest(chart.normalized, { ...chart.context(chart.normalized, false), unsorted }),
+      undefined,
+      /* quiet */ true,
+    );
+    plans = plan();
+  }
+  // Plans share their encoding lists, which hold only the lists this append adds labels to.
+  const newEncodingLabels = plans.some((plan) => plan.encodings?.size);
+  const maxPoints = chart.normalized.engine.streaming?.maxPoints;
+  const changedAxes = new Set<string>();
+  for (const plan of plans) {
+    const source = chart.ingested.sources[plan.source];
+    const count = plan.columns[0].length;
+    if (!count) continue;
+    const length = chart.engine.getSourceLength(plan.source);
+    // updateLast replaces the latest row if there is one; on empty data it appends.
+    const replace = options.updateLast && length > 0 ? 1 : 0;
+    const evicted = maxPoints === undefined ? 0 : Math.max(0, length + count - replace - maxPoints);
+    const evictedCodes: number[] = [];
+    if (source.xKind === 'category') {
+      const xi = source.sortedX ? 0 : source.fields.findIndex((field) => field.kind === 'x');
+      for (let i = 0; i < Math.min(evicted, length - replace); i++)
+        evictedCodes.push(chart.engine.getSourceValue(plan.source, xi, i));
+      if (replace) evictedCodes.push(chart.engine.getSourceValue(plan.source, xi, length - 1));
+      const fromBatch = evicted - Math.min(evicted, length - replace);
+      for (let i = 0; i < fromBatch; i++) evictedCodes.push(plan.codes![i]);
+    }
+    chart.engine.appendToSource(plan.source, plan.columns, options, /* trusted */ true);
+    if (commitAppend(chart.ingested, plan, replace > 0, evicted, evictedCodes))
+      changedAxes.add(source.axis);
+  }
+  if (newEncodingLabels) {
+    // New colorBy or tooltip labels: the series specs list them now (refreshColorCodes).
+    // Known labels change no series, so the append repaints only the data layer.
+    chart.engine.setOptions({ series: chart.configFor(chart.ingested, chart.normalized).series });
+  }
+  if (changedAxes.size) {
+    const axes = Object.fromEntries(
+      [...changedAxes].map((key) => [
+        key,
+        refreshCategoryAxis(chart.ingested, chart.normalized, key),
+      ]),
+    );
+    chart.engine.setOptions({ axes });
+  }
+  chart.publish();
+  coordinate(chart.options.group);
+}
 
 // ─── Appends ─────────────────────────────────────────────────────────
 

@@ -1,3 +1,4 @@
+import { fail } from './errors';
 /**
  * The engine's data sources: one store per source (a ring store when streaming keeps a window),
  * the source each series reads, and the transactions that replace them or append to one. The
@@ -54,7 +55,7 @@ export function replaceSources(
 
 export function getSourceData(engine: ChartCore, sourceIndex: number): ColumnarData {
   const store = engine.sourceStores[sourceIndex];
-  if (!store) throw new Error(`Unknown data source ${sourceIndex}`);
+  if (!store) fail(`Unknown data source ${sourceIndex}`);
   return store.getData();
 }
 
@@ -64,14 +65,13 @@ export function validateSources(
   indices: readonly number[],
   trusted: boolean,
 ): void {
-  if (sources.length === 0) throw new Error('At least one data source is required');
-  if (indices.length !== config.series.length)
-    throw new Error('Each series requires a data source index');
+  if (sources.length === 0) fail('At least one data source is required');
+  if (indices.length !== config.series.length) fail('Each series requires a data source index');
   if (!trusted) for (const source of sources) ColumnarStore.validate(source);
   for (let si = 0; si < config.series.length; si++) {
     const sourceIndex = indices[si];
     if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sources.length) {
-      throw new Error(`Invalid data source for series ${si}`);
+      fail(`Invalid data source for series ${si}`);
     }
   }
 }
@@ -106,16 +106,15 @@ export function appendToSource(
   trusted = false,
 ): void {
   if (engine.destroyed) return;
-  if (!engine.sourceStores[sourceIndex]) throw new Error(`Unknown data source ${sourceIndex}`);
+  if (!engine.sourceStores[sourceIndex]) fail(`Unknown data source ${sourceIndex}`);
   ensureStoreMatchesStreaming(engine);
   const store = engine.sourceStores[sourceIndex];
   if (!trusted) ColumnarStore.validate(data);
-  if (data.length !== store.seriesCount + 1)
-    throw new Error('Appended columns must match the source schema');
+  if (data.length !== store.seriesCount + 1) fail('Appended columns must match the source schema');
   if (!trusted && data[0].length && store.length) {
     const previousIndex = opts?.updateLast ? store.length - 2 : store.length - 1;
     if (previousIndex >= 0 && data[0][0] < store.xAt(previousIndex))
-      throw new Error('Appended X values must preserve source order');
+      fail('Appended X values must preserve source order');
   }
 
   const write = () => {

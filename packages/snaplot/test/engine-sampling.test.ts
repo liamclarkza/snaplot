@@ -125,15 +125,14 @@ describe('engine interaction sampling', () => {
     expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: budget });
   });
 
-  it('keeps the 10,000-point mouse budget for a source not culled by X', () => {
-    // Its stride runs over the whole source, so the width-scaled budget would leave a
-    // fraction of it in view (gap-perf-gate-01:sampling, M11). Touch keeps 1.5 per pixel.
+  it('samples a source not culled by X to its in-view share, for every pointer', () => {
+    // Its stride runs over the whole source, scaled by the share of it in view
+    // (gap-perf-gate-01:sampling): the budget counts in-view points, mouse or touch.
     const { chart, n, nudge } = scatter(2);
     const budget = Math.max(400, Math.round(chart.getLayout().plot.width * 1.5));
     tapAt(chart, plotPoint(chart), 'touch');
     expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: budget });
-    // After a mouse move the budget is 10,000 points, so nothing is sampled.
     hoverAt(chart, plotPoint(chart));
-    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: n });
+    expect(nudge()).toEqual({ inViewPoints: n, drawnPoints: budget });
   });
 });

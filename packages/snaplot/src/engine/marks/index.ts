@@ -266,11 +266,17 @@ export function renderAllSeries(engine: ChartCore): void {
       drawn = decimateLineSegments(engine, renderSegments, xScale);
       if (drawn !== renderSegments) record.decimated = drawn;
     } else if (mark.interaction === 'sample') {
-      const budget = interactionSamplingBudget(engine, canCullByGlobalX);
+      // The budget counts in-view points (plan §3.4). A source culled by X is all in view; an
+      // unsorted one is strided over its whole length, so its in-view share is estimated from a
+      // sparse probe of the column (gap-perf-gate-01:sampling).
+      const budget = interactionSamplingBudget(engine);
       if (budget !== null && interactionActive(engine)) {
         let visible = 0;
         for (const segment of renderSegments) {
           visible += segment.endIdx - segment.startIdx + 1;
+        }
+        if (!canCullByGlobalX && visible > budget) {
+          visible = Math.max(1, Math.round(visible * inViewShare(renderSegments, xScale, yScale)));
         }
         if (visible > budget) {
           sampleStride = visible / budget;
@@ -313,21 +319,12 @@ export function renderAllSeries(engine: ChartCore): void {
   }
 }
 
-/**
- * The most scatter points drawn per frame during a gesture, or null when sampling is off.
- * `culledByX`: the series' X is the store's X, so its segments hold the in-view points only.
- */
-export function interactionSamplingBudget(engine: ChartCore, culledByX = false): number | null {
+/** The most in-view scatter points drawn per frame during a gesture, or null when sampling is off. */
+export function interactionSamplingBudget(engine: ChartCore): number | null {
   const configured = engine.config.performance?.interactionSampling;
   if (configured === false) return null;
   if (typeof configured === 'number') return configured > 0 ? configured : null;
-  // Plan §3.4's budget, max(400, 1.5 × plot width), counts in-view points. A source culled
-  // by X (a sorted scatter) is sampled over the view, so it gets that budget for every
-  // pointer. A source that is not culled is strided over its whole length, so the mouse
-  // and programmatic changes keep 10,000 until M11 counts its in-view points
-  // (gap-perf-gate-01:sampling); touch and pen already had the width-scaled budget.
-  if (!culledByX && engine.lastPointerType !== 'touch' && engine.lastPointerType !== 'pen')
-    return DEFAULT_INTERACTION_SAMPLING;
+  // Plan §3.4's budget, max(400, 1.5 × plot width), counts in-view points.
   return Math.min(
     DEFAULT_INTERACTION_SAMPLING,
     Math.max(
@@ -335,6 +332,35 @@ export function interactionSamplingBudget(engine: ChartCore, culledByX = false):
       Math.round(engine.layout.plot.width * TOUCH_INTERACTION_POINTS_PER_PIXEL),
     ),
   );
+}
+
+/** The share of a cloud's points inside the scales' domains, from about 4,096 probes. */
+function inViewShare(
+  segments: readonly {
+    xData: ArrayLike<number>;
+    yData: ArrayLike<number>;
+    startIdx: number;
+    endIdx: number;
+  }[],
+  xScale: Scale,
+  yScale: Scale,
+): number {
+  const [x0, x1] = [Math.min(xScale.min, xScale.max), Math.max(xScale.min, xScale.max)];
+  const [y0, y1] = [Math.min(yScale.min, yScale.max), Math.max(yScale.min, yScale.max)];
+  let total = 0;
+  for (const segment of segments) total += segment.endIdx - segment.startIdx + 1;
+  const step = Math.max(1, Math.floor(total / 4096));
+  let probes = 0;
+  let inside = 0;
+  for (const { xData, yData, startIdx, endIdx } of segments) {
+    for (let i = startIdx; i <= endIdx; i += step) {
+      probes++;
+      const x = xData[i];
+      const y = yData[i];
+      if (x >= x0 && x <= x1 && y >= y0 && y <= y1) inside++;
+    }
+  }
+  return probes === 0 ? 1 : inside / probes;
 }
 
 /** True while a gesture is moving the viewport and reduced-fidelity drawing is enabled. */

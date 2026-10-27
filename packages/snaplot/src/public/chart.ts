@@ -5,13 +5,10 @@
 import { ChartCore } from '../engine/Engine';
 import { inferPosition } from '../engine/layout';
 import { ColumnarStore } from '../engine/data/ColumnarStore';
-import { fail, hint, warnOnce } from '../engine/errors';
-import { formatValue, formatX } from '../engine/format';
+import { fail, hint } from '../engine/errors';
 import type { ScaleRange, SelectionRange, TooltipPoint } from '../engine/spec';
 import { createReferenceLinesPlugin, createReferenceRegionsPlugin } from '../engine/annotations';
-import { createScale } from '../engine/scales/createScale';
-import { pointsInSelection } from '../engine/selection';
-import { categoryLabels, commitAppend, planAppend, refreshCategoryAxis } from './append';
+import { appendRows, categoryLabels } from './append';
 import { classify, sameData, STATE_KEYS, type StateKey, type Work } from './classify';
 import {
   broadcast,
@@ -24,20 +21,17 @@ import {
   paletteIndex,
   validateGroup,
 } from './group';
+import { type Churn, noteChurn, noteReplacedStreams } from './churn';
 import { companions } from './companion';
 import { accessibleName } from '../adapters/name';
-import { describeOptions, ingest } from './ingest';
+import { describeOptions } from './describe';
+import { ingest } from './ingest';
 import { mountLegend } from './legend';
+import { chartScale, cursorValue } from './axes';
+import { categoryItems, chartPoint, cursorSnapshot, selectionWithPoints } from './points';
 import { type NormalizedOptions, type NormalizedState, normalize } from './normalize';
 import { equivalent, patchOptions } from './options';
-import {
-  type Ingested,
-  type IngestContext,
-  parseIso,
-  type Retained,
-  type SourceState,
-  sourceKey,
-} from './sources';
+import { type Ingested, type IngestContext, retainedSource } from './sources';
 import { Dispatcher, type ReportedKey } from './state';
 import type {
   AppendOptions,
@@ -52,7 +46,6 @@ import type {
   CursorSnapshot,
   DataSource,
   Selection,
-  SelectionChange,
   SeriesState,
   CursorOptions,
   Viewport,
@@ -61,7 +54,6 @@ import type {
 export { createChartGroup };
 
 /** Sources of at least this many rows warn about accessor churn and re-ingest churn (plan D16). */
-const CHURN_ROWS = 10_000;
 
 /** The container height from which `legend: 'auto'` shows the legend (CSS pixels). */
 
@@ -102,14 +94,16 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   readonly container: HTMLElement;
   /** The public handle: the fourteen members of plan §4.4 and the debug symbol. */
   readonly handle: ChartHandle<Row>;
-  private engine: ChartCore;
-  private options: ChartOptions<Row>;
-  private normalized: NormalizedOptions<Row>;
-  private ingested: Ingested<Row>;
+  // The engine and the options as normalized and ingested: internal, read by the sibling
+  // modules (points.ts, append.ts) that hold parts of the controller.
+  engine: ChartCore;
+  options: ChartOptions<Row>;
+  normalized: NormalizedOptions<Row>;
+  ingested: Ingested<Row>;
   /** The state options last applied from options (plan D3). */
   private appliedState: NormalizedState = {};
   /** Identity-only accessor changes in a row, and their times (plan D16). */
-  private churn = { streak: 0, times: [] as number[], ingests: [] as number[] };
+  private churn: Churn = { streak: 0, times: [], ingests: [] };
   /** The one X pass per source and append batch (plan §3.4), for the debug symbol. */
   private counters = { xValidations: 0 };
   private hidden = new Set<string>();
@@ -139,7 +133,8 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       EVENTS,
       (key) => this.read(key),
       (event, value) => this.callback(event, value),
-      (key, value) => (key === 'selection' && value ? this.withPoints(value as Selection) : value),
+      (key, value) =>
+        key === 'selection' && value ? selectionWithPoints(this, value as Selection) : value,
     );
     // User plugin install hooks need the completed public handle, not a half-built engine,
     // so plugins are installed below, and the engine's first paint waits for them.
@@ -172,7 +167,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       cursor: (fallback) => this.getCursor({ fallback }),
       xTitle: () => this.ingested.spec.axes?.x?.title,
       observe: (listener) => this.events.observe(listener),
-      categories: () => this.legendCategories(),
+      categories: () => categoryItems(this),
       reserve: (side, px) => this.engine.reserveChrome(side, px),
     });
     try {
@@ -218,7 +213,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
    * whose input and readers are unchanged are reused (plan D16), unless `forceData` replaces
    * the chart data.
    */
-  private context(normalized: NormalizedOptions<Row>, forceData: boolean): IngestContext<Row> {
+  context(normalized: NormalizedOptions<Row>, forceData: boolean): IngestContext<Row> {
     const previous = this.ingested as Ingested<Row> | undefined;
     const previousTypes = previous ? this.previousTypes(normalized) : new Map();
     return {
@@ -239,7 +234,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
             : previous.sources.findIndex(
                 (s) => s.streamed && sameData(s.declared, input) && s.axis === axis,
               );
-        return at < 0 ? undefined : this.retained(previous.sources[at], at);
+        return at < 0
+          ? undefined
+          : retainedSource(previous.sources[at], this.engine.getSourceData(at));
       },
     };
   }
@@ -251,36 +248,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         .filter(([key]) => normalized.axes[key]?.type === undefined)
         .map(([key, axis]) => [key, axis.type ?? 'linear'] as const),
     );
-  }
-
-  /** What a streamed source retains, to ingest again instead of its declared input. */
-  private retained(source: SourceState<Row>, index: number): Retained<Row> {
-    const base = {
-      evicted: source.evicted,
-      nextIndex: source.nextIndex,
-      appended: source.appended,
-      ...(source.unsorted ? { unsorted: true as const } : {}),
-    };
-    // A row source reads its ids with the current rowId again (it is an accessor, D16).
-    if (source.kind === 'rows')
-      return {
-        ...base,
-        rows: source.rows!.slice(source.head),
-        index: source.index!.slice(source.head),
-      };
-    const data = this.engine.getSourceData(index);
-    const columns: Record<string, Float64Array> = {};
-    source.fields.forEach((field, c) => {
-      if (field.kind === 'x') columns[source.x as string] = data[c];
-      else if (field.kind === 'field') columns[field.name] = data[c];
-    });
-    // { columns, rowIds } has no accessor, so its ids are kept; ids read from a column
-    // (rowId: '<column>') are read from the retained column again.
-    return {
-      ...base,
-      columns,
-      ...(source.rowIds && !source.rowIdColumn ? { rowIds: source.rowIds.slice(source.head) } : {}),
-    };
   }
 
   /**
@@ -356,7 +323,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     this.events.mark('hiddenSeries');
   }
 
-  private configFor(ingested: Ingested<Row>, normalized: NormalizedOptions<Row>) {
+  configFor(ingested: Ingested<Row>, normalized: NormalizedOptions<Row>) {
     // Render functions are read through the latest options when called (plan D16): a new
     // identity is a repaint, and these wrappers stay the same.
     return {
@@ -423,11 +390,11 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       const applyState = () => this.applyState(state);
       const checked = Object.fromEntries(state) as NormalizedState;
       if (work.data || work.accessor) {
-        this.noteChurn(normalized, work);
+        noteChurn(this.churn, this.ingested, normalized, work);
         const ingested = ingest(normalized, this.context(normalized, named?.has('data') ?? false));
         this.validateState(checked, ingested);
         validateGroup(normalized.group, this.candidate(ingested), this);
-        this.noteReplacedStreams(ingested);
+        noteReplacedStreams(this.ingested, ingested);
         this.commit(normalized, ingested, applyState);
         return;
       }
@@ -494,7 +461,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
    * engine rejects the candidate, everything is restored. `quiet` re-stores the same data
    * (appendData() storing a scatter unsorted), which publishes and emits nothing.
    */
-  private commit(
+  commit(
     normalized: NormalizedOptions<Row>,
     ingested: Ingested<Row>,
     after?: () => void,
@@ -553,171 +520,9 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
    * accessor whose identity changes while nothing else does, three times in a row or more than
    * ten times a second, or by data replaced more than ten times a second.
    */
-  private noteChurn(next: NormalizedOptions<Row>, work: Work): void {
-    const now = Date.now();
-    const rows = (si: number) => {
-      const source = si < 0 ? undefined : this.ingested.sources[this.ingested.seriesSources[si]];
-      return source?.columns[0].length ?? 0;
-    };
-    if (work.accessor && !work.data) {
-      const change = work.accessor;
-      const count = rows(this.ingested.seriesIds.indexOf(change.id));
-      if (count < CHURN_ROWS) return;
-      this.churn.streak++;
-      this.churn.times = [...this.churn.times.filter((time) => now - time < 1000), now];
-      if (this.churn.streak >= 3 || this.churn.times.length > 10)
-        warnOnce(
-          'accessor-churn',
-          `series "${change.id}" keeps getting a new ${change.field} function, and each one re-reads its ${formatValue(count)} rows. Memoise the function, or use a field name.`,
-        );
-      return;
-    }
-    this.churn.streak = 0;
-    const largest = next.series.reduce(
-      (best, s) => {
-        const count = rows(this.ingested.seriesIds.indexOf(s.id));
-        return count > best.count ? { id: s.id, count } : best;
-      },
-      { id: '', count: 0 },
-    );
-    if (largest.count < CHURN_ROWS) return;
-    this.churn.ingests = [...this.churn.ingests.filter((time) => now - time < 1000), now];
-    if (this.churn.ingests.length > 10)
-      warnOnce(
-        'reingest-churn',
-        `series "${largest.id}" re-read its ${formatValue(largest.count)} rows more than 10 times in a second. Use appendData() for new rows, or memoise data so it keeps its identity.`,
-      );
-  }
-
-  /** Warn once when new data replaces a source that appendData() extended (plan D16). */
-  private noteReplacedStreams(next: Ingested<Row>): void {
-    let discarded = 0;
-    for (const source of this.ingested.sources) {
-      if (!source.streamed || !source.appended) continue;
-      const kept = next.sources.some(
-        (other) => other.streamed && sameData(other.declared, source.declared),
-      );
-      if (!kept) discarded += source.appended;
-    }
-    if (discarded > 0)
-      warnOnce(
-        'streamed-replaced',
-        `data replaced on a streamed source; ${formatValue(discarded)} appended rows were discarded. Pass data once (useState/createSignal) or omit it.`,
-      );
-  }
-
   appendData(data: DataSource<Row>, options: AppendOptions = {}): void {
     if (this.destroyed) return;
-    this.events.batch(() => this.append(data, options));
-  }
-
-  private append(data: DataSource<Row>, options: AppendOptions): void {
-    const { seriesIds, seriesSources, sources } = this.ingested;
-    const id = options.seriesId;
-    const si = id === undefined ? -1 : seriesIds.indexOf(id);
-    if (id !== undefined && si < 0)
-      fail(`appendData() names series "${id}", which this chart does not have.`);
-    const targets = new Set<number>();
-    if (si >= 0) {
-      const source = seriesSources[si];
-      const sharing = seriesIds.filter(
-        (_other, index) => index !== si && seriesSources[index] === source,
-      );
-      if (sharing.length)
-        fail(
-          `appendData({ seriesId: "${id}" }): series "${id}" shares its data with ${sharing.map((other) => `"${other}"`).join(', ')}. Append without a seriesId to extend the shared data, or give "${id}" its own data.`,
-        );
-      targets.add(source);
-    } else {
-      this.normalized.series.forEach((series, index) => {
-        if (series.data === undefined) targets.add(seriesSources[index]);
-      });
-    }
-    if (!targets.size)
-      fail(
-        'appendData() without a seriesId extends the chart data, but every series has its own data. Pass { seriesId }.',
-      );
-    const plan = () =>
-      planAppend(
-        this.ingested,
-        this.normalized,
-        [...targets],
-        data,
-        options,
-        this.context(this.normalized, false),
-        (source, back) => {
-          const length = this.engine.getSourceLength(source);
-          return this.engine.getSourceValue(source, 0, length - back);
-        },
-        (source) => this.engine.getSourceLength(source),
-      );
-    let plans = plan();
-    const newLabels = plans.some((plan) => plan.newLabels.size);
-    if (newLabels) {
-      const categories = categoryLabels(this.ingested);
-      for (const plan of plans) {
-        const axis = sources[plan.source].axis;
-        categories.set(axis, [...(categories.get(axis) ?? []), ...plan.newLabels.keys()]);
-      }
-      validateGroup(this.options.group, { categories, axes: this.ingested.spec.axes ?? {} }, this);
-    }
-    // Every check has run. A scatter source whose X was sorted gets an append that is not: store
-    // it unsorted (the same data, so no event), then plan again, which passes the same checks.
-    const demoted = plans.filter((plan) => plan.demote);
-    if (demoted.length) {
-      const unsorted = new Set(
-        demoted.map((plan) => sourceKey(plan.source, sources[plan.source].axis)),
-      );
-      this.commit(
-        this.normalized,
-        ingest(this.normalized, { ...this.context(this.normalized, false), unsorted }),
-        undefined,
-        /* quiet */ true,
-      );
-      plans = plan();
-    }
-    // Plans share their encoding lists, which hold only the lists this append adds labels to.
-    const newEncodingLabels = plans.some((plan) => plan.encodings?.size);
-    const maxPoints = this.normalized.engine.streaming?.maxPoints;
-    const changedAxes = new Set<string>();
-    for (const plan of plans) {
-      const source = this.ingested.sources[plan.source];
-      const count = plan.columns[0].length;
-      if (!count) continue;
-      const length = this.engine.getSourceLength(plan.source);
-      // updateLast replaces the latest row if there is one; on empty data it appends.
-      const replace = options.updateLast && length > 0 ? 1 : 0;
-      const evicted =
-        maxPoints === undefined ? 0 : Math.max(0, length + count - replace - maxPoints);
-      const evictedCodes: number[] = [];
-      if (source.xKind === 'category') {
-        const xi = source.sortedX ? 0 : source.fields.findIndex((field) => field.kind === 'x');
-        for (let i = 0; i < Math.min(evicted, length - replace); i++)
-          evictedCodes.push(this.engine.getSourceValue(plan.source, xi, i));
-        if (replace) evictedCodes.push(this.engine.getSourceValue(plan.source, xi, length - 1));
-        const fromBatch = evicted - Math.min(evicted, length - replace);
-        for (let i = 0; i < fromBatch; i++) evictedCodes.push(plan.codes![i]);
-      }
-      this.engine.appendToSource(plan.source, plan.columns, options, /* trusted */ true);
-      if (commitAppend(this.ingested, plan, replace > 0, evicted, evictedCodes))
-        changedAxes.add(source.axis);
-    }
-    if (newEncodingLabels) {
-      // New colorBy or tooltip labels: the series specs list them now (refreshColorCodes).
-      // Known labels change no series, so the append repaints only the data layer.
-      this.engine.setOptions({ series: this.configFor(this.ingested, this.normalized).series });
-    }
-    if (changedAxes.size) {
-      const axes = Object.fromEntries(
-        [...changedAxes].map((key) => [
-          key,
-          refreshCategoryAxis(this.ingested, this.normalized, key),
-        ]),
-      );
-      this.engine.setOptions({ axes });
-    }
-    this.publish();
-    coordinate(this.options.group);
+    this.events.batch(() => appendRows(this, data, options));
   }
 
   /** The cold state: one frozen snapshot per revision (plan §3.2). */
@@ -781,28 +586,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   }
 
   /**
-   * A `selection:change` value: the selection and the points it covers (plan §4.4). `points` is a
-   * getter, so a brush over a long stream costs nothing unless a listener reads it.
-   */
-  private withPoints(selection: Selection): SelectionChange<Row> {
-    const range = this.engine.getSelection();
-    let points: readonly ChartPoint<Row>[] | undefined;
-    const value = { ...selection } as SelectionChange<Row>;
-    Object.defineProperty(value, 'points', {
-      enumerable: true,
-      get: () =>
-        (points ??= Object.freeze(
-          range
-            ? pointsInSelection(this.engine, range.x, range.y).map((point) =>
-                this.point(point.seriesIndex, point.dataIndex, point),
-              )
-            : [],
-        )),
-    });
-    return Object.freeze(value);
-  }
-
-  /**
    * Show or hide the built-in legend as the `legend` option asks (plan D6, §5.6): `'auto'` shows
    * it for two or more series, or for a series coloured by category. It takes its space from the
    * chart's own layout (`reserveChrome`), so any container height works.
@@ -814,7 +597,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
       option === true ||
       typeof option === 'object' ||
       (option === 'auto' &&
-        (this.ingested.seriesIds.length >= 2 || this.legendCategories().length > 0));
+        (this.ingested.seriesIds.length >= 2 || categoryItems(this).length > 0));
     const position = typeof option === 'object' ? (option.position ?? 'top') : 'top';
     if (this.legend && (!show || this.legend.position !== position)) {
       this.legend.unmount();
@@ -822,28 +605,6 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     } else if (this.legend || !show) return;
     if (show)
       this.legend = { position, unmount: mountLegend(this.handle, this.engine.root, { position }) };
-  }
-
-  /**
-   * The static legend items of a series coloured by category (plan §5.6): each category and its
-   * colour, for the first visible series that has them.
-   */
-  private legendCategories(): { label: string; color: string }[] {
-    const series = this.ingested.spec.series;
-    for (const spec of series) {
-      const colorBy = spec.colorBy;
-      if (spec.visible === false || typeof colorBy !== 'object') continue;
-      if (colorBy.type !== 'category' || !colorBy.categoryValues || !colorBy.format) continue;
-      const palette = (colorBy.palette ?? this.engine.categoricalPalette()).map((color) =>
-        this.engine.resolveColor(color),
-      );
-      const format = colorBy.format;
-      return colorBy.categoryValues.map((code, i) => ({
-        label: format(code),
-        color: palette[i % palette.length],
-      }));
-    }
-    return [];
   }
 
   /** A legend click: show or hide one series, reported as `hiddenSeries:change`. */
@@ -904,117 +665,19 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
    * axis; anything else the X axis cannot read throws (dataapi-22).
    */
   cursorX(x: number | Date | string | null): number | null {
-    if (x === null || typeof x === 'number') return x;
-    if (x instanceof Date) return x.getTime();
-    if (typeof x !== 'string')
-      fail('setCursor() takes a number, a Date, a category label or null.');
-    const where = `setCursor() got "${x}"`;
-    const registry = this.ingested.categories.get('x');
-    if (registry) {
-      const code = registry.codes.get(x);
-      if (code === undefined)
-        fail(`${where}, which is not a category of axis "x".${hint(x, registry.codes.keys())}`);
-      return code;
-    }
-    if (this.ingested.kinds.get('x') === 'date' || this.ingested.spec.axes?.x?.type === 'time') {
-      const ms = parseIso(x, this.normalized.engine.timeZone);
-      if (Number.isFinite(ms)) return ms;
-      fail(`${where}, which is not an ISO-8601 date for time axis "x".`);
-    }
-    return fail(`${where}, but axis "x" is numeric: give a number.`);
+    return cursorValue(this, x);
   }
 
   private point(
     si: number,
     index: number,
-    values?: Partial<
-      Pick<
-        TooltipPoint,
-        'x' | 'y' | 'formattedX' | 'formattedY' | 'color' | 'xRange' | 'radius' | 'fields'
-      >
-    >,
+    values?: Parameters<typeof chartPoint<Row>>[3],
   ): ChartPoint<Row> {
-    const sourceIndex = this.ingested.seriesSources[si];
-    const source = this.ingested.sources[sourceIndex];
-    const series = this.ingested.spec.series[si];
-    const at = source.head + index;
-    const x = values?.x ?? this.engine.getSourceValue(sourceIndex, series.xColumn ?? 0, index);
-    const y = values?.y ?? this.engine.getSourceValue(sourceIndex, series.yColumn ?? 1, index);
-    const axis = series.xAxis ?? 'x';
-    const actualX = this.ingested.categories.get(axis)?.labels.get(Math.round(x)) ?? x;
-    const fieldColumns = values?.fields
-      ? [
-          ...new Set(
-            [series.colorBy, series.sizeBy, ...(series.tooltipFields ?? [])]
-              .filter((field) => field !== undefined)
-              .map((field) => (typeof field === 'number' ? field : field!.column)),
-          ),
-        ].filter((column) => column >= 0 && column < source.fields.length)
-      : [];
-    const fields = values?.fields?.map((field, i) => {
-      const descriptor = source.fields[fieldColumns[i]];
-      const labels =
-        descriptor?.kind === 'encoding' ? this.ingested.encodings.get(descriptor.key) : undefined;
-      return { ...field, value: labels?.[field.value] ?? field.value };
-    });
-    const point: ChartPoint<Row> = {
-      seriesId: this.ingested.seriesIds[si],
-      label: series.label,
-      row: source.rows?.[at],
-      rowIndex: source.index ? (source.index[at] ?? index) : source.evicted + index,
-      rowId: source.rowIds?.[at],
-      x: actualX,
-      y,
-      formattedX: values?.formattedX ?? this.format(axis, x),
-      formattedY: values?.formattedY ?? this.readout(series.yAxis ?? 'y', y),
-      color: values?.color ?? this.engine.getLegendItems()[si]?.color ?? '',
-      ...(values?.xRange ? { xRange: { ...values.xRange } } : {}),
-      ...(values?.radius !== undefined ? { radius: values.radius } : {}),
-      ...(fields ? { fields } : {}),
-    };
-    const formatter = this.normalized.series[si]?.format;
-    if (formatter) point.formattedY = formatter(y, point);
-    return point;
-  }
-  /** A value readout at value precision (plan P9); the axis format still wins here. */
-  private readout(axis: string, value: number): string {
-    if (!Number.isFinite(value)) return '';
-    const formatter = this.ingested.spec.axes?.[axis]?.format;
-    return formatter ? formatter(value) : this.engine.formatReadout(axis, value);
-  }
-  /** An X readout through the one formatter: the axis format, else a time or value-precision readout. */
-  private format(axis: string, value: number): string {
-    if (!Number.isFinite(value)) return '';
-    return formatX(this.engine, value, axis);
+    return chartPoint(this, si, index, values);
   }
   /** The values under the cursor, or at a fallback position, computed when asked. */
   getCursor(options?: CursorOptions): CursorSnapshot<Row> {
-    const snapshot = this.engine.getCursorSnapshot(options);
-    return Object.freeze({
-      x:
-        snapshot.dataX === null
-          ? null
-          : (this.ingested.categories.get('x')?.labels.get(Math.round(snapshot.dataX)) ??
-            snapshot.dataX),
-      formattedX: snapshot.formattedX,
-      source: snapshot.source,
-      points: Object.freeze(
-        snapshot.points.map((point) =>
-          Object.freeze(
-            this.point(point.seriesIndex, point.dataIndex, {
-              x: point.dataX,
-              y: point.value,
-              formattedY: point.formattedValue,
-              color: point.color,
-            }),
-          ),
-        ),
-      ),
-      activeSeriesId:
-        snapshot.activeSeriesIndex === null
-          ? null
-          : this.ingested.seriesIds[snapshot.activeSeriesIndex],
-    });
+    return cursorSnapshot(this, options);
   }
   /** Repaint a layer on the next frame; `'all'` (the default) also resolves the theme again. */
   redraw(layer: 'overlay' | 'data' | 'all' = 'all'): void {
@@ -1031,29 +694,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
    * it again after the viewport moves.
    */
   scale(key: string): ChartScale | undefined {
-    const axis = this.engine.getAxis(key);
-    if (!axis) return undefined;
-    const registry = this.ingested.categories.get(key);
-    const time = axis.type === 'time';
-    const { min, max } = axis;
-    const mapping = createScale(axis.type, key, min, max);
-    mapping.setPixelRange(axis.dataToPixel(min), axis.dataToPixel(max));
-    const read = (value: number | Date | string): number => {
-      if (typeof value === 'number') return value;
-      if (value instanceof Date) return value.getTime();
-      if (typeof value !== 'string') return Number.NaN;
-      if (registry) return registry.codes.get(value) ?? Number.NaN;
-      return time ? parseIso(value, this.normalized.engine.timeZone) : Number.NaN;
-    };
-    return Object.freeze({
-      type: registry ? ('category' as const) : axis.type,
-      horizontal: this.engine.isHorizontalAxis(key),
-      min,
-      max,
-      ...(registry ? { categories: Object.freeze(registry.list()) } : {}),
-      toPixel: (value: number | Date | string) => mapping.dataToPixel(read(value)),
-      fromPixel: (pixel: number) => mapping.pixelToData(pixel),
-    });
+    return chartScale(this, key);
   }
   groupCategories(): ReadonlyMap<string, readonly string[]> {
     return categoryLabels(this.ingested);
@@ -1105,7 +746,7 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
     );
   }
   /** A data, option or state commit: bump the revision (subscribers hear once per frame). */
-  private publish(): void {
+  publish(): void {
     if (this.mutating || this.destroyed) return;
     this.events.commit();
   }

@@ -112,6 +112,17 @@ export const SURFACE_CSS = `.snaplot-surface{outline:none}
 @media (forced-colors:active){.snaplot-surface:focus-visible{outline-color:Highlight}}`;
 
 /**
+ * Call `onResize` whenever `element`'s size changes (the built-in legend as it wraps). Returns the
+ * stop function; without ResizeObserver (jsdom, SSR) it never calls.
+ */
+export function observeSize(element: Element, onResize: () => void): () => void {
+  if (typeof ResizeObserver === 'undefined') return () => {};
+  const observer = new ResizeObserver(() => onResize());
+  observer.observe(element);
+  return () => observer.disconnect();
+}
+
+/**
  * Creates and manages the 3-layer canvas stack + DOM overlay, and the space chrome reserves at
  * the top and bottom of the root (`reserveChrome`, a W5 contract: plan §3.2).
  *
@@ -255,6 +266,18 @@ export class CanvasManager {
   /** The root's exact CSS height: fractional, as a ResizeObserver reports it. */
   get cssHeight(): number {
     return exactSize(this.container.clientHeight, this.container.getBoundingClientRect().height);
+  }
+
+  /**
+   * The size the stores were last allocated for (the ResizeObserver's or a fit's), measured only
+   * before the first allocation: the render path reads no layout (gap-scale-longevity-08).
+   */
+  get boxWidth(): number {
+    return this.allocated?.width ?? this.cssWidth;
+  }
+
+  get boxHeight(): number {
+    return this.allocated?.height ?? this.cssHeight;
   }
 
   /**

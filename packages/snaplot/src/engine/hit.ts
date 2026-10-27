@@ -347,8 +347,9 @@ export class HitTester {
     if (xCol < 0 || xCol > store.seriesCount || yCol < 1 || yCol > store.seriesCount) return null;
 
     const grid = this.getScatterGrid(store, sc, seriesIndex, xScale, yScale, dataVersion);
-    const { bestIdx, bestDist } = nearestInGrid(grid, pixelX, pixelY, proximity);
+    const { bestIdx: best, bestDist } = nearestInGrid(grid, pixelX, pixelY, proximity);
     this.lastVisits = grid.visits;
+    const bestIdx = best < 0 ? -1 : grid.from + best;
 
     if (bestIdx < 0 || bestDist > proximity) return null;
 
@@ -367,8 +368,8 @@ export class HitTester {
         });
 
     return {
-      pixelX: grid.pixelX[bestIdx],
-      pixelY: grid.pixelY[bestIdx],
+      pixelX: grid.pixelX[best],
+      pixelY: grid.pixelY[best],
       point: {
         seriesIndex,
         dataIndex: bestIdx,
@@ -414,37 +415,46 @@ export class HitTester {
     const cached = this.scatterGridCaches.get(seriesIndex);
     if (cached?.store === store && cached.key === key) return cached;
 
+    // A series stored by X is searched over its visible index range only (a zoomed view of a
+    // long series indexes a fraction of it); any other over its whole length.
+    const sorted = xCol === 0;
+    const from = sorted ? Math.max(0, store.lowerBoundX(Math.min(xScale.min, xScale.max))) : 0;
+    const to = sorted
+      ? Math.min(store.length - 1, store.upperBoundX(Math.max(xScale.min, xScale.max)))
+      : store.length - 1;
+    const count = Math.max(0, to - from + 1);
     // About one point per cell: a few points per searched cell, and as many cells as points.
     const cellSize = Math.min(
       16,
-      Math.max(1, Math.sqrt(((x1 - x0 + 1) * (y1 - y0 + 1)) / Math.max(1, store.length))),
+      Math.max(1, Math.sqrt(((x1 - x0 + 1) * (y1 - y0 + 1)) / Math.max(1, count))),
     );
     const columns = Math.max(1, Math.ceil((x1 - x0 + 1) / cellSize));
     const rows = Math.max(1, Math.ceil((y1 - y0 + 1) / cellSize));
-    const pixelX = new Float64Array(store.length);
-    const pixelY = new Float64Array(store.length);
-    const cellOf = new Int32Array(store.length);
+    // Indexed by k, the point `from + k`.
+    const pixelX = new Float64Array(count);
+    const pixelY = new Float64Array(count);
+    const cellOf = new Int32Array(count);
     const start = new Int32Array(columns * rows + 1);
-    for (let i = 0; i < store.length; i++) {
-      const px = xScale.dataToPixel(store.valueAt(xCol, i));
-      const py = yScale.dataToPixel(store.valueAt(yCol, i));
-      pixelX[i] = px;
-      pixelY[i] = py;
+    for (let k = 0; k < count; k++) {
+      const px = xScale.dataToPixel(store.valueAt(xCol, from + k));
+      const py = yScale.dataToPixel(store.valueAt(yCol, from + k));
+      pixelX[k] = px;
+      pixelY[k] = py;
       // Only points on the plot can be under the pointer.
       if (!(px >= x0 && px <= x1 + 1 && py >= y0 && py <= y1 + 1)) {
-        cellOf[i] = -1;
+        cellOf[k] = -1;
         continue;
       }
       const cell =
         Math.min(rows - 1, Math.floor((py - y0) / cellSize)) * columns +
         Math.min(columns - 1, Math.floor((px - x0) / cellSize));
-      cellOf[i] = cell;
+      cellOf[k] = cell;
       start[cell + 1]++;
     }
     for (let c = 0; c < columns * rows; c++) start[c + 1] += start[c];
     const fill = start.slice(0, columns * rows);
     const points = new Int32Array(start[columns * rows]);
-    for (let i = 0; i < store.length; i++) if (cellOf[i] >= 0) points[fill[cellOf[i]]++] = i;
+    for (let k = 0; k < count; k++) if (cellOf[k] >= 0) points[fill[cellOf[k]]++] = k;
 
     const entry: ScatterGrid = {
       store,
@@ -454,6 +464,7 @@ export class HitTester {
       cellSize,
       columns,
       rows,
+      from,
       start,
       points,
       pixelX,
@@ -477,6 +488,8 @@ interface ScatterGrid {
   cellSize: number;
   columns: number;
   rows: number;
+  /** The first point indexed: entry k of `points`, `pixelX` and `pixelY` is the point `from + k`. */
+  from: number;
   /** Cell c holds `points[start[c] .. start[c + 1])`. */
   start: Int32Array;
   points: Int32Array;

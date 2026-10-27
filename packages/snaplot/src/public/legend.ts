@@ -6,6 +6,7 @@
 import css from '../styles/legendTable.css?inline';
 import { adoptStyles, styleRootOf } from '../dom/styles';
 import { fail } from '../engine/errors';
+import { observeSize } from '../engine/render/surface';
 import { type Companion, companions } from './companion';
 import type { ChartHandle, ChartPoint, SeriesState } from './types';
 
@@ -65,9 +66,7 @@ export function mountLegend<Row>(
     reserved = px;
     control.reserve(placement.position, px);
   };
-  const observer =
-    typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => reserve());
-  observer?.observe(root);
+  const unobserveSize = observeSize(root, reserve);
 
   /** Each item and what it last showed: a commit that changes no series writes nothing. */
   const items = new Map<
@@ -168,7 +167,7 @@ export function mountLegend<Row>(
   const unobserve = control.observe(refresh);
   return () => {
     unobserve();
-    observer?.disconnect();
+    unobserveSize();
     root.remove();
     items.clear();
     control.reserve(placement.position, 0);
