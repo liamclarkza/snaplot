@@ -35,7 +35,10 @@ ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 docker info >/dev/null 2>&1 || { echo "visual-docker: docker is not available" >&2; exit 2; }
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/snaplot-visual.XXXXXX")"
+# Inside the checkout (ignored), not $TMPDIR: Docker Desktop and colima share the home directory
+# with their VM by default, but not macOS's /var/folders temp directory.
+mkdir -p .visual-docker
+WORK="$(mktemp -d "$PWD/.visual-docker/run.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 git ls-files -co --exclude-standard -z | tar --null -T - -cf "$WORK/head.tar"
 ARGS=()

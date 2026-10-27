@@ -25,6 +25,9 @@ codex-reviews/
 # Benchmark output (baselines are tracked, raw results are not)
 bench/results/
 
+# scripts/visual-docker.sh's work directories
+.visual-docker/
+
 # Playwright reports and traces
 test-results/
 playwright-report/
