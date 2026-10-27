@@ -18,10 +18,11 @@ describe('engine reserveChrome', () => {
     const chart = fakes.engine(config, [f([0, 1, 2]), f([5, 6, 7])]);
     const open = { ...chart.getLayout().plot };
     chart.reserveChrome('top', 28);
-    expect(chart.getLayout().plot.top).toBe(open.top + 28);
-    expect(chart.getLayout().plot.height).toBe(open.height - 28);
+    // Under the strip the 24 px top gutter narrows to 12: half a tick label and a gap.
+    expect(chart.getLayout().plot.top).toBe(open.top + 28 - 12);
+    expect(chart.getLayout().plot.height).toBe(open.height - 28 + 12);
     chart.reserveChrome('bottom', 10);
-    expect(chart.getLayout().plot.height).toBe(open.height - 38);
+    expect(chart.getLayout().plot.height).toBe(open.height - 38 + 12);
     chart.reserveChrome('top', 0);
     chart.reserveChrome('bottom', Number.NaN);
     expect(chart.getLayout().plot).toEqual(open);

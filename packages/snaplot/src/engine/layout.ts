@@ -112,8 +112,10 @@ export function computeLayout(
   /** Space reserved for chrome (the built-in legend): the axes and the plot sit between it. */
   chrome: ReservedChrome = NO_CHROME,
 ): Layout {
+  // Under chrome (a legend above the plot) the top gutter only has to hold half the top tick
+  // label, so the legend sits with its plot rather than a blank band above it.
   const padding: { top: number; right: number; bottom: number; left: number } = {
-    top: DEFAULT_PADDING.top,
+    top: chrome.top > 0 ? Math.max(12, Math.ceil(fontSize * 0.6) + 4) : DEFAULT_PADDING.top,
     right: insets.right ?? DEFAULT_PADDING.right,
     bottom: DEFAULT_PADDING.bottom,
     left: insets.left ?? DEFAULT_PADDING.left,
