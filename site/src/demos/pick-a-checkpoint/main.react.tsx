@@ -150,6 +150,7 @@ function Comparison({ logs }: { logs: Logs }) {
         pins={pins}
         onPin={onPin}
         validation={validation}
+        coarse={coarse}
       />
     </div>
   );

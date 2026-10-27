@@ -14,7 +14,8 @@ import { spectrum } from './fft';
 import { type Player, createPlayer } from './player';
 
 const BUNDLED = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}data/find-the-clipping/recording.mp3`;
-const BUNDLED_TITLE = 'Space-to-ground comm: PDAM prep conversation (12-02-21)';
+// The date's hyphens do not break, so a phone never splits it across lines.
+const BUNDLED_TITLE = 'Space-to-ground comm: PDAM prep conversation (12\u201102\u201121)';
 const CHANNELS = ['Left', 'Right'];
 
 interface Loaded {

@@ -111,7 +111,7 @@ describe('[ridgecrest-aftershocks] answer', () => {
     expect(d.peakIsMainshock).toBe(true);
     expect(d.daysAfterPeak).toBe(2);
     expect(headline(d)).toBe(
-      'Daily M≥2.5 count fell below 10% of its peak (1239) on 8 July, 2 days after the M7.1; half of the 3-month total came in the first 1.9 days.',
+      'Daily M≥2.5 count fell below 10% of its peak (1239) on 8 July, 2 days after the M7.1; half of the 3‑month total came in the first 1.9 days.',
     );
   });
 

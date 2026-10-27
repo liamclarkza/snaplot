@@ -101,7 +101,7 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       await expect(answer(page)).toHaveText(
         `Daily M≥2.5 count fell below 10% of its peak (${expected.peak}) on ${longDate(
           expected.below ?? 0,
-        )}, ${expected.daysAfter} days after the M7.1; half of the 3-month total came in the first ${expected.halfDays.toFixed(1)} days.`,
+        )}, ${expected.daysAfter} days after the M7.1; half of the 3‑month total came in the first ${expected.halfDays.toFixed(1)} days.`,
       );
     });
 
@@ -143,7 +143,7 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       expect(durations.at(-1)).toBeLessThan(50);
       // Back to the whole sequence.
       await page.locator('[data-part="whole"]').click();
-      await expect(answer(page)).toContainText('3-month total');
+      await expect(answer(page)).toContainText('3‑month total');
       await expect(page.locator('[data-part="whole"]')).toBeHidden();
       expect(problems).toEqual([]);
     });

@@ -113,6 +113,13 @@ kbd {
   margin-left: 4px;
 }
 
+/* A touch screen has no Space or arrow keys to name. */
+@media (pointer: coarse) {
+  kbd {
+    display: none;
+  }
+}
+
 .clock {
   font-size: 17px;
   min-width: 10ch;

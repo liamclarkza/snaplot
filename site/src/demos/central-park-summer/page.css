@@ -170,9 +170,11 @@ a:hover {
 }
 
 .demo-footer {
-  max-width: 76rem;
+  /* The page's measure inside its gutters, so the rule ends where the page's rules end. */
+  width: calc(100% - 3rem);
+  max-width: calc(76rem - 3rem);
   margin-inline: auto;
-  padding: 1rem 1.5rem 2rem;
+  padding: 1rem 0 2rem;
   border-top: 1px solid var(--rule);
   color: var(--ink-2);
   font-family: var(--sans);

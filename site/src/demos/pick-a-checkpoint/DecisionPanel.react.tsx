@@ -22,9 +22,11 @@ interface Props {
   pins: readonly Pin[];
   onPin: (pin: Pin) => void;
   validation: ChartHandle | null;
+  /** A touch screen: the hints say touch, not point. */
+  coarse: boolean;
 }
 
-export function DecisionPanel({ logs, by, onBy, pins, onPin, validation }: Props) {
+export function DecisionPanel({ logs, by, onBy, pins, onPin, validation, coarse }: Props) {
   const decision = useMemo(() => decide(logs.allVal, by), [logs, by]);
   const other = useMemo(() => otherPick(logs.allVal, by), [logs, by]);
   const smoothedRun = logs.runs.find((r) => r.labelSmoothing > 0);
@@ -154,7 +156,7 @@ export function DecisionPanel({ logs, by, onBy, pins, onPin, validation }: Props
       <h3>At the cursor</h3>
       <p className={epoch === undefined ? 'r1-hint' : undefined}>
         {epoch === undefined
-          ? 'Point at a chart to read both runs at one epoch.'
+          ? `${coarse ? 'Touch' : 'Point at'} a chart to read both runs at one epoch.`
           : correctAt(logs, epoch)}
       </p>
       <LegendTable chart={validation} columns={columns} fallback="hide" className="r1-legend" />

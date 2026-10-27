@@ -178,7 +178,8 @@ export function headline(d: Decay): string {
       : `Daily M≥2.5 count never fell below 10% of its peak (${d.peak.count}) in this window`;
   const whole = d.from === START && d.to === END;
   const half = whole
-    ? `half of the 3-month total came in the first ${formatDays(d.halfDays)}`
+    ? // A non-breaking hyphen: the readout never splits "3-month" across lines.
+      `half of the 3‑month total came in the first ${formatDays(d.halfDays)}`
     : `half of the window's ${plural(d.total, 'event')} came in its first ${formatDays(d.halfDays)}`;
   return `${first}; ${half}.`;
 }
