@@ -87,11 +87,14 @@ describe('renderAxes vertical label filtering', () => {
 });
 
 describe('label fit', () => {
-  it('keeps a log axis thinned when asking for fewer ticks returns fewer labels', () => {
+  it.each([
+    'log',
+    'time',
+  ] as const)('keeps a %s axis thinned when asking for fewer ticks returns fewer labels', (type) => {
     // 10 px apart, so every second tick fits; asked for 3, the scale offers only 2.
     const yScale: Scale = {
       ...linearScale(0, 100, []),
-      type: 'log',
+      type,
       ticks: vi.fn((count?: number) => (count === 3 ? [20, 60] : [10, 20, 30, 40, 50])),
     };
     const scales = new Map<string, Scale>([['y', yScale]]);

@@ -153,7 +153,7 @@ export class TimeScale implements Scale {
 
   /**
    * `count` caps the label density; the pixel width sets the default
-   * (about one label per 100px). The axis fit pass may thin them further.
+   * (about one label per 75px). The axis fit pass may thin them further.
    */
   ticks(count: number = 6): number[] {
     this.zoneKey = this.timeZone === 'UTC' ? 'UTC' : localZone();
@@ -163,7 +163,9 @@ export class TimeScale implements Scale {
     const domain = this.max - this.min;
     if (domain <= 0) return [this.min];
 
-    const widthTarget = Math.max(2, Math.floor(pxRange / 100));
+    // A label per 75 px at most: the axis' measured fit pass (axes/render.ts) drops any that
+    // still collide, so a phone-width quarter reads Jul Aug Sep rather than Jul Sep.
+    const widthTarget = Math.max(2, Math.floor(pxRange / 75));
     const targetLabels = Math.max(2, Math.min(count, widthTarget));
     const interval = this.pickInterval(domain / targetLabels);
 
