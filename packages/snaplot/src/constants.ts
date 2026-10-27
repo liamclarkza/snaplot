@@ -30,14 +30,18 @@ export const PALETTE_CATEGORICAL_LIGHT = [
   '#666666',
 ] as const;
 
+/**
+ * Okabe–Ito hues lightened for a dark surface, ordered so the first three stay apart under protan
+ * and deutan vision and the first five under both at ΔE00 ≥ 7 (`npm run check:palettes`).
+ */
 export const PALETTE_CATEGORICAL_DARK = [
-  '#7aa2f7',
-  '#8bd17c',
-  '#f2c14e',
-  '#ff8a65',
-  '#c79cff',
-  '#5ad4e6',
-  '#f58bb8',
+  '#56b4e9',
+  '#e69f00',
+  '#2ec79b',
+  '#cc79a7',
+  '#f0e442',
+  '#ff7f50',
+  '#8f9cff',
   '#b8beca',
 ] as const;
 

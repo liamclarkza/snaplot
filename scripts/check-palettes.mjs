@@ -14,15 +14,14 @@
 // The palettes are read from the library source (PALETTE_SOURCE). `--dark`/`--light` check a
 // candidate instead, e.g. plan §5.3's candidate A.
 //
-// MODE is 'advisory' until M11 adopts a dark palette that passes: failures are printed and the
-// exit code is 0. M11 switches it to 'enforce' (and updates PALETTE_SOURCE if the palettes move).
+// MODE is 'enforce' since M15b adopted a dark palette that passes: a failure exits 1.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
-const MODE = 'advisory';
+const MODE = 'enforce';
 const PALETTE_SOURCE = {
   file: 'packages/snaplot/src/constants.ts',
   light: 'PALETTE_CATEGORICAL_LIGHT',
