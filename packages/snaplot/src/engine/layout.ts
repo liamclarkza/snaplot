@@ -120,6 +120,11 @@ export function computeLayout(
   insets: PlotInsets = {},
   /** Space reserved for chrome (the built-in legend): the axes and the plot sit between it. */
   chrome: ReservedChrome = NO_CHROME,
+  /**
+   * Horizontal axes whose window slides at a constant width (`slidingAxes`), each with the widest
+   * end-label overhang reserved since its slide began (raised here when a wider label arrives).
+   */
+  sliding: ReadonlyMap<string, { half: number }> = NO_AXES,
 ): Layout {
   // Under chrome (a legend above the plot) the top gutter only has to hold half the top tick
   // label, so the legend sits with its plot rather than a blank band above it.
@@ -203,11 +208,22 @@ export function computeLayout(
       // A category axis' labels are thinned to fit and its edge labels clamped into the
       // container, so its ends reserve nothing: the last category's label is rarely drawn.
       if (ticks.length > 0 && !ac.thinTicks) {
+        const firstHalf = measureLabel(format(ticks[0]), fontFamily, fontSize) / 2;
+        const lastHalf = measureLabel(format(ticks[ticks.length - 1]), fontFamily, fontSize) / 2;
+        // A sliding window's ticks cross both edges as it moves: reserve each end's whole
+        // overhang, as if a tick sat on it, so the plot keeps its width instead of narrowing
+        // while a label nears an edge and widening once it has gone.
+        const slide = sliding.get(key);
+        const slides = slide !== undefined;
+        // The reservation only grows while the window slides (a label gaining a digit as the
+        // values cross 100,000,000), so the plot moves once, not back and forth.
+        const half = Math.max(firstHalf, lastHalf, slide?.half ?? 0);
+        if (slide) slide.half = half;
         horizontalEdges.push({
-          firstHalf: measureLabel(format(ticks[0]), fontFamily, fontSize) / 2,
-          lastHalf: measureLabel(format(ticks[ticks.length - 1]), fontFamily, fontSize) / 2,
-          firstFraction: horizontalFraction(scale, ticks[0]),
-          lastFraction: horizontalFraction(scale, ticks[ticks.length - 1]),
+          firstHalf: slides ? half : firstHalf,
+          lastHalf: slides ? half : lastHalf,
+          firstFraction: slides ? 0 : horizontalFraction(scale, ticks[0]),
+          lastFraction: slides ? 1 : horizontalFraction(scale, ticks[ticks.length - 1]),
         });
       }
       const needed = Math.ceil(
@@ -372,6 +388,9 @@ export function naturalGutters(engine: ChartCore): { left: number; right: number
       engine.canvasManager.dpr,
       engine.theme.fontFamily,
       engine.theme.fontSize,
+      {},
+      NO_CHROME,
+      slidingNow(engine),
     );
     engine.natural = {
       key,
@@ -389,8 +408,56 @@ export function layoutIsStale(engine: ChartCore): boolean {
   return !engine.layout || createLayoutCacheKey(engine, w, h) !== engine.layoutCacheKey;
 }
 
+/**
+ * The horizontal axes whose window slides at a constant width: a stream following its newest
+ * data (from its first frame), or a pan. A change of span (a zoom, or new data widening a static
+ * chart) ends the slide. Runs once per layout; `slidingNow` reads its last answer.
+ */
+interface Window {
+  span: number;
+  min: number;
+  sliding: boolean;
+  /** The end-label overhang reserved since the slide began (computeLayout raises it). */
+  half: number;
+}
+const windows = new WeakMap<ChartCore, Map<string, Window>>();
+const lastSliding = new WeakMap<ChartCore, ReadonlyMap<string, Window>>();
+const NO_AXES: ReadonlyMap<string, Window> = new Map();
+
+function slidingAxes(engine: ChartCore): ReadonlyMap<string, Window> {
+  let seen = windows.get(engine);
+  if (!seen) {
+    seen = new Map();
+    windows.set(engine, seen);
+  }
+  const streaming = engine.following && engine.config.streaming?.followWindow !== undefined;
+  let out: Map<string, Window> | null = null;
+  for (const [key, scale] of engine.scales) {
+    const pos = inferPosition(key, engine.config.axes?.[key]?.position);
+    if (pos !== 'bottom' && pos !== 'top') continue;
+    const span = scale.max - scale.min;
+    const was = seen.get(key);
+    const sameSpan = was !== undefined && Math.abs(span - was.span) <= Math.abs(span) * 1e-9;
+    const sliding = streaming || (sameSpan && (was.sliding || scale.min !== was.min));
+    const record = was ?? { span, min: scale.min, sliding, half: 0 };
+    if (!sliding) record.half = 0;
+    record.span = span;
+    record.min = scale.min;
+    record.sliding = sliding;
+    if (!was) seen.set(key, record);
+    if (sliding) (out ??= new Map()).set(key, record);
+  }
+  const result = out ?? NO_AXES;
+  lastSliding.set(engine, result);
+  return result;
+}
+
+/** The sliding axes the current layout was made with. */
+const slidingNow = (engine: ChartCore) => lastSliding.get(engine) ?? NO_AXES;
+
 export function updateLayout(engine: ChartCore): void {
   settleRange(engine);
+  slidingAxes(engine);
   const w = engine.canvasManager.boxWidth || 600;
   const h = engine.canvasManager.boxHeight || 400;
   const cacheKey = createLayoutCacheKey(engine, w, h);
@@ -409,6 +476,7 @@ export function updateLayout(engine: ChartCore): void {
     engine.theme.fontSize,
     engine.plotInsets,
     reservedChrome(engine),
+    slidingNow(engine),
   );
   engine.layoutCacheKey = cacheKey;
   updateInteractionLayer(engine);
@@ -477,6 +545,7 @@ export function createLayoutCacheKey(engine: ChartCore, width: number, height: n
     engine.plotInsets.right,
     engine.canvasManager.reservedChrome('top'),
     engine.canvasManager.reservedChrome('bottom'),
+    slidingNow(engine).size ? [...slidingNow(engine).keys()].join(',') : '',
     axes,
   ].join('|');
 }

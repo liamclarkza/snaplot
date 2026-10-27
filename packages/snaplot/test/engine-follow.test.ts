@@ -22,6 +22,24 @@ const streamConfig = {
 const zoomIn = (chart: ChartCore) => press(chart, '+');
 
 describe('engine live-follow viewport', () => {
+  it('keeps the plot one width as ticks cross its edges while the window slides', () => {
+    // Long tick labels (10,000,000 and on), so an edge tick's label would reach past the plot.
+    const step = 3_000_000;
+    const chart = fakes.engine({ ...streamConfig, streaming: { followWindow: 100_000_000 } }, [
+      f([0, step, 2 * step]),
+      f([5, 6, 7]),
+    ]);
+    const edges = new Set<string>();
+    for (let x = 3 * step; x < 400_000_000; x += step) {
+      chart.appendToSource(0, [f([x]), f([(x / step) % 7])]);
+      fakes.frames.flush();
+      const { plot } = chart.getLayout();
+      edges.add(`${plot.left}..${plot.left + plot.width}`);
+    }
+    // Ticks pass through both edges as the window slides; the plot's edges never move.
+    expect([...edges]).toHaveLength(1);
+  });
+
   it('starts following and pins the X window to the trailing follow width', () => {
     const chart = fakes.engine(streamConfig, [f([0, 1, 2]), f([5, 6, 7])]);
     expect(chart.isFollowing()).toBe(true);
