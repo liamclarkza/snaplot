@@ -250,6 +250,14 @@ const examples = DEMOS.map((demo) => ({
     max-width: none;
   }
 
+  /* On a phone the button sits above its three lines rather than beside the first. */
+  @media (max-width: 40rem) {
+    .hero-caption {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
   /* Wide enough for "Back to live", so the caption does not move when the label changes. */
   .hero-toggle {
     flex: none;
@@ -287,7 +295,7 @@ const examples = DEMOS.map((demo) => ({
   ul.home-examples {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 2.5rem 1.5rem;
+    gap: 2rem 1.5rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -295,6 +303,7 @@ const examples = DEMOS.map((demo) => ({
   @media (min-width: 40rem) {
     ul.home-examples {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      row-gap: 2.5rem;
     }
   }
   @media (min-width: 64rem) {
@@ -315,6 +324,10 @@ const examples = DEMOS.map((demo) => ({
     border: 1px solid var(--snaplot-rule);
     border-radius: var(--snaplot-radius);
     transition: border-color 120ms ease;
+  }
+  /* The light pages' pictures sit a little dimmer on a dark page. */
+  :global(:root[data-theme='dark']) .demo-thumb {
+    filter: brightness(0.88);
   }
   .home-examples h3 {
     margin: 0.875rem 0 0.25rem;

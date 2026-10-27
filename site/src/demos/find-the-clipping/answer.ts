@@ -137,12 +137,14 @@ export function rmsDb(
 
 /** `mm:ss`, or `mm:ss.mmm` with `precise`. */
 export function timecode(seconds: number, precise = false): string {
-  const total = Math.max(0, seconds);
-  const m = Math.floor(total / 60);
-  const s = total - m * 60;
-  const whole = Math.floor(s);
+  // Whole milliseconds, rounded: 79.922 is stored as 79.92199… and must not read as .921.
+  const ms = precise
+    ? Math.round(Math.max(0, seconds) * 1000)
+    : Math.floor(Math.max(0, seconds)) * 1000;
+  const m = Math.floor(ms / 60_000);
+  const whole = Math.floor(ms / 1000) % 60;
   const base = `${String(m).padStart(2, '0')}:${String(whole).padStart(2, '0')}`;
-  return precise ? `${base}.${String(Math.floor((s - whole) * 1000)).padStart(3, '0')}` : base;
+  return precise ? `${base}.${String(ms % 1000).padStart(3, '0')}` : base;
 }
 
 /** Milliseconds with two significant digits below 10 ms ("0.091 ms"), whole above. */

@@ -1,6 +1,6 @@
 /** @jsxImportSource solid-js */
 import { For, Show } from 'solid-js';
-import { type ClipReport, type Span, formatMs, headline, timecode } from './answer';
+import { type ClipReport, type Span, formatMs, timecode } from './answer';
 import { runChannels } from './audio';
 
 /**
@@ -11,7 +11,7 @@ function peakDb(peak: number): string {
   return (Math.round(20 * Math.log10(peak) * 100) / 100 + 0).toFixed(2);
 }
 
-/** The clip-list panel: the answer, then every clipped run and long silence, each a jump target. */
+/** The clip-list panel: every clipped run and long silence, each a jump target. */
 export function ClipList(props: {
   report: ClipReport;
   marks: { t: number; v: number }[][];
@@ -23,11 +23,7 @@ export function ClipList(props: {
   const at = (s: Span) => timecode(s.start / rate(), true);
   const isCurrent = (s: Span) => props.current?.start === s.start;
   return (
-    <section class="cliplist" aria-labelledby="cliplist-title">
-      <h2 id="cliplist-title">Where does this recording clip?</h2>
-      <p class="answer" data-answer>
-        {headline(props.report)}
-      </p>
+    <section class="cliplist" aria-label="Clipped runs and silences">
       <Show when={props.report.clippedRuns.length > 0}>
         <table>
           <caption>Clipped runs, in time order</caption>

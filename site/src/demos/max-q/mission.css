@@ -143,8 +143,13 @@ h2 {
   border-left: 1px solid var(--panel-edge);
 }
 
-.control:hover {
+.control:hover:not(:disabled) {
   background: #121a2a;
+}
+
+.control:disabled {
+  color: var(--ink-3);
+  cursor: default;
 }
 
 .control[aria-pressed="true"] {
@@ -231,7 +236,7 @@ h2 {
 }
 
 .mission[data-state="done"][data-readout="live"] .readout-note::before {
-  background: var(--lime);
+  background: var(--ink-3);
 }
 
 .readout {
@@ -368,6 +373,13 @@ h2 {
 
 .chip-whole {
   color: var(--ink-2);
+}
+
+/* The view the charts are on: an event's minute, or the whole flight. */
+.chip[aria-pressed="true"] {
+  border-color: var(--cyan);
+  background: rgb(76 201 240 / 0.14);
+  color: var(--ink);
 }
 
 .mission:not([data-state="done"]) .chip-whole {

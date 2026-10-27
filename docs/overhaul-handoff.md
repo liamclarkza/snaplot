@@ -135,7 +135,7 @@ Every intentional pixel change since `overhaul-baseline`, with the commit to rev
 | V61 | time axes label every month on a phone | `31f4f40` | `git revert 31f4f40` |
 | V62 | density maps bin on a data-space lattice | `d4efa98` | `git revert d4efa98` |
 | V63 | bar charts label every category that fits | `d6aaa73`, `63c9dd9` | `git revert 63c9dd9 d6aaa73` |
-| V64 | bar and category labels keep half a numeric axis's gap | (this commit) | revert the commit "fix(axes): bar and category labels keep half the gap of a numeric axis" |
+| V64 | bar and category labels keep half a numeric axis's gap | `8fd86ce` | `git revert 8fd86ce` |
 | V90 | reference lines, regions and plugins given at creation draw at mount again | `4a042b7` | `git revert 4a042b7` |
 
 A revert can conflict with later commits that build on the change. Revert one row at a time and rerun

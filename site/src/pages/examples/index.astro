@@ -40,7 +40,7 @@ const examples = DEMOS.map((demo) => ({
               class="thumb"
               src={`${base}examples/${demo.slug}.jpg`}
               srcset={`${base}examples/${demo.slug}.jpg 640w, ${base}examples/${demo.slug}@2x.jpg 1280w`}
-              sizes="(min-width: 80rem) 33vw, (min-width: 44rem) 50vw, 100vw"
+              sizes="(min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw"
               alt=""
               width="320"
               height="200"
@@ -88,21 +88,28 @@ const examples = DEMOS.map((demo) => ({
     padding: 0;
     list-style: none;
   }
-  @media (min-width: 44rem) {
+  /* The home page's grid steps: two columns from 40rem, three from 64rem. */
+  @media (min-width: 40rem) {
     ul.examples {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
-  @media (min-width: 80rem) {
+  @media (min-width: 64rem) {
     ul.examples {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
+  /* Each item the height of its row, its links at the foot, so a row's links line up. */
   ul.examples > li {
     position: relative;
-    display: grid;
-    align-content: start;
-    row-gap: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .row-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
   }
   .thumb {
     display: block;
@@ -114,6 +121,10 @@ const examples = DEMOS.map((demo) => ({
     border: 1px solid var(--snaplot-rule);
     border-radius: var(--snaplot-radius);
     transition: border-color 120ms ease;
+  }
+  /* The light pages' pictures sit a little dimmer on a dark page. */
+  :global(:root[data-theme='dark']) .thumb {
+    filter: brightness(0.88);
   }
   /* A demo whose page has not been built yet keeps its place, without a stand-in picture. */
   .thumb-missing {
@@ -153,13 +164,15 @@ const examples = DEMOS.map((demo) => ({
     flex-wrap: wrap;
     align-items: center;
     gap: 0.25rem 1rem;
-    margin-top: 0.625rem;
+    margin-top: auto;
+    padding-top: 0.625rem;
     font-size: 0.8125rem;
   }
   /* Open repeats the question's link; it stays for keyboards and readers, quietly. */
   .demo-links a {
     position: relative;
     z-index: 1;
+    padding-block: 0.375rem;
     color: var(--snaplot-ink-secondary);
   }
   .demo-links a:hover {

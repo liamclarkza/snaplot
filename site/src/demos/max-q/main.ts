@@ -87,16 +87,24 @@ function part<T extends HTMLElement = HTMLElement>(root: ParentNode, name: strin
 }
 
 /**
- * The time charts' shared options: the whole flight on X, no tooltip, and ticks on whole minutes
- * (every other minute on a narrow chart: explicit ticks are kept as given, never thinned).
+ * Ticks on whole divisions of a minute across [from, to]: every minute over the flight (every
+ * other on a narrow chart), every 10 or 15 seconds over an event's minute. Explicit ticks are kept
+ * as given, never thinned, so the step is chosen for the width here.
  */
-function timeChart(end: number, narrow: boolean): Partial<ChartOptions<Frame>> {
+function timeTicks(from: number, to: number, narrow: boolean): number[] {
+  const most = narrow ? 5 : 10;
+  const step = [10, 15, 30, 60, 120, 300].find((s) => (to - from) / s <= most) ?? 300;
   const ticks: number[] = [];
-  for (let t = 0; t <= end; t += narrow ? 120 : 60) ticks.push(t);
+  for (let t = Math.ceil(from / step) * step; t <= to; t += step) ticks.push(t);
+  return ticks;
+}
+
+/** The time charts' shared options: the whole flight on X, no tooltip, and ticks on minutes. */
+function timeChart(end: number, narrow: boolean): Partial<ChartOptions<Frame>> {
   return {
     data: [],
     x: 't',
-    axes: { x: { min: 0, max: end, ticks, format: minutes } },
+    axes: { x: { min: 0, max: end, ticks: timeTicks(0, end, narrow), format: minutes } },
     theme: THEME,
     tooltip: false,
     legend: { position: 'top' },
@@ -302,6 +310,10 @@ export function mount(root: HTMLElement): Demo {
   const stageLabel = part(root, 'stage');
   const clockLabel = part(root, 'clock');
   const progress = part(root, 'progress');
+  const skipButton = part<HTMLButtonElement>(root, 'skip');
+  const wholeButton = part<HTMLButtonElement>(root, 'whole');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const stacked = matchMedia('(max-width: 44rem)');
   const chips = [...root.querySelectorAll<HTMLButtonElement>('[data-event]')];
   const dots = [...root.querySelectorAll<HTMLElement>('.track-dot')];
   // Each event's dot sits at its share of the flight along the track.
@@ -337,7 +349,8 @@ export function mount(root: HTMLElement): Demo {
     tiles.mach.textContent = format.twoPlaces.format(f.mach);
     tiles.downrange.textContent = format.whole.format(f.downrange);
     stageLabel.textContent = STAGES[f.stage];
-    readoutNote.textContent = pointer === null ? 'Live' : `At ${clock(f.t)}`;
+    const over = root.dataset.state === 'done';
+    readoutNote.textContent = pointer !== null ? `At ${clock(f.t)}` : over ? 'Final' : 'Live';
     root.dataset.readout = pointer === null ? 'live' : 'cursor';
   }
 
@@ -439,6 +452,9 @@ export function mount(root: HTMLElement): Demo {
     playButton.textContent = 'Replay';
     playButton.setAttribute('aria-pressed', 'false');
     for (const chip of chips) chip.disabled = false;
+    skipButton.disabled = true;
+    select(wholeButton);
+    showReadout(time);
     // The live heads go out with the engines.
     head = null;
     for (const chart of [ascent, pressure, accel, trajectory]) chart.redraw('data');
@@ -454,6 +470,8 @@ export function mount(root: HTMLElement): Demo {
     for (const chart of [ascent, pressure, accel, trajectory]) chart.destroy();
     build();
     for (const chip of chips) chip.disabled = true;
+    select(null);
+    skipButton.disabled = false;
     root.dataset.state = 'paused';
     advance(0);
   }
@@ -471,23 +489,44 @@ export function mount(root: HTMLElement): Demo {
         other.setAttribute('aria-pressed', String(other === button));
     });
   }
-  part(root, 'skip').addEventListener('click', () => {
+  skipButton.addEventListener('click', () => {
     advance(summary.seco);
     finish();
   });
+  /** Show `chosen` (an event chip, or Whole flight) as the view the charts are on. */
+  function select(chosen: HTMLButtonElement | null) {
+    for (const chip of [...chips, wholeButton]) {
+      chip.setAttribute('aria-pressed', String(chip === chosen));
+    }
+  }
+  /** Zoom the time charts to [from, to], or the whole flight, with ticks to suit. */
+  function zoomTo(range: [number, number] | null, chosen: HTMLButtonElement) {
+    const [from, to] = range ?? [0, end];
+    for (const chart of [ascent, pressure, accel]) {
+      chart.update({ axes: { x: { ticks: timeTicks(from, to, narrow) } } });
+    }
+    ascent.update({ viewport: range ? { x: range } : {} });
+    select(chosen);
+    // On a phone the charts are above the events: bring the first one into view.
+    if (stacked.matches) {
+      part(root, 'ascent').scrollIntoView({
+        block: 'center',
+        behavior: reduced ? 'auto' : 'smooth',
+      });
+    }
+  }
   // After the flight, an event chip zooms the time charts to the minute around it.
   for (const chip of chips) {
     chip.addEventListener('click', () => {
       const t = Number(chip.dataset.t);
-      ascent.update({ viewport: { x: [Math.max(0, t - 30), Math.min(end, t + 30)] } });
+      zoomTo([Math.max(0, t - 30), Math.min(end, t + 30)], chip);
     });
   }
-  part(root, 'whole').addEventListener('click', () => ascent.update({ viewport: {} }));
+  wholeButton.addEventListener('click', () => zoomTo(null, wholeButton));
 
   part(root, 'answer').textContent = headline(summary);
   part(root, 'highlights').textContent = highlights(summary);
 
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const startAtEnd = new URLSearchParams(location.search).get('t') === 'end' || reduced;
   build();
   for (const chip of chips) chip.disabled = true;

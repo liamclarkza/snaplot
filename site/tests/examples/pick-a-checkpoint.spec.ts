@@ -97,7 +97,7 @@ test.describe('desktop, 1280 px', () => {
     const problems = watch(page);
     await open(page);
     await expect(page).toHaveTitle('Which checkpoint should we ship? · snaplot examples');
-    const panel = page.getByRole('complementary', { name: 'Which checkpoint should we ship?' });
+    const panel = page.getByRole('complementary', { name: 'The pick' });
     const answer = panel.getByRole('status');
     await expect(answer).toContainText(sentence(argBest('valLoss', 1)));
     // Run A's validation loss at epoch 60 is ≥ 5% over its minimum, so the panel says so.
@@ -155,7 +155,7 @@ test.describe('desktop, 1280 px', () => {
 
   test('the cursor panel and the legend table read the hovered epoch', async ({ page }) => {
     await open(page);
-    const panel = page.getByRole('complementary', { name: 'Which checkpoint should we ship?' });
+    const panel = page.getByRole('complementary', { name: 'The pick' });
     await expect(panel).toContainText('Point at a chart to read both runs at one epoch.');
     await expect(panel.locator('.r1-legend table')).toBeHidden();
     const at = await clickPoint(page, 'validation', 'A', 23);
@@ -185,7 +185,7 @@ test.describe('desktop, 1280 px', () => {
     page,
   }) => {
     await open(page, '?pins=');
-    const panel = page.getByRole('complementary', { name: 'Which checkpoint should we ship?' });
+    const panel = page.getByRole('complementary', { name: 'The pick' });
     await panel.getByRole('combobox', { name: 'Run' }).selectOption('B');
     await panel.getByRole('spinbutton', { name: 'Epoch' }).fill('42');
     await panel.getByRole('spinbutton', { name: 'Epoch' }).press('Enter');
@@ -327,9 +327,7 @@ test.describe('phone, 390 px with touch', () => {
     await expectNoOverflow(page);
     await expect(page.locator('.r1-help')).toContainText('Tap a validation point');
     await expect(
-      page
-        .getByRole('complementary', { name: 'Which checkpoint should we ship?' })
-        .getByRole('status'),
+      page.getByRole('complementary', { name: 'The pick' }).getByRole('status'),
     ).toContainText(sentence(argBest('valLoss', 1)));
     // The data's provenance stays on screen at 390 px.
     await expect(page.locator('.r1-meta')).toBeVisible();

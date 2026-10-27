@@ -88,6 +88,13 @@ function stripesPlugin(years: readonly Year[]): ChartPlugin<Year> {
         const left = x.toPixel(y.year - 0.5);
         const right = x.toPixel(y.year + 0.5);
         context.fillStyle = stripe(y.anomaly);
+        if (y.partial) {
+          // This year so far: set off by a gap and paler, as an unfinished year.
+          context.globalAlpha = 0.55;
+          context.fillRect(left + 2, plot.top, right - left - 2, plot.height);
+          context.globalAlpha = 1;
+          continue;
+        }
         // A hair wider than the slot, so neighbouring stripes meet without a seam.
         context.fillRect(left, plot.top, right - left + 0.5, plot.height);
       }
@@ -157,13 +164,16 @@ export async function mount(root: HTMLElement): Promise<Demo> {
     data: years,
     x: 'year',
     series: [
+      // A dark casing under the white line keeps it visible over the palest stripes.
       {
-        id: 'anomaly',
+        id: 'casing',
         y: 'anomaly',
         label: 'Anomaly',
-        color: '#ffffff',
-        lineWidth: 1.5,
+        color: '#15171c',
+        opacity: 0.35,
+        lineWidth: 4,
       },
+      { id: 'anomaly', y: 'anomaly', label: 'Anomaly', color: '#ffffff', lineWidth: 1.5 },
     ],
     axes: {
       x: {
@@ -319,7 +329,9 @@ export async function mount(root: HTMLElement): Promise<Demo> {
   part(root, 'through').textContent = longDate(summary.last.date);
   if (file.firstPreliminary) {
     part(root, 'preliminary').textContent =
-      `Values from ${longDate(file.firstPreliminary)} are preliminary.`;
+      file.firstPreliminary === summary.last.date
+        ? 'The last day is preliminary.'
+        : `Values from ${longDate(file.firstPreliminary)} on are preliminary.`;
   }
   // The key's ramp: every other step of the stripes' colours.
   for (const colour of STRIPES.filter((_, i) => i % 2 === 1)) {

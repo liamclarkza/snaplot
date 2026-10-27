@@ -19,7 +19,7 @@ export function Verdict(props: {
     props.rollback ? 'rolled-back' : props.answer?.verdict.rollBack ? 'roll-back' : 'waiting';
   return (
     <section class="verdict" aria-labelledby="verdict-title" data-state={state()}>
-      <h2 id="verdict-title">Did deploy #482 cause the p99 spike?</h2>
+      <h1 id="verdict-title">Did deploy #482 cause the p99 spike?</h1>
       <p class="answer" data-answer>
         {props.answer ? headline(props.answer.verdict) : ''}
       </p>

@@ -11,8 +11,11 @@ export default function hero(el: HTMLElement) {
       { y: 'p99', label: 'p99' },
     ],
     axes: {
-      x: { type: 'time' },
-      y: { type: 'log', format: { suffix: ' ms' } },
+      x: {
+        type: 'time',
+        format: { timeStyle: 'medium', hourCycle: 'h23' },
+      },
+      y: { type: 'log', min: 20, format: { suffix: ' ms' } },
     },
     streaming: { maxPoints: 900, followWindow: 4 * 60_000 },
     timeZone: 'UTC',

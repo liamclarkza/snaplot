@@ -214,8 +214,18 @@ kbd {
   margin: 0 0 4px;
 }
 
+.question {
+  margin: 12px 0;
+}
+
+.question h1 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
 .answer {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 14px;
   color: var(--ink);
   border-left: 3px solid var(--clip);
@@ -248,8 +258,15 @@ th {
 }
 
 td button {
+  min-height: 28px;
   font-family: var(--mono);
   padding: 0 6px;
+}
+
+@media (pointer: coarse) {
+  td button {
+    min-height: 40px;
+  }
 }
 
 tr[aria-current="true"] td {

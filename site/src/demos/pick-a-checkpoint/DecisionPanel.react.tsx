@@ -68,7 +68,7 @@ export function DecisionPanel({ logs, by, onBy, pins, onPin, validation, coarse 
 
   return (
     <aside className="r1-decision" aria-labelledby="r1-decision-title">
-      <h2 id="r1-decision-title">Which checkpoint should we ship?</h2>
+      <h2 id="r1-decision-title">The pick</h2>
       <fieldset className="r1-criterion">
         <legend>Best checkpoint by</legend>
         {(
@@ -158,13 +158,16 @@ export function DecisionPanel({ logs, by, onBy, pins, onPin, validation, coarse 
         suggest={decide(logs.allVal, by === 'valLoss' ? 'valAcc' : 'valLoss').ship}
       />
 
-      <h3>At the cursor</h3>
-      <p className={epoch === undefined ? 'r1-hint' : undefined}>
-        {epoch === undefined
-          ? `${coarse ? 'Touch' : 'Point at'} a chart to read both runs at one epoch.`
-          : correctAt(logs, epoch)}
-      </p>
-      <LegendTable chart={validation} columns={columns} fallback="hide" className="r1-legend" />
+      {/* On a phone the panel sits above the charts, so the tooltip is the reading there. */}
+      <div className="r1-at-cursor">
+        <h3>At the cursor</h3>
+        <p className={epoch === undefined ? 'r1-hint' : undefined}>
+          {epoch === undefined
+            ? `${coarse ? 'Touch' : 'Point at'} a chart to read both runs at one epoch.`
+            : correctAt(logs, epoch)}
+        </p>
+        <LegendTable chart={validation} columns={columns} fallback="hide" className="r1-legend" />
+      </div>
     </aside>
   );
 }

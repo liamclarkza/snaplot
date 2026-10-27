@@ -83,6 +83,8 @@ export function MetricCharts(props: Props) {
     props.onPin({ run: point.seriesId, epoch: Number(point.x) });
 
   const x = { min: 0, max: logs.epochs, title: 'Epoch' };
+  // The validation charts have a row per epoch: their readouts name whole epochs.
+  const epochs = { ...x, format: { maximumFractionDigits: 0 } };
   const shared = {
     x: 'epoch',
     group: props.group,
@@ -112,7 +114,10 @@ export function MetricCharts(props: Props) {
           ariaLabel="Validation loss of each run by epoch"
           series={lossSeries}
           hiddenSeries={hidden}
-          axes={{ x, y: { title: 'Cross-entropy', format: { maximumFractionDigits: 4 } } }}
+          axes={{
+            x: epochs,
+            y: { title: 'Cross-entropy', format: { maximumFractionDigits: 4 } },
+          }}
           onPointClick={onPointClick}
         />
       </Panel>
@@ -124,7 +129,7 @@ export function MetricCharts(props: Props) {
           series={accSeries}
           hiddenSeries={hidden}
           axes={{
-            x,
+            x: epochs,
             y: { format: { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 } },
           }}
           onPointClick={onPointClick}
@@ -142,6 +147,8 @@ function validationSeries(logs: Logs, y: 'valLoss' | 'valAcc'): SeriesOptions[] 
     data: logs.val.get(id) ?? [],
     y,
     color: RUN_COLORS[id],
+    // Losses read to four places in the tooltip and the table alike (0.1550, not 0.155).
+    ...(y === 'valLoss' && { format: { minimumFractionDigits: 4, maximumFractionDigits: 4 } }),
   }));
 }
 

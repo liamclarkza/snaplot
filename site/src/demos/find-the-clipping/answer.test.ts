@@ -175,6 +175,8 @@ describe('[find-the-clipping] answer', () => {
   it('timecodes and durations', () => {
     expect(timecode(35.0702)).toBe('00:35');
     expect(timecode(35.0702, true)).toBe('00:35.070');
+    expect(timecode(79.922, true)).toBe('01:19.922');
+    expect(timecode(59.9996, true)).toBe('01:00.000');
     expect(timecode(3599.9)).toBe('59:59');
     expect(timecode(-1)).toBe('00:00');
     expect(formatMs(0.0907)).toBe('0.091 ms');

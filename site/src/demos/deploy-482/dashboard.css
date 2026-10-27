@@ -92,8 +92,10 @@ select:hover {
   border-bottom: 1px solid var(--border);
 }
 
-.topbar h1 {
+.service {
+  margin: 0;
   font-size: 15px;
+  font-weight: 500;
 }
 
 .tag {
@@ -181,8 +183,8 @@ select:hover {
   border-left-color: var(--deploy);
 }
 
-.verdict h2 {
-  font-size: 13px;
+.verdict h1 {
+  font-size: 14px;
   color: var(--text-dim);
 }
 

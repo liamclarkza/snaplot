@@ -6,7 +6,7 @@
  */
 import { Chart, type ChartHandle, createChartGroup } from 'snaplot/solid';
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
-import { type ClipReport, RULE, type Span, rmsDb, scan, timecode } from './answer';
+import { type ClipReport, RULE, type Span, headline, rmsDb, scan, timecode } from './answer';
 import { type Audio, clipMarks, decode, waveformColumns } from './audio';
 import { ClipList } from './ClipList.solid';
 import { type Track, lane, overview, spectrumChart, tc } from './charts';
@@ -123,6 +123,12 @@ export default function Editor() {
     if (kind === 'run') show(from - 0.004, to + 0.004);
     else show(from - 0.25, to + 0.25);
     seek(Math.max(0, from - (kind === 'run' ? 0.5 : 0)));
+    // The list is below the lanes: bring the first lane into view if it has scrolled away.
+    const first = document.querySelector('.lane');
+    if (first && first.getBoundingClientRect().top < 0) {
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      first.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+    }
   };
 
   const onKey = (e: KeyboardEvent) => {
@@ -178,7 +184,7 @@ export default function Editor() {
   return (
     <div class="editor">
       <header class="toolbar">
-        <h1 class="file">{loaded()?.title ?? 'recording.mp3'}</h1>
+        <p class="file">{loaded()?.title ?? 'recording.mp3'}</p>
         <div class="transport" role="toolbar" aria-label="Transport">
           <button
             type="button"
@@ -219,6 +225,12 @@ export default function Editor() {
       <Show when={loaded()} keyed>
         {(l) => (
           <>
+            <section class="question" aria-labelledby="question-title">
+              <h1 id="question-title">Where does this recording clip?</h1>
+              <p class="answer" data-answer>
+                {headline(l.report)}
+              </p>
+            </section>
             <section class="overview" aria-label="Whole recording">
               <div class="plot">
                 <Chart

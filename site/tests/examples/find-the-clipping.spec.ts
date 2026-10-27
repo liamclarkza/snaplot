@@ -214,7 +214,7 @@ test.describe('find-the-clipping', () => {
     await expect(page.locator('[data-answer]')).toHaveText(
       /^2 clipped runs \(samples at or above −0\.1 dBFS\); the longest is 0\.75 ms \(6 samples\) at 00:01; 1 silence longer than 2 s\.$/,
     );
-    await expect(page.locator('h1')).toHaveText('interview.wav');
+    await expect(page.locator('.toolbar .file')).toHaveText('interview.wav');
     await expect(page.locator('.format')).toContainText('8 kHz · mono');
     expect(sent).toEqual([]);
   });

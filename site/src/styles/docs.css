@@ -57,6 +57,14 @@ mobile-starlight-toc a:hover {
   border-radius: var(--snaplot-radius);
 }
 
+/* A touch screen shows the copy button all the time (a mouse sees it on hover), so the code
+   starts below it rather than under it. */
+@media (hover: none) {
+  .expressive-code .frame pre {
+    padding-top: 2.5rem;
+  }
+}
+
 /* The shared header (SiteHeader.astro) fills Starlight's fixed bar. On a narrow screen its nav
    takes a second row, so the bar is taller and the menu button stays on the first row. */
 @media (max-width: 49.99rem) {

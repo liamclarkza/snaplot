@@ -197,7 +197,7 @@ export default function Dashboard() {
   return (
     <div class="dashboard">
       <header class="topbar">
-        <h1>shop-web production</h1>
+        <p class="service">shop-web production</p>
         <span class="tag">Simulated service · seed {seed}</span>
         <span class="paged">Paged 03:12 UTC</span>
         <label class="field">

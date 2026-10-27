@@ -93,7 +93,18 @@ body.r1 {
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 8px;
+  min-height: 32px;
   cursor: pointer;
+}
+.r1-runs input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+@media (pointer: coarse) {
+  .r1-runs label {
+    min-height: 44px;
+  }
 }
 .r1-run-name {
   font-weight: 500;
@@ -257,6 +268,8 @@ table.r1-table td,
   color: var(--r1-ink-2);
   font-size: 16px;
   line-height: 1;
+  min-width: 32px;
+  min-height: 32px;
   padding: 2px 6px;
   border-radius: 3px;
   cursor: pointer;
@@ -343,6 +356,9 @@ table.r1-table td,
   .r1-decision {
     position: static;
     order: -1;
+  }
+  .r1-at-cursor {
+    display: none;
   }
 }
 

@@ -6,11 +6,5 @@
     "width": 1280,
     "height": 800
   },
-  "query": "?paused",
-  "crop": {
-    "x": 0,
-    "y": 40,
-    "width": 1024,
-    "height": 640
-  }
+  "query": "?paused"
 }
