@@ -16,8 +16,8 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
 - A framework-independent `createChart(element, options)` accepts rows or named typed columns, shared or independent series datasets, stable series/row IDs, categories, named encodings and direct histogram results.
 - Atomic `update`, the `viewport` state option, `resetViewport`, `resumeFollow`, declarative reference lines/regions, typed interaction events and core chart groups replace the previous public authoring surface.
 - Native React 18.3 and 19 and Solid 1.9 integrations provide equivalent direct props, controlled state, state subscriptions, groups and JSX legend/table companions with isolated optional peers and SSR-safe imports.
-- Axis options use `title`, `nice` and `format`; streaming uses `maxPoints` and `followWindow`. Repository examples, documentation, benchmarks and comparison adapters use the new API. No compatibility aliases are retained.
-- Existing visual defaults are preserved by the API overhaul.
+- Axis options use `title`, `nice` and `format`; streaming uses `maxPoints` and `followWindow`. The examples, the docs and the benchmarks use the new API. No compatibility aliases are retained; the migration guide (`/snaplot/migrate-0-12/`) maps every removed name.
+- Visual defaults change where the overhaul fixed them; each change is a row of the visual ledger in ADR 0002 (V17–V61), with the commit to revert.
 
 ### Options and validation (1.0)
 
@@ -369,13 +369,10 @@ what to use instead, and the chart keeps its default:
   goes with it.
 
 ### Development
-- Added a native-defaults comparison audit with text/size/data edge cases,
-  reproduced layout failures, correction-work tracking, and API/expected-behavior
-  reviews. The audit deliberately retains the failures for reproduction.
-- Added a private React comparison lab with five dashboard scenarios rendered
-  by Snaplot, Chart.js, Recharts and ECharts, deterministic stress controls,
-  browser evaluation evidence, and React adapter lifecycle tests. The published
-  Solid adapter is unchanged; the lab now exercises the additive row helper.
+- The chart lab and its native-defaults audit are removed (read them with
+  `git show overhaul-baseline:experiments/chart-lab/<path>`). In their place: a same-machine bench
+  harness (`bench/`, `npm run bench:ab`), visual baselines with a contact sheet, an expected-failure
+  ledger (`npm run ledger`), and conformance suites for React 18, React 19 and Solid.
 
 ## [0.12.0] - 2026-07-12
 
