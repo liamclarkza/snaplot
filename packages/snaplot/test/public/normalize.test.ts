@@ -566,6 +566,28 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(axis(chart, 'x')).toMatchObject({ min: start.getTime(), max: end.getTime() });
   });
 
+  it('labels every category whose label fits half a numeric axis gap from the next', () => {
+    // Ten ranked years: an unlabelled bar could not be inferred from its neighbours.
+    const years = ['24', '25', '23', '20', '16', '19', '17', '22', '21', '18'];
+    const chart = mount(
+      {
+        data: years.map((y, i) => ({ year: `’${y}`, v: 10 - i })),
+        x: 'year',
+        series: [{ type: 'bar', y: 'v' }],
+      },
+      { width: 350 },
+    );
+    fakes.frames.flush();
+    const boxes = debug(chart)
+      .labelBoxes()
+      .filter((box) => box.axis === 'x' && box.kind === 'tick');
+    const plot = chart.scale('x')!;
+    const spacing = plot.toPixel(1) - plot.toPixel(0);
+    // Each label is 21 px wide in the fakes: the slots leave less than 12 px between them.
+    expect(spacing - 21).toBeLessThan(12);
+    expect(boxes.map((box) => box.text)).toEqual(years.map((y) => `’${y}`));
+  });
+
   it('[arch-15] explicit ticks accept Dates', () => {
     const ticks = [new Date(2026, 0, 2), new Date(2026, 0, 3)];
     const chart = mount({

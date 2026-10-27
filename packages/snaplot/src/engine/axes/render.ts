@@ -151,8 +151,13 @@ export function renderAxes(
           (i) => texts[i],
           // Vertical labels keep about two and a half lines between centres: closer, a short axis
           // reads as a column of numbers. Log ticks across decades keep down to under two lines
-          // apart: a skipped decade reads as one.
-          isHorizontal ? LABEL_MIN_GAP : theme.fontSize * (decades ? 0.6 : 1.4),
+          // apart: a skipped decade reads as one. A bar's or a category's label sits under its
+          // own slot, so those labels keep half the gap of a numeric axis's.
+          isHorizontal
+            ? useCustomTicks || ac.thinTicks
+              ? LABEL_MIN_GAP / 2
+              : LABEL_MIN_GAP
+            : theme.fontSize * (decades ? 0.6 : 1.4),
           alignedEnds(values),
         );
       };
