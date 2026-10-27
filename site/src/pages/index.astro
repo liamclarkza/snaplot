@@ -179,6 +179,12 @@ const examples = DEMOS.map((demo) => ({
       grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
       gap: 1.5rem;
       align-items: start;
+      /* The code's frame starts clear of the tabs' rule, level with the chart beside it, so the
+         two edges never sit 2px apart as a double line. */
+      padding-top: 1rem;
+    }
+    .hero :global(.example-output) {
+      padding-top: 0;
     }
     /* The chart stays beside the code while the code scrolls past, so the two read together. */
     .hero :global(.example-output) {

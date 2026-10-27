@@ -67,6 +67,16 @@ describe('debug counters (plan D31)', () => {
     expect(data()).toBe(before + 3);
   });
 
+  it('repaints in the same task when a new height reallocates the layers', () => {
+    const chart = make();
+    const before = debug(chart).renderCount;
+    chart.update({ height: 333 });
+    // No frame has run: a reallocation clears the canvases, so waiting for one would show a
+    // frame of bare background.
+    expect(debug(chart).renderCount.grid).toBeGreaterThan(before.grid);
+    expect(debug(chart).renderCount.data).toBeGreaterThan(before.data);
+  });
+
   it('counts in-view and drawn points of the last data pass', () => {
     const chart = make();
     expect(debug(chart).inViewPoints).toBe(10);

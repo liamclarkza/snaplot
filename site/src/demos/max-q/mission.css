@@ -445,8 +445,15 @@ h2 {
 }
 
 @media (max-width: 44rem) {
+  /* On a phone the first screen holds the telemetry and a live chart; the events follow them. */
   .mission {
+    display: flex;
+    flex-direction: column;
     padding-inline: 1rem;
+  }
+
+  .events {
+    order: 1;
   }
 
   .mission-bar {

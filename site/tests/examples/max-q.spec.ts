@@ -56,6 +56,23 @@ test.describe(`[demos-03] ${SLUG}`, () => {
       expect(problems).toEqual([]);
     });
 
+    test('a replay starts the flight again from empty charts, as often as you like', async ({
+      page,
+    }) => {
+      const problems = watch(page);
+      await page.goto(`${BASE}examples/${SLUG}/?t=end`);
+      await page.waitForFunction(() => 'demo' in window);
+      for (let round = 0; round < 2; round++) {
+        await page.getByRole('button', { name: 'Replay' }).click();
+        await expect(page.locator('main')).toHaveAttribute('data-state', 'playing');
+        await expect.poll(() => replayTime(page)).toBeGreaterThan(5);
+        expect(await replayTime(page)).toBeLessThan(seco);
+        await page.getByRole('button', { name: 'Skip to orbit' }).click();
+        await expect(page.locator('main')).toHaveAttribute('data-state', 'done');
+      }
+      expect(problems).toEqual([]);
+    });
+
     test('pointing at a chart reads every instrument at that moment', async ({ page }) => {
       await page.goto(`${BASE}examples/${SLUG}/?t=end`);
       await page.waitForFunction(() => 'demo' in window);

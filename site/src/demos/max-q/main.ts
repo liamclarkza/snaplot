@@ -10,6 +10,7 @@
  * flight.
  */
 import {
+  type ChartGroup,
   type ChartHandle,
   type ChartOptions,
   type ChartPlugin,
@@ -128,141 +129,160 @@ export function mount(root: HTMLElement): Demo {
   const end = Math.ceil(summary.seco / 10) * 10 + 10;
   const narrow = part(root, 'ascent').clientWidth < 520;
   const timeOptions = timeChart(end, narrow);
-  const group = createChartGroup({ cursor: true, viewport: true });
   /** The newest frame on the charts while the replay runs (null when it is over). */
   let head: Frame | null = null;
 
-  const ascent = createChart<Frame>(part(root, 'ascent'), {
-    ...timeOptions,
-    group,
-    series: [
+  // The charts and their group, built once at mount and again for each replay: a replay starts
+  // from empty charts, and a new chart is how a streamed source starts empty again (a destroyed
+  // chart leaves its group, so the old group goes with them).
+  let group: ChartGroup;
+  let ascent: ChartHandle<Frame>;
+  let pressure: ChartHandle<Frame>;
+  let accel: ChartHandle<Frame>;
+  let trajectory: ChartHandle<Frame | BoosterPoint>;
+
+  function build() {
+    group = createChartGroup({ cursor: true, viewport: true });
+    ascent = createChart<Frame>(part(root, 'ascent'), {
+      ...timeOptions,
+      group,
+      series: [
+        {
+          id: 'altitude',
+          y: 'altitude',
+          label: 'Altitude',
+          color: COLOR.altitude,
+          lineWidth: 2,
+          format: { maximumFractionDigits: 1, suffix: ' km' },
+        },
+        {
+          id: 'speed',
+          y: (f) => f.velocity * 3.6,
+          label: 'Speed',
+          yAxis: 'speed',
+          color: COLOR.speed,
+          lineWidth: 1.5,
+          format: { maximumFractionDigits: 0, suffix: ' km/h' },
+        },
+      ],
+      axes: {
+        ...timeOptions.axes,
+        y: { min: 0, max: 250, format: { suffix: ' km' } },
+        speed: { min: 0, max: 30_000, position: 'right', format: { notation: 'compact' } },
+      },
+      referenceLines: [{ axis: 'y', value: 100, label: 'Kármán line', color: COLOR.karman }],
+      plugins: [liveHead('head', COLOR.altitude, () => head && { x: head.t, y: head.altitude })],
+      ariaLabel: 'Altitude and speed against mission time, simulated.',
+    });
+
+    pressure = createChart<Frame>(part(root, 'pressure'), {
+      ...timeOptions,
+      group,
+      series: [
+        {
+          id: 'q',
+          type: 'area',
+          y: 'q',
+          label: 'Dynamic pressure',
+          color: COLOR.q,
+          lineWidth: 2,
+          format: { maximumFractionDigits: 1, suffix: ' kPa' },
+        },
+      ],
+      axes: { ...timeOptions.axes, y: { min: 0, max: 40, format: { suffix: ' kPa' } } },
+      legend: false,
+      plugins: [liveHead('head', COLOR.q, () => head && { x: head.t, y: head.q })],
+      ariaLabel: `Dynamic pressure against mission time, simulated. ${headline(summary)}`,
+    });
+
+    accel = createChart<Frame>(part(root, 'accel'), {
+      ...timeOptions,
+      group,
+      series: [
+        {
+          id: 'accel',
+          y: 'accel',
+          label: 'Acceleration',
+          color: COLOR.accel,
+          lineWidth: 2,
+          format: { maximumFractionDigits: 2, suffix: ' g' },
+        },
+        {
+          id: 'throttle',
+          y: (f) => f.throttle * 100,
+          label: 'Throttle',
+          yAxis: 'throttle',
+          color: COLOR.throttle,
+          dash: [4, 3],
+          lineWidth: 1,
+          format: { maximumFractionDigits: 0, suffix: '%' },
+        },
+      ],
+      axes: {
+        ...timeOptions.axes,
+        y: { min: 0, max: 6, format: { suffix: ' g' } },
+        throttle: {
+          min: 0,
+          max: 120,
+          position: 'right',
+          ticks: [0, 50, 100],
+          format: { suffix: '%' },
+        },
+      },
+      plugins: [liveHead('head', COLOR.accel, () => head && { x: head.t, y: head.accel })],
+      ariaLabel: 'Sensed acceleration and throttle against mission time, simulated.',
+    });
+
+    /** The trajectory's series, the booster's with its own (empty) data. */
+    const trajectorySeries = (): ChartOptions<Frame | BoosterPoint>['series'] => [
       {
-        id: 'altitude',
+        id: 'upper',
         y: 'altitude',
-        label: 'Altitude',
+        label: 'Rocket',
         color: COLOR.altitude,
         lineWidth: 2,
         format: { maximumFractionDigits: 1, suffix: ' km' },
       },
       {
-        id: 'speed',
-        y: (f) => f.velocity * 3.6,
-        label: 'Speed',
-        yAxis: 'speed',
-        color: COLOR.speed,
+        id: 'booster',
+        data: [],
+        x: 'downrange',
+        y: 'altitude',
+        label: 'First stage after separation',
+        color: COLOR.booster,
+        dash: [5, 4],
         lineWidth: 1.5,
-        format: { maximumFractionDigits: 0, suffix: ' km/h' },
+        format: { maximumFractionDigits: 1, suffix: ' km' },
       },
-    ],
-    axes: {
-      ...timeOptions.axes,
-      y: { min: 0, max: 250, format: { suffix: ' km' } },
-      speed: { min: 0, max: 30_000, position: 'right', format: { notation: 'compact' } },
-    },
-    referenceLines: [{ axis: 'y', value: 100, label: 'Kármán line', color: COLOR.karman }],
-    plugins: [liveHead('head', COLOR.altitude, () => head && { x: head.t, y: head.altitude })],
-    ariaLabel: 'Altitude and speed against mission time, simulated.',
-  });
-
-  const pressure = createChart<Frame>(part(root, 'pressure'), {
-    ...timeOptions,
-    group,
-    series: [
-      {
-        id: 'q',
-        type: 'area',
-        y: 'q',
-        label: 'Dynamic pressure',
-        color: COLOR.q,
-        lineWidth: 2,
-        format: { maximumFractionDigits: 1, suffix: ' kPa' },
-      },
-    ],
-    axes: { ...timeOptions.axes, y: { min: 0, max: 40, format: { suffix: ' kPa' } } },
-    legend: false,
-    plugins: [liveHead('head', COLOR.q, () => head && { x: head.t, y: head.q })],
-    ariaLabel: `Dynamic pressure against mission time, simulated. ${headline(summary)}`,
-  });
-
-  const accel = createChart<Frame>(part(root, 'accel'), {
-    ...timeOptions,
-    group,
-    series: [
-      {
-        id: 'accel',
-        y: 'accel',
-        label: 'Acceleration',
-        color: COLOR.accel,
-        lineWidth: 2,
-        format: { maximumFractionDigits: 2, suffix: ' g' },
-      },
-      {
-        id: 'throttle',
-        y: (f) => f.throttle * 100,
-        label: 'Throttle',
-        yAxis: 'throttle',
-        color: COLOR.throttle,
-        dash: [4, 3],
-        lineWidth: 1,
-        format: { maximumFractionDigits: 0, suffix: '%' },
-      },
-    ],
-    axes: {
-      ...timeOptions.axes,
-      y: { min: 0, max: 6, format: { suffix: ' g' } },
-      throttle: {
-        min: 0,
-        max: 120,
-        position: 'right',
-        ticks: [0, 50, 100],
-        format: { suffix: '%' },
-      },
-    },
-    plugins: [liveHead('head', COLOR.accel, () => head && { x: head.t, y: head.accel })],
-    ariaLabel: 'Sensed acceleration and throttle against mission time, simulated.',
-  });
-
-  /** The trajectory's series, the booster's with its own (empty) data. */
-  const trajectorySeries = (): ChartOptions<Frame | BoosterPoint>['series'] => [
-    {
-      id: 'upper',
-      y: 'altitude',
-      label: 'Rocket',
-      color: COLOR.altitude,
-      lineWidth: 2,
-      format: { maximumFractionDigits: 1, suffix: ' km' },
-    },
-    {
-      id: 'booster',
+    ];
+    trajectory = createChart<Frame | BoosterPoint>(part(root, 'trajectory'), {
       data: [],
       x: 'downrange',
-      y: 'altitude',
-      label: 'First stage after separation',
-      color: COLOR.booster,
-      dash: [5, 4],
-      lineWidth: 1.5,
-      format: { maximumFractionDigits: 1, suffix: ' km' },
-    },
-  ];
-  const trajectory = createChart<Frame | BoosterPoint>(part(root, 'trajectory'), {
-    data: [],
-    x: 'downrange',
-    series: trajectorySeries(),
-    axes: {
-      x: { min: 0, max: 1_400, format: { suffix: ' km' } },
-      y: { min: 0, max: 250, format: { suffix: ' km' } },
-    },
-    referenceLines: [{ axis: 'y', value: 100, label: 'Kármán line', color: COLOR.karman }],
-    theme: THEME,
-    tooltip: false,
-    legend: { position: 'top' },
-    interaction: 'readonly',
-    plugins: [
-      liveHead('head', COLOR.altitude, () => head && { x: head.downrange, y: head.altitude }),
-    ],
-    ariaLabel:
-      'Altitude against distance downrange, for the rocket and the first stage, simulated.',
-  });
+      series: trajectorySeries(),
+      axes: {
+        x: { min: 0, max: 1_400, format: { suffix: ' km' } },
+        y: { min: 0, max: 250, format: { suffix: ' km' } },
+      },
+      referenceLines: [{ axis: 'y', value: 100, label: 'Kármán line', color: COLOR.karman }],
+      theme: THEME,
+      tooltip: false,
+      legend: { position: 'top' },
+      interaction: 'readonly',
+      plugins: [
+        liveHead('head', COLOR.altitude, () => head && { x: head.downrange, y: head.altitude }),
+      ],
+      ariaLabel:
+        'Altitude against distance downrange, for the rocket and the first stage, simulated.',
+    });
+
+    for (const chart of [ascent, pressure, accel]) {
+      chart.on('cursor:change', (cursor) => {
+        const x = cursor?.points[0]?.x;
+        pointer = typeof x === 'number' && x <= time ? x : null;
+        showReadout(pointer ?? time);
+      });
+    }
+  }
 
   // ─── Readout ────────────────────────────────────────────────────────
   const tiles = {
@@ -313,14 +333,6 @@ export function mount(root: HTMLElement): Demo {
     stageLabel.textContent = STAGES[f.stage];
     readoutNote.textContent = pointer === null ? 'Live' : `At ${clock(f.t)}`;
     root.dataset.readout = pointer === null ? 'live' : 'cursor';
-  }
-
-  for (const chart of [ascent, pressure, accel]) {
-    chart.on('cursor:change', (cursor) => {
-      const x = cursor?.points[0]?.x;
-      pointer = typeof x === 'number' && x <= time ? x : null;
-      showReadout(pointer ?? time);
-    });
   }
 
   // ─── Replay ─────────────────────────────────────────────────────────
@@ -434,8 +446,8 @@ export function mount(root: HTMLElement): Demo {
     nextBooster = 0;
     eventsPassed = -1;
     pointer = null;
-    for (const chart of [ascent, pressure, accel]) chart.update({ data: [], viewport: {} });
-    trajectory.update({ data: [], series: trajectorySeries() });
+    for (const chart of [ascent, pressure, accel, trajectory]) chart.destroy();
+    build();
     for (const chip of chips) chip.disabled = true;
     root.dataset.state = 'paused';
     advance(0);
@@ -472,6 +484,7 @@ export function mount(root: HTMLElement): Demo {
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const startAtEnd = new URLSearchParams(location.search).get('t') === 'end' || reduced;
+  build();
   for (const chip of chips) chip.disabled = true;
   advance(0);
   if (startAtEnd) {
@@ -485,7 +498,9 @@ export function mount(root: HTMLElement): Demo {
   );
 
   return {
-    charts: { ascent, pressure, accel, trajectory },
+    get charts() {
+      return { ascent, pressure, accel, trajectory };
+    },
     flight,
     replay: {
       play: () => setPlaying(true),

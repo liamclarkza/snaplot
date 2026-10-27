@@ -16,6 +16,12 @@ export default defineConfig({
   base: '/snaplot/',
   // The dev server and `astro preview` take PORT, so parallel worktrees never collide.
   server: { host: '127.0.0.1', port: Number(process.env.PORT ?? 5336) },
+  // A build prebundles dependencies in production mode. In the dev server's cache that swaps
+  // React's jsx-dev-runtime for its production build (no jsxDEV), and every React island of a
+  // running dev server throws, so a build keeps a cache of its own.
+  vite: {
+    cacheDir: process.argv.includes('build') ? 'node_modules/.vite-build' : 'node_modules/.vite',
+  },
   integrations: [
     react({ include: ['**/*.react.tsx'] }),
     // snaplot/solid resolves through its `solid` export condition to dist/solid.jsx, JSX source

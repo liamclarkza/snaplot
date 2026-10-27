@@ -407,12 +407,13 @@ export class ChartCore implements EngineHost {
    * Size the canvases to the root's box now, after chrome beside it (the built-in legend)
    * changed it, instead of waiting for the ResizeObserver: the next paint has the right size.
    */
-  fitToRoot(): void {
-    if (this.destroyed) return;
+  fitToRoot(): boolean {
+    if (this.destroyed) return false;
     const width = this.canvasManager.cssWidth;
     const height = this.canvasManager.cssHeight;
-    if (width > 0 && height > 0 && this.canvasManager.resize(width, height))
-      this.onResize(width, height);
+    if (!(width > 0 && height > 0 && this.canvasManager.resize(width, height))) return false;
+    this.onResize(width, height);
+    return true;
   }
 
   /**
@@ -532,9 +533,12 @@ export class ChartCore implements EngineHost {
       this.canvasManager.setInteractive(this.config.mode !== 'readonly');
     }
 
+    // A new height reallocates (and so clears) the layers: they repaint before this task ends,
+    // or the cleared grid shows for a frame (as on the ResizeObserver path).
+    let refit = false;
     if (fullReplace || 'height' in partial) {
       this.canvasManager.setHeight(this.config.height);
-      this.fitToRoot();
+      refit = this.fitToRoot();
     }
 
     if (fullReplace || partial.theme) {
@@ -559,6 +563,7 @@ export class ChartCore implements EngineHost {
     // Marks drawn as before over the same scales and plot keep the data layer.
     const keep = marksBefore !== null && marksKey(this) === marksBefore;
     this.scheduler.markDirty(keep ? DirtyFlag.GRID | DirtyFlag.OVERLAY : DirtyFlag.ALL);
+    if (refit) this.scheduler.flush();
     this.emitEvent('options:update', this.config);
     if (themeChanged) this.emitEvent('theme:update', this.theme);
   }
@@ -674,8 +679,10 @@ export class ChartCore implements EngineHost {
 
   resize(width: number, height: number): void {
     if (this.destroyed) return;
-    this.canvasManager.resize(width, height);
+    const reallocated = this.canvasManager.resize(width, height);
     this.onResize(width, height);
+    // Cleared layers repaint now, not a frame later.
+    if (reallocated) this.scheduler.flush();
   }
 
   destroy(): void {
