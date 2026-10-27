@@ -109,6 +109,20 @@ describe('label fit', () => {
   });
 });
 
+describe('log label gap', () => {
+  it('keeps decades 25 px apart on a log axis, where a linear axis thins them', () => {
+    const labelsOf = (type: 'log' | 'linear') => {
+      const yScale: Scale = { ...linearScale(0, 100, [10, 35, 60, 85]), type };
+      const config = { series: [], axes: { y: { position: 'left' } } } as unknown as ChartSpec;
+      return renderAxes(context(), layout(), new Map([['y', yScale]]), theme, config)
+        .labels.filter((l) => l.axis === 'y')
+        .map((l) => l.text);
+    };
+    expect(labelsOf('log')).toEqual(['10', '35', '60', '85']);
+    expect(labelsOf('linear')).toEqual(['10', '60']);
+  });
+});
+
 describe('per-axis grid config', () => {
   const gridConfig = (grid: unknown) =>
     ({ series: [], axes: { y: { position: 'left', grid } } }) as unknown as ChartSpec;

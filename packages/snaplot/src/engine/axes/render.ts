@@ -148,9 +148,10 @@ export function renderAxes(
                 return [y - half, y + half];
               },
           (i) => texts[i],
-          // Vertical labels keep about two and a half lines between centres: closer, a short
-          // axis reads as a column of numbers.
-          isHorizontal ? LABEL_MIN_GAP : theme.fontSize * 1.4,
+          // Vertical labels keep about two and a half lines between centres: closer, a short axis
+          // reads as a column of numbers. A log axis keeps every decade down to under two lines
+          // apart: one skipped reads as a decade.
+          isHorizontal ? LABEL_MIN_GAP : theme.fontSize * (scale.type === 'log' ? 0.6 : 1.4),
           alignedEnds(values),
         );
       };
