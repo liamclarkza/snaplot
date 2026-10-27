@@ -129,10 +129,15 @@ export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined
   // Category ticks are capped to what the plot width can label legibly
   // (and to an explicit axes.x.tickCount when set): a year of daily bars
   // used to tick every day, smearing labels and gridlines into a band.
-  const maxCategoryTicks = Math.min(
-    Math.max(2, Math.floor(engine.layout.plot.width / 65)),
-    xAxisCfg?.tickCount ?? Number.POSITIVE_INFINITY,
-  );
+  // Bars cap at one per 28 px and keep the labels that fit as measured, so
+  // ten short labels ('24, '25) all show on a phone; histogram edges keep
+  // one per 65 px.
+  const categoryTicks = (spacing: number) =>
+    Math.min(
+      Math.max(2, Math.floor(engine.layout.plot.width / spacing)),
+      xAxisCfg?.tickCount ?? Number.POSITIVE_INFINITY,
+    );
+  const maxCategoryTicks = categoryTicks(65);
 
   // Histogram: X data = bin edges, use them as tick values
   const histSeries = visibleSeries.find((s) => markOf(s).draw.x === 'bin');
@@ -171,7 +176,7 @@ export function computeCustomXTicks(engine: ChartCore): CustomXTicks | undefined
   if (barSeries && engine.hasData()) {
     const coordinates = axisMarkCoordinates(engine, 'slot');
     if (xScale?.type === 'time' && coordinates.length > maxCategoryTicks) return undefined;
-    const values = thinTicks(coordinates, maxCategoryTicks);
+    const values = thinTicks(coordinates, categoryTicks(28));
     return { values, format };
   }
 

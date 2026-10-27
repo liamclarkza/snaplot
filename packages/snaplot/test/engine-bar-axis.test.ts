@@ -41,8 +41,10 @@ describe('engine bar X-axis planning', () => {
     // The domain is the bars' own slots (visuals-08); the plan still picks the tick centres.
     expect(xScale.min).toBe(6.5);
     expect(xScale.max).toBe(18.5);
-    expect(tickValues(chart)).toEqual([7, 9, 11, 13, 15, 17]);
-    expect(bottomTickMarks(fakes, chart)).toEqual(pixels(chart, [7, 9, 11, 13, 15, 17]));
+    // Twelve short labels fit the plot, so each hour keeps its tick.
+    const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+    expect(tickValues(chart)).toEqual(hours);
+    expect(bottomTickMarks(fakes, chart)).toEqual(pixels(chart, hours));
   });
 
   it('keeps small integer categories at every center with half-slot edges', () => {
