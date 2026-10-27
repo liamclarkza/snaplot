@@ -186,6 +186,19 @@ const tabs = FRAMEWORKS.map((framework) => ({
   .example-output :global(button:not([class*='snaplot']):hover) {
     border-color: var(--snaplot-ink-secondary);
   }
+  .example-output :global(label:not([class*='snaplot'])) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--snaplot-ink);
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+  }
+  .example-output :global(input[type='checkbox']) {
+    accent-color: var(--snaplot-accent);
+    margin: 0;
+  }
 </style>
 
 <script>

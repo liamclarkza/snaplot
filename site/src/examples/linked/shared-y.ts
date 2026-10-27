@@ -12,6 +12,7 @@ export default function sharedLossRange(el: HTMLElement) {
     data: trainLoss,
     x: 'step',
     series: [{ id: 'baseline', y: 'baseline', label: 'Baseline' }],
+    axes: { y: { title: 'Baseline' } },
     group,
     height: 140,
     ariaLabel: 'Training loss per step, baseline run',
@@ -22,6 +23,7 @@ export default function sharedLossRange(el: HTMLElement) {
     series: [
       { id: 'regularised', y: 'regularised', label: 'Regularised' },
     ],
+    axes: { y: { title: 'Regularised' } },
     group,
     height: 140,
     ariaLabel: 'Training loss per step, regularised run',

@@ -14,6 +14,7 @@ export default function SharedLossRange() {
           { id: 'baseline', y: 'baseline', label: 'Baseline' },
         ]}
         group={group}
+        axes={{ y: { title: 'Baseline' } }}
         height={140}
         ariaLabel="Training loss per step, baseline run"
       />
@@ -28,6 +29,7 @@ export default function SharedLossRange() {
           },
         ]}
         group={group}
+        axes={{ y: { title: 'Regularised' } }}
         height={140}
         ariaLabel="Training loss per step, regularised run"
       />
