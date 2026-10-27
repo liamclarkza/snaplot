@@ -63,6 +63,9 @@ a:hover {
 }
 
 .toolbar .back {
+  /* A taller hit area (about 35 px) that moves nothing: the margin takes back the padding. */
+  padding-block: 0.5rem;
+  margin-block: -0.5rem;
   color: var(--ink-dim);
   font-size: 13px;
   text-decoration: none;

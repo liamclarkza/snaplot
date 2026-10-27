@@ -41,6 +41,9 @@ body.r1 {
   padding: 12px 16px;
 }
 .r1-back {
+  /* A taller hit area (about 35 px) that moves nothing: the margin takes back the padding. */
+  padding-block: 0.5rem;
+  margin-block: -0.5rem;
   color: var(--r1-ink-2);
   font-size: 13px;
   text-decoration: none;
@@ -299,6 +302,7 @@ table.r1-table td,
 }
 .r1-pin-form select,
 .r1-pin-form input {
+  min-height: 32px;
   font: inherit;
   padding: 2px 4px;
   border: 1px solid #adb5bd;
@@ -310,6 +314,7 @@ table.r1-table td,
   width: 4.5em;
 }
 .r1-pin-form button {
+  min-height: 32px;
   font: inherit;
   font-weight: 500;
   padding: 4px 14px;

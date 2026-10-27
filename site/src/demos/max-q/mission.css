@@ -523,6 +523,9 @@ h2 {
 
 /* The way back to the examples, as quiet as the mission name beside it. */
 .back {
+  /* A taller hit area (about 35 px) that moves nothing: the margin takes back the padding. */
+  padding-block: 0.5rem;
+  margin-block: -0.5rem;
   color: var(--ink-3);
   font-size: 0.8125rem;
   text-decoration: none;
