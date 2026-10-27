@@ -138,6 +138,8 @@ const examples = DEMOS.map((demo) => ({
             <img
               class="demo-thumb"
               src={`${base}examples/${demo.slug}.jpg`}
+              srcset={`${base}examples/${demo.slug}.jpg 640w, ${base}examples/${demo.slug}@2x.jpg 1280w`}
+              sizes="(max-width: 40rem) 100vw, 200px"
               alt=""
               width="240"
               height="150"
@@ -189,6 +191,16 @@ const examples = DEMOS.map((demo) => ({
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       column-gap: 2rem;
+    }
+  }
+
+  @media (min-width: 100rem) {
+    /* The code is no wider than its longest line: the chart takes the half it does not need. */
+    .hero :global(.example-panel:not([hidden])) {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    ul.home-examples {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 

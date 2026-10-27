@@ -286,6 +286,11 @@ select:hover {
     height: 180px;
   }
 
+  /* Its four-endpoint legend wraps to two rows on a phone: the plot keeps its height under them. */
+  .area-traffic .plot {
+    height: 220px;
+  }
+
   .clock {
     margin-left: 0;
   }

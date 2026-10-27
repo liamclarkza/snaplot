@@ -39,6 +39,8 @@ const examples = DEMOS.map((demo) => ({
             <img
               class="thumb"
               src={`${base}examples/${demo.slug}.jpg`}
+              srcset={`${base}examples/${demo.slug}.jpg 640w, ${base}examples/${demo.slug}@2x.jpg 1280w`}
+              sizes="(min-width: 100rem) 33vw, (min-width: 72rem) 50vw, (min-width: 44rem) 320px, 100vw"
               alt=""
               width="320"
               height="200"
@@ -134,6 +136,12 @@ const examples = DEMOS.map((demo) => ({
 
     .thumb {
       width: 100%;
+    }
+  }
+
+  @media (min-width: 100rem) {
+    ul.examples {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 

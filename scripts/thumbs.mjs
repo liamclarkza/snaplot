@@ -15,7 +15,8 @@
 // server, and waits for the bench lock like every Playwright run (plan §11.1).
 //
 // A thumbnail is the demo page at 1280 × 800 CSS pixels, rendered at half density (640 × 400) as a
-// JPEG of at most 60 KB (Playwright cannot write WebP). Each demo says how to take it in
+// JPEG of at most 60 KB, and at full density (1280 × 800, `<slug>@2x.jpg`, at most 160 KB) for
+// high-density screens (Playwright cannot write WebP). Each demo says how to take it in
 // site/src/demos/<slug>/thumbnail.json: `path` and `query` to open (`?paused` holds a stream
 // still), the `viewport` (1280 × 800) and `ready`, the selector that marks the first paint
 // (`html[data-demo-ready]` on all six). Without that file the script opens the page and waits for
@@ -45,7 +46,11 @@ const value = (name) => {
 };
 const CHECK = has('--check');
 const MONTAGE = has('--montage');
-const MAX_BYTES = 60 * 1024;
+/** The thumbnail densities: 640 × 400 (the `src`) and 1280 × 800 (the `@2x` in `srcset`). */
+const DENSITIES = [
+  { density: 0.5, suffix: '', maxBytes: 60 * 1024 },
+  { density: 1, suffix: '@2x', maxBytes: 160 * 1024 },
+];
 /** The social card (og:image) of the homepage, the hub and the docs: 1200 × 630, at most 150 KB. */
 const CARD = { file: 'social-card.jpg', width: 1200, height: 630, maxBytes: 150 * 1024 };
 const VIEWPORT = { width: 1280, height: 800 };
@@ -436,40 +441,45 @@ try {
   for (const slug of slugs) {
     const how = hook(slug);
     problems.push(...how.problems);
-    const context = await browser.newContext({
-      viewport: how.viewport,
-      deviceScaleFactor: 0.5,
-      colorScheme: 'light',
-      reducedMotion: 'no-preference',
-    });
-    const page = await context.newPage();
-    // A demo may open external pages or stream; nothing leaves the machine.
-    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());
-    const response = await page.goto(`${server.origin}${BASE}${how.path}${how.query}`);
-    if (!response?.ok()) problems.push(`${slug}: HTTP ${response?.status()}`);
-    await settle(page, how.ready);
-    let quality = 80;
-    let shot = await page.screenshot({ type: 'jpeg', quality });
-    while (shot.length > MAX_BYTES && quality > 40) {
-      quality -= 5;
-      shot = await page.screenshot({ type: 'jpeg', quality });
-    }
-    shots.set(slug, shot);
-    facts.set(slug, await page.evaluate(probe));
-    const file = join(out, `${slug}.jpg`);
-    if (CHECK) {
-      if (!existsSync(file))
-        problems.push(`${slug}: no thumbnail at site/public/examples/${slug}.jpg`);
-      else if (statSync(file).size > MAX_BYTES) {
-        problems.push(
-          `${slug}: the thumbnail is ${(statSync(file).size / 1024).toFixed(1)} KB (max 60)`,
-        );
+    // One JPEG per density: 640 × 400 for 1x screens and an @2x of 1280 × 800 for the rest, each
+    // at the highest quality under its budget.
+    for (const { density, suffix, maxBytes } of DENSITIES) {
+      const context = await browser.newContext({
+        viewport: how.viewport,
+        deviceScaleFactor: density,
+        colorScheme: 'light',
+        reducedMotion: 'no-preference',
+      });
+      const page = await context.newPage();
+      // A demo may open external pages or stream; nothing leaves the machine.
+      await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());
+      const response = await page.goto(`${server.origin}${BASE}${how.path}${how.query}`);
+      if (!response?.ok()) problems.push(`${slug}: HTTP ${response?.status()}`);
+      await settle(page, how.ready);
+      let quality = 80;
+      let shot = await page.screenshot({ type: 'jpeg', quality });
+      while (shot.length > maxBytes && quality > 40) {
+        quality -= 5;
+        shot = await page.screenshot({ type: 'jpeg', quality });
       }
-    } else {
-      writeFileSync(file, shot);
-      console.log(`thumbs: ${slug}.jpg ${(shot.length / 1024).toFixed(1)} KB (quality ${quality})`);
+      if (!suffix) {
+        shots.set(slug, shot);
+        facts.set(slug, await page.evaluate(probe));
+      }
+      const name = `${slug}${suffix}.jpg`;
+      const file = join(out, name);
+      const kb = (bytes) => (bytes / 1024).toFixed(1);
+      if (CHECK) {
+        if (!existsSync(file))
+          problems.push(`${slug}: no thumbnail at site/public/examples/${name}`);
+        else if (statSync(file).size > maxBytes)
+          problems.push(`${slug}: ${name} is ${kb(statSync(file).size)} KB (max ${kb(maxBytes)})`);
+      } else {
+        writeFileSync(file, shot);
+        console.log(`thumbs: ${name} ${kb(shot.length)} KB (quality ${quality})`);
+      }
+      await context.close();
     }
-    await context.close();
   }
 
   // The social card: the top of the homepage, with the sentence and the hero.

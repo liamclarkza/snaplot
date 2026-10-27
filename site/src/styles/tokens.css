@@ -88,6 +88,16 @@
   --sl-text-h5: 1rem;
 }
 
+/* Past 100rem the custom pages fill the screen up to 120rem instead of leaving a band at the right:
+   their left edge stays the docs header's, so the measure grows only rightwards. */
+@media (min-width: 100rem) {
+  :root,
+  :root[data-theme] {
+    /* 100% is the container's own block (the page without its scrollbar), less the gutters. */
+    --snaplot-container: min(120rem, 100% - 2 * var(--snaplot-gutter));
+  }
+}
+
 /* Narrow screens: a smaller h1, as on the custom pages. */
 @media (max-width: 50rem) {
   :root,

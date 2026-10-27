@@ -332,8 +332,12 @@ test.describe('the homepage', () => {
         const thumbnail = row.locator('img');
         await thumbnail.scrollIntoViewIfNeeded();
         await expect
-          .poll(() => thumbnail.evaluate((img: HTMLImageElement) => img.naturalWidth))
-          .toBe(640);
+          .poll(() =>
+            thumbnail.evaluate((img: HTMLImageElement) =>
+              img.naturalWidth > 0 ? (img.currentSrc.split('/').pop() ?? '') : '',
+            ),
+          )
+          .toMatch(new RegExp(`^${demo.slug}(@2x)?\\.jpg$`));
       }
     }
   });

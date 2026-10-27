@@ -107,6 +107,9 @@ test.describe('the examples hub', () => {
       const file = join(site, 'public/examples', `${demo.slug}.jpg`);
       expect(existsSync(file), `${demo.slug}: run npm run thumbs`).toBe(true);
       expect(statSync(file).size).toBeLessThanOrEqual(60 * 1024);
+      const retina = file.replace(/\.jpg$/, '@2x.jpg');
+      expect(existsSync(retina), `${demo.slug}: run npm run thumbs`).toBe(true);
+      expect(statSync(retina).size).toBeLessThanOrEqual(160 * 1024);
       const image = page.locator(`.examples > li[data-demo="${demo.slug}"] img.thumb`);
       await image.scrollIntoViewIfNeeded();
       const src = (await image.getAttribute('src')) ?? '';
@@ -114,9 +117,14 @@ test.describe('the examples hub', () => {
       expect(response.headers()['content-type']).toBe('image/jpeg');
       // A JPEG (FF D8) rendered by the thumbs script at 640 × 400.
       expect([...(await response.body()).subarray(0, 2)]).toEqual([0xff, 0xd8]);
+      // One of its two densities is the one shown (srcset picks by slot width and DPR).
       await expect
-        .poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth))
-        .toBe(640);
+        .poll(() =>
+          image.evaluate((img: HTMLImageElement) =>
+            img.naturalWidth > 0 ? (img.currentSrc.split('/').pop() ?? '') : '',
+          ),
+        )
+        .toMatch(new RegExp(`^${demo.slug}(@2x)?\\.jpg$`));
     }
   });
 
