@@ -222,11 +222,11 @@ What is still open, from the final `npm run bench:ab -- --base overhaul-baseline
 
 | Item | Finding | Status | Measured | Acceptance |
 |---|---|---|---|---|
-| Streaming heap per append (budget 50 KB gross) | — | open | 141–147 KB desktop, 81–109 KB mobile (550 at M14) | `stream20hz-50k-*-heap` ≤ 50; the remainder is many small per-frame allocations (tick labels, layout, segments) |
+| Streaming heap per append (budget 50 KB gross) | — | open | 141–147 KB desktop, 81–109 KB mobile (550 at M14). The bench samples the heap every frame at 60 Hz and divides by the 20 Hz appends, so each op carries two idle frames and the harness's own work; measured alone, an append and its paint allocate 56–78 KB, flat across many small allocations (no function over 4 KB) | `stream20hz-50k-*-heap` ≤ 50, or a per-frame heap metric |
 | An option update repaints the data layer even when the plot did not move | — | open | about 1 ms a frame on 200k points | a data-layer signature that skips the repaint |
 | Reference lines and regions do not extend the auto domain | — | open | — | an engine test: a line past the data stays in view |
 | Library size: about 17,300 code lines and 80.4 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `node scripts/overhaul/metrics.mjs`; one option-schema table would remove about 1,000 lines |
-| A check on real phones (iOS Safari, a low-end Android) | — | open | WebKit at iPhone size in the Playwright image only | the handoff's human step 8 |
+| A check on real phones (iOS Safari, a low-end Android) | — | open | WebKit at iPhone size in the Playwright image only; the iOS Simulator needs the maintainer (one runtime does not finish booting, the other asks for access) | the handoff's human step 8 |
 
 ## Sources
 
