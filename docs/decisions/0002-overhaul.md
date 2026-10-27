@@ -1419,9 +1419,8 @@ $ npm run check:size
 - **Visual ledger over the full range.** `check-visual-ledger` from `overhaul-baseline` fails on V51–V53 only:
   those rows were committed in `docs(decisions): visual-ledger rows V51-V53 for M11 part 2` instead of in
   their fixing commit, and the check reads each row as of its commit. From `ovh-m11-part2` on it passes.
-- **Deferred**, not claimed: gap-perf-gate-03 (hover per move on mobile). `trace-ids.json` marks it `wont-do` with
-  the measurement, and `docs/backlog.md` §11 carries it with the other budget misses above. gap-perf-gate-05 and
-  `perf:density-cache`, deferred at M17, closed in the final pass (below).
+- **Deferred at M17**: gap-perf-gate-03, gap-perf-gate-05 and `perf:density-cache`. All three closed in the final
+  pass (below); nothing is deferred now.
 - **Largest file.** M17 split `public/chart.ts` (the public handle and the event tables moved out) and
   `interaction/gestures.ts` (pointer geometry in `interaction/pointer.ts`), so the largest is 850 lines and the
   §0 target is met. Code lines are 17,258 (still missed).
@@ -1430,18 +1429,29 @@ $ npm run check:size
 
 ### Final pass (after M17)
 
-The last review (`ovh-polish-final-done`, then `ovh/polish-2`) fixed the hub, Central Park's edge days, the search
-excerpts, the wide-screen measure and the phone traffic panel. It wrote the Linux visual baselines
-(`scripts/visual-docker.sh --platform linux/arm64 --update`: 141 PNGs, and a compare run passes, 706), and closed
-two perf units:
+The last review fixed:
+- the hub, Central Park's edge days and the search excerpts (`ovh-polish-final-done`, then `ovh/polish-2`);
+- the wide-screen measure, the phone traffic panel and find-the-clipping in WebKit.
+
+It also wrote the Linux visual baselines (`scripts/visual-docker.sh --platform linux/arm64 --update`: 141 PNGs; a
+compare run passes, 706). A WebKit pass ran at iPhone 15 size in the pinned Playwright image: the iOS Simulator
+did not boot on the maintainer's machine. It closed the deferred perf units and every bench budget but one:
 
 - **gap-perf-gate-05.** An option update rescanned every X and Y of a 200k-row chart for the auto-range. A sorted X
   now gives its extent from its ends, and whole-column Y extents are cached at their data version:
-  `reingest-rows-200k-title` 0.230 ms (was 2.47; budget 2).
-- **`perf:density-cache`.** Density maps bin on a lattice fixed in data space with a margin, so a pan at the same
-  zoom draws a window of the cached bitmap (V62): `heatmap-pan-300k` 0.34 ms (0.10× the baseline).
+  `reingest-rows-200k-title` 0.23 ms (was 2.47; budget 2).
+- **`perf:density-cache`.** Density maps bin on a data-space lattice with a margin, so a pan at the same zoom draws
+  a window of the cached bitmap (V62): `heatmap-pan-300k` 0.34 ms (0.10× the baseline).
+- **gap-perf-gate-03**, measured on the mobile profile for the first time: `hover-sync-*-200k` 0.045–0.06 ms
+  against 0.2.
+- **Offscreen paints at mount, 20 → 0.** A chart already far outside the viewport waits from the start. The bench
+  now counts offscreen past the library's 200 px visibility margin, inside which a chart paints on purpose.
+- **Offscreen share of 24 streaming charts, 0.32 → 0.105 (desktop).** An offscreen chart's ranges wait for the
+  next look.
+- **Pinch fidelity, 0.72 → 1.00.** A sorted cloud's gesture sampling budgets the points in view on both axes.
+- **Streaming heap, 349 → 141 KB gross per append** (desktop; 81–109 on mobile). M4 decimates into a per-chart
+  arena. This is the one budget still missed (50). The rest is spread across many small per-frame allocations.
 
-Bench A/B on the final tree, `npm run bench:ab -- --base overhaul-baseline --profile desktop`: **PASS**, no
-blocking failure. Budgets still missed (non-blocking): streaming heap about 300–350 KB gross per append (was 550;
-budget 50), the offscreen share 0.29 (0.15), offscreen paints at mount 20 (0) and pinch fidelity 0.72 (0.8).
-
+Bench A/B on the final tree, `npm run bench:ab -- --base overhaul-baseline` with `--profile desktop` and
+`--profile mobile` (and `--raster software` for `stream-50hz-idle`, 20.5 ms against 33): **PASS** on both, no
+blocking failure. Every budget is met except streaming heap.

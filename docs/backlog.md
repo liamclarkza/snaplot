@@ -215,23 +215,18 @@ right.
 
 ## 11. Left open after the overhaul
 
-The overhaul closed every required finding except gap-perf-gate-03, which is deferred rather than claimed:
-`scripts/overhaul/trace-ids.json` marks it `wont-do` with the measurement in `lockNote`, so `trace-check` passes,
-and the overhaul handoff lists it for review. gap-perf-gate-05 and `perf:density-cache`, deferred at M17, were
-closed in the final pass (`perf(engine): sorted X extents…`). The `planned:M<N>` statuses above are the plan's;
-every finding id they name is now closed or listed here. Figures are the final
-`npm run bench:ab -- --base overhaul-baseline --profile desktop`.
+The overhaul closed every required finding: `trace-check` locks them all, and the expected-failure ledger holds
+only the §6 won't-do parts. The units deferred at M17 (gap-perf-gate-03, gap-perf-gate-05, `perf:density-cache`)
+closed in the final pass. The `planned:M<N>` statuses above are the plan's; every finding id they name is closed.
+What is still open, from the final `npm run bench:ab -- --base overhaul-baseline` (desktop and mobile):
 
 | Item | Finding | Status | Measured | Acceptance |
 |---|---|---|---|---|
-| A hover at most 0.2 ms per move on a mid-range phone | gap-perf-gate-03 | open | 0.37–0.39 ms on desktop; the mobile profile was not run | `bench hover-sync-{line,scatter,unsorted}-200k` on the mobile profile |
-| Streaming heap per append about 300–350 KB gross (budget 50) | — | open | `stream20hz-50k-*` heap (550 KB at M14) | `bench/gate.json` heap budgets met |
-| 20 offscreen charts paint at mount (budget 0) | — | open | `mount-24-charts` | `mount-24-charts-offscreen-paints` ≤ 0 |
-| Offscreen share of 24 streaming charts 0.29 (budget 0.15) | — | open | `offscreen-stream-24` | `offscreen-stream-24-share` ≤ 0.15 |
-| Pinch-zoom fidelity 0.72 (budget 0.8) | — | open | `pinch-zoom-gesture-50k` | fidelity ≥ 0.8 |
+| Streaming heap per append (budget 50 KB gross) | — | open | 141–147 KB desktop, 81–109 KB mobile (550 at M14) | `stream20hz-50k-*-heap` ≤ 50; the remainder is many small per-frame allocations (tick labels, layout, segments) |
 | An option update repaints the data layer even when the plot did not move | — | open | about 1 ms a frame on 200k points | a data-layer signature that skips the repaint |
 | Reference lines and regions do not extend the auto domain | — | open | — | an engine test: a line past the data stays in view |
-| Library size: about 17,300 code lines and 80.2 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `node scripts/overhaul/metrics.mjs`; one option-schema table would remove about 1,000 lines |
+| Library size: about 17,300 code lines and 80.4 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `node scripts/overhaul/metrics.mjs`; one option-schema table would remove about 1,000 lines |
+| A check on real phones (iOS Safari, a low-end Android) | — | open | WebKit at iPhone size in the Playwright image only | the handoff's human step 8 |
 
 ## Sources
 

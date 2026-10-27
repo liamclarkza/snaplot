@@ -7,9 +7,8 @@ what a maintainer needs to review it and ship `1.0.0-beta.0`; the milestone hand
 ## Stop point
 
 Every milestone of the plan merged: M0–M9b, M10, M11 (and M11d), M12a, M12b, M13, M14, M15a, M15b, M16a–c, M16s,
-the M16 polish, M17 and a final polish pass. `node scripts/overhaul/trace-check.mjs` locks 226 of 226 closed
-units, and the expected-failure ledger holds only the five §6 won't-do parts. One perf unit that missed its gate,
-gap-perf-gate-03, is deferred, not claimed (see Known gaps).
+the M16 polish, M17 and a final pass. `node scripts/overhaul/trace-check.mjs` locks every closed unit, and the
+expected-failure ledger holds only the five §6 won't-do parts. Nothing is deferred.
 
 ## Final pass
 
@@ -18,7 +17,7 @@ After M17 a last review covered:
 - every docs page in dark;
 - the search dialog, the 404 page and the API reference on a phone.
 
-Its commits (`ovh-polish-final-done`, then `ovh-polish-2-done`):
+Its commits (`ovh-polish-final-done`, `ovh-polish-2-done`, then `ovh-polish-3-done`):
 
 - `7a75700` epoch numbers and ISO times on one axis make a time axis in either order
 - `9225155` a two-column examples gallery on wide screens, whole edge days in Central Park, no shortcut hint on
@@ -29,8 +28,13 @@ Its commits (`ovh-polish-final-done`, then `ovh-polish-2-done`):
   without rebinning (gap-perf-gate-05 and `perf:density-cache` closed; V62)
 - `fdf47bb` search excerpts without the beta banner or the footer; no Ctrl+K on the 404 page
 - `38ba656` the Linux visual baselines, and `scripts/visual-docker.sh` working under colima
+- `776a955` no paint for a chart mounted far offscreen; M4 decimates into a per-chart arena
+- `a6062ed` a sorted cloud's gesture sampling budgets the points in view on both axes
+- `e451b11` find-the-clipping fits an iPhone in WebKit, and no "-0.00 dBFS"
+- `4f16a56` an offscreen chart's ranges wait for the next look
 
-The final bench A/B passes: no required scenario is slower than 1.5× `overhaul-baseline`.
+The final bench A/B passes on the desktop and the mobile profiles. Every budget is met except streaming heap
+(see Known gaps), including the mobile hover target, which was measured for the first time.
 
 ## What changed
 
@@ -133,17 +137,12 @@ A revert can conflict with later commits that build on the change. Revert one ro
 
 ## Known gaps
 
-From `docs/backlog.md` §11 and the milestone handoffs:
+From `docs/backlog.md` §11:
 
-- **Deferred perf unit:** gap-perf-gate-03, a hover at most 0.2 ms per move on a phone. Desktop measures
-  0.37–0.39 ms, and the mobile profile was not run. It is marked `wont-do` in `scripts/overhaul/trace-ids.json`
-  with that measurement.
-- **Other bench budgets missed** (non-blocking):
-  - streaming heap about 300–350 KB gross per append (budget 50);
-  - 20 offscreen charts paint at mount (budget 0);
-  - the offscreen share of 24 streaming charts is 0.29 (0.15);
-  - pinch fidelity 0.72 (0.8).
-- **Size.** About 17,300 code lines and 80.2 KiB gzip miss the §0 targets (10,500 and 50 KiB). One option-schema
+- **Streaming heap.** About 141–147 KB gross per append on desktop and 81–109 on mobile, against a budget of 50
+  (550 at M14). It is the one bench budget still missed. The rest is spread across many small per-frame
+  allocations.
+- **Size.** About 17,300 code lines and 80.4 KiB gzip miss the §0 targets (10,500 and 50 KiB). One option-schema
   table in `public/` would remove about 1,000 lines.
 - **Smaller gaps.**
   - Reference lines and regions do not extend the auto domain.
@@ -155,8 +154,11 @@ From `docs/backlog.md` §11 and the milestone handoffs:
     `ovh-m11-part2` on it passes.
   - The Linux baselines were rendered on linux/arm64. An amd64 run under emulation was killed for memory in the
     2 GiB colima VM, so if CI's amd64 runners differ, refresh them there with the `update-snapshots` workflow.
-- **Not run.** The bench mobile profile and the `--base v0.12.0 --filter legacy` comparison. No real Android or
-  iOS device was used: every touch check ran in Playwright emulation.
+- **Devices.**
+  - No real phone was used.
+  - Touch and layout ran in Chromium's mobile emulation, and a WebKit pass ran at iPhone 15 size in the pinned
+    Playwright image. The iOS Simulator did not boot on this machine: `simctl` hung.
+  - The `--base v0.12.0 --filter legacy` comparison was not repeated.
 
 ## Draft PR description
 
@@ -205,7 +207,7 @@ From `docs/backlog.md` §11 and the milestone handoffs:
 > - Gates on the final tree: verify, browser 78, conformance 110, visual 706 (0 changed against the M16 tip),
 >   site 262, consumers, API, size, palettes, migration and `trace-check` (224 of 224 locked).
 >
-> **Not in this PR:** the deferred mobile hover target and the budgets in `docs/backlog.md` §11.
+> **Not in this PR:** the streaming-heap budget and the other items in `docs/backlog.md` §11.
 
 ## Human steps, in order
 
@@ -7603,7 +7605,7 @@ None.
   accessibility layer, a tooltip portalled into dialogs and fullscreen, transform-aware pointer input
   (`0e041c2`).
 
-Closes: arch-06:cursor, backlog-14, dxtrial-07, gap-environments-05:focus, gap-perf-gate-01:hover, interact-02:hit, interact-03, interact-04, interact-05, interact-06, interact-07, interact-08, interact-09, interact-10, interact-11, interact-12, interact-13, interact-14, interact-17, interact-18, interact-23, uisite-03, visuals-05, perf:hover-visits.
+Closes: arch-06:cursor, backlog-14, gap-perf-gate-03, dxtrial-07, gap-environments-05:focus, gap-perf-gate-01:hover, interact-02:hit, interact-03, interact-04, interact-05, interact-06, interact-07, interact-08, interact-09, interact-10, interact-11, interact-12, interact-13, interact-14, interact-17, interact-18, interact-23, uisite-03, visuals-05, perf:hover-visits.
 
 ### Gates
 
@@ -7620,8 +7622,8 @@ None.
 
 ### Known gaps
 
-gap-perf-gate-03 (a hover at most 0.2 ms per move on mobile) is deferred: 0.31–0.38 ms on desktop at M16, and the
-mobile profile was not run (`docs/backlog.md`).
+None. gap-perf-gate-03 (a hover at most 0.2 ms per move on mobile) was measured on the mobile profile after M17:
+0.045–0.060 ms.
 
 ### Data notes
 
