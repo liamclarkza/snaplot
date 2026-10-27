@@ -186,11 +186,13 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
         this.mutating = false;
       }
       this.syncLegend();
+      // Join the group first, so the shared gutters and Y range are in place for the one mount
+      // paint (gap-scale-longevity-05).
+      membership(normalized.group, this, true);
+      coordinate(normalized.group);
       // The mount paint: nothing repaints an unchanged box after it, so it must
       // draw the annotations, plugins and the legend's space (gap-annotations-extensibility-06:mount).
       this.engine.paint();
-      membership(normalized.group, this, true);
-      coordinate(normalized.group);
       this.events.reset();
     } catch (error) {
       // Every option is checked before the engine exists. Should anything here throw anyway,

@@ -139,8 +139,8 @@ function Comparison({ logs }: { logs: Logs }) {
         />
         <p className="r1-help">
           {coarse
-            ? 'Tap a validation point to pin its epoch. Pinch a chart to zoom; double-tap to reset.'
-            : 'Click a validation point to pin its epoch. Drag across a chart to zoom, Shift+drag to pan, double-click to reset.'}
+            ? 'Tap a validation point to pin or unpin its epoch. Pinch a chart to zoom; double-tap to reset.'
+            : 'Click a validation point to pin or unpin its epoch. Drag across a chart to zoom, Shift+drag to pan, double-click to reset.'}
         </p>
       </section>
       <DecisionPanel

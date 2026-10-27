@@ -228,6 +228,17 @@ export interface LegendTableHandle<Row = Record<string, any>> {
 
 const DEFAULT_COLUMNS = ['swatch', 'name', 'value'] as const;
 
+/** The companion tokens a chart sets on its host (`--snaplot-theme-*`, theme/resolve.ts). */
+const THEME_VARS = [
+  '--snaplot-theme-text',
+  '--snaplot-theme-muted',
+  '--snaplot-theme-border',
+  '--snaplot-theme-hover',
+  '--snaplot-theme-highlight',
+  '--snaplot-theme-font-family',
+  '--snaplot-theme-accent',
+] as const;
+
 /** Check the table's options as they will apply: its columns and its fallback. */
 function check({ columns, fallback }: Omit<LegendTableOptions<any>, 'chart'>): void {
   if (!['latest', 'first', 'hide'].includes(fallback as string))
@@ -248,6 +259,15 @@ function check({ columns, fallback }: Omit<LegendTableOptions<any>, 'chart'>): v
 }
 
 const HEADERS = { swatch: '', name: 'Series', value: 'Value' } as const;
+
+/** What a column set looks like: equal shapes keep the header and the rows (an inline array). */
+function shape(columns: readonly LegendTableColumn<any>[]): string {
+  return columns
+    .map((column) =>
+      typeof column === 'string' ? column : `${column.header}|${column.align ?? ''}`,
+    )
+    .join('\u0000');
+}
 
 function align(column: LegendTableColumn<any>): string {
   return column === 'value' ? 'right' : typeof column === 'object' ? (column.align ?? '') : '';
@@ -293,7 +313,7 @@ export function createLegendTable<Row = Record<string, any>>(
   root.append(step, table);
   element.append(root);
 
-  type Line = { row: HTMLTableRowElement; cells: HTMLTableCellElement[]; columns: unknown };
+  type Line = { row: HTMLTableRowElement; cells: HTMLTableCellElement[]; shape: string };
   const rows = new Map<string, Line>();
   let unbind = () => {};
 
@@ -341,6 +361,12 @@ export function createLegendTable<Row = Record<string, any>>(
   const refresh = () => {
     const chart = current.chart;
     const control = companion(chart);
+    // The table usually sits outside the chart: it carries the chart's theme tokens, so its text
+    // has the chart's muted colour (a contrast the theme checked), not a translucent default.
+    for (const name of THEME_VARS) {
+      const value = chart.container.style.getPropertyValue(name);
+      if (root.style.getPropertyValue(name) !== value) root.style.setProperty(name, value);
+    }
     const cursor = control.cursor(current.fallback);
     root.hidden = current.fallback === 'hide' && cursor.source === 'none';
     const x = cursor.points.length ? cursor.formattedX : '';
@@ -349,7 +375,7 @@ export function createLegendTable<Row = Record<string, any>>(
     const list = control.series();
     const ids = new Set(list.map((item) => item.id));
     for (const [id, entry] of rows)
-      if (!ids.has(id) || entry.columns !== current.columns) {
+      if (!ids.has(id) || entry.shape !== shape(current.columns)) {
         entry.row.remove();
         rows.delete(id);
       }
@@ -371,7 +397,7 @@ export function createLegendTable<Row = Record<string, any>>(
         });
         row.addEventListener('mouseenter', () => companion(current.chart).highlight(series.id));
         row.addEventListener('mouseleave', () => companion(current.chart).highlight(null));
-        entry = { row, cells, columns: current.columns };
+        entry = { row, cells, shape: shape(current.columns) };
         rows.set(series.id, entry);
       }
       if (body.children[index] !== entry.row)
@@ -405,7 +431,9 @@ export function createLegendTable<Row = Record<string, any>>(
       check({ columns, fallback });
       companion(chart);
       const rebind = chart !== current.chart;
-      const reheader = columns !== current.columns;
+      // Columns compare by shape, so an inline array (a new one each render) rebuilds nothing;
+      // the latest `value` functions are read on the next refresh.
+      const reheader = shape(columns) !== shape(current.columns);
       current = { chart, columns, fallback };
       if (rebind) bind();
       if (reheader) header();

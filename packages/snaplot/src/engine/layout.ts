@@ -333,8 +333,12 @@ function tickFormatId(fn: ((value: number) => string) | undefined): number {
 export function setPlotInsets(engine: ChartCore, insets: PlotInsets): void {
   if (engine.destroyed) return;
   if (insets.left === engine.plotInsets.left && insets.right === engine.plotInsets.right) return;
+  const before = engine.layout?.plot;
   engine.plotInsets = { ...insets };
   updateLayout(engine);
+  const after = engine.layout.plot;
+  // Insets no wider than the chart's own gutters move nothing: no repaint.
+  if (before && before.left === after.left && before.width === after.width) return;
   updateScalePixelRanges(engine);
   refreshCursor(engine);
   engine.scheduler.markDirty(DirtyFlag.ALL);

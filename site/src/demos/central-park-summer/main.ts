@@ -71,6 +71,11 @@ function part(root: ParentNode, name: string): HTMLElement {
   return found;
 }
 
+/** Half a day before (-1) or after (1) a `YYYY-MM-DD` date, in epoch milliseconds (UTC). */
+function dayEdge(date: string | undefined, side: -1 | 1): number | undefined {
+  return date === undefined ? undefined : Date.parse(`${date}T00:00:00Z`) + side * 12 * 3_600_000;
+}
+
 export async function mount(root: HTMLElement): Promise<ChartHandle<SummerRow>> {
   const url = `${import.meta.env.BASE_URL}data/central-park-summer/summer.json`;
   const response = await fetch(url);
@@ -122,7 +127,11 @@ export async function mount(root: HTMLElement): Promise<ChartHandle<SummerRow>> 
         pointRadius: 4,
       },
     ],
-    axes: { y: { format: { suffix: ' °F' } } },
+    axes: {
+      // Half a day either side, so the first and last days' bars are whole.
+      x: { min: dayEdge(summer[0]?.date, -1), max: dayEdge(summer.at(-1)?.date, 1) },
+      y: { format: { suffix: ' °F' } },
+    },
     plugins: [dailyRange(summer)],
     legend: false,
     interaction: 'readonly',

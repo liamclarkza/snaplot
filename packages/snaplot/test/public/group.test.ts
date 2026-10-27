@@ -170,3 +170,20 @@ describe('[dataapi-15][arch-13][gap-perf-gate-06] plot insets', () => {
     expect(debug(b).plot.left).toBe(debug(a).plot.left);
   });
 });
+
+describe('[gap-scale-longevity-05] mounting into a group', () => {
+  it('[gap-scale-longevity-05] each member paints once at mount, as a lone chart does', () => {
+    const data = Array.from({ length: 50 }, (_, t) => ({ t, v: t % 7 }));
+    const group = createChartGroup({
+      cursor: true,
+      viewport: true,
+      alignPlots: true,
+      yRange: true,
+    });
+    const a = fakes.mount({ data, x: 't', series: [{ y: 'v' }], group });
+    const b = fakes.mount({ data, x: 't', series: [{ y: 'v' }], group });
+    fakes.frames.flush();
+    expect(debug(a).renderCount.data).toBe(1);
+    expect(debug(b).renderCount.data).toBe(1);
+  });
+});
