@@ -117,7 +117,7 @@ export function niceTicks(min: number, max: number, count: number): number[] {
 
   const ticks: number[] = new Array(n);
   const decimals = Math.max(0, -Math.floor(Math.log10(Math.abs(step))));
-  const factor = 10 ** Math.min(decimals, 12);
+  const factor = 10 ** Math.min(decimals, 300);
   for (let i = 0; i < n; i++) {
     // Multiplication still exposes binary noise (1.2 + 0.2 ->
     // 1.4000000000000001). Quantize to the nice step's decimal precision so

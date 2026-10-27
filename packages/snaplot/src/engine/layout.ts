@@ -30,6 +30,14 @@ let measureCtx: CanvasRenderingContext2D | null = null;
 const measureCache = new Map<string, number>();
 const MEASURE_CACHE_MAX = 4096;
 
+/**
+ * The width of a label as the DOM shows it, in CSS pixels. Labels use tabular figures, which the
+ * canvas cannot set: every digit is measured as a `0`, the width tabular digits share.
+ */
+export function measureLabel(text: string, fontFamily: string, fontSize: number): number {
+  return measureTextWidth(text.replace(/\d/g, '0'), fontFamily, fontSize);
+}
+
 function measureTextWidth(text: string, fontFamily: string, fontSize: number): number {
   if (typeof document === 'undefined') return text.length * 7;
 
@@ -159,7 +167,7 @@ export function computeLayout(
       const format = (v: number) => formatTick(formats, key, v);
       let maxWidth = 0;
       for (const t of ticks) {
-        const width = measureTextWidth(format(t), fontFamily, fontSize);
+        const width = measureLabel(format(t), fontFamily, fontSize);
         if (width > maxWidth) maxWidth = width;
       }
       // Tick mark + label gap + label width + optional title strip, rounded
@@ -181,10 +189,12 @@ export function computeLayout(
           ? ac.ticks.filter((t) => Number.isFinite(t) && t >= lo && t <= hi).sort((a, b) => a - b)
           : scale.ticks(ac.tickCount ?? DEFAULT_TICK_COUNT).sort((a, b) => a - b);
       const format = (value: number) => formatTick(formats, key, value);
-      if (ticks.length > 0) {
+      // A category axis' labels are thinned to fit and its edge labels clamped into the
+      // container, so its ends reserve nothing: the last category's label is rarely drawn.
+      if (ticks.length > 0 && !ac.thinTicks) {
         horizontalEdges.push({
-          firstHalf: measureTextWidth(format(ticks[0]), fontFamily, fontSize) / 2,
-          lastHalf: measureTextWidth(format(ticks[ticks.length - 1]), fontFamily, fontSize) / 2,
+          firstHalf: measureLabel(format(ticks[0]), fontFamily, fontSize) / 2,
+          lastHalf: measureLabel(format(ticks[ticks.length - 1]), fontFamily, fontSize) / 2,
           firstFraction: horizontalFraction(scale, ticks[0]),
           lastFraction: horizontalFraction(scale, ticks[ticks.length - 1]),
         });

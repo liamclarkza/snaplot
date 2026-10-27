@@ -92,8 +92,8 @@ describe('engine bar X-axis planning', () => {
     // intervals keep its half-slot edge inside the regular grid domain.
     expect(xScale.min).toBe(-0.5);
     expect(xScale.max).toBe(149.5);
-    // Three irregular bars: a tick under each bar.
-    expect(tickValues(chart)).toEqual([0, 1, 100]);
+    // Three irregular bars: the labels of 0 and 1 sit a few pixels apart, so 1 gives way.
+    expect(tickValues(chart)).toEqual([0, 100]);
   });
 
   it('keeps legacy bar bounds for nice:false, explicit ticks, and zoomed viewports', () => {

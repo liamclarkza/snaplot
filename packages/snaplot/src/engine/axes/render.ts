@@ -1,9 +1,15 @@
 import type { AxisSpec, Layout, Scale, ThemeConfig, AxisPosition, ChartSpec } from '../spec';
-import { AXIS_LABEL_GAP, AXIS_TICK_LENGTH, EDGE_MARGIN, LABEL_MIN_GAP } from '../../constants';
-import { inferPosition } from '../layout';
+import {
+  AXIS_LABEL_GAP,
+  AXIS_TICK_LENGTH,
+  DEFAULT_TICK_COUNT,
+  EDGE_MARGIN,
+  LABEL_MIN_GAP,
+} from '../../constants';
+import { inferPosition, measureLabel } from '../layout';
 import { opaqueColorOnBackground } from '../theme/color';
 import { type AxesRenderResult, type LabelBox, resolveAxisCornerCollisions } from './labels';
-import { axisTickValues, thinTicks } from './ticks';
+import { axisTickValues, fitTicks } from './ticks';
 import { type FormatContext, formatTick } from '../format';
 import { crisp } from '../render/crisp';
 
@@ -14,6 +20,19 @@ import { crisp } from '../render/crisp';
  * Every 1 px stroke (gridlines, tick marks, the plot frame) is snapped by
  * render/crisp.ts, so it stays sharp at the canvas' device pixel ratio.
  */
+
+/** `text`, cut with an ellipsis to at most `max` pixels wide. */
+function truncate(text: string, max: number, measure: (text: string) => number): string {
+  if (measure(text) <= max) return text;
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (measure(`${text.slice(0, mid).trimEnd()}…`) <= max) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo === 0 ? '' : `${text.slice(0, lo).trimEnd()}…`;
+}
 
 /** Resolve an axis's grid config to concrete draw values, or null when hidden. */
 function resolveGrid(
@@ -87,55 +106,67 @@ export function renderAxes(
     const useCustomTicks = isHorizontal && customXTicks && !hasExplicitTicks;
     let ticks = useCustomTicks ? customXTicks!.values : axisTickValues(scale, ac);
     const edgeTolerance = Math.abs(scale.max - scale.min) * 1e-9;
-    const preserveEnds =
+    const alignedEnds = (values: number[]) =>
       !useCustomTicks &&
       scale.type === 'linear' &&
-      ticks.length > 1 &&
-      Math.abs(ticks[0] - scale.min) <= edgeTolerance &&
-      Math.abs(ticks[ticks.length - 1] - scale.max) <= edgeTolerance;
+      values.length > 1 &&
+      Math.abs(values[0] - scale.min) <= edgeTolerance &&
+      Math.abs(values[values.length - 1] - scale.max) <= edgeTolerance;
     // Bar labels name slot centers; their grid spans the slot boundaries.
     // Keep that full grid when label fitting skips crowded center labels.
     const customGridValues = useCustomTicks ? customXTicks?.gridValues : undefined;
     // Formatter precedence: custom-tick formatter (bar/histogram path) ->
     // engine/format.ts (the axis format, else the scale's tick format).
-    const tickLabel =
+    const tickLabel: (v: number) => string =
       useCustomTicks && customXTicks!.format
         ? customXTicks!.format
         : (v: number) => formatTick(formats, key, v);
 
-    // Width fit pass: generated tick counts are density targets that know
-    // nothing about the rendered strings, so measure the actual labels and
-    // thin until the widest fits the spacing. Thinning every nth entry
-    // preserves calendar/nice alignment (every second Monday is still a
-    // Monday). Explicit ac.ticks are the user's exact choice and are
-    // exempt. Canvas measureText matches the DOM labels' font closely
-    // enough for spacing and forces no reflow.
-    ctx.font = `${theme.fontSize}px ${theme.fontFamily}`;
-    let widestLabel = 0;
-    if (isHorizontal && ticks.length > 1) {
-      for (const t of ticks) {
-        const w = ctx.measureText(tickLabel(t)).width;
-        if (w > widestLabel) widestLabel = w;
-      }
-      const spacing = plot.width / (ticks.length - 1);
-      if (!hasExplicitTicks && widestLabel + LABEL_MIN_GAP > spacing) {
-        ticks = thinTicks(
-          ticks,
-          Math.max(2, Math.floor(plot.width / (widestLabel + LABEL_MIN_GAP)) + 1),
-          preserveEnds,
+    // Fit pass: generated tick counts are density targets that know nothing about the rendered
+    // strings, so measure the labels as they will be placed (edge labels clamped into the
+    // container) and keep every nth tick at the smallest stride where neighbours keep a gap and
+    // never read the same. Generated ticks first ask the scale for that many, so the step (and the
+    // labels' precision) follows; every nth of the last set keeps calendar and nice alignment
+    // (every second Monday is still a Monday). Explicit ac.ticks are the user's exact choice and
+    // are exempt.
+    const measure = (text: string) => measureLabel(text, theme.fontFamily, theme.fontSize);
+    if ((!hasExplicitTicks || ac.thinTicks) && ticks.length > 1) {
+      const half = theme.fontSize * 0.6;
+      const fitLabels = (values: number[]) => {
+        const texts = values.map(tickLabel);
+        return fitTicks(
+          values.length,
+          isHorizontal
+            ? (i) => {
+                const w = measure(texts[i]) / 2;
+                const px = scale.dataToPixel(values[i]);
+                const x = Math.max(w + 2, Math.min(layout.width - w - 2, px));
+                return [x - w, x + w];
+              }
+            : (i) => {
+                const y = scale.dataToPixel(values[i]);
+                return [y - half, y + half];
+              },
+          (i) => texts[i],
+          isHorizontal ? LABEL_MIN_GAP : theme.fontSize * 0.2,
+          alignedEnds(values),
         );
+      };
+      let kept = fitLabels(ticks);
+      if (!useCustomTicks && !hasExplicitTicks) {
+        let count = ac.tickCount ?? DEFAULT_TICK_COUNT;
+        for (let attempt = 0; attempt < 4 && kept.length < ticks.length && count > 2; attempt++) {
+          const next = scale.ticks(Math.max(2, Math.min(count - 1, kept.length)));
+          if (next.length >= ticks.length || next.length < 2) {
+            scale.ticks(count); // the scale formats by its last step: restore it
+            break;
+          }
+          count = Math.max(2, Math.min(count - 1, kept.length));
+          ticks = next;
+          kept = fitLabels(ticks);
+        }
       }
-    } else if (!isHorizontal && !hasExplicitTicks && ticks.length > 1) {
-      // Vertical labels collide when tick spacing drops below a line height.
-      const minSpacing = theme.fontSize * 1.4;
-      const spacing = plot.height / (ticks.length - 1);
-      if (spacing < minSpacing) {
-        ticks = thinTicks(
-          ticks,
-          Math.max(2, Math.floor(plot.height / minSpacing) + 1),
-          preserveEnds,
-        );
-      }
+      if (kept.length < ticks.length) ticks = kept.map((i) => ticks[i]);
     }
 
     if (ac.tickMarks !== false) {
@@ -238,7 +269,7 @@ export function renderAxes(
           const px = scale.dataToPixel(t);
           if (px >= plot.left - 10 && px <= plot.left + plot.width + 10) {
             const text = tickLabel(t);
-            const half = ctx.measureText(text).width / 2;
+            const half = measure(text) / 2;
             const x = Math.max(half + 2, Math.min(layout.width - half - 2, px));
             labels.push({ axis: key, kind: 'tick', text, x, y: labelY, anchor: 'middle' });
           }
@@ -250,6 +281,8 @@ export function renderAxes(
     if (ac.title) {
       const area = layout.axes[key]?.area;
       if (area) {
+        // A title runs along its plot edge and is cut to it with an ellipsis.
+        const title = truncate(ac.title, isHorizontal ? plot.width : plot.height, measure);
         // Center of the title glyph sits EDGE_MARGIN + half a line in from
         // the outer edge, mirroring the titleStrip Layout reserves, so the
         // glyph never touches the canvas edge (or the host's card border).
@@ -259,7 +292,7 @@ export function renderAxes(
             labels.push({
               axis: key,
               kind: 'title',
-              text: ac.title,
+              text: title,
               x: area.left + inset,
               y: plot.top + plot.height / 2,
               anchor: 'middle',
@@ -269,7 +302,7 @@ export function renderAxes(
             labels.push({
               axis: key,
               kind: 'title',
-              text: ac.title,
+              text: title,
               x: area.left + area.width - inset,
               y: plot.top + plot.height / 2,
               anchor: 'middle',
@@ -279,7 +312,7 @@ export function renderAxes(
             labels.push({
               axis: key,
               kind: 'title',
-              text: ac.title,
+              text: title,
               x: plot.left + plot.width / 2,
               y: area.top + area.height - inset,
               anchor: 'middle',
@@ -289,7 +322,7 @@ export function renderAxes(
             labels.push({
               axis: key,
               kind: 'title',
-              text: ac.title,
+              text: title,
               x: plot.left + plot.width / 2,
               y: area.top + inset,
               anchor: 'middle',

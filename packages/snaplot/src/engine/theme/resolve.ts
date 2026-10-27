@@ -335,7 +335,23 @@ export function resolveTheme(
   resolveScalarColors(merged, resolve);
   const normalized = normalizeTheme(merged, userTheme, Object.keys(cssOverrides).length > 0);
   resolvePaletteColors(normalized, resolve);
+  normalized.fontSize = renderedFontSize(container, normalized.fontSize);
   return normalized;
+}
+
+/**
+ * The size chart text renders at in `container`: page CSS (a forced minimum, a reader's
+ * `!important` rule) can override the theme's, and labels are measured at the rendered size so
+ * gutters and thinning fit what the reader sees.
+ */
+function renderedFontSize(container: HTMLElement, fontSize: number): number {
+  if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') return fontSize;
+  const probe = document.createElement('span');
+  probe.style.cssText = `position:absolute;visibility:hidden;font-size:${fontSize}px`;
+  container.appendChild(probe);
+  const rendered = Number.parseFloat(getComputedStyle(probe).fontSize);
+  probe.remove();
+  return Number.isFinite(rendered) && rendered > 0 ? rendered : fontSize;
 }
 
 /** The page surface behind `container`: an opaque ancestor background, else from the text colour. */

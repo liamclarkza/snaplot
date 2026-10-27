@@ -62,8 +62,16 @@ export class LinearScale implements Scale {
       ? this.lastTickStep
       : niceStep(this.min, this.max, DEFAULT_TICK_COUNT);
     if (step === 0 || !Number.isFinite(step)) return String(value);
-    const decimals = Math.min(20, stepDecimals(step));
     const rounded = Math.abs(value) < Math.abs(step) * 1e-9 ? 0 : value;
+    // Values under a ten-thousandth or past a quadrillion are unreadable in positional digits:
+    // write them in exponent form with the mantissa decimals the step needs (1.5e-13, 2.0e-13).
+    const magnitude = Math.max(Math.abs(this.min), Math.abs(this.max));
+    if (magnitude < 1e-4 || magnitude >= 1e15) {
+      if (rounded === 0) return '0';
+      const exponent = Math.floor(Math.log10(Math.abs(rounded)));
+      return rounded.toExponential(Math.min(6, stepDecimals(step / 10 ** exponent)));
+    }
+    const decimals = Math.min(20, stepDecimals(step));
     return tickNumberFormat(this.locale, decimals).format(rounded);
   }
 

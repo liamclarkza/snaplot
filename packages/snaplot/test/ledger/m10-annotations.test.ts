@@ -52,7 +52,7 @@ describe('[gap-annotations-extensibility-01] category regions span slot edges', 
     });
   }
 
-  it.fails('[gap-annotations-extensibility-01] a Sat–Sun region covers both whole slots', () => {
+  it('[gap-annotations-extensibility-01] a Sat–Sun region covers both whole slots', () => {
     const chart = mountWeek([{ from: 'Sat', to: 'Sun' }]);
     repaint(chart);
     const { plot } = debug(chart);
@@ -63,7 +63,7 @@ describe('[gap-annotations-extensibility-01] category regions span slot edges', 
     expect(rect.right).toBeCloseTo(plot.left + 7 * slot, 0);
   });
 
-  it.fails('[gap-annotations-extensibility-01] a single-category region draws its slot', () => {
+  it('[gap-annotations-extensibility-01] a single-category region draws its slot', () => {
     const chart = mountWeek([{ from: 'Wed', to: 'Wed' }]);
     repaint(chart);
     const { plot } = debug(chart);
@@ -86,7 +86,7 @@ describe('[gap-annotations-extensibility-04] open and log regions', () => {
     ).not.toThrow();
   });
 
-  it.fails('[gap-annotations-extensibility-04] a log-axis region from 0 is clamped to the domain, not dropped', () => {
+  it('[gap-annotations-extensibility-04] a log-axis region from 0 is clamped to the domain, not dropped', () => {
     const chart = fakes.mount({
       data: [2, 30, 400, 1100].map((v, t) => ({ t, v })),
       x: 't',

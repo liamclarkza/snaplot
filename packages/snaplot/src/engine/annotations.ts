@@ -188,8 +188,11 @@ export function createReferenceRegionsPlugin(options: {
     const { left, top, width, height } = chart.getLayout().plot;
     const scale = chart.getAxis(region.axisKey ?? region.axis);
     if (!scale) return null;
-    const a = scale.dataToPixel(region.from);
-    const b = scale.dataToPixel(region.to);
+    // A log axis has no 0: an end at or below it reaches the bottom of the domain.
+    const floor = (v: number) =>
+      scale.type === 'log' && v <= 0 ? Math.min(scale.min, scale.max) : v;
+    const a = scale.dataToPixel(floor(region.from));
+    const b = scale.dataToPixel(floor(region.to));
     if (region.axis === 'x') {
       const start = Math.max(left, Math.min(a, b));
       const end = Math.min(left + width, Math.max(a, b));

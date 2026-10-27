@@ -290,10 +290,12 @@ describe('CSS variable and color-space resolution', () => {
     expect(theme.heatmapGradient).toEqual(['#14161f', '#7aa2f7']);
   });
 
-  it('leaves plain parseable colors untouched without touching the DOM', () => {
+  it('leaves plain parseable colors untouched without a colour probe', () => {
     const container = stubDom({});
     const theme = resolveTheme(container, { backgroundColor: '#123456' });
     expect(theme.backgroundColor).toBe('#123456');
-    expect((container.appendChild as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+    // The one probe is the rendered font size's.
+    const probes = (container.appendChild as ReturnType<typeof vi.fn>).mock.calls;
+    expect(probes.filter(([el]) => !String(el.style?.cssText).includes('font-size'))).toEqual([]);
   });
 });

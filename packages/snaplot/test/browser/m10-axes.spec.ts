@@ -32,7 +32,6 @@ test.describe('axis label measurement', () => {
   test('[render-26] tabular-digit Y labels keep the 8 px edge margin', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[render-26]');
     await page.evaluate(() => {
       window.harness.mount({
         data: [1_111_111_111, 1_111_111_115, 1_111_111_119].map((v, t) => ({ t, v })),
@@ -51,7 +50,6 @@ test.describe('axis label measurement', () => {
   test('[gap-environments-07] a 24 px minimum label font keeps every label inside the container', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[gap-environments-07]');
     await page.addStyleTag({ content: '#chart-0 * { font-size: 24px !important; }' });
     await page.evaluate(() => {
       window.harness.mount({
@@ -76,7 +74,6 @@ test.describe('axis label measurement', () => {
   test('[gap-environments-05:labels] axis labels opt out of forced-colour backplates over the canvas', async ({
     harnessPage: page,
   }) => {
-    test.fail(true, '[gap-environments-05:labels]');
     await page.emulateMedia({ forcedColors: 'active' });
     await page.evaluate(() => {
       window.harness.mount({

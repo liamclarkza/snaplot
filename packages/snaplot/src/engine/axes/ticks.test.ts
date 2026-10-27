@@ -38,7 +38,7 @@ describe('thinTicks', () => {
   });
   // gap-overhaul-delta-06: the previous assertion enshrined this collapse
   // (thinTicks([0..50], 4, true) → [0, 50]) as the specification.
-  it.fails('[visuals-09] keeps ≥ 3 labels for prime interval counts', () => {
+  it('[visuals-09] keeps ≥ 3 labels for prime interval counts', () => {
     // Five intervals: no stride divides them, so only the two endpoints survive today.
     expect(thinTicks([0, 10, 20, 30, 40, 50], 4, true).length).toBeGreaterThanOrEqual(3);
   });

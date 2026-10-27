@@ -493,6 +493,11 @@ export interface AxisSpec {
    */
   ticks?: number[];
   /**
+   * `ticks` are the axis' own (a category axis' codes), not the user's: the renderer may thin
+   * their labels to fit, as it does generated ticks.
+   */
+  thinTicks?: boolean;
+  /**
    * Gridline control for this axis. `false` hides this axis's gridlines
    * entirely; an object styles them. Default: solid hairlines in the
    * theme's grid color.

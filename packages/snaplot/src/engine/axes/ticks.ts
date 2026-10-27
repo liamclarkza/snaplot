@@ -27,19 +27,64 @@ export function axisTickValues(scale: Scale, ac: AxisSpec): number[] {
  * histogram charts tick every category by default, which smears into an
  * unreadable band once categories outnumber the pixels available for
  * labels (a year of daily bars). Keeps the first entry and every nth after.
+ * `preserveEnds` prefers a stride that divides the list, so the last entry
+ * stays too, while that keeps three entries (a prime interval count would
+ * otherwise collapse to its two ends).
  */
 export function thinTicks(values: number[], maxCount: number, preserveEnds = false): number[] {
   const max = Math.max(2, Math.floor(maxCount));
   if (values.length <= max) return values;
   let step = Math.ceil(values.length / max);
   if (preserveEnds) {
-    // Select a stride that divides the full sequence: appending the last tick
-    // afterwards would create a shorter, misleading interval at the edge.
     const intervals = values.length - 1;
-    step = Math.ceil(intervals / (max - 1));
-    while (intervals % step !== 0) step++;
+    let dividing = Math.ceil(intervals / (max - 1));
+    while (intervals % dividing !== 0) dividing++;
+    if (intervals / dividing >= 2) step = dividing;
   }
   return values.filter((_, i) => i % step === 0);
+}
+
+/**
+ * The indices of the ticks whose labels fit along an axis: every `stride`-th tick from the first,
+ * at the smallest stride where neighbouring labels keep `gap` pixels between their boxes and never
+ * read the same. `extent(i)` is label i's [start, end] along the axis as it will be placed (edge
+ * labels clamped into the container). With `preserveEnds`, a stride that also keeps the last tick
+ * wins when it is at most twice the smallest and keeps three labels.
+ */
+export function fitTicks(
+  count: number,
+  extent: (index: number) => readonly [number, number],
+  text: (index: number) => string,
+  gap: number,
+  preserveEnds = false,
+): number[] {
+  if (count <= 1) return count === 1 ? [0] : [];
+  const extents = Array.from({ length: count }, (_, i) => extent(i));
+  const texts = Array.from({ length: count }, (_, i) => text(i));
+  const fits = (stride: number) => {
+    for (let i = stride; i < count; i += stride) {
+      const [a0, a1] = extents[i - stride];
+      const [b0, b1] = extents[i];
+      if (Math.max(a0, b0) < Math.min(a1, b1) + gap || texts[i] === texts[i - stride]) {
+        return false;
+      }
+    }
+    return true;
+  };
+  let stride = 1;
+  while (stride < count && !fits(stride)) stride++;
+  if (stride >= count) return [0];
+  if (preserveEnds && (count - 1) % stride !== 0) {
+    for (let d = stride + 1; d <= stride * 2 && (count - 1) / d >= 2; d++) {
+      if ((count - 1) % d === 0 && fits(d)) {
+        stride = d;
+        break;
+      }
+    }
+  }
+  const out: number[] = [];
+  for (let i = 0; i < count; i += stride) out.push(i);
+  return out;
 }
 
 export type CustomXTicks = {

@@ -449,7 +449,12 @@ describe('ingest (plan §3.2, D18, D23)', () => {
     expect(result.spec.axes?.right).toMatchObject({ title: 'Metric', position: 'right' });
     expect(result.spec.streaming).toEqual({ maxPoints: 40, followWindow: 10 });
     expect(result.referenceLines[0]).toMatchObject({ axis: 'y', axisKey: 'right', value: 3 });
-    expect(result.referenceRegions[0]).toMatchObject({ axis: 'x', axisKey: 'x', from: 0, to: 1 });
+    expect(result.referenceRegions[0]).toMatchObject({
+      axis: 'x',
+      axisKey: 'x',
+      from: -0.5,
+      to: 1.5,
+    });
   });
 
   it('carries locale, timeZone, legend, height and interaction as final spec fields (plan §3.2)', () => {

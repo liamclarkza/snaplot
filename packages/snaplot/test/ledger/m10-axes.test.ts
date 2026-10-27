@@ -63,7 +63,7 @@ function overlaps(list: Box[]): string[] {
 const texts = (chart: ChartHandle<any>, axis: string) => boxes(chart, axis).map((b) => b.text);
 
 describe('[render-02][backlog-03][visuals-21:def-03] category labels thin to fit', () => {
-  it.fails('[render-02][backlog-03][visuals-21:def-03] 30 long categories at 480 px do not overlap', () => {
+  it('[render-02][backlog-03][visuals-21:def-03] 30 long categories at 480 px do not overlap', () => {
     const chart = fakes.mount(
       {
         data: Array.from({ length: 30 }, (_, i) => ({ region: `Northern region ${i + 1}`, v: i })),
@@ -76,7 +76,7 @@ describe('[render-02][backlog-03][visuals-21:def-03] category labels thin to fit
     expect(boxes(chart, 'x').length).toBeGreaterThanOrEqual(2);
   });
 
-  it.fails('[render-02] 40 categories on a line chart do not overlap', () => {
+  it('[render-02] 40 categories on a line chart do not overlap', () => {
     const chart = fakes.mount(
       {
         data: Array.from({ length: 40 }, (_, i) => ({
@@ -119,7 +119,7 @@ describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] nu
     expect(texts(chart, 'y').length).toBeGreaterThanOrEqual(2);
   });
 
-  it.fails('[render-07] values near 1e-13 get distinct labels', () => {
+  it('[render-07] values near 1e-13 get distinct labels', () => {
     const chart = fakes.mount({
       data: [1e-13, 2e-13, 3e-13, 4e-13].map((v, t) => ({ t, v })),
       x: 't',
@@ -140,7 +140,7 @@ describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] nu
     expect(new Set(labels).size).toBe(labels.length);
   });
 
-  it.fails('[render-13][visuals-09] a prime interval count keeps at least 3 labels', () => {
+  it('[render-13][visuals-09] a prime interval count keeps at least 3 labels', () => {
     const chart = fakes.mount(
       {
         data: Array.from({ length: 12 }, (_, t) => ({ t, v: t })),
@@ -153,7 +153,7 @@ describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] nu
     expect(texts(chart, 'x').length).toBeGreaterThanOrEqual(3);
   });
 
-  it.fails('[render-14] a clamped end label keeps a gap from its neighbour', () => {
+  it('[render-14] a clamped end label keeps a gap from its neighbour', () => {
     // Three minutes at 640 px: the last label is clamped inward until it
     // touches the one before it (gap 0 today).
     const start = Date.UTC(2026, 0, 5, 8, 0);
@@ -176,7 +176,7 @@ describe('[render-06][render-07][render-13][render-14][render-19][visuals-09] nu
     }
   });
 
-  it.fails('[render-19] a rounding format never repeats adjacent labels', () => {
+  it('[render-19] a rounding format never repeats adjacent labels', () => {
     const chart = fakes.mount({
       data: [0.999, 0.9993, 0.9996, 0.9999].map((v, t) => ({ t, v })),
       x: 't',
@@ -269,7 +269,7 @@ describe('[backlog-10][visuals-21:def-01] layout', () => {
     expect(debug(chart).layout.axes.y2?.position).toBe('right');
   });
 
-  it.fails('[visuals-21:def-01] long axis titles stay inside a 320 × 220 container', () => {
+  it('[visuals-21:def-01] long axis titles stay inside a 320 × 220 container', () => {
     const chart = fakes.mount(
       {
         data: [1, 2, 3].map((t) => ({ t, v: t })),

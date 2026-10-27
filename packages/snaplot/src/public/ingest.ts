@@ -129,11 +129,8 @@ export function describeOptions<Row>(
         n,
       ),
     })),
-    referenceRegions: n.referenceRegions.map((region, i) => ({
-      ...region,
-      axis: orientation(axisSpecs, region.axis),
-      axisKey: region.axis,
-      from: annotationValue(
+    referenceRegions: n.referenceRegions.map((region, i) => {
+      const from = annotationValue(
         region.axis,
         region.from,
         `referenceRegions[${i}].from`,
@@ -142,8 +139,8 @@ export function describeOptions<Row>(
         categories,
         n,
         true,
-      ),
-      to: annotationValue(
+      );
+      const to = annotationValue(
         region.axis,
         region.to,
         `referenceRegions[${i}].to`,
@@ -152,8 +149,17 @@ export function describeOptions<Row>(
         categories,
         n,
         true,
-      ),
-    })),
+      );
+      // On a category axis a region names whole categories: it spans their slots, edge to edge.
+      const slots = categories.has(region.axis);
+      return {
+        ...region,
+        axis: orientation(axisSpecs, region.axis),
+        axisKey: region.axis,
+        from: slots ? Math.min(from, to) - 0.5 : from,
+        to: slots ? Math.max(from, to) + 0.5 : to,
+      };
+    }),
   };
 }
 
@@ -978,6 +984,7 @@ export function categoryAxisSpec(
     min: axis.min ?? (slots ? first - 0.5 : first),
     max: axis.max ?? (slots ? Math.max(first + 0.5, last + 0.5) : last),
     ticks: axis.ticks ?? codes,
+    thinTicks: axis.ticks === undefined,
     format: (code) => registry.labels.get(code) ?? '',
   };
 }

@@ -113,7 +113,7 @@ export function updateDOMLabels(
   theme: ThemeConfig,
   layout: Layout,
 ): void {
-  const baseStyle = `position:absolute;font-family:${theme.fontFamily};font-size:${theme.fontSize}px;font-variant-numeric:tabular-nums;color:${theme.axisLabelColor ?? theme.textColor};white-space:nowrap;pointer-events:none;`;
+  const baseStyle = `position:absolute;font-family:${theme.fontFamily};font-size:${theme.fontSize}px;font-variant-numeric:tabular-nums;color:${theme.axisLabelColor ?? theme.textColor};white-space:nowrap;pointer-events:none;forced-color-adjust:none;`;
 
   const pool = domLayer.children;
   let used = 0;
