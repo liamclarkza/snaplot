@@ -32,9 +32,13 @@ Its commits (`ovh-polish-final-done`, `ovh-polish-2-done`, then `ovh-polish-3-do
 - `a6062ed` a sorted cloud's gesture sampling budgets the points in view on both axes
 - `e451b11` find-the-clipping fits an iPhone in WebKit, and no "-0.00 dBFS"
 - `4f16a56` an offscreen chart's ranges wait for the next look
+- `37c5916` and `43dd3c2` M4 in a function V8 keeps optimised, per-axis label, colour and format caches, and a
+  bench that warms up on appends: streaming heap 36–39 KB per append (was 141–147)
+- `bca9482` value-axis reference lines and regions in the automatic range; an option update that changes no mark
+  keeps the data layer
 
-The final bench A/B passes on the desktop and the mobile profiles. Every budget is met except streaming heap
-(see Known gaps), including the mobile hover target, which was measured for the first time.
+The final bench A/B passes on the desktop and the mobile profiles, and every budget is met, including the mobile
+hover target, which was measured for the first time.
 
 ## What changed
 
@@ -139,16 +143,9 @@ A revert can conflict with later commits that build on the change. Revert one ro
 
 From `docs/backlog.md` §11:
 
-- **Streaming heap.** About 141–147 KB gross per append on desktop and 81–109 on mobile, against a budget of 50
-  (550 at M14). It is the one bench budget still missed. The rest is spread across many small per-frame
-  allocations.
-- **Size.** About 17,300 code lines and 80.4 KiB gzip miss the §0 targets (10,500 and 50 KiB). One option-schema
-  table in `public/` would remove about 1,000 lines.
-- **Smaller gaps.**
-  - Reference lines and regions do not extend the auto domain.
-  - An option update repaints the data layer even when the plot did not move (about 1 ms a frame on 200k
-    points).
-  - TypeDoc lists the React and Solid `ChartProps` as two identical "Extended by" links.
+- **Size.** About 17,700 code lines and 81.4 KiB gzip miss the §0 targets (10,500 and 50 KiB). One option-schema
+  table in `public/` would remove about 1,000 lines. The size budgets were reset to measured + 2% in `43dd3c2`, for
+  the streaming caches and the two features after them (about 1 KiB gzip).
 - **Tooling.**
   - `check-visual-ledger` over the full range fails on V51–V53, which were committed in a docs commit; from
     `ovh-m11-part2` on it passes.

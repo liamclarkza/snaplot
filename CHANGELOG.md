@@ -363,7 +363,7 @@ what to use instead, and the chart keeps its default:
   29 ms (was 142). A hover on 200k points visits a few dozen through a grid of the visible points;
   an unsorted cloud samples its in-view share during gestures; labels are measured once and the
   render path reads no layout. Bench tables are in ADR 0002.
-- A streaming append and its paint allocate about 40 KB (was 550 at the start of the overhaul):
+- A streaming append and its paint allocate 36–39 KB (550 at M14):
   tick labels, grid colours, label widths and time formats are cached per axis. An option update
   that changes nothing a series draws (the tooltip, the cursor, the legend, interaction, the
   locale) keeps the data layer instead of repainting it.

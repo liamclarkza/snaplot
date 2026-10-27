@@ -1449,9 +1449,18 @@ did not boot on the maintainer's machine. It closed the deferred perf units and 
 - **Offscreen share of 24 streaming charts, 0.32 → 0.105 (desktop).** An offscreen chart's ranges wait for the
   next look.
 - **Pinch fidelity, 0.72 → 1.00.** A sorted cloud's gesture sampling budgets the points in view on both axes.
-- **Streaming heap, 349 → 141 KB gross per append** (desktop; 81–109 on mobile). M4 decimates into a per-chart
-  arena. This is the one budget still missed (50). The rest is spread across many small per-frame allocations.
+- **Streaming heap, 349 → 36–39 KB gross per append** (desktop; 32–36 on mobile; budget 50). M4 decimates into a
+  per-chart arena and runs in a function of its own, so V8 keeps it optimised. Grid colours, label styles and
+  widths, tick labels and time formats are cached per axis. The bench had warmed up on 20 frames, which a 20 Hz
+  stream at 120 Hz spends on 4 appends, so its window measured the JIT's cold start (about 100 KB of the 159 KB per
+  append the metric read). The sweep now warms up on operations, as its comment says; a sweep that operates every
+  frame is unchanged.
+
+It also closed two smaller gaps. Reference lines and the finite ends of regions on a value axis are in its
+automatic range (lines on X do not widen it). An option update that changes no mark (the tooltip, the cursor, the
+legend, interaction, the locale) keeps the data layer when the canvas, the plot and every scale are unchanged.
+These caches and the two features add about 1 KiB gzip; the size budgets were reset to measured + 2%.
 
 Bench A/B on the final tree, `npm run bench:ab -- --base overhaul-baseline` with `--profile desktop` and
-`--profile mobile` (and `--raster software` for `stream-50hz-idle`, 20.5 ms against 33): **PASS** on both, no
-blocking failure. Every budget is met except streaming heap.
+`--profile mobile` (and `--raster software` for `stream-50hz-idle`): **PASS** on both, no blocking failure, and
+every budget is met.

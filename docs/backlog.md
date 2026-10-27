@@ -217,15 +217,16 @@ right.
 
 The overhaul closed every required finding: `trace-check` locks them all, and the expected-failure ledger holds
 only the §6 won't-do parts. The units deferred at M17 (gap-perf-gate-03, gap-perf-gate-05, `perf:density-cache`)
-closed in the final pass. The `planned:M<N>` statuses above are the plan's; every finding id they name is closed.
-What is still open, from the final `npm run bench:ab -- --base overhaul-baseline` (desktop and mobile):
+closed in the final pass, and so did three items this table listed: the streaming heap (36–39 KB gross per append
+on desktop, 32–36 on mobile, against 50; the bench had warmed up on frames, not appends), the data-layer repaint on an
+option update that changes no mark, and reference lines and regions outside the automatic Y range. The
+`planned:M<N>` statuses above are the plan's; every finding id they name is closed.
+Every budget of the final `npm run bench:ab -- --base overhaul-baseline` is met on the desktop and the mobile
+profiles. What is still open:
 
 | Item | Finding | Status | Measured | Acceptance |
 |---|---|---|---|---|
-| Streaming heap per append (budget 50 KB gross) | — | open | 141–147 KB desktop, 81–109 KB mobile (550 at M14). The bench samples the heap every frame at 60 Hz and divides by the 20 Hz appends, so each op carries two idle frames and the harness's own work; measured alone, an append and its paint allocate 56–78 KB, flat across many small allocations (no function over 4 KB) | `stream20hz-50k-*-heap` ≤ 50, or a per-frame heap metric |
-| An option update repaints the data layer even when the plot did not move | — | open | about 1 ms a frame on 200k points | a data-layer signature that skips the repaint |
-| Reference lines and regions do not extend the auto domain | — | open | — | an engine test: a line past the data stays in view |
-| Library size: about 17,300 code lines and 80.4 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `node scripts/overhaul/metrics.mjs`; one option-schema table would remove about 1,000 lines |
+| Library size: about 17,700 code lines and 81.4 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `node scripts/overhaul/metrics.mjs`; one option-schema table would remove about 1,000 lines |
 | A check on real phones (iOS Safari, a low-end Android) | — | open | WebKit at iPhone size in the Playwright image only; the iOS Simulator needs the maintainer (one runtime does not finish booting, the other asks for access) | the handoff's human step 8 |
 
 ## Sources
