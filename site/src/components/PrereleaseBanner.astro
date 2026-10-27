@@ -2,7 +2,8 @@
 /**
  * The prerelease banner (D1, plan §9 item 2): a prerelease build says which docs these are on
  * every page and links to the 0.12 docs. The docs show it through the Banner override, and the
- * homepage and hub through their layout. A release renders nothing.
+ * homepage and hub through their layout. A release renders nothing. Search does not index it,
+ * so no result's excerpt starts with the banner.
  */
 import { isPrerelease, releaseLine, version } from '../lib/version';
 
@@ -16,7 +17,7 @@ const { rowClass } = Astro.props;
 
 {
   isPrerelease && (
-    <div class="prerelease-banner" data-prerelease={version}>
+    <div class="prerelease-banner" data-prerelease={version} data-pagefind-ignore>
       <p class:list={['prerelease-banner-row', rowClass]}>
         {releaseLine} beta docs. 0.12 docs:{' '}
         <a href="https://github.com/liamclarkza/snaplot/tree/v0.12.0#readme">README at tag v0.12.0</a>.
