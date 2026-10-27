@@ -4,8 +4,6 @@ name: Update visual snapshots
 # Playwright image as CI's visual job, on the branch it is dispatched from. The screenshots and
 # the HTML report are uploaded for review; with `commit` set, the new baselines are also
 # committed and pushed to that branch. Use it when local baselines came from another platform.
-# While the overhaul's visual ledger is checked (P13, until M17), list that commit in
-# docs/decisions/visual-ledger/baseline-commits.txt.
 
 on:
   workflow_dispatch:

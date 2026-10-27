@@ -2,7 +2,7 @@
 
 A one-page map of `packages/snaplot/src`. The design decisions behind it are in
 [ADR 0002](decisions/0002-overhaul.md) and the plan ([`overhaul-plan.md`](overhaul-plan.md));
-`npm run metrics` measures the tree, and `node scripts/check-architecture.mjs` enforces the rules at
+`node scripts/overhaul/metrics.mjs` measures the tree, and `node scripts/check-architecture.mjs` enforces the rules at
 the end of this page.
 
 ## Packages and entries

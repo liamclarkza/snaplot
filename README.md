@@ -13,7 +13,7 @@ dependencies; React and Solid are optional peers.
 
 <!-- sync-readme:install -->
 ```sh
-npm i snaplot
+npm i snaplot@next
 ```
 <!-- /sync-readme:install -->
 
@@ -130,7 +130,7 @@ export default function FirstChart() {
 ```html
 <div id="chart"></div>
 <script type="module">
-  import { createChart } from 'https://cdn.jsdelivr.net/npm/snaplot@0.12.0/+esm';
+  import { createChart } from 'https://cdn.jsdelivr.net/npm/snaplot@1.0.0-beta.0/+esm';
 
   const highs = [66, 71, 79, 83, 87, 84, 76, 76, 64, 73, 81, 87, 78, 68, 64];
   createChart(document.getElementById('chart'), {

@@ -37,14 +37,14 @@ and run only if it passes. Every workflow declares its `permissions:`.
 | G1 | Lint and format | `npx biome ci .` | blocking |
 | G2 | Types | `npm run typecheck` (library: `tsconfig.json` and `tsconfig.test.json`; every workspace) | blocking |
 | G3 | Unit | `npm test` (CI adds v8 coverage), `npm run test:tz`, `node scripts/check-architecture.mjs` | blocking |
-| G4 | Ledger | `npm run ledger`, `npm run trace-check`, `node scripts/overhaul/check-visual-ledger.mjs` | blocking (overhaul tooling, removed at M17) |
+| G4 | Ledger | `npm run ledger` (every expected-failure marker and its id) | blocking |
 | G5 | Package | `npm run build && npm run check:package` | blocking, on Node 22.12.0 and `.nvmrc` |
 | G6 | Size | `npm run build && npm run check:size` | blocking |
 | G7 | API | `npm run build && npm run check:api` | blocking |
 | G8 | Palettes | `npm run check:palettes` | blocking |
 | G9 | Browser | `npm run test:browser` (Chromium, WebKit and Firefox smoke) | blocking |
-| G10 | Visual | `npm run test:visual -- --against <ref>`, then `node scripts/overhaul/check-visual-diffs.mjs` | advisory in CI; review every changed shot and add a `docs/decisions/visual-ledger/` row in the commit that changes it |
-| G11 | Docs | `npm run build:site`, `npm run check:examples`, `npm run check:migration` | blocking |
+| G10 | Visual | `npm run test:visual -- --against <ref>` (writes `test-results/visual/contact-sheet.html`) | advisory in CI; review every changed shot and describe an intended pixel change in the commit body |
+| G11 | Docs | `npm run build:site`, `npm run check:examples` | blocking |
 | G12 | Perf | `npm run bench:ab -- --base <ref>` | advisory in CI |
 
 What the package, size and API gates check:

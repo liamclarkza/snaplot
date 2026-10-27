@@ -76,21 +76,16 @@ jobs:
           retention-days: 7
 
   ledger:
-    name: Ledger and traceability (G4)
+    name: Ledger (G4)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          # check-visual-ledger walks overhaul-baseline..HEAD.
-          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run ledger
-      - run: npm run trace-check
-      - run: node scripts/overhaul/check-visual-ledger.mjs
 
   package:
     name: Package (G5, Node ${{ matrix.node || 'from .nvmrc' }})

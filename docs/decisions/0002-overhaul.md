@@ -1307,7 +1307,7 @@ Measured by `npm run metrics` at the M14 tip.
 | Public option leaves | ≤ 110 | 106 | met |
 | `ChartHandle` members / events | 14 / 7 | 14 / 7 | met |
 | Legend implementations | 1 list + 1 table | 1 (`public/legend.ts`: list and table) | met |
-| Largest source file | ≤ 850 (cap 900) | 890 (`public/chart.ts`) | cap met, target missed |
+| Largest source file | ≤ 850 (cap 900) | 890 (`public/chart.ts`); 850 at M17 | met at M17 |
 | Library code lines | ≤ 10,500 (≤ 12,125 formatted) | 17,016 | missed |
 | `createChart` gzip | ≤ 50 KiB | 78.7 KiB | missed |
 
@@ -1378,4 +1378,52 @@ ms against 2). `firstpaint-line-1m` met its budget (29.4 ms against 45; D34). Th
 and the `--base v0.12.0 --filter legacy` run were not repeated at M14; `overhaul-baseline` is the
 0.12 line's last commit.
 
-M17 adds the release status and the handoff.
+### Release status (M17)
+
+`1.0.0-beta.0` is prepared on `overhaul` and not published: the version, the CHANGELOG section and the
+README's `npm i snaplot@next` are in `chore(release): prepare 1.0.0-beta.0`; publishing is a human step
+(`docs/overhaul-handoff.md`). The overhaul-only tools ran one last time on that tree and were then removed from
+CI and the root scripts. Their files stay in `scripts/overhaul/` as history.
+
+```
+$ npm run trace-check
+trace-check: merged: M16, M1b, M0, M1, M2, M3a, M3b, M4, M5, M6a, M6b, M7, M8, M9a, M9b, M10, M11, M12a, M12b, M13, M14, M15a, M15b, M16a, M16b, M16c
+  closed units checked: 224, locked: 224
+  ledger: 6 markers (vitest 6, consumers 0, browser 0, visual 0, conformance 0); executed expected failures: vitest 6, consumers 0, browser 0, visual 0, conformance 0
+OK
+
+$ node scripts/overhaul/check-visual-ledger.mjs --base ovh-m11-part2
+check-visual-ledger: 21 commits in ovh-m11-part2..HEAD, 8 with visual changes, 1 listed baseline commit(s)
+check-visual-ledger: OK
+
+$ node scripts/overhaul/check-visual-diffs.mjs --milestone M16 --any-head   (after test:visual --against daf236f)
+  141 shots: 98 changed, 0 added, 0 removed, 0 broken, 0 unverified; geometry: 570 checks, 0 failing
+check-visual-diffs: OK
+
+$ npm run check:migration
+check-migration: OK (535 removed names, all in the migration guide)
+
+$ npm run metrics   (source)
+files 99, physical lines 24,007, code lines 17,258, largest file engine/Engine.ts 850;
+entry points 3; runtime exports 4 / 6 / 6; option leaves 106; handle 14 members, 7 events;
+legend implementations 1 (public/legend.ts)
+
+$ npm run check:size
+| createChart | 246.3 | 79.3 | 80.7 | 1.8% | ok |
+| Chart (react) | 247.9 | 79.9 | 81.4 | 1.8% | ok |
+| Chart (solid) | 247.6 | 79.8 | 81.3 | 1.8% | ok |
+| histogram | 4.1 | 1.8 | 1.9 | 2.0% | ok |
+| createLegendTable | 9.4 | 3.2 | 3.2 | 0.6% | ok |
+```
+
+- **Visual ledger over the full range.** `check-visual-ledger` from `overhaul-baseline` fails on V51–V53 only:
+  those rows were committed in `docs(decisions): visual-ledger rows V51-V53 for M11 part 2` instead of in
+  their fixing commit, and the check reads each row as of its commit. From `ovh-m11-part2` on it passes.
+- **Deferred at M17**, not claimed: gap-perf-gate-03 (hover per move on mobile), gap-perf-gate-05 (the title-only
+  re-ingest, 2.47 ms against 2) and `perf:density-cache`. `trace-ids.json` marks them `wont-do` with the
+  measurement, and `docs/backlog.md` §11 carries them with the other budget misses above.
+- **Largest file.** M17 split `public/chart.ts` (the public handle and the event tables moved out) and
+  `interaction/gestures.ts` (pointer geometry in `interaction/pointer.ts`), so the largest is 850 lines and the
+  §0 target is met. Code lines are 17,258 (still missed).
+- **M16** (`ovh-m16-done`) was the site and example polish: V58–V61 and `docs/handoff/m16.md`. Its bench
+  re-run passed (`firstpaint-line-1m` 26.9 ms, `hover-sync-scatter-200k` 0.24× the baseline).

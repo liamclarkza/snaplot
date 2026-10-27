@@ -6,6 +6,11 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0-beta.0] - 2026-10-27
+
+The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design record is ADR 0002
+(`docs/decisions/0002-overhaul.md`); every intentional pixel change is a row of its visual ledger.
+
 ### API overhaul
 
 - A framework-independent `createChart(element, options)` accepts rows or named typed columns, shared or independent series datasets, stable series/row IDs, categories, named encodings and direct histogram results.
@@ -97,6 +102,9 @@ to [Semantic Versioning](https://semver.org/).
   series fades and is struck through; swatches keep their colour in forced colours.
 - A legend table column's `value` may return a DOM node; a node equal to the one shown is kept,
   so focus inside a cell survives cursor moves.
+- Under a legend the plot's top gutter is 12 px (V60); legend items are 32 px tall on touch
+  screens; the legend table carries its chart's theme tokens, and its headers line up with their
+  columns.
 - The legend styles are injected once per document: `import 'snaplot/legend-table.css'` is no
   longer needed. `createLegendPlugin`, `createLegendTablePlugin` and the column helpers
   `nameColumn`, `valueColumn`, `swatchColumn`, `metricColumn` and `column` are removed.
@@ -302,6 +310,13 @@ what to use instead, and the chart keeps its default:
   its edge with an ellipsis (V54).
 - A reference region on a category axis covers whole slots; a region from 0 on a log axis starts
   at the domain.
+- Value axes keep about two and a half lines between labels; log ticks across decades keep every
+  decade, and a log axis under a decade labels evenly spaced nice values. A time axis asks for a
+  label per 75 px, so a quarter on a phone reads Jul Aug Sep, and time bars take calendar ticks. A
+  scatter value on a nice edge keeps its marker inside the plot (V58, V59, V61).
+- Reference-line labels sit on a box of the surface and keep clear of each other and of region
+  labels; a vertical line's label takes the side no other line crosses; a region's label always
+  shows, centred over the region (V58, V59).
 
 ### Marks, colour and sizing (1.0)
 

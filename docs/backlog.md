@@ -229,7 +229,7 @@ plan's; every finding id they name is now closed or deferred here.
 | 20 offscreen charts paint at mount (budget 0) | — | open | `mount-24-charts` | `mount-24-charts-offscreen-paints` ≤ 0 |
 | Pinch-zoom fidelity 0.72 (budget 0.8) | — | open | `pinch-zoom-gesture-50k` | fidelity ≥ 0.8 |
 | Reference lines and regions do not extend the auto domain | — | open | — | an engine test: a line past the data stays in view |
-| Library size: 17,016 code lines and 78.7 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `npm run metrics`; one option-schema table would remove about 1,000 lines |
+| Library size: 17,016 code lines and 78.7 KiB gzip against 10,500 and 50 | — | open | ADR 0002 §6 | `node scripts/overhaul/metrics.mjs`; one option-schema table would remove about 1,000 lines |
 
 ## Sources
 
