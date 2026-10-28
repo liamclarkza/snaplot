@@ -19,7 +19,7 @@ export default {
     },
   ],
   axes: {
-    x: { title: 'Seconds after liftoff', nice: false },
+    x: { title: 'Seconds after liftoff' },
     y: { min: 0, format: { suffix: ' km' } },
     speed: { min: 0, position: 'right', title: 'km/h' },
   },

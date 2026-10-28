@@ -13,7 +13,28 @@ beforeEach(() => {
 afterEach(() => fakes.uninstall());
 
 describe('engine auto-range and log interactions', () => {
-  it('nicens linear auto-range by default and honors explicit opt-out', () => {
+  it('rounds the X of a line out only where the round bound is near its data', () => {
+    // 0–119 rounds to 0–120 (under 1% past the data); 1940–2025 would run on to 2040 (18%).
+    const near = fakes.engine(
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        series: [{ label: 'v', yColumn: 1 }],
+      },
+      [f([0, 60, 119]), f([1, 2, 3])],
+    );
+    expect([near.getAxis('x')?.min, near.getAxis('x')?.max]).toEqual([0, 120]);
+    near.destroy();
+    const far = fakes.engine(
+      {
+        axes: { x: { type: 'linear' }, y: { type: 'linear' } },
+        series: [{ label: 'v', yColumn: 1 }],
+      },
+      [f([1940, 1980, 2025]), f([1, 2, 3])],
+    );
+    expect([far.getAxis('x')?.min, far.getAxis('x')?.max]).toEqual([1940, 2025]);
+  });
+
+  it('rounds near bounds by default and honors nice: false and nice: true', () => {
     const exactChart = fakes.engine(
       {
         axes: { x: { type: 'linear', nice: false }, y: { type: 'linear' } },
@@ -34,6 +55,7 @@ describe('engine auto-range and log interactions', () => {
       [f([3, 50, 97]), f([0.2, 0.3, 0.4])],
     );
 
+    // 0 and 100 are each within 5% of the 94-wide span.
     expect(defaultChart.getAxis('x')?.min).toBe(0);
     expect(defaultChart.getAxis('x')?.max).toBe(100);
     defaultChart.destroy();
@@ -77,7 +99,10 @@ describe('engine auto-range and log interactions', () => {
   it('uses tickCount to stabilize both automatic bounds and generated intervals', () => {
     const chart = fakes.engine(
       {
-        axes: { x: { type: 'linear', tickCount: 3 }, y: { type: 'linear', nice: false } },
+        axes: {
+          x: { type: 'linear', nice: true, tickCount: 3 },
+          y: { type: 'linear', nice: false },
+        },
         series: [{ label: 'value', type: 'line', yColumn: 1 }],
       },
       [f([-100, -89]), f([0, 1])],
@@ -91,7 +116,10 @@ describe('engine auto-range and log interactions', () => {
 
     const sparseChart = fakes.engine(
       {
-        axes: { x: { type: 'linear', tickCount: 2 }, y: { type: 'linear', nice: false } },
+        axes: {
+          x: { type: 'linear', nice: true, tickCount: 2 },
+          y: { type: 'linear', nice: false },
+        },
         series: [{ label: 'value', type: 'line', yColumn: 1 }],
       },
       [f([-1000, 1]), f([0, 1])],
@@ -123,7 +151,7 @@ describe('engine auto-range and log interactions', () => {
     const chart = fakes.engine(
       {
         axes: {
-          x: { type: 'linear', min: 13, tickCount: 6 },
+          x: { type: 'linear', min: 13, nice: true, tickCount: 6 },
           y: { type: 'linear', nice: false },
         },
         series: [{ label: 'value', type: 'line', yColumn: 1 }],

@@ -254,11 +254,19 @@ export function autoRangeHorizontal(engine: ChartCore): void {
       scale.max = xMax + pad;
     }
 
-    // Linear continuous domains use regular 1/2/5 tick intervals by default.
-    // Bar X axes use their own slot plan above; histogram bounds stay exact.
-    // `nice: false` opts out.
+    // Linear continuous domains use regular 1/2/5 bounds by default; `nice: false` opts out. The
+    // X of lines, areas and bands takes a round bound only where it is close to the data (at most
+    // NEAR_ROUND of the span past it): 0–119 reads 0–120, but 1940–2025 stops at 2025 rather than
+    // running on to 2040. `nice: true` rounds both sides. Bar X axes use their own slot plan
+    // above; histogram bounds stay exact.
     if (shouldNiceAutoRange(scale, ac, hasBarSeries)) {
+      const [dataMin, dataMax] = [scale.min, scale.max];
       niceAutoRange(scale, ac.tickCount ?? DEFAULT_TICK_COUNT);
+      if (!hasBarSeries && !isScatterOnly && ac.nice !== true) {
+        const near = (dataMax - dataMin) * NEAR_ROUND;
+        if (dataMin - scale.min > near) scale.min = dataMin;
+        if (scale.max - dataMax > near) scale.max = dataMax;
+      }
     }
 
     // One-signed X never gets an axis across zero (visuals-07).
@@ -584,6 +592,9 @@ export function paddedLogRange(min: number, max: number, padding: number): [numb
   const logPad = (logMax - logMin) * padding;
   return [10 ** (logMin - logPad), 10 ** (logMax + logPad)];
 }
+
+/** How far past the data the X of a line may round out, as a share of its span. */
+const NEAR_ROUND = 0.05;
 
 export function shouldNiceAutoRange(
   scale: Scale,

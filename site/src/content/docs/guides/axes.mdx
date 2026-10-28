@@ -23,8 +23,9 @@ Without a `type`, the x values decide (see [Data](/snaplot/guides/data/#axis-inf
 
 ## Bounds
 
-Automatic bounds come from the data. A value axis rounds them out to a tick step (`nice`), and the
-x of a line, area or band ends at the data. Data that is all positive or all negative never
+Automatic bounds come from the data. A value axis rounds them out to a tick step (`nice`). The x
+of a line, area or band ends at the data, or at a round value just past it (within 5% of the
+span): 0–119 reads 0–120, but 1940–2025 stops at 2025. `nice: true` always rounds. Data that is all positive or all negative never
 crosses zero, and an area or a bar always includes zero.
 
 `min` and `max` fix a bound; give one and the other stays automatic. `nice: false` keeps the

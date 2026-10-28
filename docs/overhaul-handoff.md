@@ -137,6 +137,7 @@ Every intentional pixel change since `overhaul-baseline`, with the commit to rev
 | V63 | bar charts label every category that fits | `d6aaa73`, `63c9dd9` | `git revert 63c9dd9 d6aaa73` |
 | V64 | bar and category labels keep half a numeric axis's gap | `8fd86ce` | `git revert 8fd86ce` |
 | V65 | one set of horizontal gridlines, from the first Y axis | `b2c1cfd` | `git revert b2c1cfd` |
+| V66 | the X of a line rounds out only to a near round value | (this commit) | revert the commit "fix(axes): the X of a line rounds out only to a near round value" |
 | V90 | reference lines, regions and plugins given at creation draw at mount again | `4a042b7` | `git revert 4a042b7` |
 
 A revert can conflict with later commits that build on the change. Revert one row at a time and rerun

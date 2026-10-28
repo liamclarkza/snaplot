@@ -18,8 +18,7 @@ export default {
     },
   ],
   axes: {
-    // A year axis ends at the last year rather than rounding out to 2040.
-    x: { nice: false, format: { useGrouping: false } },
+    x: { format: { useGrouping: false } },
     y: { format: { signDisplay: 'exceptZero', suffix: ' °C' } },
   },
   ariaLabel:

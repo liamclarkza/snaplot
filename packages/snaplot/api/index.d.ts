@@ -36,7 +36,8 @@ declare interface AxisCommon {
     position?: AxisPosition;
     /**
      * Round automatic bounds out to tick steps.
-     * @defaultValue `true` for value axes, `false` for the X of line, area and band series
+     * @defaultValue `true` for value axes; on the X of line, area and band series, only a side whose
+     * round value is within 5% of the span past the data
      */
     nice?: boolean;
     /**
