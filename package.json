@@ -27,6 +27,7 @@
     "build:site": "npm run build -w site --",
     "dev": "npm run dev -w site --",
     "dev:lib": "npm run dev -w packages/snaplot",
+    "dev:live": "node scripts/dev-live.mjs",
     "demo-data": "node scripts/demo-data/index.mjs",
     "thumbs": "node scripts/thumbs.mjs",
     "bench": "npm run bench -w bench --",
