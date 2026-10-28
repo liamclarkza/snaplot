@@ -131,8 +131,6 @@ export const HINTS: Record<string, string> = {
   onSelect: 'Removed in 1.0: use onSelectionChange.',
   // Axes.
   'axes.*.roundBounds': "Use extent: 'pad' (round bounds) or extent: 'data'.",
-  'axes.*.nice':
-    "Renamed in 1.0: use extent: 'pad' for nice: true, extent: 'data' for nice: false.",
   'axes.*.rangePadding': 'Removed in 1.0: set min and max for a fixed domain.',
   'axes.*.auto': 'Removed in 1.0.',
   'axes.*.tickCount': 'Removed in 1.0: use ticks for explicit values.',
