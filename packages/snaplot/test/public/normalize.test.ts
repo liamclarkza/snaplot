@@ -536,7 +536,7 @@ describe('§4.4 option leaves reach the engine', () => {
     expect(color).toHaveBeenCalledWith(10, data[1], 1);
   });
 
-  it('axis nice: false keeps the data bounds', () => {
+  it("axis extent: 'data' keeps the data bounds", () => {
     const chart = mount({
       data: [
         { t: 0, v: 3.3 },
@@ -544,11 +544,22 @@ describe('§4.4 option leaves reach the engine', () => {
       ],
       x: 't',
       series: [{ y: 'v' }],
-      axes: { y: { nice: false } },
+      axes: { y: { extent: 'data' } },
     });
     const y = axis(chart, 'y')!;
     expect(y.max).toBeLessThan(10.1);
     expect(y.min).toBeGreaterThan(2.9);
+  });
+
+  it("axis extent: 'pad' rounds a line's X out to round ticks", () => {
+    const data = [
+      { year: 1940, v: 1 },
+      { year: 2025, v: 2 },
+    ];
+    const fitted = mount({ data, x: 'year', series: [{ y: 'v' }] });
+    expect(axis(fitted, 'x')!.max).toBe(2025);
+    const padded = mount({ data, x: 'year', series: [{ y: 'v' }], axes: { x: { extent: 'pad' } } });
+    expect(axis(padded, 'x')!.max).toBe(2040);
   });
 
   it('[arch-15] axis min and max accept Dates', () => {

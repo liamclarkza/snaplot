@@ -18,7 +18,7 @@ export default {
   x: 'time',
   series: [{ y: 'amplitude', label: 'Amplitude' }],
   axes: {
-    x: { title: 'Milliseconds into the recording', nice: false },
+    x: { title: 'Milliseconds into the recording', extent: 'data' },
     y: { min: -1, max: 1 },
   },
   referenceLines: [

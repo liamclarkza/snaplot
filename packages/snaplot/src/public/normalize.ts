@@ -27,6 +27,7 @@ import {
   LEGEND,
   LINE,
   POSITIONS,
+  EXTENTS,
   REGION,
   REMOVED_VALUES,
   RENDER_MODES,
@@ -640,7 +641,9 @@ function normalizeAxis(
       POSITIONS,
       undefined,
     ) as AxisSpec['position'];
-  if (value.nice !== undefined) spec.nice = value.nice !== false;
+  // An unknown extent warns and keeps the automatic bounds.
+  const extent = enumValue(`${path}.extent`, value.extent, EXTENTS, undefined);
+  if (extent !== undefined) spec.nice = extent === 'pad';
   if (value.ticks !== undefined) {
     if (!Array.isArray(value.ticks)) fail(`${path}.ticks must be an array of numbers or Dates.`);
     spec.ticks = value.ticks.map((tick, i) => toNumber(tick, `${path}.ticks[${i}]`));

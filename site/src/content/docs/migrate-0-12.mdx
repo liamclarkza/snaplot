@@ -80,7 +80,7 @@ to use instead, and the chart keeps its default, so a page keeps rendering while
 
 | 0.12 | 1.0 |
 | --- | --- |
-| `axes.<key>.roundBounds` | `nice` |
+| `axes.<key>.roundBounds` | `extent: 'pad'` (or `'data'` for tight bounds) |
 | `axes.<key>.tickCount` | `ticks` (explicit values) |
 | `heatmap: true` on a scatter | `renderMode: 'density'` |
 | `visible: false` on a series | `hiddenSeries: ['id']` |
@@ -93,7 +93,8 @@ to use instead, and the chart keeps its default, so a page keeps rendering while
 
 - **ISO date strings make a time axis.** 0.12 drew them as categories. To keep categories, set
   `axes: { x: { type: 'category' } }`.
-- **The value axis rounds to whole tick steps.** Set `nice: false` on the axis for tight bounds.
+- **The value axis pads out to round tick values.** Set `extent: 'data'` on the axis for tight
+  bounds.
 - **Invalid options throw** with what is wrong and how to fix it, in every build. An unknown key
   warns once with the option it is closest to.
 - **Options are copied when passed.** Mutating an array after passing it changes nothing; pass it

@@ -484,12 +484,12 @@ describe('public chart transactions', () => {
     const firstOptions: Omit<ChartOptions<{ x: number; y: number }>, 'data'> = {
       x: 'x',
       series: [{ y: 'y' }],
-      axes: { y: { nice: false } },
+      axes: { y: { extent: 'data' as const } },
     };
     // A title widens the second chart's left gutter; alignPlots widens the first's to match.
     const secondOptions: typeof firstOptions = {
       ...firstOptions,
-      axes: { y: { nice: false, title: 'Requests per second' } },
+      axes: { y: { extent: 'data' as const, title: 'Requests per second' } },
     };
     const own = make({ ...firstOptions, data: rows(1, 3) });
     const ownLeft = debug(own).plot.left;
@@ -531,7 +531,7 @@ describe('public chart transactions', () => {
       ],
       x: 'x',
       series: [{ y: 'y' }],
-      axes: { y: { nice: false } },
+      axes: { y: { extent: 'data' as const } },
     };
     const secondOptions = {
       ...firstOptions,
@@ -539,7 +539,7 @@ describe('public chart transactions', () => {
         { x: 0, y: 100 },
         { x: 1, y: 200 },
       ],
-      axes: { y: { nice: false, title: 'Requests per second' } },
+      axes: { y: { extent: 'data' as const, title: 'Requests per second' } },
     };
     const firstY = soloY(firstOptions);
     const secondY = soloY(secondOptions);

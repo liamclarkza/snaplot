@@ -157,7 +157,9 @@ describe('[arch-15] removed options name their replacement', () => {
     const text = warnings().join('\n');
     expect(text).toMatch(/stroke.*color/);
     expect(text).toMatch(/lineDash.*dash/);
-    expect(text).toMatch(/roundBounds.*nice/);
+    expect(text).toMatch(/roundBounds.*extent/);
+    mount({ ...base, axes: { x: { nice: true } } });
+    expect(warnings().join('\n')).toMatch(/axes\.x\.nice.*extent: 'pad'/);
     expect(text).toMatch(/tickCount/);
     expect(text).toMatch(/fill.*color/);
     expect(text).toMatch(/backgroundColor.*surface/);

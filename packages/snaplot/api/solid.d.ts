@@ -39,11 +39,12 @@ declare interface AxisCommon {
      */
     position?: AxisPosition;
     /**
-     * Round automatic bounds out to tick steps.
-     * @defaultValue `true` for value axes; on the X of line, area and band series, only a side whose
-     * round value is within 5% of the span past the data
+     * How far automatic bounds reach: `'data'` ends at the data (a scatter keeps a margin so its
+     * points stay whole), `'pad'` pads out to the next round tick value.
+     * @defaultValue `'pad'` for value axes; on the X of line, area and band series, padding only on
+     * a side whose round value is within 5% of the span past the data
      */
-    nice?: boolean;
+    extent?: 'data' | 'pad';
     /**
      * Explicit tick values. Values outside the domain are dropped, gridlines follow them and `format`
      * still applies.

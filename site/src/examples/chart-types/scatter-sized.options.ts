@@ -21,7 +21,7 @@ export default {
     },
   ],
   axes: {
-    x: { title: 'Seconds after liftoff', nice: false },
+    x: { title: 'Seconds after liftoff', extent: 'data' },
     y: { title: 'Altitude (km)' },
   },
   ariaLabel:

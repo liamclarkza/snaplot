@@ -79,7 +79,7 @@ export const AXIS = keys(
   'min',
   'max',
   'position',
-  'nice',
+  'extent',
   'ticks',
   'grid',
   'format',
@@ -108,6 +108,7 @@ export const COLOR_BY = keys('field', 'type', 'palette', 'domain', 'label', 'for
 export const SIZE_BY = keys('field', 'range', 'label', 'format');
 export const TOOLTIP_FIELD = keys('field', 'label', 'format');
 export const SELECTION = keys('x', 'y');
+export const EXTENTS = ['data', 'pad'];
 
 /**
  * Hints for keys that are not options: the 0.12 options 1.0 removed (arch-15)
@@ -129,7 +130,9 @@ export const HINTS: Record<string, string> = {
   debug: 'Removed in 1.0.',
   onSelect: 'Removed in 1.0: use onSelectionChange.',
   // Axes.
-  'axes.*.roundBounds': 'Use nice.',
+  'axes.*.roundBounds': "Use extent: 'pad' (round bounds) or extent: 'data'.",
+  'axes.*.nice':
+    "Renamed in 1.0: use extent: 'pad' for nice: true, extent: 'data' for nice: false.",
   'axes.*.rangePadding': 'Removed in 1.0: set min and max for a fixed domain.',
   'axes.*.auto': 'Removed in 1.0.',
   'axes.*.tickCount': 'Removed in 1.0: use ticks for explicit values.',

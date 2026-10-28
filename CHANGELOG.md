@@ -16,7 +16,7 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
 - A framework-independent `createChart(element, options)` accepts rows or named typed columns, shared or independent series datasets, stable series/row IDs, categories, named encodings and direct histogram results.
 - Atomic `update`, the `viewport` state option, `resetViewport`, `resumeFollow`, declarative reference lines/regions, typed interaction events and core chart groups replace the previous public authoring surface.
 - Native React 18.3 and 19 and Solid 1.9 integrations provide equivalent direct props, controlled state, state subscriptions, groups and JSX legend/table companions with isolated optional peers and SSR-safe imports.
-- Axis options use `title`, `nice` and `format`; streaming uses `maxPoints` and `followWindow`. The examples, the docs and the benchmarks use the new API. No compatibility aliases are retained; the migration guide (`/snaplot/migrate-0-12/`) maps every removed name.
+- Axis options use `title`, `extent` and `format`; streaming uses `maxPoints` and `followWindow`. The examples, the docs and the benchmarks use the new API. No compatibility aliases are retained; the migration guide (`/snaplot/migrate-0-12/`) maps every removed name.
 - Visual defaults change where the overhaul fixed them; each change is a row of the visual ledger in ADR 0002 (V17–V61), with the commit to revert.
 
 ### Options and validation (1.0)
@@ -218,7 +218,7 @@ what to use instead, and the chart keeps its default:
   the tooltip's `show`, `offset`, `xFormat`, `yFormat` and `rangeFormat` (use `tooltip: false`
   and the axis or series `format`).
 - The 20 theme roles (`backgroundColor` and the rest); use the ten `ThemeTokens`.
-- Axes: `roundBounds` (use `nice`), `rangePadding`, `auto`, `tickCount` (use `ticks`) and
+- Axes: `roundBounds` (use `extent`), `rangePadding`, `auto`, `tickCount` (use `ticks`) and
   `tickMarks`.
 - Series: `stroke` (use `color`), `lineDash` (use `dash`), `fill` on bar, scatter and histogram
   series (use `color`; `fill` stays the area and band fill), a `fill` function (use a `color`
@@ -300,9 +300,10 @@ what to use instead, and the chart keeps its default:
 
 - One formatter for tick labels and readouts (series `format` > axis `format` > automatic);
   calendar time ticks in local time or UTC; the locale from `locale`, else the page (V30).
-- One domain policy: `nice` rounding is the padding, data that is all positive or all negative
-  never crosses zero, areas and bars include zero, numeric bars span their slots and a second
-  value axis sits on the right (V31).
+- One domain policy: an axis pads out to round values (`extent: 'pad'`) rather than by a fixed
+  margin, data that is all positive or all negative never crosses zero, areas and bars include
+  zero, numeric bars span their slots and a second value axis sits on the right (V31). The X of a
+  line pads only to a round value near its data (V66).
 - Labels fit as they render: measured in the axis font with tabular figures at the size the page
   shows them, a generated axis takes fewer ticks with a coarser step before thinning, category
   labels thin to every nth that fits, edge labels never touch their neighbours, adjacent labels
