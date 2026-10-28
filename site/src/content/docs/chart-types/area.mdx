@@ -1,0 +1,19 @@
+---
+title: Area
+description: A line filled down to zero, in the line's own interpolation.
+---
+
+import Example from '../../../components/Example.astro';
+
+`type: 'area'` draws a line and fills it down to zero, in the line's own `interpolation`. Its
+fill is a translucent ramp of its colour; `fill` sets your own colour, and `fill: null` keeps the
+outline only. A line beside it reads as a line: here the import is dashed.
+
+<Example name="chart-types/area" />
+
+## Above and below zero
+
+The fill always runs to zero, so values on both sides of it fill up to zero and down to it. A Y
+axis of an area that stays on one side starts at zero.
+
+<Example name="chart-types/area-zero" />

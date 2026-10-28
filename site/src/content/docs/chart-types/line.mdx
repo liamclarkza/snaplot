@@ -1,0 +1,41 @@
+---
+title: Line
+description: Lines in X order, straight, smooth or stepped, dashed, with gaps, on one or two axes.
+---
+
+import Example from '../../../components/Example.astro';
+
+`type: 'line'` is the default: a series without a `type` is a line through its `y` values in X
+order. `lineWidth` sets its width in CSS pixels, and `dash` draws dashes or dots, as `[6, 3]` or
+`[2, 2]`.
+
+<Example name="chart-types/line" />
+
+## Steps and curves
+
+`interpolation` shapes the path between points: `'linear'` (the default), `'monotone'` (smooth,
+never past a point) and three steps. `'step-after'` holds each value until the next point, the
+shape of a meter reading that covers the hour after its time; `'step-before'` and
+`'step-middle'` change at the point and halfway to it.
+
+<Example name="chart-types/line-step" />
+
+## Gaps
+
+A missing value (`null`, `undefined` or `NaN`) breaks the line, and a value on its own between
+two gaps draws as a dot. `spanGaps: true` bridges the gaps instead. See
+[Data](/snaplot/guides/data/#gaps) for what counts as missing.
+
+## Two Y axes
+
+A series names its axis with `yAxis`; any key under `axes` other than `x` is a Y axis, on the
+left unless `position: 'right'`. Each axis ranges over its own series.
+
+<Example name="chart-types/line-two-axes" />
+
+## A log axis
+
+A series that falls over decades reads better on `type: 'log'`, which gives each decade the same
+height. See [Axes](/snaplot/guides/axes/#axis-types) for the other axis types.
+
+<Example name="chart-types/line-log" />

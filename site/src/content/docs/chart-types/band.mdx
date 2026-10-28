@@ -1,0 +1,15 @@
+---
+title: Band
+description: A range between a lower and an upper value, with a centre line.
+---
+
+import Example from '../../../components/Example.astro';
+
+`type: 'band'` fills between `lower` and `upper` and draws `y` as its centre line. Each of the
+three is a field name or a function of the row, like any series' `y`. The tooltip shows the
+centre value and the range.
+
+Give a band a muted `color` when it is context for another series, such as a normal range behind
+this year's line: the band draws first, so the line stays on top.
+
+<Example name="chart-types/band" />

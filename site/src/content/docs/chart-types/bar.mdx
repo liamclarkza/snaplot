@@ -1,0 +1,25 @@
+---
+title: Bar
+description: Bars in slots centred on their X values, grouped, coloured by value, or by category.
+---
+
+import Example from '../../../components/Example.astro';
+
+`type: 'bar'` draws a bar from zero to each `y`. Bars sit in slots centred on their X values, so
+a numeric X of `0, 1, 2…` reads like categories, and several bar series share each slot side by
+side.
+
+<Example name="chart-types/bar-grouped" />
+
+## A colour per bar
+
+`color` can be a function of the value, the row and its index, for a colour per bar.
+
+<Example name="chart-types/bar-colored" />
+
+## Categories
+
+String X values make a category axis, in the order of the rows: sort the rows to rank the bars.
+Every label that fits is shown.
+
+<Example name="chart-types/bar-ranked" />

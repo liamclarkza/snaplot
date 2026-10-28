@@ -1,0 +1,134 @@
+---
+/**
+ * The chart types as a grid of pictures, each a still, live chart of the type's first recipe and a
+ * link to its page (chart-types/index.mdx). The pictures are the charts themselves, readonly and
+ * hidden from assistive technology: the link names the type, and its page has the charts.
+ */
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+
+const TYPES = [
+  {
+    slug: 'line',
+    title: 'Line',
+    example: 'chart-types/line',
+    text: 'Values joined in X order, straight, smooth or stepped.',
+  },
+  {
+    slug: 'area',
+    title: 'Area',
+    example: 'chart-types/area-zero',
+    text: 'A line filled to zero, above it and below it.',
+  },
+  {
+    slug: 'band',
+    title: 'Band',
+    example: 'chart-types/band',
+    text: 'A range between a lower and an upper value, with its centre.',
+  },
+  {
+    slug: 'bar',
+    title: 'Bar',
+    example: 'chart-types/bar-grouped',
+    text: 'A bar per X value; several series share each slot.',
+  },
+  {
+    slug: 'scatter',
+    title: 'Scatter',
+    example: 'chart-types/scatter',
+    text: 'Points coloured and sized by fields; a density map past 200,000.',
+  },
+  {
+    slug: 'histogram',
+    title: 'Histogram',
+    example: 'chart-types/histogram',
+    text: 'Counts of values in bins on nice edges.',
+  },
+];
+---
+
+<ul class="chart-types not-content">
+  {
+    TYPES.map((type) => (
+      <li>
+        <snaplot-vanilla-mount
+          class="chart-type-picture"
+          data-name={type.example}
+          data-kind="options"
+          data-still
+          aria-hidden="true"
+        />
+        <h3>
+          <a href={`${base}chart-types/${type.slug}/`}>{type.title}</a>
+        </h3>
+        <p>{type.text}</p>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  ul.chart-types {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0 2rem;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 36rem) {
+    ul.chart-types {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 72rem) {
+    ul.chart-types {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  ul.chart-types > li {
+    position: relative;
+    margin: 0;
+    padding: 0.75rem 0.875rem 0.875rem;
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius);
+    background-color: var(--snaplot-background);
+    transition: border-color 120ms ease;
+  }
+  ul.chart-types > li:hover {
+    border-color: var(--snaplot-ink-secondary);
+  }
+  .chart-type-picture {
+    display: block;
+    height: 150px;
+  }
+  ul.chart-types h3 {
+    margin: 0.75rem 0 0.25rem;
+    font-size: 1rem;
+  }
+  ul.chart-types h3 a {
+    color: var(--snaplot-ink);
+    text-decoration: none;
+  }
+  /* The whole card is the link. */
+  ul.chart-types h3 a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  ul.chart-types > li:hover h3 a,
+  ul.chart-types h3 a:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  ul.chart-types p {
+    margin: 0;
+    color: var(--snaplot-ink-secondary);
+    font-size: 0.875rem;
+  }
+</style>
+
+<script>
+  import { defineVanillaMount } from '../lib/vanilla-mount';
+
+  defineVanillaMount();
+</script>

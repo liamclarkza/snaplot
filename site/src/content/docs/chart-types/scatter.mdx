@@ -1,0 +1,24 @@
+---
+title: Scatter
+description: Points coloured and sized by fields, and density maps past 200,000 points.
+---
+
+import Example from '../../../components/Example.astro';
+
+`type: 'scatter'` draws a point at each row. `colorBy` colours points by a field: strings and a
+few distinct integers become categories with a legend entry each, other numbers a ramp. The
+tooltip of a point names its x and y, then the colour category, then `tooltipFields` in order.
+
+<Example name="chart-types/scatter" />
+
+## Sized points
+
+`sizeBy` scales each point's area by a field, between the radii of `range` in CSS pixels.
+
+<Example name="chart-types/scatter-sized" />
+
+## Density
+
+Above 200,000 points in view, `renderMode: 'auto'` (the default) draws a density map instead of
+points, coloured by how many fall in each cell; zooming in far enough draws the points again.
+`'points'` and `'density'` pin one or the other. See [Performance](/snaplot/guides/performance/).

@@ -1,0 +1,19 @@
+---
+title: Histogram
+description: Counts of values in bins on nice edges, from histogram().
+---
+
+import Example from '../../../components/Example.astro';
+
+`histogram(values)` bins numbers on nice edges and returns bins that a `type: 'histogram'`
+series reads as its `data`. Pass `{ bins }` for a bin count or a rule (`'sturges'`, `'scott'`), or
+`{ thresholds }` for edges of your own.
+
+<Example name="chart-types/histogram" />
+
+## Two sets on the same bins
+
+To compare two sets, bin both on the same edges: pass the same `thresholds` to each, or one
+histogram's `edges` to the other.
+
+<Example name="chart-types/histogram-compare" />

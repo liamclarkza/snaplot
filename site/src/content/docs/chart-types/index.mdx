@@ -1,0 +1,33 @@
+---
+title: Chart types
+description: Lines, areas, bands, bars, scatter and histograms, each a series type you can mix in one chart.
+---
+
+import ChartTypeCards from '../../../components/ChartTypeCards.astro';
+import Example from '../../../components/Example.astro';
+
+A series' `type` decides how it draws. Each page below shows its type in a few small recipes,
+each with the code for Vanilla JS, React and Solid.
+
+<ChartTypeCards />
+
+## Options every type takes
+
+Every series takes `label`, `color`, `opacity`, `xAxis` and `yAxis`. The table lists what else
+each type reads.
+
+| `type` | Reads | Notes |
+| --- | --- | --- |
+| [`'line'`](/snaplot/chart-types/line/) (default) | `y` | `interpolation`, `dash`, `spanGaps`, `lineWidth`. |
+| [`'area'`](/snaplot/chart-types/area/) | `y` | A line filled to zero. `fill` sets the fill; `fill: null` draws the outline only. |
+| [`'band'`](/snaplot/chart-types/band/) | `y`, `lower`, `upper` | A range with a centre line at `y`. |
+| [`'bar'`](/snaplot/chart-types/bar/) | `y` | One bar per x value; several bar series share each slot. |
+| [`'scatter'`](/snaplot/chart-types/scatter/) | `y` | Points; `colorBy`, `sizeBy`, `tooltipFields`, `renderMode`. |
+| [`'histogram'`](/snaplot/chart-types/histogram/) | bins | `data` from [`histogram()`](/snaplot/reference/api/snaplot/functions/histogram/). |
+
+## Mixing types
+
+Each series picks its own type, so one chart can hold bars and a line, or a band behind a line.
+They share the X axis, and each can take its own Y axis with `yAxis`.
+
+<Example name="chart-types/bar-line" />

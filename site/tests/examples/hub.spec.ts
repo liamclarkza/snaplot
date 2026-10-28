@@ -79,7 +79,7 @@ test.describe('the examples hub', () => {
     await page.goto(`${BASE}examples/`);
     await expect(page.locator('main h1')).toHaveText('Examples');
     await expect(page.locator('main > p')).toHaveText([
-      'Each example answers one question with real or documented data.',
+      'Each example answers one question with real or documented data; for one chart type at a time, with its code, see Chart types.',
     ]);
     expect(
       await page.locator('main > *').evaluateAll((els) => els.map((el) => el.tagName)),

@@ -38,7 +38,13 @@ const PAGES: Record<string, number> = {
   'migrate-0-12': 1,
   // M15b
   'guides/axes': 3,
-  'guides/marks': 5,
+  'chart-types/index': 1,
+  'chart-types/line': 4,
+  'chart-types/area': 2,
+  'chart-types/band': 1,
+  'chart-types/bar': 3,
+  'chart-types/scatter': 2,
+  'chart-types/histogram': 2,
   'guides/tooltips-legends': 2,
   'guides/zoom-pan-selection': 2,
   'guides/annotations-plugins': 2,
@@ -57,7 +63,7 @@ const OWNED = [
   'linked',
   // M15b
   'axes-guide',
-  'marks-guide',
+  'chart-types',
   'tooltips-guide',
   'interaction-guide',
   'annotations-guide',

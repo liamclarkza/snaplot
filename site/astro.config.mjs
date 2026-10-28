@@ -14,6 +14,8 @@ const library = (path) => fileURLToPath(new URL(`../packages/snaplot/${path}`, i
 export default defineConfig({
   site: 'https://liamclarkza.github.io',
   base: '/snaplot/',
+  // The 1.0 betas called the chart types "Marks", one guide page; they are a section now.
+  redirects: { '/guides/marks': '/snaplot/chart-types/' },
   // The dev server and `astro preview` take PORT, so parallel worktrees never collide.
   server: { host: '127.0.0.1', port: Number(process.env.PORT ?? 5336) },
   // A build prebundles dependencies in production mode. In the dev server's cache that swaps
@@ -103,12 +105,23 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Chart types',
+          items: [
+            { slug: 'chart-types', label: 'Overview' },
+            { slug: 'chart-types/line' },
+            { slug: 'chart-types/area' },
+            { slug: 'chart-types/band' },
+            { slug: 'chart-types/bar' },
+            { slug: 'chart-types/scatter' },
+            { slug: 'chart-types/histogram' },
+          ],
+        },
+        {
           label: 'Guides',
           items: [
             { slug: 'guides/data' },
             { slug: 'guides/updating' },
             { slug: 'guides/axes' },
-            { slug: 'guides/marks' },
             { slug: 'guides/tooltips-legends' },
             { slug: 'guides/zoom-pan-selection' },
             { slug: 'guides/linked-charts' },

@@ -202,7 +202,7 @@ const tabs = FRAMEWORKS.map((framework) => ({
 </style>
 
 <script>
-  import type { ChartHandle, ChartOptions } from 'snaplot';
+  import { defineVanillaMount } from '../lib/vanilla-mount';
 
   const STORAGE_KEY = 'snaplot-site-framework';
   const FRAMEWORKS = ['vanilla', 'react', 'solid'] as const;
@@ -273,57 +273,6 @@ const tabs = FRAMEWORKS.map((framework) => ({
     }
   }
 
-  // Vanilla examples mount on first sight, the way the islands do with client:visible.
-  const optionModules = import.meta.glob<{ default: ChartOptions<any> }>(
-    '../examples/**/*.options.ts',
-  );
-  const vanillaModules = import.meta.glob<{ default: (el: HTMLElement) => ChartHandle<any> }>([
-    '../examples/**/*.ts',
-    '!../examples/**/*.options.ts',
-    '!../examples/data/**',
-  ]);
-
-  class SnaplotVanillaMount extends HTMLElement {
-    #chart: ChartHandle<any> | undefined;
-    #observer: IntersectionObserver | undefined;
-    #disconnected = false;
-
-    connectedCallback(): void {
-      this.#disconnected = false;
-      this.#observer = new IntersectionObserver((entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        this.#observer?.disconnect();
-        void this.#mount();
-      });
-      this.#observer.observe(this);
-    }
-
-    disconnectedCallback(): void {
-      this.#disconnected = true;
-      this.#observer?.disconnect();
-      this.#chart?.destroy();
-      this.#chart = undefined;
-    }
-
-    async #mount(): Promise<void> {
-      const { name, kind } = this.dataset;
-      if (kind === 'options') {
-        const load = optionModules[`../examples/${name}.options.ts`];
-        if (!load) throw new Error(`snaplot site: no options example "${name}"`);
-        const [{ createChart }, { default: options }] = await Promise.all([
-          import('snaplot'),
-          load(),
-        ]);
-        if (!this.#disconnected) this.#chart = createChart(this, options);
-      } else {
-        const load = vanillaModules[`../examples/${name}.ts`];
-        if (!load) throw new Error(`snaplot site: no vanilla example "${name}"`);
-        const { default: mount } = await load();
-        if (!this.#disconnected) this.#chart = mount(this);
-      }
-    }
-  }
-
   customElements.define('snaplot-example', SnaplotExample);
-  customElements.define('snaplot-vanilla-mount', SnaplotVanillaMount);
+  defineVanillaMount();
 </script>
