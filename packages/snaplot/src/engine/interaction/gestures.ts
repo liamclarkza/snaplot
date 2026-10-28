@@ -11,6 +11,9 @@ import {
   DOUBLE_TAP_TIMEOUT,
 } from '../../constants';
 
+/** Focus a press gives the chart: no scroll, and no keyboard-focus ring (`focusVisible`). */
+const POINTER_FOCUS = { preventScroll: true, focusVisible: false } as FocusOptions;
+
 /**
  * GestureManager, unified gesture detection and action dispatch.
  *
@@ -302,12 +305,12 @@ export class GestureManager {
     if (area.type === 'outside') return;
 
     // Pointer interaction should not paint the browser's keyboard-focus ring, but a mouse or pen
-    // press does focus the chart, so the keys work next (plan D20); :focus-visible keeps the ring
-    // for keyboard focus. A touch does not focus it: no keys follow a finger, and iOS Safari
-    // draws the focus-visible ring around a chart focused from script after a touch.
+    // press does focus the chart, so the keys work next (plan D20). Focus from script can match
+    // :focus-visible (Chrome rings it), so it asks for no ring: Tab still shows one. A touch does
+    // not focus the chart: no keys follow a finger, and iOS Safari draws the ring after a touch.
     if (!this.isTouchLike(e)) {
       e.preventDefault();
-      if (mode !== 'readonly') this.coordinateTarget.focus({ preventScroll: true });
+      if (mode !== 'readonly') this.coordinateTarget.focus(POINTER_FOCUS);
     }
 
     if (this.isTouchLike(e) && area.type === 'plot') {

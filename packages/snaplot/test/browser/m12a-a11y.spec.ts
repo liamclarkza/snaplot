@@ -85,6 +85,15 @@ test.describe('accessibility', () => {
         document.getElementById('chart-0')?.contains(document.activeElement),
       ),
     ).toBe(true);
+    // A click is not keyboard focus: no ring (the keys still work).
+    const ring = await page.evaluate(() => {
+      const element = document.activeElement as HTMLElement;
+      return {
+        visible: element.matches(':focus-visible'),
+        outline: getComputedStyle(element).outlineStyle,
+      };
+    });
+    expect(ring).toEqual({ visible: false, outline: 'none' });
   });
 
   test('[interact-08][backlog-14] keyboard focus shows a visible focus ring', async ({
