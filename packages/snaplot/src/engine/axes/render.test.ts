@@ -298,6 +298,28 @@ describe('plot furniture', () => {
   });
 });
 
+describe('one grid per direction', () => {
+  it('draws the horizontal gridlines of the first Y axis only, whichever side the second is on', () => {
+    const left = linearScale(0, 100, [10, 50, 90]);
+    const right = { ...linearScale(0, 100, [20, 40, 60, 80]), key: 'y2' };
+    const scales = new Map<string, Scale>([
+      ['y', left],
+      ['y2', right],
+    ]);
+    const ctx = context();
+    const spec = {
+      series: [],
+      axes: { y: { position: 'left' }, y2: { position: 'right' } },
+    } as unknown as ChartSpec;
+    renderAxes(ctx, layout(), scales, theme, spec);
+    // A gridline crosses the plot: from its left edge to its right.
+    const lines = vi
+      .mocked(ctx.moveTo)
+      .mock.calls.filter(([x], i) => x === 20 && vi.mocked(ctx.lineTo).mock.calls[i]?.[0] === 120);
+    expect(lines.map(([, y]) => y)).toEqual([10, 50, 90].map((v) => crisp(v, 1)));
+  });
+});
+
 describe('bar slot grids', () => {
   it('keeps evenly spaced slot boundaries when center labels are thinned', () => {
     const ctx = context();

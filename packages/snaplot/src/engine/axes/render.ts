@@ -87,8 +87,9 @@ export function renderAxes(
   ctx.rect(plot.left, plot.top, plot.width, plot.height);
   ctx.clip();
 
-  // Track which positions have already drawn gridlines (only first axis per position draws them)
-  const gridDrawn = new Set<AxisPosition>();
+  // Which directions have drawn gridlines: the first X axis draws the vertical ones and the first
+  // Y axis the horizontal ones, so a second Y axis never adds a grid that misses the first.
+  const gridDrawn = new Set<'vertical' | 'horizontal'>();
 
   const axisConfigs = config.axes ?? {};
 
@@ -195,12 +196,12 @@ export function renderAxes(
       });
     }
 
-    // The first axis at each position decides that position's gridlines
-    // (draw styled by its grid config, or hide them entirely); later axes
-    // at the same position never add a second grid on top.
+    // The first axis in each direction decides its gridlines (drawn styled by its grid config, or
+    // hidden entirely); later axes in that direction, on either side, never add a second grid.
     const grid = resolveGrid(ac, theme);
-    const shouldDrawGrid = !gridDrawn.has(pos);
-    if (shouldDrawGrid) gridDrawn.add(pos);
+    const direction = isHorizontal ? 'vertical' : 'horizontal';
+    const shouldDrawGrid = !gridDrawn.has(direction);
+    if (shouldDrawGrid) gridDrawn.add(direction);
     if (shouldDrawGrid && grid !== null) {
       ctx.strokeStyle = opaqueColorOnBackground(
         grid.color,
