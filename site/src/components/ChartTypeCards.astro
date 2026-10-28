@@ -67,20 +67,25 @@ const TYPES = [
 </ul>
 
 <style>
+  /* The overview has no table of contents: its content takes the room, up to three cards wide. */
+  :global(.main-pane:has(ul.chart-types) .sl-container) {
+    max-width: 64rem;
+  }
   ul.chart-types {
+    max-width: none;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
-    margin: 1.5rem 0 2rem;
+    gap: 1.25rem;
+    margin: 1.75rem 0 2.5rem;
     padding: 0;
     list-style: none;
   }
-  @media (min-width: 36rem) {
+  @media (min-width: 40rem) {
     ul.chart-types {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
-  @media (min-width: 72rem) {
+  @media (min-width: 80rem) {
     ul.chart-types {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -88,7 +93,7 @@ const TYPES = [
   ul.chart-types > li {
     position: relative;
     margin: 0;
-    padding: 0.75rem 0.875rem 0.875rem;
+    padding: 1rem 1rem 1.125rem;
     border: 1px solid var(--snaplot-rule);
     border-radius: var(--snaplot-radius);
     background-color: var(--snaplot-background);
@@ -99,11 +104,11 @@ const TYPES = [
   }
   .chart-type-picture {
     display: block;
-    height: 150px;
+    height: 190px;
   }
   ul.chart-types h3 {
-    margin: 0.75rem 0 0.25rem;
-    font-size: 1rem;
+    margin: 0.875rem 0 0.25rem;
+    font-size: 1.0625rem;
   }
   ul.chart-types h3 a {
     color: var(--snaplot-ink);
@@ -124,6 +129,7 @@ const TYPES = [
     margin: 0;
     color: var(--snaplot-ink-secondary);
     font-size: 0.875rem;
+    line-height: 1.5;
   }
 </style>
 
