@@ -6,7 +6,7 @@
 import css from '../styles/legendTable.css?inline';
 import { adoptStyles, styleRootOf } from '../dom/styles';
 import { fail } from '../engine/errors';
-import { observeSize } from '../engine/render/surface';
+import { observeSize } from '../engine/render/observe-size';
 import { type Companion, companions } from './companion';
 import type { ChartHandle, ChartPoint, SeriesState } from './types';
 

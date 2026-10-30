@@ -49,7 +49,10 @@ const P2 = {
   },
   observers: {
     what: 'matchMedia, ResizeObserver, IntersectionObserver, requestAnimationFrame',
-    allowed: (file) => file === 'engine/render/surface.ts' || file === 'engine/render/scheduler.ts',
+    allowed: (file) =>
+      file === 'engine/render/surface.ts' ||
+      file === 'engine/render/scheduler.ts' ||
+      file === 'engine/render/observe-size.ts',
   },
   errors: {
     what: 'throw new Error',

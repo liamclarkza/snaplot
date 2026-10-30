@@ -180,7 +180,7 @@ export default defineConfig({
         manualChunks: (id) => {
           if (id.endsWith('/src/public/histogram.ts')) return 'histogram';
           if (
-            /\/src\/(public\/(legend|companion)\.ts|engine\/errors\.ts|dom\/styles\.ts|styles\/)/.test(
+            /\/src\/(public\/(legend|companion)\.ts|engine\/(errors|render\/observe-size)\.ts|dom\/styles\.ts|styles\/)/.test(
               id,
             )
           )

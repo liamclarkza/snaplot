@@ -112,17 +112,6 @@ export const SURFACE_CSS = `.snaplot-surface{outline:none}
 @media (forced-colors:active){.snaplot-surface:focus-visible{outline-color:Highlight}}`;
 
 /**
- * Call `onResize` whenever `element`'s size changes (the built-in legend as it wraps). Returns the
- * stop function; without ResizeObserver (jsdom, SSR) it never calls.
- */
-export function observeSize(element: Element, onResize: () => void): () => void {
-  if (typeof ResizeObserver === 'undefined') return () => {};
-  const observer = new ResizeObserver(() => onResize());
-  observer.observe(element);
-  return () => observer.disconnect();
-}
-
-/**
  * Creates and manages the 3-layer canvas stack + DOM overlay, and the space chrome reserves at
  * the top and bottom of the root (`reserveChrome`, a W5 contract: plan §3.2).
  *
