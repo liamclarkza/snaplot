@@ -16,7 +16,7 @@ export default {
         field: 'q',
         range: [2, 8],
         label: 'Dynamic pressure',
-        format: { maximumFractionDigits: 1, suffix: ' kPa' },
+        format: (kPa) => `${kPa.toFixed(1)} kPa`,
       },
     },
   ],
