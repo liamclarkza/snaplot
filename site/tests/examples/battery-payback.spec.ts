@@ -306,20 +306,30 @@ test.describe('phone, 390 px with touch', () => {
   });
 });
 
-/** A one-finger upward swipe that starts on `selector`; returns how far the page scrolled. */
+/**
+ * A one-finger upward swipe of 200 px that starts on `selector`; returns how far the page
+ * scrolled. Raw touch events, not `Input.synthesizeScrollGesture`, which scrolls nothing in Linux
+ * headless Chromium (CI); the events honour `touch-action` as a finger does.
+ */
 async function swipeUpOn(page: Page, selector: string): Promise<number> {
   await page.locator(selector).scrollIntoViewIfNeeded();
   const box = await page.locator(selector).boundingBox();
   if (!box) throw new Error(`no ${selector}`);
+  const x = Math.round(box.x + box.width / 2);
+  const y = Math.round(box.y + box.height / 2);
   const before = await page.evaluate(() => scrollY);
   const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Input.synthesizeScrollGesture', {
-    x: Math.round(box.x + box.width / 2),
-    y: Math.round(box.y + box.height / 2),
-    yDistance: -200,
-    gestureSourceType: 'touch',
-    speed: 800,
-  });
+  const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', dy: number) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: type === 'touchEnd' ? [] : [{ x, y: y - dy, id: 1 }],
+    });
+  await touch('touchStart', 0);
+  for (let step = 1; step <= 10; step++) {
+    await touch('touchMove', step * 20);
+    await page.waitForTimeout(16);
+  }
+  await touch('touchEnd', 200);
   await page.waitForTimeout(300);
   return (await page.evaluate(() => scrollY)) - before;
 }

@@ -13,10 +13,17 @@ function loadAll(kind) {
   const file = kind === 'require' ? 'load-entries.cjs' : 'load-entries.mjs';
   write(file, `const out = {};\n${lines.join('\n')}\nconsole.log(JSON.stringify(out));\n`);
   const result = node([file]);
-  // Node 22.12 still prints an ExperimentalWarning for require(esm); later versions do not.
+  // Node 22.12 still prints an ExperimentalWarning for require(esm), over three lines; later
+  // versions do not.
   const stderr = result.stderr
     .split('\n')
-    .filter((line) => line && !/ExperimentalWarning|--trace-warnings/.test(line));
+    .filter(
+      (line) =>
+        line &&
+        !/ExperimentalWarning|Support for loading ES Module in require\(\)|--trace-warnings/.test(
+          line,
+        ),
+    );
   expect(stderr, `${kind} of every entry`).toEqual([]);
   expect(result.status).toBe(0);
   return JSON.parse(result.stdout);
