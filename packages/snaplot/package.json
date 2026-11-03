@@ -1,6 +1,6 @@
 {
   "name": "snaplot",
-  "version": "1.0.0-beta.0",
+  "version": "0.13.0",
   "type": "module",
   "description": "Canvas charts for live data. One options object for vanilla JS, React and Solid.",
   "main": "./dist/index.js",

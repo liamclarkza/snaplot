@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // M8's state and events locks (plan D3 declarative state options, RC2
-// viewport = pinned axes, RC3 one isolated dispatcher, P14), on the 1.0
+// viewport = pinned axes, RC3 one isolated dispatcher, P14), on the 0.13
 // handle. Public API, fakes and debug() only.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createChartGroup } from '../../src/index';

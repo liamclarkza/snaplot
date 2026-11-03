@@ -1,4 +1,4 @@
-// v2 adapter: the 1.0 surface of plan §4 (M8 onwards). Handles have `setOptions`, take state
+// v2 adapter: the 0.13 surface of plan §4 (M8 onwards). Handles have `setOptions`, take state
 // through `update({ viewport | highlight })`, expose `scale(key)` instead of `getAxis`/`getLayout`,
 // and drop `getStats` for the debug symbol (which also carries the plot rectangle). Legends are
 // built in (`legend`) or a separate `createLegendTable(el, { chart })`, plugins draw through

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// The 1.0 option contract (plan §4.4, §5.9, P1, D16, D18): normalize() is the
+// The 0.13 option contract (plan §4.4, §5.9, P1, D16, D18): normalize() is the
 // one validation layer. It throws `snaplot: <what is wrong>. <how to fix it>`
 // at the call that caused it, infers the axis kind from the data, copies
 // array- and object-valued options on intake, and maps every public option
@@ -26,7 +26,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Options are written in the 1.0 vocabulary; the cast keeps this file independent of the types. */
+/** Options are written in the 0.13 vocabulary; the cast keeps this file independent of the types. */
 type Loose = Record<string, unknown>;
 function mount(options: Loose, size?: { width?: number; height?: number }): ChartHandle<any> {
   return fakes.mount(options as never, size);

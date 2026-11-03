@@ -3,8 +3,8 @@
 #
 #   scripts/release.sh patch | minor | major     (from a release version)
 #   scripts/release.sh 1.2.3
-#   scripts/release.sh 1.0.0-beta.0              (a prerelease: npm dist-tag `next`)
-#   scripts/release.sh --dry-run 1.0.0-beta.0    (print the plan, change nothing)
+#   scripts/release.sh 0.14.0-beta.0             (a prerelease: npm dist-tag `next`)
+#   scripts/release.sh --dry-run 0.14.0-beta.0   (print the plan, change nothing)
 #
 # Bumps packages/snaplot/package.json, promotes the [Unreleased] section of CHANGELOG.md under
 # a dated [X.Y.Z] header (reseeding an empty Unreleased on top), commits and tags. It does NOT

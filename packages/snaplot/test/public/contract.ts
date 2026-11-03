@@ -1,5 +1,5 @@
 /**
- * Helpers for the 1.0 contract tests (plan §4.4). M8's first commit wrote these tests against
+ * Helpers for the 0.13 contract tests (plan §4.4). M8's first commit wrote these tests against
  * local copies of the final types; now that `ChartHandle` is the final handle, the names below
  * are aliases of the exported types.
  */
@@ -20,7 +20,7 @@ export type FinalHandle<Row = Record<string, any>> = Omit<
 /** The D21 plugin contract (the exported `ChartPlugin`). */
 export type FinalPlugin<Row = Record<string, any>> = ChartPlugin<Row>;
 
-/** The members `ChartHandle` has in 1.0, in plan §4.4's order. */
+/** The members `ChartHandle` has in 0.13, in plan §4.4's order. */
 export const HANDLE_MEMBERS = [
   'container',
   'update',

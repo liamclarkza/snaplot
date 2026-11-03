@@ -2,7 +2,7 @@
 
 The perf gate (plan §3.4, gate G12): a same-run A/B of main-thread busy time between two builds
 of snaplot, on GPU raster, with heap-per-operation, fidelity and absolute budgets. It replaces the
-pre-1.0 harness, which timed rAF deltas on software raster against a committed baseline (see
+0.12-era harness, which timed rAF deltas on software raster against a committed baseline (see
 [History](#history)).
 
 ## Quick start

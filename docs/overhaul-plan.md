@@ -173,6 +173,7 @@ The implementers apply each recommendation. M0 copies a condensed list into `doc
 - Prerelease builds of the site show a banner: "1.0 beta docs. 0.12 docs: README at tag v0.12.0", linking to GitHub.
 - `deploy.yml` refuses to deploy a prerelease unless `npm view snaplot@next version` equals the package version, so the docs never go live before the beta.
 - If changed: for 0.13.0, change the version string, the CHANGELOG heading and the banner, and the install string becomes plain (no code changes). For 1.0.0, skip the `next` workflow changes and the banner.
+- **Changed on 2026-11-02: 0.13.0 on `latest`.** The maintainer expects more breaking changes, so the overhaul ships on the 0.x line, where a minor is the breaking bump and `^0.12` ranges stay on 0.12. The install string is plain, prerelease builds alone show the banner, and the library's warnings say "Removed in 0.13". Elsewhere in this plan, "1.0" names this release.
 
 **D2. React 18 support.**
 - Options: React 19 only (ref as a prop); React 18.3 and 19.

@@ -1,8 +1,11 @@
 # Overhaul handoff
 
-The snaplot 1.0 overhaul, from `overhaul-baseline` (`6237289`, the 0.12 line's last commit) to `overhaul` at
+The snaplot overhaul, from `overhaul-baseline` (`6237289`, the 0.12 line's last commit) to `overhaul` at
 the M17 merge (tag `ovh-m17-done`). Everything is local: nothing is pushed, published or deployed. This file is
-what a maintainer needs to review it and ship `1.0.0-beta.0`; the milestone handoffs follow as an appendix.
+what a maintainer needs to review it and ship `0.13.0`; the milestone handoffs follow as an appendix.
+
+**Version (2026-11-02).** The maintainer chose to release this as 0.13.0, not 1.0.0 or a 1.0 beta, because more
+breaking changes are expected. "1.0" in the appendix and in the plan and ADR 0002 names this release.
 
 ## Stop point
 
@@ -147,8 +150,8 @@ A revert can conflict with later commits that build on the change. Revert one ro
 
 From `docs/backlog.md` §11:
 
-- **Size.** About 17,800 code lines and 82 KiB gzip. The target was revised for 1.0 to this baseline (ADR 0002 §6),
-  held by the size budgets at measured + 2%; 50 KiB is the post-1.0 aim. One option-schema table in `public/` would
+- **Size.** About 17,800 code lines and 82 KiB gzip. The target was revised for 0.13 to this baseline (ADR 0002 §6),
+  held by the size budgets at measured + 2%; 50 KiB is a later aim. One option-schema table in `public/` would
   remove about 1,000 lines.
 - **Devices.** iOS Safari was checked on the iPhone 17 simulator. A physical phone and a low-end Android are a
   human step (step 8).
@@ -165,9 +168,9 @@ From `docs/backlog.md` §11:
 
 ## Draft PR description
 
-> **snaplot 1.0: one options object for vanilla JS, React and Solid**
+> **snaplot 0.13: one options object for vanilla JS, React and Solid**
 >
-> This branch is the 1.0 overhaul planned from a 19-auditor review of 0.12. That review found 336 findings,
+> This branch is the overhaul planned from a 19-auditor review of 0.12. That review found 336 findings,
 > 165 of them confirmed defects. The work merged milestone by milestone with tags (`ovh-*`), and the
 > design record is `docs/decisions/0002-overhaul.md`.
 >
@@ -193,7 +196,7 @@ From `docs/backlog.md` §11:
 > - New docs with every example in three tabs, six task-specific demos, and a migration guide that covers
 >   every removed name.
 >
-> **Breaking changes.** The whole public surface changed; `CHANGELOG.md` `[1.0.0-beta.0]` and the migration
+> **Breaking changes.** The whole public surface changed; `CHANGELOG.md` (its 0.13.0 section) and the migration
 > guide list every removal. Visual defaults changed where the overhaul fixed them: V17–V61 in the visual
 > ledger, each with its revert commit.
 >
@@ -203,7 +206,7 @@ From `docs/backlog.md` §11:
 >     same-machine bench within 1.5×. Its one flagged case, `scatter-render-10k`, reproduced on the
 >     pre-overhaul commit too.
 >   - `trials/RESULTS.md`: two blind usability trials compiled as written. The friction was the React
->     ref-to-legend wiring and explicit series ids for a shared Y field. In 1.0, companions take the chart's ref
+>     ref-to-legend wiring and explicit series ids for a shared Y field. In 0.13, companions take the chart's ref
 >     object directly, and a repeated series id throws an error that names the fix.
 > - Metrics: 106 option leaves, a 14-member handle, 7 events, 3 entry points and a largest file of 850 lines.
 >   Missed: library size, 17,258 code lines and 79.3 KiB gzip (ADR 0002 §6).
@@ -218,9 +221,9 @@ From `docs/backlog.md` §11:
 2. Push `overhaul` and watch the first CI run. The Linux visual baselines were rendered on linux/arm64; if the
    amd64 visual job differs, refresh them with the `update-snapshots` workflow.
 3. Open a draft PR with the description above.
-4. Run `scripts/release.sh 1.0.0-beta.0`. It publishes on the `next` dist-tag, so `npm i snaplot` keeps
-   installing 0.12.0.
-5. Only then deploy the docs (tag or dispatch). `deploy.yml` checks that `snaplot@next` exists.
+4. Run `scripts/release.sh 0.13.0`. It dates the CHANGELOG's Unreleased section as 0.13.0 and publishes on
+   `latest`. A 0.x minor is a breaking bump under semver, so `^0.12` ranges stay on 0.12.x.
+5. Only then deploy the docs (tag or dispatch). `deploy.yml` checks that `snaplot@latest` is 0.13.0.
 6. Pin the GitHub Actions by SHA and add Dependabot.
 7. File the `docs/backlog.md` items as issues, if wanted.
 8. Spot-check a low-end Android phone (`alpha: true` compositing, touch scroll) and iOS 16.4 Safari (24 charts on

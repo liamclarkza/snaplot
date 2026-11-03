@@ -1,17 +1,17 @@
-# Public names of snaplot v0.12.0 that the 1.0 declarations no longer have (plan P15, §8.5).
+# Public names of snaplot v0.12.0 that the 0.13 declarations no longer have (plan P15, §8.5).
 #
 # Generated once by M8 with the TypeScript checker, from `git show v0.12.0:` sources
 # (packages/snaplot/src/{index,core,solid}.ts and what they export) against the golden
 # packages/snaplot/api/{index,react,solid}.d.ts at ovh-api-frozen:
 #   entry <specifier>       an import path that is gone
-#   export <name>           an exported name no 1.0 entry exports
+#   export <name>           an exported name no 0.13 entry exports
 #   member <Type>.<member>  a member declared on an exported v0.12.0 class or interface that the
-#                           1.0 type of that name lacks (every member, when the type is gone)
+#                           0.13 type of that name lacks (every member, when the type is gone)
 #   from <specifier> <name> a name that entry exported in v0.12.0 and no longer does, although
-#                           another 1.0 entry exports the same name (so `export` cannot list
+#                           another 0.13 entry exports the same name (so `export` cannot list
 #                           it); added by hand in the M8 review, which compared each entry's
 #                           export list with its own golden
-# A name that its 1.0 entry still exports with another meaning (createChartGroup) is not listed.
+# A name that its 0.13 entry still exports with another meaning (createChartGroup) is not listed.
 # scripts/overhaul/check-migration.mjs (M15b) checks that the migration guide mentions every name
 # below, per entry for `from` lines; lines starting with # are comments.
 entry snaplot/core

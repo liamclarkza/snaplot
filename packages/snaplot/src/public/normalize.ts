@@ -64,13 +64,13 @@ const PLUGIN_HOOKS: ReadonlySet<string> = new Set([
 ]);
 /** What the 0.12 plugin hooks became. */
 const PLUGIN_HINTS: Record<string, string> = {
-  beforeDraw: 'Removed in 1.0: a plugin cannot skip the marks.',
+  beforeDraw: 'Removed in 0.13: a plugin cannot skip the marks.',
   afterDrawGrid: 'Use drawBelow(context, chart, plot).',
   afterDrawData: 'Use drawAbove(context, chart, plot).',
   afterDrawOverlay: 'Use drawOverlay(context, chart, plot).',
   destroy: 'Return a cleanup function from install(chart).',
-  onDataUpdate: 'Removed in 1.0: listen with chart.subscribe() or chart.on().',
-  onOptionsUpdate: 'Removed in 1.0: listen with chart.subscribe() or chart.on().',
+  onDataUpdate: 'Removed in 0.13: listen with chart.subscribe() or chart.on().',
+  onOptionsUpdate: 'Removed in 0.13: listen with chart.subscribe() or chart.on().',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -517,7 +517,7 @@ function normalizeInteraction(
   if (value === 'timeseries' || value === 'analytical') {
     warnOnce(
       'removed-option',
-      `interaction '${value}' was removed in 1.0 and is ignored. Use ${value === 'analytical' ? "interaction: { zoom: 'xy' }" : 'the default (no interaction option)'}.`,
+      `interaction '${value}' was removed in 0.13 and is ignored. Use ${value === 'analytical' ? "interaction: { zoom: 'xy' }" : 'the default (no interaction option)'}.`,
     );
     value = undefined;
   }
@@ -731,7 +731,7 @@ function normalizeSeries(
   if (typeof value.fill === 'function') {
     warnOnce(
       'removed-option',
-      `${path}.fill as a function was removed in 1.0 and is ignored. Use color: (value, row, index) => …`,
+      `${path}.fill as a function was removed in 0.13 and is ignored. Use color: (value, row, index) => …`,
     );
   } else if (value.fill !== undefined && (type === 'bar' || type === 'scatter' || histogram)) {
     // fill is the area and band fill; these marks take color (0.12 bars took fill).

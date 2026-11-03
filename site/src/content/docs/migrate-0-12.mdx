@@ -1,14 +1,14 @@
 ---
 title: Migrating from 0.12
-description: Every change from snaplot 0.12 to 1.0, with before and after code.
+description: Every change from snaplot 0.12 to 0.13, with before and after code.
 ---
 
 import Example from '../../components/Example.astro';
 
-{/* Draft for 1.0: re-check each table against the CHANGELOG before the release. */}
+{/* Draft for 0.13: re-check each table against the CHANGELOG before the release. */}
 
-1.0 replaces the 0.12 API: there are no compatibility aliases. Most charts need the ten edits in
-the first section. An option 0.12 had and 1.0 does not warns once per page with its path and what
+0.13 replaces the 0.12 API: there are no compatibility aliases. Most charts need the ten edits in
+the first section. An option 0.12 had and 0.13 does not warns once per page with its path and what
 to use instead, and the chart keeps its default, so a page keeps rendering while you migrate.
 
 ## In 10 minutes
@@ -19,7 +19,7 @@ to use instead, and the chart keeps its default, so a page keeps rendering while
    ```ts
    // 0.12
    { data: [new Float64Array(t), new Float64Array(cpu)], config: { series: [{ dataIndex: 1, label: 'CPU' }] } }
-   // 1.0
+   // 0.13
    { data: rows, x: 'time', series: [{ y: 'cpu', label: 'CPU' }] }
    // or columns: { data: { columns: { time, cpu } }, x: 'time', series: [{ y: 'cpu' }] }
    ```
@@ -44,7 +44,7 @@ to use instead, and the chart keeps its default, so a page keeps rendering while
 
 ### Handle members
 
-| 0.12 | 1.0 |
+| 0.12 | 0.13 |
 | --- | --- |
 | `setViewport`, `setSelection`, `setSeriesVisible`, `setHighlight` | `update({ viewport \| selection \| hiddenSeries \| highlight })` |
 | `getCursorSnapshot()` | `getCursor({ fallback })` |
@@ -56,7 +56,7 @@ to use instead, and the chart keeps its default, so a page keeps rendering while
 
 ### Events
 
-| 0.12 | 1.0 |
+| 0.12 | 0.13 |
 | --- | --- |
 | `follow:change` | `following:change` |
 | `visibility:change` | `hiddenSeries:change` |
@@ -66,7 +66,7 @@ to use instead, and the chart keeps its default, so a page keeps rendering while
 
 ### Exports
 
-| 0.12 | 1.0 |
+| 0.12 | 0.13 |
 | --- | --- |
 | `snaplot/core` | `snaplot` |
 | `lightTheme`, `darkTheme` and the other theme objects, `createTheme`, `resolveTheme` | `theme: 'light' \| 'dark'` or `ThemeTokens` |
@@ -78,7 +78,7 @@ to use instead, and the chart keeps its default, so a page keeps rendering while
 
 ### Options
 
-| 0.12 | 1.0 |
+| 0.12 | 0.13 |
 | --- | --- |
 | `axes.<key>.roundBounds` | `extent: 'pad'` (or `'data'` for tight bounds) |
 | `axes.<key>.tickCount` | `ticks` (explicit values) |
@@ -173,7 +173,7 @@ with `lightTheme` and `darkTheme`, are `theme: 'light' | 'dark'` and tokens.
 | `HistogramOptions` | `binCount`, `method` | `bins` |
 | `LegendTableColumn` | `key`, `title`, `cell`, `width`, `header`, `align` as 0.12 shaped them | `'swatch'`, `'name'`, `'value'` or `{ header, value, align }` |
 | `LegendTableOptions` | `className`, `formatStep`, `highlightOnHover`, `maxHeight`, `position`, `showStepHeader`, `toggleVisibilityOnClick` | style the element you pass; hover always highlights |
-| `LegendTableProps` | `children`, `columns`, `fallback`, `formatStep`, `highlightOnHover`, `maxHeight`, `showStepHeader` | the 1.0 `<LegendTable chart columns fallback>` |
+| `LegendTableProps` | `children`, `columns`, `fallback`, `formatStep`, `highlightOnHover`, `maxHeight`, `showStepHeader` | the 0.13 `<LegendTable chart columns fallback>` |
 | `ReferenceLine` | `axisKey` | `axis` |
 | `ReferenceRegion` | `axisKey`, `edges`, `edgeColor`, `edgeDash`, `fill` | `axis`, `color` |
 | `ThemeTokens` | `base`, `borderOpacity`, `gridOpacity`, `heatmap`, `tooltip` | `muted` sets the grid and frame; `sequential` the density ramp |

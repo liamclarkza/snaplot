@@ -1,6 +1,6 @@
 /**
  * The keys every option object accepts, and the hints an unknown key gets:
- * the 0.12 options 1.0 removed (arch-15), each with its replacement, and
+ * the 0.12 options 0.13 removed (arch-15), each with its replacement, and
  * names from other libraries. normalize() checks options against them.
  */
 import type { SeriesType } from './types';
@@ -111,7 +111,7 @@ export const SELECTION = keys('x', 'y');
 export const EXTENTS = ['data', 'pad'];
 
 /**
- * Hints for keys that are not options: the 0.12 options 1.0 removed (arch-15)
+ * Hints for keys that are not options: the 0.12 options 0.13 removed (arch-15)
  * and names from other libraries, each with what to use instead. A key is
  * looked up by its full path (`axes.y.roundBounds`), then by its path with the
  * axis key or series index generalised (`axes.*.roundBounds`, `series.*.stroke`),
@@ -119,46 +119,46 @@ export const EXTENTS = ['data', 'pad'];
  */
 export const HINTS: Record<string, string> = {
   // Top level.
-  width: 'Removed in 1.0: size the container with CSS; the chart follows it.',
-  autoResize: 'Removed in 1.0: charts always follow their container.',
-  padding: 'Removed in 1.0: the gutters are measured from the axis labels.',
-  zoom: "Removed in 1.0: use interaction: { zoom: 'x' | 'xy' | 'none', bounds }.",
+  width: 'Removed in 0.13: size the container with CSS; the chart follows it.',
+  autoResize: 'Removed in 0.13: charts always follow their container.',
+  padding: 'Removed in 0.13: the gutters are measured from the axis labels.',
+  zoom: "Removed in 0.13: use interaction: { zoom: 'x' | 'xy' | 'none', bounds }.",
   'zoom.onZoom': 'Observe zoom with onViewportChange.',
-  pan: "Removed in 1.0: use interaction: { drag: 'pan' }; panning follows interaction.zoom.",
-  touch: "Removed in 1.0: use interaction: { drag: 'pan' | 'select' }.",
-  performance: 'Removed in 1.0: sampling during gestures is automatic.',
-  debug: 'Removed in 1.0.',
-  onSelect: 'Removed in 1.0: use onSelectionChange.',
+  pan: "Removed in 0.13: use interaction: { drag: 'pan' }; panning follows interaction.zoom.",
+  touch: "Removed in 0.13: use interaction: { drag: 'pan' | 'select' }.",
+  performance: 'Removed in 0.13: sampling during gestures is automatic.',
+  debug: 'Removed in 0.13.',
+  onSelect: 'Removed in 0.13: use onSelectionChange.',
   // Axes.
   'axes.*.roundBounds': "Use extent: 'pad' (round bounds) or extent: 'data'.",
-  'axes.*.rangePadding': 'Removed in 1.0: set min and max for a fixed domain.',
-  'axes.*.auto': 'Removed in 1.0.',
-  'axes.*.tickCount': 'Removed in 1.0: use ticks for explicit values.',
-  'axes.*.tickMarks': 'Removed in 1.0.',
+  'axes.*.rangePadding': 'Removed in 0.13: set min and max for a fixed domain.',
+  'axes.*.auto': 'Removed in 0.13.',
+  'axes.*.tickCount': 'Removed in 0.13: use ticks for explicit values.',
+  'axes.*.tickMarks': 'Removed in 0.13.',
   // Series.
   'series.*.stroke': 'Use color.',
   'series.*.lineDash': 'Use dash.',
-  'series.*.fillGradient': 'Removed in 1.0.',
-  'series.*.barWidthRatio': 'Removed in 1.0.',
-  'series.*.pointShape': 'Removed in 1.0.',
+  'series.*.fillGradient': 'Removed in 0.13.',
+  'series.*.barWidthRatio': 'Removed in 0.13.',
+  'series.*.pointShape': 'Removed in 0.13.',
   'series.*.heatmap': "Use renderMode: 'density'.",
-  'series.*.heatmapBinSize': 'Removed in 1.0.',
-  'series.*.heatmapGradient': "Removed in 1.0: density uses the theme's sequential ramp.",
+  'series.*.heatmapBinSize': 'Removed in 0.13.',
+  'series.*.heatmapGradient': "Removed in 0.13: density uses the theme's sequential ramp.",
   'series.*.visible': 'Use hiddenSeries.',
-  'series.*.meta': 'Removed in 1.0: keep it in your own map by series id.',
-  'series.*.colorBy.nullColor': 'Removed in 1.0: missing values take the series colour.',
-  'series.*.sizeBy.scale': 'Removed in 1.0: point area is proportional to the value.',
-  'series.*.sizeBy.domain': 'Removed in 1.0: the size domain runs from zero to the largest value.',
+  'series.*.meta': 'Removed in 0.13: keep it in your own map by series id.',
+  'series.*.colorBy.nullColor': 'Removed in 0.13: missing values take the series colour.',
+  'series.*.sizeBy.scale': 'Removed in 0.13: point area is proportional to the value.',
+  'series.*.sizeBy.domain': 'Removed in 0.13: the size domain runs from zero to the largest value.',
   // Annotations.
   'referenceRegions.*.fill': 'Use color.',
-  'referenceRegions.*.edges': 'Removed in 1.0.',
-  'referenceRegions.*.edgeColor': 'Removed in 1.0.',
-  'referenceRegions.*.edgeDash': 'Removed in 1.0.',
+  'referenceRegions.*.edges': 'Removed in 0.13.',
+  'referenceRegions.*.edgeColor': 'Removed in 0.13.',
+  'referenceRegions.*.edgeDash': 'Removed in 0.13.',
   // Cursor.
   'cursor.show': 'Use cursor: false.',
-  'cursor.color': "Removed in 1.0: the crosshair takes the theme's accent.",
-  'cursor.dash': 'Removed in 1.0.',
-  'cursor.syncTooltip': 'Removed in 1.0: a group shares the cursor; each chart keeps its tooltip.',
+  'cursor.color': "Removed in 0.13: the crosshair takes the theme's accent.",
+  'cursor.dash': 'Removed in 0.13.',
+  'cursor.syncTooltip': 'Removed in 0.13: a group shares the cursor; each chart keeps its tooltip.',
   // Tooltip.
   'tooltip.show': 'Use tooltip: false.',
   'tooltip.xFormat': 'Use axes.x.format.',
@@ -176,13 +176,13 @@ export const HINTS: Record<string, string> = {
   'theme.crosshairColor': 'Use accent.',
   'theme.tooltipBackground': 'Use surface.',
   'theme.tooltipTextColor': 'Use text.',
-  'theme.gridColor': 'Removed in 1.0: grid lines derive from text and surface.',
-  'theme.gridOpacity': 'Removed in 1.0: grid lines derive from text and surface.',
-  'theme.axisLineColor': 'Removed in 1.0: axis lines derive from text and surface.',
-  'theme.borderColor': 'Removed in 1.0: borders derive from text and surface.',
-  'theme.borderOpacity': 'Removed in 1.0: borders derive from text and surface.',
-  'theme.tickColor': 'Removed in 1.0: ticks derive from text and surface.',
-  'theme.tooltipBorderColor': 'Removed in 1.0: the tooltip border derives from text and surface.',
+  'theme.gridColor': 'Removed in 0.13: grid lines derive from text and surface.',
+  'theme.gridOpacity': 'Removed in 0.13: grid lines derive from text and surface.',
+  'theme.axisLineColor': 'Removed in 0.13: axis lines derive from text and surface.',
+  'theme.borderColor': 'Removed in 0.13: borders derive from text and surface.',
+  'theme.borderOpacity': 'Removed in 0.13: borders derive from text and surface.',
+  'theme.tickColor': 'Removed in 0.13: ticks derive from text and surface.',
+  'theme.tooltipBorderColor': 'Removed in 0.13: the tooltip border derives from text and surface.',
   // Other libraries.
   maxLen: 'Use streaming.maxPoints.',
   follow: 'Use streaming.followWindow.',

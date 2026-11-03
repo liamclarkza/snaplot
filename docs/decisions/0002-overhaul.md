@@ -1,6 +1,8 @@
 # ADR 0002: The snaplot 1.0 API overhaul
 
 - **Status:** accepted; being executed. Edited only by milestones M0, M14 and M17.
+- **Version (2026-11-02):** released as 0.13.0, not 1.0.0: the maintainer expects more breaking changes (plan
+  D1). "1.0" in this record names that release.
 - **Plan:** the working copies are `notes/overhaul-audit/plan.md` and `notes/overhaul-audit/EXECUTION.md`
   (local and gitignored; EXECUTION.md's process rules win where they conflict). The orchestrator may amend
   them while the overhaul runs. [`docs/overhaul-plan.md`](../overhaul-plan.md) and

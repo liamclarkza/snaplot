@@ -13,7 +13,7 @@ dependencies; React and Solid are optional peers.
 
 <!-- sync-readme:install -->
 ```sh
-npm i snaplot@next
+npm i snaplot
 ```
 <!-- /sync-readme:install -->
 
@@ -133,7 +133,7 @@ export default function FirstChart() {
 ```html
 <div id="chart"></div>
 <script type="module">
-  import { createChart } from 'https://cdn.jsdelivr.net/npm/snaplot@1.0.0-beta.0/+esm';
+  import { createChart } from 'https://cdn.jsdelivr.net/npm/snaplot@0.13.0/+esm';
 
   const temps = [16.57, 16.52, 16.48, 16.47, 16.51, 16.49, 16.5, 16.55, 16.61, 16.63, 16.68];
   createChart(document.getElementById('chart'), {
@@ -154,7 +154,7 @@ package is ES modules only, targets ES2022 and ships no polyfills.
 
 ## Not yet supported
 
-These are not in 1.0, and the options do not exist:
+These are not in snaplot, and the options do not exist:
 
 - stacked marks and horizontal bars;
 - animated transitions;

@@ -42,8 +42,8 @@ interface GroupRecord {
 
 const GROUP_KEYS = ['cursor', 'highlight', 'viewport', 'alignPlots', 'yRange'];
 const GROUP_HINTS: Record<string, string> = {
-  yAxis: 'Removed in 1.0: yRange shares the "y" axis.',
-  defaults: 'Removed in 1.0: spread shared options into each chart instead.',
+  yAxis: 'Removed in 0.13: yRange shares the "y" axis.',
+  defaults: 'Removed in 0.13: spread shared options into each chart instead.',
 };
 const DEFAULTS: Required<ChartGroupOptions> = {
   cursor: true,

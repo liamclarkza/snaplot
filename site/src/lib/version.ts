@@ -6,7 +6,7 @@ import pkg from 'snaplot/package.json' with { type: 'json' };
 
 export const version: string = pkg.version;
 export const isPrerelease = version.includes('-');
-/** "1.0" for 1.0.0-beta.0. */
+/** "0.13" for 0.13.0. */
 export const releaseLine = version.split('.').slice(0, 2).join('.');
 
 export function installCommand(v: string = version): string {

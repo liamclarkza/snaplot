@@ -114,8 +114,8 @@ Flow is "edit CHANGELOG as you go, cut a release with one script":
 2. When you're ready to ship, run from a clean `main`:
 
     ```bash
-    scripts/release.sh patch      # or: minor | major | 1.2.3 | 1.0.0-beta.0
-    scripts/release.sh --dry-run 1.0.0-beta.0   # print the plan, change nothing
+    scripts/release.sh patch      # or: minor | major | 1.2.3 | 0.14.0-beta.0
+    scripts/release.sh --dry-run 0.14.0-beta.0  # print the plan, change nothing
     ```
 
    That bumps `packages/snaplot/package.json`, updates/stages

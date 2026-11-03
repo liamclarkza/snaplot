@@ -6,9 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [1.0.0-beta.0] - 2026-10-27
-
-The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design record is ADR 0002
+The overhaul, released as 0.13.0: a breaking release on the 0.x line, so `^0.12` ranges stay on 0.12
+until you upgrade and follow the migration guide. The design record is ADR 0002
 (`docs/decisions/0002-overhaul.md`); every intentional pixel change is a row of its visual ledger.
 
 ### API overhaul
@@ -19,7 +18,7 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
 - Axis options use `title`, `extent` and `format`; streaming uses `maxPoints` and `followWindow`. The examples, the docs and the benchmarks use the new API. No compatibility aliases are retained; the migration guide (`/snaplot/migrate-0-12/`) maps every removed name.
 - Visual defaults change where the overhaul fixed them; each change is a row of the visual ledger in ADR 0002 (V17–V61), with the commit to revert.
 
-### Options and validation (1.0)
+### Options and validation (0.13)
 
 - One validation layer, always on in every build (no `NODE_ENV` check): invalid input throws
   `snaplot: <what is wrong>. <how to fix it>` at the call that passed it, and an unknown option
@@ -46,7 +45,7 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
   that is not a category and on a string a numeric axis cannot read, and reads an ISO-8601 date
   on a time axis.
 
-### Updates and state (1.0)
+### Updates and state (0.13)
 
 - Option changes cost only what they change: a title, axis bounds, a style, the theme, a format,
   the tooltip, reference lines, the accessible name or a callback re-renders without reading the
@@ -86,7 +85,7 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
   Events raised inside a call are delivered after it commits, and a listener added during a
   dispatch runs from the next one.
 
-### Legends (1.0)
+### Legends (0.13)
 
 - `createLegendTable(element, { chart, columns, fallback })` replaces `createLegendTablePlugin()`:
   a table of each series' value at the cursor (or the latest data), keyed by series id and
@@ -110,7 +109,7 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
   `nameColumn`, `valueColumn`, `swatchColumn`, `metricColumn` and `column` are removed.
   `LegendItem` is `SeriesState`.
 
-### React and Solid (1.0)
+### React and Solid (0.13)
 
 - `<Chart>` takes exactly the options `createChart` takes, plus the host's `className`/`class`,
   `style`, `id`, `aria-*` and `data-*`, and applies them with `chart.setOptions` on every render:
@@ -144,7 +143,7 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
   application holds one engine, and the Solid server build (the `node`, `deno` and `worker`
   conditions) no longer inlines a second one (3.5 KB, was 289 KB).
 
-### Groups (1.0)
+### Groups (0.13)
 
 - `createChartGroup({ cursor, highlight, viewport, alignPlots, yRange })` links cursor,
   highlight, the horizontal viewport and the plot edges by default (`yRange` stays opt-in). The
@@ -158,7 +157,7 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
   has `setCursor` and `setHighlight` only: `options` and `destroy()` are removed, and an empty
   group is garbage.
 
-### Plugins (1.0)
+### Plugins (0.13)
 
 - A plugin is `{ id, install?(chart) → cleanup?, drawBelow?, drawAbove?, drawOverlay? }`. Draw
   hooks receive `(context, chart, plot)` and run after the built-in reference lines and regions
@@ -173,7 +172,7 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
   draw hooks), `destroy` (return a cleanup from `install`), `onDataUpdate` and `onOptionsUpdate`
   (use `chart.subscribe()` or `chart.on()`). A plugin no longer makes appends copy the data.
 
-### Handle and exports (1.0)
+### Handle and exports (0.13)
 
 - The handle has fourteen members: `container`, `update`, `setOptions`, `appendData`,
   `getState`, `subscribe`, `on`, `getCursor`, `resetViewport`, `resumeFollow`, `setCursor`,
@@ -204,7 +203,7 @@ The 1.0 overhaul, for the `next` dist-tag (`npm i snaplot@next`). The design rec
 - The package marks itself free of side effects (`sideEffects: false`), so a bundler drops the
   modules an app does not import: `histogram` and `createLegendTable` cost only themselves.
 
-### Removed options (1.0)
+### Removed options (0.13)
 
 The 0.12 options below left the public types. Passing one warns once per page with its path and
 what to use instead, and the chart keeps its default:
@@ -229,7 +228,7 @@ what to use instead, and the chart keeps its default:
 - `createChartGroup({ yAxis })`: `yRange` shares the `y` axis.
 - `meta` on points and legend items.
 
-### Data (1.0)
+### Data (0.13)
 
 - Typed columns are used in place: no copy and one pass over X per source and per append. Line,
   area, band and bar columns must be sorted by X (rows are sorted for you, stably, so equal X
@@ -260,7 +259,7 @@ what to use instead, and the chart keeps its default:
   milliseconds; 0.12 threw ("mixes date and number values"). ISO-8601 strings mixed with numbers
   still throw.
 
-### Histograms (1.0)
+### Histograms (0.13)
 
 - `histogram(values, { bins, thresholds })`: `bins` is a count from 1 to 10,000 or the rule
   (`'freedman-diaconis'`, the default, `'sturges'` or `'scott'`); `thresholds` takes explicit
@@ -273,7 +272,7 @@ what to use instead, and the chart keeps its default:
   counts always agree with the edges. Edges stay finite and strictly increasing up to
   `±Number.MAX_VALUE`, and a single repeated value gets one bin around it at any magnitude.
 
-### Types (1.0)
+### Types (0.13)
 
 - Every public type is declared and documented in `snaplot` itself; none is derived from the
   internal engine, so the API reference lists every option with its default.
@@ -285,7 +284,7 @@ what to use instead, and the chart keeps its default:
 - Axis `format` is typed per axis kind: value axes take `NumberFormat` (a function of a number, or
   `Intl.NumberFormat` options with `prefix` and `suffix`), time axes take `DateFormat`, and a
   category axis takes none. `min`, `max` and `ticks` accept `Date`.
-- New option types for the 1.0 surface: `InteractionOptions`, `TooltipOptions`, `LegendOptions`,
+- New option types for the 0.13 surface: `InteractionOptions`, `TooltipOptions`, `LegendOptions`,
   `StreamingOptions`, `ThemeTokens` (ten tokens), `Viewport` (`{ x?: [from, to] }`), `Selection`,
   `SelectionChange` and the `on<Key>Change` callbacks.
 - Renamed type exports: `ChartType` is `SeriesType`, `ScatterColorEncodingType` is
@@ -296,7 +295,7 @@ what to use instead, and the chart keeps its default:
 - The React and Solid `<Chart>` keep their controlled `viewport`, `selectionState` and
   `hiddenSeries` props, typed with `ViewportRanges` and `SelectionRange`.
 
-### Axes (1.0)
+### Axes (0.13)
 
 - One formatter for tick labels and readouts (series `format` > axis `format` > automatic);
   calendar time ticks in local time or UTC; the locale from `locale`, else the page (V30).
@@ -323,7 +322,7 @@ what to use instead, and the chart keeps its default:
   labels; a vertical line's label takes the side no other line crosses; a region's label always
   shows, centred over the region (V58, V59).
 
-### Marks, colour and sizing (1.0)
+### Marks, colour and sizing (0.13)
 
 - The theme follows the page the chart sits on (an explicit surface, else the first opaque
   background, else the text colour), and the plot is transparent (V50). `--chart-text` colours
@@ -336,7 +335,7 @@ what to use instead, and the chart keeps its default:
   one warning. Offscreen charts do not paint; printing paints every chart. Without a canvas or a
   ResizeObserver (jsdom), a chart warns once and draws nothing instead of throwing.
 
-### Interaction and accessibility (1.0)
+### Interaction and accessibility (0.13)
 
 - The index tooltip shows anywhere along x inside the data, not only near a line; a point cloud
   reads the point nearest the pointer and lists coincident points; one tooltip layout with the
@@ -358,7 +357,7 @@ what to use instead, and the chart keeps its default:
   pans, + and − zoom, 0 resets and Escape clears; a polite live region reads the cursor. Readonly
   charts are not tab stops.
 
-### Performance (1.0)
+### Performance (0.13)
 
 - Lines and areas are decimated per device column at rest; a 1M-point line first paints in about
   29 ms (was 142). A hover on 200k points visits a few dozen through a grid of the visible points;

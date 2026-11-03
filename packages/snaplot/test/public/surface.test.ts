@@ -19,7 +19,7 @@ describe('[repo-19][frameworks-13] one entry and one name per concept', () => {
     expect(Object.keys(manifest.exports)).toEqual(['.', './react', './solid', './package.json']);
   });
 
-  it('[frameworks-13] each entry exports the 1.0 names and no second way to do the same thing', () => {
+  it('[frameworks-13] each entry exports the 0.13 names and no second way to do the same thing', () => {
     expect(Object.keys(core).sort()).toEqual([
       'createChart',
       'createChartGroup',
