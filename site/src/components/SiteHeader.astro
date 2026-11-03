@@ -7,6 +7,7 @@
  * docs the theme toggle then lives in Starlight's menu, beside the menu button.
  */
 import { version } from '../lib/version';
+import Mark from './Mark.astro';
 import ThemeSelect from './ThemeSelect.astro';
 
 export type Section = 'home' | 'docs' | 'examples' | 'api';
@@ -40,7 +41,8 @@ const mark = (link: { href: string; section?: Section }) =>
     href={base}
     aria-current={current === 'home' ? 'page' : undefined}
   >
-    <span translate="no">snaplot</span>
+    <Mark size={28} />
+    <span class="wordmark" translate="no">snaplot</span>
     <span class="site-version num" data-version={version}>v{version}</span>
   </a>
   <nav class="site-header-nav" aria-label="Site">
@@ -67,58 +69,82 @@ const mark = (link: { href: string; section?: Section }) =>
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.25rem 2rem;
+    gap: 0.25rem 1.75rem;
     min-height: 100%;
     font-size: 0.9375rem;
   }
 
   .brand {
     display: inline-flex;
-    align-items: baseline;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.625rem;
     color: var(--snaplot-ink);
-    font-size: 1.125rem;
-    font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
   }
-  .brand:hover {
+  .wordmark {
+    font-family: var(--snaplot-font-display);
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1;
+  }
+  .brand:hover .wordmark {
     color: var(--snaplot-accent);
   }
+  /* The point of the mark lifts a little on hover, as a new value would. */
+  .brand :global(.mark-point) {
+    transition: transform 200ms var(--snaplot-ease);
+    transform-origin: 23px 9.5px;
+  }
+  .brand:hover :global(.mark-point) {
+    transform: translate(1px, -1.5px) scale(1.12);
+  }
   .site-version {
+    padding: 0.125rem 0.5rem;
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius-pill);
     color: var(--snaplot-ink-secondary);
-    font-size: 0.875rem;
+    font-family: var(--snaplot-font-mono);
+    font-size: 0.6875rem;
     font-weight: 400;
+    line-height: 1.5;
   }
 
   .site-nav {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem 1.25rem;
+    gap: 0.125rem 0.25rem;
     margin: 0;
     padding: 0;
     list-style: none;
   }
   .site-nav a {
-    /* A taller hit area (about 35 px) that moves nothing: the margin takes back the padding. */
-    padding-block: 0.5rem;
-    margin-block: -0.5rem;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--snaplot-radius-pill);
     color: var(--snaplot-ink-secondary);
+    font-weight: 500;
     text-decoration: none;
-    text-underline-offset: 0.3em;
+    transition:
+      color 120ms ease,
+      background-color 120ms ease;
   }
   .site-nav a:hover {
     color: var(--snaplot-ink);
-    text-decoration: underline;
+    background-color: var(--snaplot-surface);
   }
   .site-nav a[aria-current] {
     color: var(--snaplot-accent);
+    background-color: var(--snaplot-accent-soft);
   }
 
   .site-header-tools {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-inline-start: auto;
   }
 
@@ -130,10 +156,29 @@ const mark = (link: { href: string; section?: Section }) =>
     .site-header-nav {
       order: 3;
       flex-basis: 100%;
+      /* The first pill's text lines up with the brand. */
+      margin-inline-start: -0.75rem;
     }
     /* In the docs, Starlight's menu (which holds the toggle) opens from the button on this row. */
     .is-docs .site-header-theme {
       display: none;
+    }
+  }
+  /* A phone: the brand, version and toggle still share the first row. */
+  @media (max-width: 29.99rem) {
+    .brand {
+      gap: 0.5rem;
+    }
+    .brand :global(.mark) {
+      width: 24px;
+      height: 24px;
+    }
+    .wordmark {
+      font-size: 1.25rem;
+    }
+    .site-version {
+      padding-inline: 0.375rem;
+      font-size: 0.625rem;
     }
   }
 </style>

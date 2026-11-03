@@ -1,7 +1,7 @@
 // Style lint for the site (plan §9, uisite-19). Presentational inline styles and !important
 // caused the old site's hover, focus and responsive bugs, so site/src has none; component styles
-// live in classes with real :hover and :focus-visible states. Also: no shouting eyebrows, no
-// gradients or shadows on the homepage, radius at most 6px, and tokens that keep their contrast.
+// live in classes with real :hover and :focus-visible states. Also: no shouting eyebrows, radii and
+// shadows from the tokens on the site's own pages, and tokens that keep their contrast.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -114,27 +114,49 @@ describe('[uisite-19] the visual rules of plan §9', () => {
     expect(found).toEqual([]);
   });
 
-  it('has no gradients or shadows on the homepage', () => {
-    const homepage = [
-      'src/pages/index.astro',
-      'src/layouts/Site.astro',
-      'src/styles/site.css',
-      'src/styles/base.css',
-      'src/styles/tokens.css',
-    ];
-    const found = sources
-      .filter((file) => homepage.includes(file.path))
-      .flatMap((file) =>
-        [...file.text.matchAll(/linear-gradient|radial-gradient|box-shadow/g)].map(
-          (m) => `${file.path}:${lineOf(file.text, m.index ?? 0)} ${m[0]}`,
-        ),
-      );
+  /** The site's own chrome: styles, components, layouts, the homepage and the hub. The demos keep
+   *  their own in-world styles. */
+  const chrome = sources.filter(
+    (file) =>
+      /^src\/(styles|components|layouts)\/|^src\/pages\/(index|examples\/index)\.astro$/.test(
+        file.path,
+      ) && !/tokens\.css$/.test(file.path),
+  );
+
+  it('draws every radius on the site chrome from the radius tokens', () => {
+    const found: string[] = [];
+    for (const file of chrome) {
+      for (const block of cssBlocks(file)) {
+        for (const m of block.body.matchAll(/border-radius:\s*([^;]+)/g)) {
+          const value = (m[1] ?? '').trim();
+          if (!/^(0|0px|50%|inherit|var\(--snaplot-radius(-[a-z]+)?\))$/.test(value)) {
+            found.push(`${file.path}:${block.line} ${m[0]}`);
+          }
+        }
+      }
+    }
     expect(found).toEqual([]);
   });
 
-  it('keeps every border radius at 6px or less', () => {
+  it('draws every shadow on the site chrome from the shadow tokens', () => {
     const found: string[] = [];
-    for (const file of sources) {
+    for (const file of chrome) {
+      for (const block of cssBlocks(file)) {
+        for (const m of block.body.matchAll(/(?:^|[;\s])box-shadow:\s*([^;]+)/g)) {
+          const value = (m[1] ?? '').trim();
+          if (!/^(none|var\(--snaplot-shadow-(sm|md|lg)\))$/.test(value)) {
+            found.push(`${file.path}:${block.line} box-shadow: ${value}`);
+          }
+        }
+      }
+    }
+    expect(found).toEqual([]);
+  });
+
+  it('keeps the demos at a radius of 6px or less', () => {
+    const found: string[] = [];
+    for (const file of sources.filter((f) => !chrome.includes(f))) {
+      if (/tokens\.css$/.test(file.path)) continue;
       for (const block of cssBlocks(file)) {
         for (const m of block.body.matchAll(/border-radius:\s*([^;]+)/g)) {
           for (const v of (m[1] ?? '').matchAll(/([\d.]+)(px|rem|em|%)/g)) {
@@ -191,6 +213,20 @@ describe('[uisite-06] the colour tokens keep their contrast', () => {
     return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
   };
 
+  /** `--snaplot-accent-soft`, the accent mixed into the background: the current page's pill. */
+  const tint = (t: { accent: string; background: string }) => {
+    const share = Number(/--snaplot-accent-soft:[^;]*?([\d.]+)%/.exec(tokens)?.[1]) / 100;
+    if (!share) throw new Error('no --snaplot-accent-soft percentage in tokens.css');
+    const channel = (hex: string, i: number) => Number.parseInt(hex.slice(i, i + 2), 16);
+    return `#${[1, 3, 5]
+      .map((i) =>
+        Math.round(channel(t.accent, i) * share + channel(t.background, i) * (1 - share))
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')}`;
+  };
+
   for (const [mode, selector] of [
     ['dark', ':root'],
     ['light', `:root[data-theme="light"]`],
@@ -200,9 +236,11 @@ describe('[uisite-06] the colour tokens keep their contrast', () => {
       expect(contrast(t.ink, t.background)).toBeGreaterThanOrEqual(7);
       expect(contrast(t.secondary, t.background)).toBeGreaterThanOrEqual(7);
       expect(contrast(t.accent, t.background)).toBeGreaterThanOrEqual(4.5);
-      // Text on the surface (code blocks, the current page in the sidebar).
+      // Text on the surface (code blocks, the fact chips).
       expect(contrast(t.secondary, t.surface)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(t.accent, t.surface)).toBeGreaterThanOrEqual(4.5);
+      // The current page in the nav and the sidebar: the accent on its own tint.
+      expect(contrast(t.accent, tint(t))).toBeGreaterThanOrEqual(4.5);
     });
   }
 });

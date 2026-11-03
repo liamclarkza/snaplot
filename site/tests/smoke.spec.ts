@@ -105,7 +105,9 @@ async function seriousViolations(page: Page): Promise<string[]> {
     undefined,
     { timeout: 5_000 },
   );
-  const { violations } = await new AxeBuilder({ page }).analyze();
+  // The footer's large wordmark is a logotype (aria-hidden, no pointer), which WCAG 1.4.3 exempts
+  // from contrast; it is faint on purpose.
+  const { violations } = await new AxeBuilder({ page }).exclude('.site-footer-mark').analyze();
   return violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
     .map(

@@ -1,13 +1,24 @@
-/* Starlight-specific rules on top of base.css (plan §9). */
+/* Starlight-specific rules on top of base.css: the same faces, radii and surfaces as the custom
+   pages. */
 
-/* Sentence case, left aligned, measured headings. */
-.sl-markdown-content h1,
+/* Headings in Bricolage, sentence case, left aligned. */
+.sl-markdown-content :is(h1, h2, h3, h4),
 h1#_top {
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-family: var(--snaplot-font-display);
+  font-weight: 700;
+  letter-spacing: -0.025em;
 }
-.sl-markdown-content :is(h2, h3, h4) {
-  font-weight: 600;
+h1#_top {
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+.sl-markdown-content h2 {
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+.sl-markdown-content :is(h2, h3) {
+  scroll-margin-top: calc(var(--sl-nav-height) + 1.5rem);
 }
 
 /* A readable measure (≤ 68ch) for prose (uisite-06). */
@@ -15,26 +26,59 @@ h1#_top {
   max-width: 68ch;
 }
 
-/* Links: accent, underlined on hover. */
+/* Links: accent, with a quiet underline that fills in on hover. */
 .sl-markdown-content a:not(.not-content *) {
   color: var(--snaplot-accent);
+  text-decoration-color: var(--snaplot-accent-line);
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 120ms ease;
 }
 .sl-markdown-content a:not(.not-content *):hover {
-  text-decoration-thickness: 2px;
+  text-decoration-color: currentColor;
 }
 
-/* The current page: accent text on the surface, not a filled accent pill. */
+/* Inline code: a small chip on the surface. */
+.sl-markdown-content :not(pre) > code:not(.not-content *) {
+  padding: 0.125em 0.375em;
+  border: 1px solid var(--snaplot-rule);
+  border-radius: var(--snaplot-radius-sm);
+  font-size: 0.875em;
+}
+
+/* The bar is translucent and blurs the page under it. */
+.page > .header {
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+}
+
+/* The sidebar: groups in the body face, links as rounded rows, the current page in ember. */
+.sidebar-content .group-label .large {
+  color: var(--snaplot-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.sidebar-content a {
+  border-radius: var(--snaplot-radius-sm);
+  font-size: 0.875rem;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
 .sidebar-content a[aria-current="page"],
 .sidebar-content a[aria-current="page"]:hover,
 .sidebar-content a[aria-current="page"]:focus {
   color: var(--snaplot-accent);
-  background-color: var(--snaplot-surface);
+  font-weight: 600;
+  background-color: var(--snaplot-accent-soft);
 }
 
 /* Visible hover on the sidebar, header, TOC and footer (uisite-05). */
 .sidebar-content a:not([aria-current="page"]):hover {
   color: var(--snaplot-ink);
   background-color: var(--snaplot-surface);
+}
+.sidebar-content summary {
+  border-radius: var(--snaplot-radius-sm);
 }
 .sidebar-content summary:hover {
   color: var(--snaplot-ink);
@@ -44,17 +88,53 @@ starlight-toc a:hover,
 mobile-starlight-toc a:hover {
   color: var(--snaplot-accent);
 }
+starlight-toc a[aria-current="true"],
+mobile-starlight-toc a[aria-current="true"] {
+  color: var(--snaplot-accent);
+  font-weight: 600;
+}
 .social-icons a:hover,
 .pagination-links a:hover {
   color: var(--snaplot-accent);
 }
 
-/* Hairlines instead of cards; radius at most 6px. */
-.sl-markdown-content :is(pre, .expressive-code .frame) {
-  border-radius: var(--snaplot-radius);
-}
+/* Previous and next: cards that lift. */
 .pagination-links a {
-  border-radius: var(--snaplot-radius);
+  border-color: var(--snaplot-rule);
+  border-radius: var(--snaplot-radius-md);
+  background-color: var(--snaplot-raised);
+  box-shadow: var(--snaplot-shadow-sm);
+  transition:
+    transform 200ms var(--snaplot-ease),
+    box-shadow 200ms var(--snaplot-ease),
+    border-color 200ms var(--snaplot-ease);
+}
+.pagination-links a:hover {
+  border-color: var(--snaplot-rule-strong);
+  box-shadow: var(--snaplot-shadow-md);
+  transform: translateY(-2px);
+}
+.pagination-links a .link-title {
+  font-family: var(--snaplot-font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pagination-links a {
+    transition: none;
+  }
+  .pagination-links a:hover {
+    transform: none;
+  }
+}
+
+/* Tables: a rule under the head, rows divided by hairlines. A long identifier breaks rather than
+   push the table wider than the column (an unfocusable scroll region, uisite-06). */
+.sl-markdown-content table th {
+  font-weight: 600;
+}
+.sl-markdown-content :is(td, th) code {
+  overflow-wrap: anywhere;
 }
 
 /* A touch screen shows the copy button all the time (a mouse sees it on hover), so the code
@@ -70,14 +150,20 @@ mobile-starlight-toc a:hover {
 @media (max-width: 49.99rem) {
   :root,
   :root[data-theme="light"] {
-    --sl-nav-height: 6rem;
+    --sl-nav-height: 6.25rem;
   }
   .sl-menu-button {
     top: calc((3.75rem - var(--sl-menu-button-size)) / 2);
   }
 }
 
-/* Asides sit on the surface token, like code; the variant keeps its coloured left rule (D35). */
+/* Asides sit on the surface token, like code, rounded; the variant keeps its coloured left rule. */
 .starlight-aside {
+  border-radius: var(--snaplot-radius);
   background-color: var(--snaplot-surface);
+}
+.starlight-aside__title {
+  font-family: var(--snaplot-font-display);
+  font-weight: 700;
+  letter-spacing: -0.015em;
 }

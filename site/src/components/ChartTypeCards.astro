@@ -75,7 +75,7 @@ const TYPES = [
     max-width: none;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 1.25rem;
+    gap: 1rem;
     margin: 1.75rem 0 2.5rem;
     padding: 0;
     list-style: none;
@@ -93,22 +93,46 @@ const TYPES = [
   ul.chart-types > li {
     position: relative;
     margin: 0;
-    padding: 1rem 1rem 1.125rem;
+    padding: 0.5rem 0.5rem 1.125rem;
     border: 1px solid var(--snaplot-rule);
-    border-radius: var(--snaplot-radius);
-    background-color: var(--snaplot-background);
-    transition: border-color 120ms ease;
+    border-radius: var(--snaplot-radius-md);
+    background-color: var(--snaplot-raised);
+    box-shadow: var(--snaplot-shadow-sm);
+    transition:
+      transform 220ms var(--snaplot-ease),
+      box-shadow 220ms var(--snaplot-ease),
+      border-color 220ms var(--snaplot-ease);
   }
   ul.chart-types > li:hover {
-    border-color: var(--snaplot-ink-secondary);
+    transform: translateY(-3px);
+    border-color: var(--snaplot-rule-strong);
+    box-shadow: var(--snaplot-shadow-md);
   }
+  @media (prefers-reduced-motion: reduce) {
+    ul.chart-types > li {
+      transition: none;
+    }
+    ul.chart-types > li:hover {
+      transform: none;
+    }
+  }
+  /* The picture sits in a well, which also holds its place until the chart mounts on sight. */
   .chart-type-picture {
     display: block;
     height: 190px;
+    padding: 0.5rem 0.5rem 0;
+    border-radius: var(--snaplot-radius-sm);
+    background-color: var(--snaplot-surface);
   }
   ul.chart-types h3 {
-    margin: 0.875rem 0 0.25rem;
-    font-size: 1.0625rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 1rem 0.625rem 0.25rem;
+    font-family: var(--snaplot-font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
   ul.chart-types h3 a {
     color: var(--snaplot-ink);
@@ -120,13 +144,27 @@ const TYPES = [
     position: absolute;
     inset: 0;
   }
+  ul.chart-types h3::after {
+    content: '→' / '';
+    color: var(--snaplot-accent);
+    font-family: var(--snaplot-font);
+    font-size: 1rem;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition:
+      opacity 160ms ease,
+      transform 160ms var(--snaplot-ease);
+  }
+  ul.chart-types > li:hover h3::after {
+    opacity: 1;
+    transform: none;
+  }
   ul.chart-types > li:hover h3 a,
   ul.chart-types h3 a:focus-visible {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
+    color: var(--snaplot-accent);
   }
   ul.chart-types p {
-    margin: 0;
+    margin: 0 0.625rem;
     color: var(--snaplot-ink-secondary);
     font-size: 0.875rem;
     line-height: 1.5;

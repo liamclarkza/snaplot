@@ -2,9 +2,10 @@
 /**
  * The layout for pages outside the docs: the homepage and the examples hub (plan §9, §10.3).
  * No Starlight chrome, but the same header and footer components as the docs (SiteHeader,
- * SiteFooter). Nav, page and footer share one 72rem container with 24px gutters, anchored at the
- * same left edge as the docs header, so the brand never moves between layouts (uisite-12). The
- * theme script is the docs' own, so a choice made in either place holds in both.
+ * SiteFooter); the footer here ends in the wordmark. Nav, page and footer share one container with
+ * 24px gutters, anchored at the same left edge as the docs header, so the brand never moves
+ * between layouts (uisite-12). The theme script is the docs' own, so a choice made in either place
+ * holds in both.
  */
 import '../styles/fonts.css';
 import '../styles/tokens.css';
@@ -53,7 +54,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       <slot />
     </main>
     <footer class="site-footer" data-pagefind-ignore>
-      <div class="container"><SiteFooter /></div>
+      <div class="container">
+        <SiteFooter />
+        <p class="site-footer-mark" aria-hidden="true">snaplot</p>
+      </div>
     </footer>
   </body>
 </html>

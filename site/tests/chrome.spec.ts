@@ -25,7 +25,7 @@ const fontsOf = (page: Page) =>
 
 test.describe('[m16s] fonts', () => {
   for (const route of ROUTES) {
-    test(`${route}: body and h1 are set in IBM Plex Sans and the Plex faces load`, async ({
+    test(`${route}: body in Geist, the h1 in Bricolage Grotesque, and the faces load`, async ({
       page,
     }) => {
       await page.goto(route);
@@ -38,12 +38,12 @@ test.describe('[m16s] fonts', () => {
         });
       }
       const fonts = await fontsOf(page);
-      expect(fonts.body).toMatch(/^"?IBM Plex Sans"?,/);
-      expect(fonts.h1).toMatch(/^"?IBM Plex Sans"?,/);
+      expect(fonts.body).toMatch(/^"?Geist"?,/);
+      expect(fonts.h1).toMatch(/^"?Bricolage Grotesque"?,/);
       expect(fonts.loaded).toEqual(
-        expect.arrayContaining(['IBM Plex Sans 400', 'IBM Plex Sans 600']),
+        expect.arrayContaining(['Geist 100 900', 'Bricolage Grotesque 200 800']),
       );
-      if (fonts.hasCode) expect(fonts.loaded).toContain('IBM Plex Mono 400');
+      if (fonts.hasCode) expect(fonts.loaded).toContain('Geist Mono 100 900');
     });
   }
 });
@@ -90,8 +90,8 @@ test.describe('[uisite-12][m16s] one header and footer on every page', () => {
 });
 
 test.describe('[m16s] the theme toggle and tokens', () => {
-  const surfaces = { light: 'rgb(255, 255, 255)', dark: 'rgb(17, 17, 19)' };
-  const codeSurfaces = { light: 'rgb(246, 247, 249)', dark: 'rgb(26, 26, 29)' };
+  const surfaces = { light: 'rgb(251, 250, 247)', dark: 'rgb(12, 12, 15)' };
+  const codeSurfaces = { light: 'rgb(242, 240, 235)', dark: 'rgb(22, 22, 27)' };
 
   test('the header toggle sets the same theme and surfaces on every page', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });

@@ -14,7 +14,8 @@ const library = (path) => fileURLToPath(new URL(`../packages/snaplot/${path}`, i
 export default defineConfig({
   site: 'https://liamclarkza.github.io',
   base: '/snaplot/',
-  // The 1.0 betas called the chart types "Marks", one guide page; they are a section now.
+  // Earlier builds of these docs called the chart types "Marks", one guide page; they are a
+  // section now.
   redirects: { '/guides/marks': '/snaplot/chart-types/' },
   // The dev server and `astro preview` take PORT, so parallel worktrees never collide.
   server: { host: '127.0.0.1', port: Number(process.env.PORT ?? 5336) },
@@ -48,14 +49,15 @@ export default defineConfig({
         },
         { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
       ],
-      // Code frames follow the tokens: no shadow, radius 6px, and a copy tooltip in ink on the
-      // background, which passes contrast in both themes (uisite-06).
+      // Code frames follow the tokens: no shadow, the medium radius, and a copy tooltip in ink on
+      // the background, which passes contrast in both themes (uisite-06). Expressive Code rounds
+      // the frame and its title bar or tabs together, so the radius is set here and not in CSS.
       expressiveCode: {
         styleOverrides: {
-          // The site's own stacks, so code is set in Plex Mono in both layouts (D35).
+          // The site's own stacks, so code is set in Geist Mono in both layouts (D35).
           codeFontFamily: 'var(--snaplot-font-mono)',
           uiFontFamily: 'var(--snaplot-font)',
-          borderRadius: '6px',
+          borderRadius: 'var(--snaplot-radius)',
           // Code sits on the surface token in both themes, as asides do (D35).
           codeBackground: 'var(--snaplot-surface)',
           borderColor: 'var(--snaplot-rule)',

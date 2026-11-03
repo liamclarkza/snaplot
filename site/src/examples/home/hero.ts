@@ -17,7 +17,7 @@ export default function hero(el: HTMLElement) {
       },
       y: { type: 'log', min: 20, format: { suffix: ' ms' } },
     },
-    streaming: { maxPoints: 900, followWindow: 4 * 60_000 },
+    streaming: { maxPoints: 900, followWindow: 12 * 60_000 },
     timeZone: 'UTC',
     height: 340,
     ariaLabel: 'Latency of /search, p50 and p99, streaming',

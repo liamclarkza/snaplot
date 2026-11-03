@@ -1,20 +1,27 @@
 ---
 /**
- * The homepage (plan §9, D34), in order: one sentence, the install string and one fact line, a
- * chart and code pair in three tabs (the hero, whose tabs show the files that run beside them),
- * the examples and the footer. There are no performance adjectives or benchmark numbers: the only
- * facts are the version, the measured gzip size of each entry point and the peer ranges
- * (gap-competitive-04).
+ * The homepage (plan §9, D34), in order: one sentence, two ways in and the install string, the
+ * facts as chips, then the stage: a chart that streams while you read, its live readouts, and in
+ * three tabs the very file that draws it. Then the six chart types as live pictures, the examples,
+ * and a last way in. There are no performance adjectives or benchmark numbers: the only facts are
+ * the version, the measured gzip size of each entry point and the peer ranges (gap-competitive-04).
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import ChartTypeCards from '../components/ChartTypeCards.astro';
 import Example from '../components/Example.astro';
 import { Code } from '@astrojs/starlight/components';
 import Site from '../layouts/Site.astro';
 import { DEMOS } from '../lib/demos';
 import routes from '../lib/old-routes.json';
-import { dependencyCount, installCommand, version } from '../lib/version';
+import {
+  dependencyCount,
+  installCommand,
+  isPrerelease,
+  releaseLine,
+  version,
+} from '../lib/version';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const repo = join(process.cwd(), '..');
@@ -44,7 +51,7 @@ const sizes = measure();
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 const entrySizes = ['snaplot', 'snaplot/react', 'snaplot/solid'].map((entry) => {
   const measured = sizes.filter((row) => row.from === entry);
-  return `${entry} ${kb(Math.max(...measured.map((row) => row.gzipBytes)))}`;
+  return { entry, size: kb(Math.max(...measured.map((row) => row.gzipBytes))) };
 });
 
 // "React 19" from `^19.0.0`, "React 18.3/19" from `^18.3.0 || ^19.0.0`.
@@ -62,12 +69,13 @@ const supported = (range = '') =>
     .map(([, major, minor]) => (minor === '0' ? major : `${major}.${minor}`))
     .join('/');
 
-const facts = [
-  `v${version}`,
-  `gzipped: ${entrySizes.join(', ')}`,
-  `${dependencyCount} dependencies`,
-  `React ${supported(peers.react)}`,
-  `Solid ${supported(peers['solid-js'])}`,
+/** The chips: what a fact is about, then its value. */
+const facts: { label: string; value: string }[] = [
+  { label: 'version', value: `v${version}` },
+  ...entrySizes.map(({ entry, size }) => ({ label: 'gzip', value: `${entry} ${size}` })),
+  { label: 'runtime', value: `${dependencyCount} dependencies` },
+  { label: 'peers', value: `React ${supported(peers.react)}` },
+  { label: 'peers', value: `Solid ${supported(peers['solid-js'])}` },
 ];
 
 /** The hero's simulator is the deploy-482 example's; the caption links to it once it is built. */
@@ -103,208 +111,628 @@ const examples = DEMOS.map((demo) => ({
     }
   </script>
 
-  <!-- One sentence pair (research-10): the claim large, the framework promise under it. -->
-  <h1 class="lede">
-    Canvas charts for live data. <span class="lede-sub"
-      >One options object for vanilla JS, React and Solid.</span
-    >
-  </h1>
-  <!-- The install string (D1), as a plain code line with its copy button: no terminal frame. -->
-  <div class="install"><Code code={installCommand()} lang="sh" frame="none" /></div>
-  <p class="facts num">{facts.join(' · ')}</p>
+  <div class="intro">
+    <!-- The release line, and the way in for 0.12 users: this release breaks their code. -->
+    <a class="kicker" href={`${base}migrate-0-12/`}>
+      <span class="kicker-tag">{isPrerelease ? `${releaseLine} beta` : releaseLine}</span>
+      <span>Moving from 0.12?</span>
+      <span class="arrow" aria-hidden="true">→</span>
+    </a>
+    <!-- One sentence pair (research-10): the claim at display size, the framework promise under
+         it. The full stop of the claim is the live point. -->
+    <h1 class="lede">
+      <span class="lede-main"
+        >Canvas charts for <span class="lede-live"
+          >live<svg
+            class="lede-spark"
+            viewBox="0 0 120 14"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+            focusable="false"><path d="M2 10 9 8l7 3 8-6 7 4 8-5 7 7 8-3 7 2 9-8 8 5 9-2 8 4 9-6 7 2"
+            ></path></svg
+          ></span
+        > data<span class="live-stop">.</span></span
+      >
+      {' '}<span class="lede-sub">One options object for vanilla JS, React and Solid.</span>
+    </h1>
+    <div class="actions">
+      <a class="button button-primary" href={`${base}first-chart/`}
+        >Draw your first chart <span class="arrow" aria-hidden="true">→</span></a
+      >
+      <a class="button" href={`${base}examples/`}>See the examples</a>
+      <!-- The install string (D1), as a plain code line with its copy button. -->
+      <div class="install"><Code code={installCommand()} lang="sh" frame="none" /></div>
+    </div>
+    <ul class="facts num" aria-label="Facts">
+      {
+        facts.map((fact) => (
+          <li class="chip">
+            <span class="fact-label">{fact.label}</span> <strong>{fact.value}</strong>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
 
-  <section class="hero" aria-labelledby="hero-title">
+  <section class="stage" aria-labelledby="hero-title" data-stage>
     <h2 id="hero-title" class="sr-only">A chart and its code</h2>
-    <Example name="home/hero" />
-    <p class="hero-caption">
+    <div class="stage-bar">
+      <p class="stage-status">
+        <strong data-readout="status">Live</strong>
+        <span class="stage-what">/search latency</span>
+      </p>
+      <dl class="readouts num">
+        <div class="readout">
+          <dt><span class="swatch swatch-1"></span>p50</dt>
+          <dd><span data-readout="p50">–</span><span class="unit"> ms</span></dd>
+        </div>
+        <div class="readout">
+          <dt><span class="swatch swatch-2"></span>p99</dt>
+          <dd><span data-readout="p99">–</span><span class="unit"> ms</span></dd>
+        </div>
+        <div class="readout">
+          <dt>rows since you arrived</dt>
+          <dd data-readout="streamed">0</dd>
+        </div>
+      </dl>
       <button type="button" class="hero-toggle" data-hero-toggle>Pause</button>
-      <span>
-        A simulated service: the latency of its /search endpoint, ten seconds of data a second.
-        Deploy #482 lands at 03:08 UTC.{' '}
-        {
-          incident ? (
-            <a href={`${base}examples/deploy-482/`}>Did it cause the spike?</a>
-          ) : (
-            'Did it cause the spike?'
-          )
-        }
-      </span>
-    </p>
+    </div>
+    <Example name="home/hero" />
+  </section>
+  <p class="hero-caption">
+    A simulated service: the latency of its /search endpoint, thirty seconds of data a second. Deploy
+    #482 lands at 03:08 UTC.{' '}
+    {
+      incident ? (
+        <a href={`${base}examples/deploy-482/`}>Did it cause the spike?</a>
+      ) : (
+        'Did it cause the spike?'
+      )
+    }
+    <span class="hint">Drag across the chart to zoom; double-click to go back.</span>
+  </p>
+
+  <section class="home-section" aria-labelledby="types-title">
+    <div class="section-head">
+      <h2 id="types-title">Six chart types</h2>
+      <p>
+        A series' <code>type</code> decides how it draws. Each picture is a live chart; its page has
+        the recipes, in all three frameworks.
+      </p>
+      <a class="section-link" href={`${base}chart-types/`}
+        >All chart types <span class="arrow" aria-hidden="true">→</span></a
+      >
+    </div>
+    <ChartTypeCards />
   </section>
 
-  <h2 class="examples-title">Examples</h2>
-  <p class="examples-intro">Each example answers one question with real or documented data.</p>
-  <ul class="home-examples">
-    {
-      examples.map((demo) => (
-        <li data-demo={demo.slug}>
-          {demo.thumbnail && (
-            <picture>
-              {/* A phone shows a close-up of the page's main chart: the whole page cannot be read
-                  at its width. */}
-              <source
-                media="(max-width: 39.99rem)"
-                srcset={`${base}examples/${demo.slug}-close.jpg 640w, ${base}examples/${demo.slug}-close@2x.jpg 1280w`}
-                sizes="100vw"
-              />
-              <img
-                class="demo-thumb"
-                src={`${base}examples/${demo.slug}.jpg`}
-                srcset={`${base}examples/${demo.slug}.jpg 640w, ${base}examples/${demo.slug}@2x.jpg 1280w`}
-                sizes="(min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw"
-                alt=""
-                width="640"
-                height="400"
-                loading="lazy"
-              />
-            </picture>
-          )}
-          <div>
-            <h3>
-              {demo.page ? <a href={`${base}examples/${demo.slug}/`}>{demo.question}</a> : demo.question}
-            </h3>
-            <p class="demo-meta">
-              {demo.framework} · {demo.dataset}
-            </p>
-          </div>
-        </li>
-      ))
-    }
-  </ul>
+  <section class="home-section" aria-labelledby="examples-title">
+    <div class="section-head">
+      <h2 id="examples-title">Six questions, answered</h2>
+      <p>Each example answers one question with real or documented data.</p>
+      <a class="section-link" href={`${base}examples/`}
+        >All examples <span class="arrow" aria-hidden="true">→</span></a
+      >
+    </div>
+    <ul class="home-examples">
+      {
+        examples.map((demo) => (
+          <li class="demo-card" data-demo={demo.slug}>
+            {demo.thumbnail && (
+              <picture class="demo-card-picture">
+                {/* A phone shows a close-up of the page's main chart: the whole page cannot be
+                    read at its width. */}
+                <source
+                  media="(max-width: 39.99rem)"
+                  srcset={`${base}examples/${demo.slug}-close.jpg 640w, ${base}examples/${demo.slug}-close@2x.jpg 1280w`}
+                  sizes="100vw"
+                />
+                <img
+                  class="demo-thumb"
+                  src={`${base}examples/${demo.slug}.jpg`}
+                  srcset={`${base}examples/${demo.slug}.jpg 640w, ${base}examples/${demo.slug}@2x.jpg 1280w`}
+                  sizes="(min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw"
+                  alt=""
+                  width="640"
+                  height="400"
+                  loading="lazy"
+                />
+              </picture>
+            )}
+            <div class="demo-card-body">
+              <h3>
+                {demo.page ? (
+                  <a href={`${base}examples/${demo.slug}/`}>{demo.question}</a>
+                ) : (
+                  demo.question
+                )}
+              </h3>
+              <p class="demo-meta">
+                <span class="framework" data-framework={demo.framework}>
+                  {demo.framework}
+                </span>{' '}
+                · {demo.dataset}
+              </p>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="closing" aria-labelledby="closing-title">
+    <svg class="closing-line" viewBox="0 0 400 240" aria-hidden="true" focusable="false">
+      <path
+        d="M0 205 28 196 52 210 80 184 104 192 132 160 156 172 184 139 210 150 236 112 262 126 290 88 316 98 344 58 372 66"
+      ></path>
+      <circle cx="372" cy="66" r="9"></circle>
+    </svg>
+    <h2 id="closing-title">Plot something that moves</h2>
+    <p>
+      Give a chart an element and one options object, then append rows as they arrive. The same
+      object works in plain JavaScript, in React and in Solid.
+    </p>
+    <div class="actions">
+      <a class="button button-ink" href={`${base}first-chart/`}
+        >Draw your first chart <span class="arrow" aria-hidden="true">→</span></a
+      >
+      <a class="button button-on-ember" href={`${base}reference/api/`}>Read the API</a>
+    </div>
+  </section>
 </Site>
 
 <script>
-  import { bindHeroToggle } from '../examples/data/latency-feed';
+  import { bindHeroReadouts, bindHeroToggle } from '../examples/data/latency-feed';
 
   const toggle = document.querySelector<HTMLButtonElement>('[data-hero-toggle]');
   if (toggle) bindHeroToggle(toggle);
+  const stage = document.querySelector<HTMLElement>('[data-stage]');
+  if (stage) bindHeroReadouts(stage);
 </script>
 
 <style>
-  /* The sentence: the claim at display size, the framework promise under it in the body face. */
+  /* The opening: the claim at display size, then two ways in, the install line and the facts. */
+  .intro {
+    padding-block: clamp(1rem, 4vw, 3.5rem) 0;
+  }
+
+  .kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.25rem;
+    margin-bottom: 1.75rem;
+    padding: 0.25rem 0.875rem 0.25rem 0.3125rem;
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius-pill);
+    background-color: var(--snaplot-raised);
+    color: var(--snaplot-ink-secondary);
+    font-size: 0.875rem;
+    text-decoration: none;
+    box-shadow: var(--snaplot-shadow-sm);
+    transition: border-color 160ms ease;
+  }
+  .kicker:hover {
+    border-color: var(--snaplot-rule-strong);
+    color: var(--snaplot-ink);
+  }
+  .kicker-tag {
+    padding: 0.125rem 0.625rem;
+    border-radius: var(--snaplot-radius-pill);
+    background-color: var(--snaplot-ember);
+    color: var(--snaplot-on-ember);
+    font-family: var(--snaplot-font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .kicker .arrow {
+    transition: transform 160ms var(--snaplot-ease);
+  }
+  .kicker:hover .arrow {
+    transform: translateX(3px);
+  }
+
   .lede {
     max-width: none;
-    margin-block: 1rem 1.75rem;
-    font-size: clamp(2.5rem, 1.75rem + 3vw, 4.25rem);
-    line-height: 1.04;
-    letter-spacing: -0.03em;
+    margin-block: 0 2.25rem;
+  }
+  .lede-main {
+    --lede-size: clamp(3.25rem, 1.25rem + 8.5vw, 8.5rem);
+    display: block;
+    max-width: 11ch;
+    font-size: var(--lede-size);
+    font-weight: 800;
+    line-height: 0.92;
+    letter-spacing: -0.045em;
+  }
+  /* "live" carries a small line drawn in ember, which draws itself in once. */
+  .lede-live {
+    position: relative;
+    display: inline-block;
+  }
+  .lede-spark {
+    position: absolute;
+    left: 0.02em;
+    right: 0.04em;
+    bottom: -0.06em;
+    width: calc(100% - 0.06em);
+    height: 0.14em;
+    overflow: visible;
+  }
+  .lede-spark path {
+    fill: none;
+    stroke: var(--snaplot-point);
+    stroke-width: clamp(3px, 0.045em, 6px);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+    stroke-dasharray: 400;
+    stroke-dashoffset: 400;
+    animation: draw 1.6s 0.3s var(--snaplot-ease) forwards;
+  }
+  @keyframes draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  /* The full stop is the newest point: the character stays for readers (at no size), and an ember
+     dot sits on the baseline in its place. */
+  .live-stop {
+    font-size: 0;
+    color: transparent;
+  }
+  .live-stop::before {
+    content: '';
+    display: inline-block;
+    width: calc(var(--lede-size) * 0.17);
+    height: calc(var(--lede-size) * 0.17);
+    margin-inline-start: calc(var(--lede-size) * 0.035);
+    border-radius: 50%;
+    background-color: var(--snaplot-point);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lede-spark path {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
   }
   .lede-sub {
     display: block;
-    max-width: 44ch;
-    margin-top: 1rem;
+    max-width: 34ch;
+    margin-top: 1.5rem;
     color: var(--snaplot-ink-secondary);
-    font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
+    font-family: var(--snaplot-font);
+    font-size: clamp(1.25rem, 1rem + 0.9vw, 1.75rem);
     font-weight: 400;
-    line-height: 1.45;
-    letter-spacing: 0;
+    line-height: 1.35;
+    letter-spacing: -0.015em;
   }
 
-  /* The install line as wide as its command, the facts beside it on a wide screen. */
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  /* The install line as wide as its command, a pill like the buttons beside it. */
   .install {
     inline-size: fit-content;
-    min-inline-size: 16rem;
+    min-inline-size: 15rem;
   }
+  .install :global(.expressive-code pre) {
+    border-radius: var(--snaplot-radius-pill);
+    border-color: var(--snaplot-rule);
+  }
+  .install :global(.expressive-code .ec-line) {
+    padding-inline-start: 1.25rem;
+  }
+  .install :global(.expressive-code .copy) {
+    inset-inline-end: 0.375rem;
+  }
+  .install :global(.expressive-code .copy button) {
+    border-radius: var(--snaplot-radius-pill);
+  }
+
   .facts {
-    margin: 0.75rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .fact-label {
+    color: var(--snaplot-ink-secondary);
+  }
+  /* A phone: the facts run in one row that scrolls sideways, faded at its end. */
+  @media (max-width: 39.99rem) {
+    .facts {
+      flex-wrap: nowrap;
+      margin-inline: calc(-1 * var(--snaplot-gutter));
+      padding-inline: var(--snaplot-gutter);
+      overflow-x: auto;
+      scrollbar-width: none;
+      mask-image: linear-gradient(90deg, #000 85%, transparent);
+    }
+    .facts::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  /* The stage: the chart that streams while you read, its readouts, and the file that draws it. */
+  .stage {
+    position: relative;
+    margin-top: clamp(2.5rem, 6vw, 4.5rem);
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius-lg);
+    background-color: var(--snaplot-raised);
+    box-shadow: var(--snaplot-shadow-lg);
+    overflow: hidden;
+  }
+  .stage-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.75rem;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--snaplot-rule);
+  }
+  .stage-status {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin: 0;
+    font-size: 0.875rem;
+  }
+  .stage-status strong {
+    min-width: 3.75rem;
+    font-weight: 600;
+  }
+  .stage-what {
+    color: var(--snaplot-ink-secondary);
+    font-family: var(--snaplot-font-mono);
     font-size: 0.8125rem;
   }
-
-  .hero {
-    margin-top: 3rem;
+  .readouts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 1.75rem;
+    margin: 0;
+  }
+  .readout {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .readout dt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--snaplot-ink-secondary);
+    font-size: 0.8125rem;
+  }
+  .readout dd {
+    margin: 0;
+    min-width: 3ch;
+    font-family: var(--snaplot-font-mono);
+    font-size: 1.125rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+  .readout .unit {
+    color: var(--snaplot-ink-secondary);
+    font-size: 0.75rem;
+  }
+  .swatch {
+    width: 0.625rem;
+    height: 0.1875rem;
+    border-radius: var(--snaplot-radius-pill);
+    background-color: var(--snaplot-series-1);
+  }
+  .swatch-2 {
+    background-color: var(--snaplot-series-2);
   }
 
-  /* The chart is the larger half, framed like its code and the same height; the chart first on a
-     phone too. */
+  /* Wide enough for "Back to live", so the bar does not move when the label changes. */
+  .hero-toggle {
+    flex: none;
+    min-width: 7.5rem;
+    min-height: 2.25rem;
+    padding: 0.25rem 1rem;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 550;
+    color: var(--snaplot-ink);
+    background-color: var(--snaplot-surface);
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius-pill);
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease;
+  }
+  .hero-toggle:hover {
+    border-color: var(--snaplot-ink-secondary);
+  }
+  .hero-toggle[data-live='false'] {
+    border-color: var(--snaplot-ember);
+    background-color: var(--snaplot-ember);
+    color: var(--snaplot-on-ember);
+  }
+  .hero-toggle:focus-visible {
+    outline: 2px solid var(--snaplot-accent);
+    outline-offset: 2px;
+  }
+
+  /* The example's own card folds into the stage. */
+  .stage :global(.example) {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+    box-shadow: none;
+  }
+  .stage :global(.example-tabs) {
+    margin: 0.75rem 1.25rem 0;
+  }
+  .stage :global(.example-output) {
+    padding: 1rem 1rem 0.75rem;
+  }
+  .stage :global([data-example-code]) {
+    border-top: 1px solid var(--snaplot-rule);
+  }
+  .stage :global([data-example-code] .expressive-code .frame) {
+    border-radius: 0;
+  }
+  .stage :global([data-example-code] .expressive-code .frame pre) {
+    max-height: 20rem;
+    overflow: auto;
+    border-width: 0;
+    border-radius: 0;
+  }
+  .stage :global([data-example-code] .expressive-code .frame .header) {
+    border-radius: 0;
+  }
+
+  /* A phone: the state and the toggle on one row, the readouts under them. */
+  @media (max-width: 39.99rem) {
+    .stage-bar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.625rem 1rem;
+      padding: 0.75rem 1rem;
+    }
+    .stage-status strong {
+      min-width: 0;
+    }
+    .stage-what {
+      white-space: nowrap;
+    }
+    .readouts {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      gap: 0.25rem 1.25rem;
+    }
+    .stage :global(.example-tabs) {
+      margin: 0.75rem 1rem 0;
+    }
+  }
+
+  /* Wide screens: the tabs sit in the bar, the chart is the larger half and its code runs the
+     chart's height beside it. */
   @media (min-width: 64rem) {
-    .hero :global(.example-panel:not([hidden])) {
+    .stage-bar {
+      padding-inline-end: 18rem;
+    }
+    .stage :global(.example-tabs) {
+      position: absolute;
+      top: 0.75rem;
+      right: 1.25rem;
+      margin: 0;
+    }
+    .stage :global(.example-panel:not([hidden])) {
       display: grid;
       grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-      gap: 1.25rem;
       align-items: stretch;
-      /* The frames start clear of the tabs' rule, so the two edges never sit 2px apart. */
-      padding-top: 1rem;
     }
-    .hero :global(.example-output) {
-      padding: 1rem 1rem 0.75rem;
-      border: 1px solid var(--snaplot-rule);
-      border-radius: var(--snaplot-radius);
-      background-color: var(--snaplot-background);
+    .stage :global(.example-output) {
+      padding: 1.5rem 1.5rem 1rem;
     }
-    /* The code scrolls inside a frame the chart's height rather than running on below it. */
-    .hero :global([data-example-code] pre) {
-      max-height: 22rem;
-      overflow: auto;
+    .stage :global([data-example-code]) {
+      border-top: 0;
+      border-left: 1px solid var(--snaplot-rule);
+    }
+    .stage :global([data-example-code] .expressive-code .frame pre) {
+      max-height: 23.25rem;
     }
   }
 
   /* The hero's code asks for 340px. The adapters do not size their host from `height` yet
      (frameworks-15, D26), so the islands' wrappers and the vanilla mount (sized for the docs'
      280px examples) take it here, or the chart runs over the code below it on a phone. */
-  .hero :global(.example-island),
-  .hero :global(.example-chart) {
+  .stage :global(.example-island),
+  .stage :global(.example-chart) {
     height: 340px;
   }
-  .hero :global(.example-output) {
+  .stage :global(.example-output) {
     min-height: 340px;
   }
 
   .hero-caption {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-    margin: 0.875rem 0 0;
+    max-width: 72ch;
+    margin: 1.125rem 0 0;
     color: var(--snaplot-ink-secondary);
     font-size: 0.875rem;
-    max-width: none;
+  }
+  .hint {
+    display: block;
+    margin-top: 0.25rem;
+    font-family: var(--snaplot-font-mono);
+    font-size: 0.75rem;
   }
 
-  /* On a phone the button sits above its three lines rather than beside the first. */
-  @media (max-width: 40rem) {
-    .hero-caption {
-      flex-direction: column;
-      align-items: flex-start;
-    }
+  /* Sections: a heading with its sentence and a link, then the grid. */
+  .home-section {
+    margin-top: clamp(5rem, 10vw, 8rem);
   }
-
-  /* Wide enough for "Back to live", so the caption does not move when the label changes. */
-  .hero-toggle {
-    flex: none;
-    min-width: 6.5rem;
-    padding: 0.25rem 0.75rem;
-    font: inherit;
-    color: var(--snaplot-ink);
-    background-color: var(--snaplot-background);
-    border: 1px solid var(--snaplot-rule);
-    border-radius: var(--snaplot-radius);
-    cursor: pointer;
+  .section-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem 2rem;
+    align-items: end;
+    margin-bottom: 2rem;
   }
-
-  .hero-toggle:hover {
-    background-color: var(--snaplot-surface);
-    border-color: var(--snaplot-ink-secondary);
+  .section-head h2 {
+    margin: 0;
   }
-
-  .hero-toggle:focus-visible {
-    outline: 2px solid var(--snaplot-accent);
-    outline-offset: 2px;
-  }
-
-  /* The examples: a grid of pictures with their questions under them, each item one link. */
-  .examples-title {
-    margin-block: 5rem 0.5rem;
-    font-size: 1.75rem;
-    letter-spacing: -0.015em;
-  }
-  .examples-intro {
-    margin: 0 0 2rem;
+  .section-head p {
+    margin: 0;
     color: var(--snaplot-ink-secondary);
     font-size: 1.0625rem;
   }
+  .section-link {
+    justify-self: start;
+    color: var(--snaplot-ink);
+    font-weight: 550;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .section-link .arrow {
+    display: inline-block;
+    color: var(--snaplot-accent);
+    transition: transform 160ms var(--snaplot-ease);
+  }
+  .section-link:hover .arrow {
+    transform: translateX(3px);
+  }
+  @media (min-width: 64rem) {
+    .section-head {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .section-head h2 {
+      grid-column: 1;
+    }
+    .section-head p {
+      grid-column: 1;
+    }
+    .section-link {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: end;
+      justify-self: end;
+    }
+  }
+  .home-section :global(ul.chart-types) {
+    margin: 0;
+  }
+
+  /* The examples: cards with the page's picture, the question and the framework. */
   ul.home-examples {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 2rem 1.5rem;
+    gap: 1.25rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -312,7 +740,6 @@ const examples = DEMOS.map((demo) => ({
   @media (min-width: 40rem) {
     ul.home-examples {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      row-gap: 2.5rem;
     }
   }
   @media (min-width: 64rem) {
@@ -320,51 +747,89 @@ const examples = DEMOS.map((demo) => ({
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
-  ul.home-examples > li {
-    position: relative;
-  }
-  ul.home-examples picture {
-    display: block;
-  }
-  .demo-thumb {
-    display: block;
-    width: 100%;
-    height: auto;
-    aspect-ratio: 8 / 5;
-    object-fit: cover;
-    object-position: top;
-    border: 1px solid var(--snaplot-rule);
-    border-radius: var(--snaplot-radius);
-    transition: border-color 120ms ease;
-  }
-  /* The light pages' pictures sit a little dimmer on a dark page. */
-  :global(:root[data-theme='dark']) .demo-thumb {
-    filter: brightness(0.88);
-  }
   .home-examples h3 {
-    margin: 0.875rem 0 0.25rem;
-    font-size: 1.0625rem;
-    line-height: 1.35;
-  }
-  .home-examples h3 a {
-    color: var(--snaplot-ink);
-    text-decoration: none;
-  }
-  /* The whole item is the link: its picture, its question and its line. */
-  .home-examples h3 a::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-  }
-  .home-examples li:hover .demo-thumb {
-    border-color: var(--snaplot-ink-secondary);
-  }
-  .home-examples li:hover h3 a,
-  .home-examples h3 a:focus-visible {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
+    margin: 0 0 0.5rem;
+    font-size: 1.1875rem;
+    line-height: 1.25;
   }
   .home-examples .demo-meta {
     font-size: 0.8125rem;
+  }
+
+  /* The last way in: an ember panel, with a line in ink climbing to its newest point. */
+  .closing {
+    position: relative;
+    margin-top: clamp(5rem, 10vw, 8rem);
+    padding: clamp(2rem, 5vw, 4rem);
+    border-radius: var(--snaplot-radius-lg);
+    background-color: var(--snaplot-ember);
+    color: var(--snaplot-on-ember);
+    overflow: hidden;
+  }
+  .closing > :not(.closing-line) {
+    position: relative;
+  }
+  .closing-line {
+    position: absolute;
+    right: clamp(-4rem, -2vw, 0rem);
+    bottom: clamp(1rem, 3vw, 2.5rem);
+    width: min(48%, 34rem);
+    height: auto;
+    overflow: visible;
+    opacity: 0.9;
+  }
+  .closing-line path {
+    fill: none;
+    stroke: var(--snaplot-on-ember);
+    stroke-width: 5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .closing-line circle {
+    fill: #fbfaf7;
+    stroke: var(--snaplot-on-ember);
+    stroke-width: 5;
+  }
+  /* On a phone the line runs behind the text, faintly. */
+  @media (max-width: 47.99rem) {
+    .closing-line {
+      width: 90%;
+      right: -10%;
+      bottom: 0.5rem;
+      opacity: 0.18;
+    }
+  }
+  .closing h2 {
+    max-width: 14ch;
+    margin: 0 0 1rem;
+    font-size: clamp(2.25rem, 1.5rem + 3.5vw, 4.5rem);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.05em;
+  }
+  .closing p {
+    max-width: 46ch;
+    margin: 0 0 2rem;
+    font-size: 1.125rem;
+  }
+  .closing :global(.button-ink) {
+    border-color: var(--snaplot-on-ember);
+    background-color: var(--snaplot-on-ember);
+    color: #fbfaf7;
+  }
+  .closing :global(.button-ink:hover) {
+    border-color: var(--snaplot-on-ember);
+    background-color: #2a2a2e;
+  }
+  .closing :global(.button-on-ember) {
+    border-color: color-mix(in srgb, var(--snaplot-on-ember) 40%, transparent);
+    background-color: transparent;
+    color: var(--snaplot-on-ember);
+  }
+  .closing :global(.button-on-ember:hover) {
+    border-color: var(--snaplot-on-ember);
+  }
+  .closing :global(:focus-visible) {
+    outline-color: var(--snaplot-on-ember);
   }
 </style>

@@ -477,6 +477,7 @@ The implementers apply each recommendation. M0 copies a condensed list into `doc
 - **Recommendation: IBM Plex Sans and IBM Plex Mono, self-hosted via `@fontsource` (OFL).** The visual fixtures already load Plex for determinism, so this adds no dependency.
 - Surfaces are plain white and near-black (`#FFFFFF` / `#111113`), not warm paper. The accent is the library's own first series colour (`#0072B2` light, `#56B4E9` dark), so the site is visibly the chart's own palette rather than a stock "tasteful" teal.
 - Panel: judge 2 on Plex. Judge 1 preferred the system stack, which is the one-line fallback if the maintainer disagrees.
+- **Superseded on 2026-11-02.** The maintainer found the result bland and chose a new look ("Ember") from four prototypes: Bricolage Grotesque, Geist and Geist Mono; warm paper and near-black; ember as the one loud colour, with an accent derived from it. §9 has the tokens. The library's visual fixtures still load Plex Sans for determinism.
 
 **D36. Deferred features.** These go to `docs/backlog.md` with acceptance criteria. They are features, not findings; declined *findings* are listed only in the §6 won't-do table, which `docs/backlog.md` references.
 - IANA time zones, reversed axes, stacked bars and areas (with a `stack()` helper), horizontal bars;
@@ -1391,16 +1392,21 @@ Every adapter capability is a public core feature: `setOptions`, state options, 
 **Homepage** (`site/src/pages/index.astro`, custom layout, no Starlight chrome), in order:
 
 1. **One left-aligned sentence:** "Canvas charts for live data. One options object for vanilla JS, React and Solid." It becomes "live and dense data" only if ADR 0002 records that `firstpaint-line-1m` met ≤ 45 ms desktop and ≤ 150 ms mobile in M14; `lint-copy` enforces this by failing on "dense" when ADR 0002 marks the budget missed.
-2. **The generated install string** (D1: `npm i snaplot@next` while the version is a prerelease) with a copy button. Prerelease builds show the beta banner.
-3. **A code/chart pair** with persisted Vanilla, React and Solid tabs.
+   - The claim is set at display size. A short line in ember draws itself in once under "live", and the full stop is a still ember point. Nothing on the site pulses.
+   - While the version is a prerelease, a small link above it leads to the migration guide.
+2. **The next step:** a primary button ("Draw your first chart"), a secondary one ("See the examples"), and the generated install string (D1: `npm i snaplot@next` while the version is a prerelease) with a copy button. Prerelease builds show the beta banner.
+3. **One row of facts as chips:** version · gzip size per entry (from `scripts/size.mjs --json`) · 0 dependencies · React 18/19 · Solid 1.9. There are **no performance adjectives or bench numbers** until the maintainer publishes a measured comparison (gap-competitive-04).
+4. **The stage: a code/chart pair** with persisted Vanilla, React and Solid tabs.
    - The code shown is the literal source (`?raw`) of the chart beside it: `site/src/examples/home/hero.{ts,react.tsx,solid.tsx}`, about 18 lines each.
    - It streams the deploy-#482 simulator's p50/p99 with `appendData` (the shared `site/src/demos/deploy-482/simulator.ts`), never rebuilding arrays.
+   - A bar above it shows the stream's state (Live, Zoomed, Paused), the newest p50 and p99, the rows streamed since the page opened, and the pause button. A one-line hint under it says how to zoom and go back.
    - It pauses offscreen, starts paused under `prefers-reduced-motion`, and has a visible pause button (uisite-13, demos-15).
-4. **One fact line:** version · gzip size per entry (from `scripts/size.mjs --json`) · 0 dependencies · React 18/19 · Solid 1.9. There are **no performance adjectives or bench numbers** until the maintainer publishes a measured comparison (gap-competitive-04).
-5. **The examples list:** six rows, each with its real Playwright thumbnail (`site/public/examples/<slug>.jpg`), the question, the framework and the dataset.
-6. **Footer:** Docs · Examples · API · Changelog · GitHub · licence · version.
+5. **The six chart types,** each a small live chart linking to its page.
+6. **The examples list:** six cards, each with its real Playwright thumbnail (`site/public/examples/<slug>.jpg`), the question, the framework and the dataset.
+7. **A closing panel** in ember with the same two next steps.
+8. **Footer:** Docs · Examples · API · Changelog · GitHub · licence · version, then the wordmark, large and faint, cut off by the bottom of the page.
 
-There is no gallery of feature tiles.
+There is no gallery of feature tiles: the chart-type cards are charts, not claims.
 
 **Cut** (all of it goes with the old site in M0; uisite §4):
 - the glow and grid hero background;
@@ -1414,27 +1420,32 @@ There is no gallery of feature tiles.
 - body-wide `tabular-nums` and "Soft UI" elevation tokens;
 - every presentational inline style and every `!important`.
 
-**Design system** (`site/src/styles/tokens.css`, mapped onto Starlight's `--sl-*` variables):
+**Design system** (`site/src/styles/tokens.css`, mapped onto Starlight's `--sl-*` variables). The identity is the live edge: a line that ends in its newest point. That point is ember, the vermilion of the library's Okabe–Ito palette pushed bright, and it is the only loud colour on the site.
 
 | Token | Light | Dark |
 |---|---|---|
-| background | `#FFFFFF` | `#111113` |
-| surface (code blocks, the active nav item) | `#F6F7F9` | `#1A1A1D` |
-| ink | `#1C1C1E` | `#ECEAE6` |
-| secondary ink | `#55565E` (≥ 7:1) | `#A6A4AB` |
-| rules | `#E3E4E8` | `#2C2C30` |
-| accent (links, focus and current page only) | `#0072B2`, the library's first series colour (5.2:1) | `#56B4E9` (8.2:1) |
+| background | `#FBFAF7` | `#0C0C0F` |
+| surface (code blocks, asides, the footer) | `#F2F0EB` | `#16161B` |
+| raised (cards, the stage, examples) | `#FFFFFF` | `#1A1A20` |
+| ink | `#141416` (≥ 17:1) | `#F3F1EC` (≥ 17:1) |
+| secondary ink | `#4D4E56` (≥ 7:1) | `#AEACB4` (≥ 7:1) |
+| rules (and strong rules) | `#E4E1DA` (`#CFCBC2`) | `#2A2A31` (`#3D3D46`) |
+| accent (links, focus and current page only) | `#A93C0B` (6.0:1; 4.9:1 on its tint) | `#FF8552` (8.1:1; 6.8:1 on its tint) |
+| ember (the mark, the headline's full stop, the primary button) | `#FF6A3D`, ink on it 6.5:1 | `#FF6A3D` |
 
-- **Type.** IBM Plex Sans (UI and body) and IBM Plex Mono (code), latin and latin-ext woff2 subsets via `@fontsource`.
-  - Body 16/1.6 at a measure of 68ch or less; small text 14.
-  - h1 40/600 at −0.01em; h2 24/600; h3 18/600.
+- **Type.** Bricolage Grotesque (headings and the wordmark), Geist (UI and body) and Geist Mono (code), latin and latin-ext woff2 subsets via `@fontsource-variable`.
+  - Body 16/1.65 at a measure of 68ch or less; small text 14.
+  - The homepage claim is 52–136 px/800 at −0.045em. Docs h1 48/800; h2 30/700; h3 20/700.
   - Sentence case and left alignment everywhere.
   - `tabular-nums` only on `.num`, tables and code (uisite-07).
-- **Layout.** One 72rem container with 24 px gutters, shared by nav, pages and footer (uisite-12). Hairline rules instead of cards. Radius ≤ 6 px. No shadows, glows, gradients, glass or hover lifts. Visible hover states on nav, sidebar, footer and buttons (uisite-05).
+- **Brand.** `site/src/components/Mark.astro`: an ink tile with a line that ends in an ember point, beside the wordmark in the header; `site/public/favicon.svg` is the same mark.
+- **Layout.** One container with 24 px gutters, shared by nav, pages and footer (uisite-12): 72rem, growing to 90rem past 64rem, always from the docs header's left edge. The header is translucent with a blur.
+- **Surfaces.** Radius tokens: 8 px (small), 12 px (code), 16 px (cards, the stage), 20 px (the closing panel) and pills for buttons, chips and nav links. Three shadow tokens (sm, md, lg). Cards lift on hover by a few pixels, and stay still under `prefers-reduced-motion`. No glows, glass panels or gradients. Visible hover states on nav, sidebar, footer, cards and buttons (uisite-05).
+- **Buttons.** One pill system (`.button`, `.button-primary` in ember with ink text), at least 44 px tall; nav links are 36 px pills.
 - **Focus.** `outline: 2px solid var(--accent); outline-offset: 2px`, and `Highlight` in forced colours (uisite-04).
 - **Theme.** A three-state toggle (system, light, dark) that overrides Starlight's `ThemeProvider` and `ThemeSelect`, with a pre-paint script and `color-scheme`. The storage key is `snaplot-site-theme-v2`, and every storage access is in try/catch (uisite-01/02).
 - **Charts on the site** use `theme: 'auto'` and never receive a theme object, so every page proves D4 and D5.
-- **Style lint.** `site/tests/lint-styles.test.ts` fails on `style={{` or `!important` in `site/src`, outside an allow-list for chart host heights. It also fails on `text-transform: uppercase` combined with `letter-spacing` above 0.05em, and on `linear-gradient`, `radial-gradient` or `box-shadow` on the homepage (uisite-19). The copy lint is in §8.3.
+- **Style lint.** `site/tests/lint-styles.test.ts` fails on `style={{` or `!important` in `site/src`, outside an allow-list for chart host heights. It also fails on `text-transform: uppercase` combined with `letter-spacing` above 0.05em, on a radius or `box-shadow` in the site's own chrome that does not come from the tokens, and on a radius above 6 px in a demo (uisite-19). The copy lint is in §8.3.
 
 ---
 

@@ -1,0 +1,46 @@
+---
+/**
+ * The mark: a line that ends in its newest point, the live edge. Ink tile, a line in the page's
+ * own background colour and an ember point, so it inverts with the theme. Decorative: the
+ * wordmark beside it names the site.
+ */
+interface Props {
+  /** Edge length in CSS pixels. */
+  size?: number;
+}
+
+const { size = 28 } = Astro.props;
+---
+
+<svg
+  class="mark"
+  width={size}
+  height={size}
+  viewBox="0 0 32 32"
+  aria-hidden="true"
+  focusable="false"
+>
+  <rect class="mark-tile" width="32" height="32" rx="9"></rect>
+  <path class="mark-line" d="M6.5 21.5 11.5 15l4.5 3.5 6-8.5"></path>
+  <circle class="mark-point" cx="23" cy="9.5" r="3.5"></circle>
+</svg>
+
+<style>
+  .mark {
+    display: block;
+    flex: none;
+  }
+  .mark-tile {
+    fill: var(--snaplot-ink);
+  }
+  .mark-line {
+    fill: none;
+    stroke: var(--snaplot-background);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .mark-point {
+    fill: var(--snaplot-point);
+  }
+</style>

@@ -124,45 +124,78 @@ const tabs = FRAMEWORKS.map((framework) => ({
 </snaplot-example>
 
 <style define:vars={{ chartHeight: `${EXAMPLE_HEIGHT}px` }}>
+  /* One card: the framework switch, the chart on the raised surface, then its file. */
   .example {
     display: block;
-    margin-block: 1.5rem;
+    margin-block: 1.75rem;
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius-md);
+    background-color: var(--snaplot-raised);
+    box-shadow: var(--snaplot-shadow-sm);
+    overflow: hidden;
   }
+  /* The framework switch: a segmented control. */
   .example-tabs {
-    display: flex;
-    gap: 0.25rem;
-    border-bottom: 1px solid var(--snaplot-rule);
+    display: inline-flex;
+    gap: 2px;
+    margin: 0.75rem 0.75rem 0;
+    padding: 3px;
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius-pill);
+    background-color: var(--snaplot-surface);
   }
   .example-tabs [role='tab'] {
-    font: inherit;
-    font-size: 0.875rem;
-    color: var(--snaplot-ink-secondary);
-    background: none;
+    min-height: 2rem;
+    padding: 0.25rem 0.875rem;
     border: 0;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    padding: 0.5rem 0.75rem;
+    border-radius: var(--snaplot-radius-pill);
+    background: none;
+    color: var(--snaplot-ink-secondary);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.2;
     cursor: pointer;
+    transition:
+      color 120ms ease,
+      background-color 120ms ease;
   }
   .example-tabs [role='tab']:hover {
     color: var(--snaplot-ink);
-    border-bottom-color: var(--snaplot-rule);
+    background-color: color-mix(in srgb, var(--snaplot-ink) 6%, transparent);
   }
   .example-tabs [role='tab'][aria-selected='true'] {
     color: var(--snaplot-ink);
     font-weight: 600;
-    border-bottom-color: var(--snaplot-accent);
+    background-color: var(--snaplot-raised);
+    box-shadow: var(--snaplot-shadow-sm);
   }
   .example-output {
-    padding-block: 1rem;
+    padding: 1rem 1rem 0.75rem;
     min-height: var(--chartHeight);
   }
   .example-chart {
     display: block;
     height: var(--chartHeight);
   }
-  /* Controls an example adds of its own (month buttons, Back to live) take the site's quiet
-     style rather than the browser's; snaplot's own buttons keep theirs. */
+  /* The file runs the card's width under the chart, its frame folded into the card's. */
+  [data-example-code] {
+    border-top: 1px solid var(--snaplot-rule);
+  }
+  [data-example-code] :global(.expressive-code) {
+    margin: 0;
+  }
+  [data-example-code] :global(.expressive-code .frame),
+  [data-example-code] :global(.expressive-code .frame .header),
+  [data-example-code] :global(.expressive-code .frame pre) {
+    border-radius: 0;
+  }
+  [data-example-code] :global(.expressive-code .frame pre) {
+    border-inline: 0;
+    border-bottom: 0;
+  }
+  /* Controls an example adds of its own (month buttons, Back to live) take the site's pill style
+     rather than the browser's; snaplot's own buttons keep theirs. */
   .example-output :global([role='group']) {
     display: flex;
     flex-wrap: wrap;
@@ -170,13 +203,15 @@ const tabs = FRAMEWORKS.map((framework) => ({
     margin-bottom: 0.75rem;
   }
   .example-output :global(button:not([class*='snaplot'])) {
+    min-height: 2rem;
     font: inherit;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
     color: var(--snaplot-ink);
     background: var(--snaplot-surface);
     border: 1px solid var(--snaplot-rule);
-    border-radius: var(--snaplot-radius);
-    padding: 0.25rem 0.75rem;
+    border-radius: var(--snaplot-radius-pill);
+    padding: 0.25rem 0.875rem;
     margin: 0 0 0.75rem;
     cursor: pointer;
   }

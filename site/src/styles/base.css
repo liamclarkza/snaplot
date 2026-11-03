@@ -1,10 +1,13 @@
 /*
- * Rules shared by the docs and the custom pages (plan §9). Classes and element selectors only: no
- * inline presentational styles and no !important anywhere on the site (uisite-19).
+ * Rules shared by the docs and the custom pages. Classes and element selectors only: no inline
+ * presentational styles and no !important anywhere on the site (uisite-19).
  */
 
 body {
   font-family: var(--snaplot-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 code,
@@ -12,6 +15,10 @@ kbd,
 pre,
 samp {
   font-family: var(--snaplot-font-mono);
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--snaplot-ember) 35%, transparent);
 }
 
 /* Focus: one visible ring everywhere, and the system highlight in forced colours (uisite-04). */
@@ -32,4 +39,84 @@ pre,
 kbd,
 .num {
   font-variant-numeric: tabular-nums;
+}
+
+/* Buttons and button-like links: pills. Primary is ember with ink text in both themes. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--snaplot-rule-strong);
+  border-radius: var(--snaplot-radius-pill);
+  background-color: var(--snaplot-raised);
+  color: var(--snaplot-ink);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 550;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 160ms var(--snaplot-ease),
+    background-color 160ms var(--snaplot-ease),
+    border-color 160ms var(--snaplot-ease),
+    box-shadow 160ms var(--snaplot-ease);
+}
+.button:hover {
+  border-color: var(--snaplot-ink-secondary);
+  transform: translateY(-1px);
+  box-shadow: var(--snaplot-shadow-sm);
+}
+.button:active {
+  transform: translateY(0);
+}
+.button-primary {
+  border-color: var(--snaplot-ember);
+  background-color: var(--snaplot-ember);
+  color: var(--snaplot-on-ember);
+}
+.button-primary:hover {
+  border-color: var(--snaplot-ember);
+  background-color: color-mix(in srgb, var(--snaplot-ember) 88%, var(--snaplot-raised));
+  box-shadow: var(--snaplot-shadow-md);
+}
+.button .arrow {
+  transition: transform 160ms var(--snaplot-ease);
+}
+.button:hover .arrow {
+  transform: translateX(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .button .arrow {
+    transition: none;
+  }
+  .button:hover,
+  .button:hover .arrow {
+    transform: none;
+  }
+}
+
+/* Chips: small facts and labels, set in mono. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--snaplot-rule);
+  border-radius: var(--snaplot-radius-pill);
+  background-color: var(--snaplot-surface);
+  color: var(--snaplot-ink-secondary);
+  font-family: var(--snaplot-font-mono);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.chip strong {
+  color: var(--snaplot-ink);
+  font-weight: 500;
 }

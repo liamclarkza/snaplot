@@ -1,38 +1,76 @@
 /*
- * The site's design tokens (plan §9, D35) and their mapping onto Starlight's variables. One set
- * for the docs, the homepage, the examples hub and the 404 page. Plain white and near-black
- * surfaces; the accent is the library's own first series colour and is used only for links, focus
- * and the current page. Contrast on the background: ink ≥ 15:1, secondary ink ≥ 7:1, accent 5.2:1
- * (light) and 8.2:1 (dark).
+ * The site's design tokens and their mapping onto Starlight's variables. One set for the docs, the
+ * homepage, the examples hub and the 404 page.
+ *
+ * The identity is the live edge: a line that ends in its newest point. That point is ember, the
+ * vermilion of the library's own Okabe–Ito palette pushed bright, and it is the only loud colour on
+ * the site: the mark, the headline's full stop, the primary button and the current page. Links and
+ * focus use the accent, ember darkened (light) or lightened (dark) until it reads as text. Nothing on
+ * the site pulses.
+ *
+ * Contrast on the background (site/tests/lint-styles.test.ts): ink ≥ 17:1, secondary ink ≥ 7:1,
+ * accent 6.0:1 (light) and 8.1:1 (dark), and still 4.9:1 and 6.8:1 on its own tint (the current page).
+ * Ink on ember is 6.5:1 in both themes.
  *
  * Starlight renders dark by default and switches on [data-theme='light'], which the head script in
  * ThemeProvider.astro sets before the first paint.
  */
 :root {
-  --snaplot-background: #111113;
-  --snaplot-surface: #1a1a1d;
-  --snaplot-ink: #eceae6;
-  --snaplot-ink-secondary: #a6a4ab;
-  --snaplot-rule: #2c2c30;
-  --snaplot-accent: #56b4e9;
+  --snaplot-background: #0c0c0f;
+  --snaplot-surface: #16161b;
+  --snaplot-raised: #1a1a20;
+  --snaplot-ink: #f3f1ec;
+  --snaplot-ink-secondary: #aeacb4;
+  --snaplot-rule: #2a2a31;
+  --snaplot-rule-strong: #3d3d46;
+  --snaplot-accent: #ff8552;
+  /* The library's default dark palette, first two series: the hero's readouts wear them. */
+  --snaplot-series-1: #56b4e9;
+  --snaplot-series-2: #e69f00;
+  --snaplot-shadow-sm: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 1px 2px rgb(0 0 0 / 0.4);
+  --snaplot-shadow-md: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 12px 32px -12px rgb(0 0 0 / 0.75);
+  --snaplot-shadow-lg: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 32px 64px -24px rgb(0 0 0 / 0.8);
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-  --snaplot-background: #ffffff;
-  --snaplot-surface: #f6f7f9;
-  --snaplot-ink: #1c1c1e;
-  --snaplot-ink-secondary: #55565e;
-  --snaplot-rule: #e3e4e8;
-  --snaplot-accent: #0072b2;
+  --snaplot-background: #fbfaf7;
+  --snaplot-surface: #f2f0eb;
+  --snaplot-raised: #ffffff;
+  --snaplot-ink: #141416;
+  --snaplot-ink-secondary: #4d4e56;
+  --snaplot-rule: #e4e1da;
+  --snaplot-rule-strong: #cfcbc2;
+  --snaplot-accent: #a93c0b;
+  --snaplot-series-1: #0072b2;
+  --snaplot-series-2: #009e73;
+  --snaplot-shadow-sm: 0 1px 2px rgb(20 20 22 / 0.06), 0 1px 1px rgb(20 20 22 / 0.04);
+  --snaplot-shadow-md: 0 2px 6px rgb(20 20 22 / 0.05), 0 12px 28px -10px rgb(20 20 22 / 0.16);
+  --snaplot-shadow-lg: 0 2px 8px rgb(20 20 22 / 0.05), 0 32px 64px -28px rgb(20 20 22 / 0.28);
   color-scheme: light;
 }
 
 :root,
 :root[data-theme="light"] {
+  /* Ember fills the mark, the headline's full stop and the primary button in both themes; text on it
+     is ink. */
+  --snaplot-ember: #ff6a3d;
+  --snaplot-on-ember: #141416;
+  /* The live point: the mark's dot, the line under "live" and the headline's full stop. */
+  --snaplot-point: var(--snaplot-ember);
+  --snaplot-accent-soft: color-mix(in srgb, var(--snaplot-accent) 13%, transparent);
+  --snaplot-accent-line: color-mix(in srgb, var(--snaplot-accent) 45%, transparent);
+
   --snaplot-container: 72rem;
   --snaplot-gutter: 24px;
-  --snaplot-radius: 6px;
+  /* Radii: chips and buttons are pills, code and inputs small, cards and the stage larger. */
+  --snaplot-radius-sm: 8px;
+  --snaplot-radius: 12px;
+  --snaplot-radius-md: 16px;
+  --snaplot-radius-lg: 20px;
+  --snaplot-radius-pill: 999px;
+  --snaplot-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
   /* The fallback stacks are the site's own: the custom layout loads no Starlight stylesheet in dev,
      so a var(--sl-font-system) here left its body in the browser's default serif. */
   --snaplot-font-system:
@@ -41,8 +79,9 @@
   --snaplot-font-system-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
     monospace;
-  --snaplot-font: "IBM Plex Sans", var(--snaplot-font-system);
-  --snaplot-font-mono: "IBM Plex Mono", var(--snaplot-font-system-mono);
+  --snaplot-font: "Geist", var(--snaplot-font-system);
+  --snaplot-font-display: "Bricolage Grotesque", var(--snaplot-font);
+  --snaplot-font-mono: "Geist Mono", var(--snaplot-font-system-mono);
 
   /* Colours. Starlight's "white" is the highest-contrast ink and "black" the background. */
   --sl-color-white: var(--snaplot-ink);
@@ -54,14 +93,15 @@
   --sl-color-gray-6: var(--snaplot-surface);
   --sl-color-gray-7: var(--snaplot-surface);
   --sl-color-black: var(--snaplot-background);
-  --sl-color-accent-low: var(--snaplot-surface);
+  --sl-color-accent-low: var(--snaplot-accent-soft);
   --sl-color-accent: var(--snaplot-accent);
   --sl-color-accent-high: var(--snaplot-accent);
   --sl-color-text: var(--snaplot-ink);
   --sl-color-text-accent: var(--snaplot-accent);
   --sl-color-text-invert: var(--snaplot-background);
   --sl-color-bg: var(--snaplot-background);
-  --sl-color-bg-nav: var(--snaplot-background);
+  /* The bar is translucent and blurs what scrolls under it (docs.css). */
+  --sl-color-bg-nav: color-mix(in srgb, var(--snaplot-background) 82%, transparent);
   --sl-color-bg-sidebar: var(--snaplot-background);
   --sl-color-bg-inline-code: var(--snaplot-surface);
   --sl-color-bg-accent: var(--snaplot-accent);
@@ -72,29 +112,28 @@
   /* The docs header keeps the custom pages' 24px gutter at every width (uisite-12). */
   --sl-nav-pad-x: var(--snaplot-gutter);
 
-  /* No shadows, glows or gradients anywhere (plan §9). */
-  --sl-shadow-sm: none;
-  --sl-shadow-md: none;
-  --sl-shadow-lg: none;
+  --sl-shadow-sm: var(--snaplot-shadow-sm);
+  --sl-shadow-md: var(--snaplot-shadow-md);
+  --sl-shadow-lg: var(--snaplot-shadow-lg);
 
-  /* Type: Plex, body 16/1.6, h1 40, h2 24, h3 18, small text 14. */
-  --sl-font: "IBM Plex Sans";
-  --sl-font-mono: "IBM Plex Mono";
-  --sl-line-height: 1.6;
-  --sl-text-h1: 2.5rem;
-  --sl-text-h2: 1.5rem;
-  --sl-text-h3: 1.125rem;
-  --sl-text-h4: 1rem;
+  /* Type: Geist body 16/1.65; Bricolage headings, h1 48, h2 30, h3 20. */
+  --sl-font: "Geist";
+  --sl-font-mono: "Geist Mono";
+  --sl-line-height: 1.65;
+  --sl-text-h1: 3rem;
+  --sl-text-h2: 1.875rem;
+  --sl-text-h3: 1.25rem;
+  --sl-text-h4: 1.0625rem;
   --sl-text-h5: 1rem;
 }
 
-/* Past 64rem the custom pages fill the screen up to 120rem instead of leaving a band at the right:
+/* Past 64rem the custom pages fill the screen up to 90rem instead of leaving a band at the right:
    their left edge stays the docs header's, so the measure grows only rightwards. */
 @media (min-width: 64rem) {
   :root,
   :root[data-theme] {
     /* 100% is the container's own block (the page without its scrollbar), less the gutters. */
-    --snaplot-container: min(120rem, 100% - 2 * var(--snaplot-gutter));
+    --snaplot-container: min(90rem, 100% - 2 * var(--snaplot-gutter));
   }
 }
 
@@ -102,6 +141,7 @@
 @media (max-width: 50rem) {
   :root,
   :root[data-theme="light"] {
-    --sl-text-h1: 2rem;
+    --sl-text-h1: 2.375rem;
+    --sl-text-h2: 1.625rem;
   }
 }

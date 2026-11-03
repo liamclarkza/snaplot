@@ -1,6 +1,6 @@
 /*
- * The custom pages: homepage, examples hub (plan §9). One container, hairline rules instead of
- * cards, radius at most 6px, no shadows, glows, gradients or hover lifts.
+ * The custom pages: homepage, examples hub. One container, the shared tokens, a translucent sticky
+ * header and a footer that ends in the wordmark.
  */
 @import "./base.css";
 
@@ -19,15 +19,18 @@ html {
 body {
   margin: 0;
   font-size: 1rem;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 a {
   color: var(--snaplot-accent);
-  text-underline-offset: 0.15em;
+  text-decoration-color: var(--snaplot-accent-line);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 120ms ease;
 }
 a:hover {
-  text-decoration-thickness: 2px;
+  text-decoration-color: currentColor;
 }
 
 .sr-only {
@@ -43,7 +46,7 @@ a:hover {
 }
 
 /* One left edge for nav, page and footer (uisite-12): the docs header's 24px gutter, so the brand
-   sits at the same x in both layouts. The 72rem measure is the content's, plus the gutters. */
+   sits at the same x in both layouts. */
 .container {
   width: 100%;
   max-width: calc(var(--snaplot-container) + 2 * var(--snaplot-gutter));
@@ -56,18 +59,25 @@ a:hover {
   inset-inline-start: var(--snaplot-gutter);
   top: -100px;
   padding: 0.5rem 0.75rem;
-  background-color: var(--snaplot-background);
+  background-color: var(--snaplot-raised);
   color: var(--snaplot-accent);
   border: 1px solid var(--snaplot-rule);
-  border-radius: var(--snaplot-radius);
-  z-index: 10;
+  border-radius: var(--snaplot-radius-sm);
+  z-index: 30;
 }
 .skip-link:focus {
   top: 0.5rem;
 }
 
+/* The bar stays at the top and blurs what scrolls under it. */
 .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   border-bottom: 1px solid var(--snaplot-rule);
+  background-color: color-mix(in srgb, var(--snaplot-background) 82%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
 }
 /* Full width, like Starlight's bar, so the toggle sits at the same right edge in both layouts. */
 .site-header-bar {
@@ -75,14 +85,14 @@ a:hover {
   display: flex;
   align-items: center;
   min-height: 4rem;
-  padding-block: 0.75rem;
+  padding-block: 0.625rem;
 }
 .site-header-bar > * {
   flex: 1;
 }
 
 main {
-  padding-block: 2.5rem 4rem;
+  padding-block: 2.5rem 5rem;
 }
 main:focus {
   outline: none;
@@ -91,33 +101,28 @@ main:focus {
 h1,
 h2,
 h3 {
-  font-weight: 600;
-  line-height: 1.2;
+  font-family: var(--snaplot-font-display);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
 }
 h1 {
-  font-size: 2.5rem;
-  letter-spacing: -0.01em;
-  margin-block: 0 1.5rem;
+  font-size: clamp(2.5rem, 1.75rem + 3vw, 4rem);
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin-block: 0 1.25rem;
 }
 h2 {
-  font-size: 1.5rem;
+  font-size: clamp(1.75rem, 1.4rem + 1.4vw, 2.5rem);
+  letter-spacing: -0.035em;
   margin-block: 3rem 1rem;
 }
 h3 {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   margin-block: 0 0.25rem;
 }
 p {
   max-width: 68ch;
-}
-@media (max-width: 50rem) {
-  h1 {
-    font-size: 2rem;
-  }
-}
-
-.lede {
-  max-width: 34ch;
 }
 
 .facts {
@@ -126,26 +131,144 @@ p {
   font-size: 0.875rem;
 }
 
-/* The examples list: rows divided by hairlines. */
-.demo-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--snaplot-rule);
-}
-.demo-list > li {
-  display: grid;
-  gap: 0.25rem;
-  padding-block: 1rem;
-  border-bottom: 1px solid var(--snaplot-rule);
-}
 .demo-meta {
   margin: 0;
   color: var(--snaplot-ink-secondary);
   font-size: 0.875rem;
 }
 
+/* The footer: the links, then the wordmark, cut off by the bottom of the page. */
 .site-footer {
+  position: relative;
+  overflow: hidden;
   border-top: 1px solid var(--snaplot-rule);
-  padding-block: 1.5rem;
+  padding-block: 2rem 0;
+  background-color: var(--snaplot-surface);
+}
+.site-footer-mark {
+  display: block;
+  max-width: none;
+  margin: 3rem 0 -0.1em;
+  color: color-mix(in srgb, var(--snaplot-ink) 9%, var(--snaplot-surface));
+  font-family: var(--snaplot-font-display);
+  font-size: clamp(5rem, 24vw, 22rem);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 0.78;
+  white-space: nowrap;
+  user-select: none;
+  /* Its letters rise far above its short line box, over the links; it takes no pointer. */
+  pointer-events: none;
+}
+
+/*
+ * Example cards, on the homepage and the hub: the page's picture, then its question. The whole
+ * card is the question's link (its ::after covers the card); other links sit above it.
+ */
+.demo-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--snaplot-rule);
+  border-radius: var(--snaplot-radius-md);
+  background-color: var(--snaplot-raised);
+  box-shadow: var(--snaplot-shadow-sm);
+  overflow: hidden;
+  transition:
+    transform 220ms var(--snaplot-ease),
+    box-shadow 220ms var(--snaplot-ease),
+    border-color 220ms var(--snaplot-ease);
+}
+.demo-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--snaplot-rule-strong);
+  box-shadow: var(--snaplot-shadow-md);
+}
+.demo-card-picture {
+  display: block;
+  overflow: hidden;
+  border-bottom: 1px solid var(--snaplot-rule);
+  background-color: var(--snaplot-surface);
+}
+.demo-card-picture img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 8 / 5;
+  object-fit: cover;
+  object-position: top;
+  transition: transform 500ms var(--snaplot-ease);
+}
+.demo-card:hover .demo-card-picture img {
+  transform: scale(1.035);
+}
+/* The light pages' pictures sit a little dimmer on a dark page. */
+:root[data-theme="dark"] .demo-card-picture img {
+  filter: brightness(0.9);
+}
+.demo-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 1rem 1.125rem 1.125rem;
+}
+.demo-card h2 a,
+.demo-card h3 a {
+  color: var(--snaplot-ink);
+  text-decoration: none;
+}
+.demo-card h2 a::after,
+.demo-card h3 a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.demo-card:hover h2 a,
+.demo-card:hover h3 a {
+  color: var(--snaplot-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-card,
+  .demo-card-picture img {
+    transition: none;
+  }
+  .demo-card:hover,
+  .demo-card:hover .demo-card-picture img {
+    transform: none;
+  }
+}
+
+/* A framework: its name with the framework's own colour as a dot. */
+.framework {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--snaplot-ink);
+  font-weight: 550;
+}
+.framework::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--snaplot-radius-pill);
+  background-color: var(--framework, var(--snaplot-ink-secondary));
+}
+[data-framework="Vanilla JS"] {
+  --framework: #c9a400;
+}
+[data-framework="React"] {
+  --framework: #0a7ea4;
+}
+[data-framework="Solid"] {
+  --framework: #446b9e;
+}
+:root[data-theme="dark"] [data-framework="Vanilla JS"] {
+  --framework: #f0db4f;
+}
+:root[data-theme="dark"] [data-framework="React"] {
+  --framework: #61dafb;
+}
+:root[data-theme="dark"] [data-framework="Solid"] {
+  --framework: #7fa6dc;
 }

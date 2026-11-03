@@ -1,8 +1,8 @@
 import { createChart } from 'snaplot';
 import { type Latency, searchLatency } from '../data/latency-feed';
 
-// Rows arrive ten times a second. The chart follows the last four minutes; a zoom or pan stops
-// following, and the button goes back to live.
+// Rows arrive thirty times a second. The chart follows the last twelve minutes; a zoom or pan
+// stops following, and the button goes back to live.
 export default function liveLatency(el: HTMLElement) {
   const back = document.createElement('button');
   back.type = 'button';
@@ -19,7 +19,7 @@ export default function liveLatency(el: HTMLElement) {
       { y: 'p99', label: 'p99' },
     ],
     axes: { x: { type: 'time' }, y: { format: { suffix: ' ms' } } },
-    streaming: { maxPoints: 900, followWindow: 4 * 60_000 },
+    streaming: { maxPoints: 900, followWindow: 12 * 60_000 },
     timeZone: 'UTC',
     height: 240,
     ariaLabel: 'Latency of /search, p50 and p99, streaming',
