@@ -107,6 +107,30 @@ describe('label fit', () => {
       '50',
     ]);
   });
+
+  it('keeps the same labels as a thinned time axis moves on a tick', () => {
+    // Ticks 10 px apart, so every second label fits, numbered by the scale (every 10 is one).
+    const labelsFrom = (first: number) => {
+      const generated = [0, 1, 2, 3, 4].map((i) => (first + i) * 10);
+      const yScale: Scale = {
+        ...linearScale(0, 100, generated),
+        type: 'time',
+        tickOrdinal: (v: number) => v / 10,
+      };
+      const config = { series: [], axes: { y: { position: 'left' } } } as unknown as ChartSpec;
+      return renderAxes(
+        context(),
+        layout(),
+        new Map([['y', yScale]]),
+        { ...theme, fontSize: 6 },
+        config,
+      )
+        .labels.filter((l) => l.axis === 'y')
+        .map((l) => l.text);
+    };
+    expect(labelsFrom(1)).toEqual(['20', '40']);
+    expect(labelsFrom(2)).toEqual(['20', '40', '60']);
+  });
 });
 
 describe('log label gap', () => {

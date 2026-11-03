@@ -173,6 +173,14 @@ export interface Scale {
    */
   ticks(count?: number): number[];
 
+  /**
+   * A tick's number on the grid of the last `ticks()` call: consecutive ticks take consecutive
+   * numbers, and a tick keeps its number while the domain moves. The axis fit pass keeps every nth
+   * tick by it, so a thinned axis keeps the same labels as it pans or streams. Without it, the fit
+   * pass counts from the first visible tick.
+   */
+  tickOrdinal?(value: number): number;
+
   /** Format a single tick value for display using this scale's conventions. */
   tickFormat(value: number): string;
 

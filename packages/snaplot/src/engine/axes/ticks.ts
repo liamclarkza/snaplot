@@ -45,12 +45,15 @@ export function thinTicks(values: number[], maxCount: number, preserveEnds = fal
 }
 
 /**
- * The indices of the ticks whose labels fit along an axis: every `stride`-th tick from the first,
- * at the smallest stride where neighbouring labels keep `gap` pixels between their boxes and never
- * read the same. `extent(i)` is label i's [start, end] along the axis as it will be placed (edge
- * labels clamped into the container). With `preserveEnds`, a stride that also keeps the last tick
- * wins when it is at most twice the smallest and keeps three labels. When no stride fits, each tick
- * that clears the last one kept stays.
+ * The indices of the ticks whose labels fit along an axis: every `stride`-th tick, at the smallest
+ * stride where neighbouring labels keep `gap` pixels between their boxes and never read the same.
+ * `extent(i)` is label i's [start, end] along the axis as it will be placed (edge labels clamped
+ * into the container). The stride counts from the first tick, or with `ordinal` (each tick's number
+ * on its scale's grid) keeps the ticks whose number it divides, so a panning or streaming axis keeps
+ * the same labels rather than swapping to the others each time a tick leaves the edge. With
+ * `preserveEnds`, which counts from the first tick, a stride that also keeps the last tick wins when
+ * it is at most twice the smallest and keeps three labels. When no stride fits, each tick that clears
+ * the last one kept stays.
  */
 export function fitTicks(
   count: number,
@@ -58,45 +61,47 @@ export function fitTicks(
   text: (index: number) => string,
   gap: number,
   preserveEnds = false,
+  ordinal?: (index: number) => number,
 ): number[] {
   if (count <= 1) return count === 1 ? [0] : [];
   const extents = Array.from({ length: count }, (_, i) => extent(i));
   const texts = Array.from({ length: count }, (_, i) => text(i));
-  const fits = (stride: number) => {
-    for (let i = stride; i < count; i += stride) {
-      const [a0, a1] = extents[i - stride];
-      const [b0, b1] = extents[i];
-      if (Math.max(a0, b0) < Math.min(a1, b1) + gap || texts[i] === texts[i - stride]) {
-        return false;
-      }
+  const ordinals =
+    ordinal && !preserveEnds ? Array.from({ length: count }, (_, i) => ordinal(i)) : undefined;
+  const numbers = ordinals?.every(Number.isFinite) ? ordinals : undefined;
+  const keep = (stride: number) => {
+    const out: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const n = numbers ? numbers[i] : i;
+      if (((n % stride) + stride) % stride === 0) out.push(i);
     }
-    return true;
+    return out;
   };
+  const clears = (a: number, b: number) => {
+    const [a0, a1] = extents[a];
+    const [b0, b1] = extents[b];
+    return Math.max(a0, b0) >= Math.min(a1, b1) + gap && texts[a] !== texts[b];
+  };
+  const fits = (kept: number[]) =>
+    kept.length >= 2 && kept.every((k, j) => j === 0 || clears(kept[j - 1], k));
   let stride = 1;
-  while (stride < count && !fits(stride)) stride++;
+  while (stride < count && !fits(keep(stride))) stride++;
   if (stride >= count) {
     // No even stride fits (irregular ticks, such as sparse bars): keep each tick that clears the
     // last one kept.
     const kept = [0];
-    for (let i = 1; i < count; i++) {
-      const [a0, a1] = extents[kept[kept.length - 1]];
-      const [b0, b1] = extents[i];
-      if (Math.max(a0, b0) >= Math.min(a1, b1) + gap && texts[i] !== texts[kept[kept.length - 1]])
-        kept.push(i);
-    }
+    for (let i = 1; i < count; i++) if (clears(kept[kept.length - 1], i)) kept.push(i);
     return kept;
   }
   if (preserveEnds && (count - 1) % stride !== 0) {
     for (let d = stride + 1; d <= stride * 2 && (count - 1) / d >= 2; d++) {
-      if ((count - 1) % d === 0 && fits(d)) {
+      if ((count - 1) % d === 0 && fits(keep(d))) {
         stride = d;
         break;
       }
     }
   }
-  const out: number[] = [];
-  for (let i = 0; i < count; i += stride) out.push(i);
-  return out;
+  return keep(stride);
 }
 
 export type CustomXTicks = {

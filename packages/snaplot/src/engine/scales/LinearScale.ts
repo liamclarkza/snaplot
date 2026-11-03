@@ -57,6 +57,11 @@ export class LinearScale implements Scale {
     return ticks;
   }
 
+  /** Ticks are multiples of the step, so a tick's number is how many steps it is from zero. */
+  tickOrdinal(value: number): number {
+    return Math.round(value / this.lastTickStep);
+  }
+
   /** BCP 47 locale of tick labels; the runtime default when unset (plan D7). */
   locale: string | undefined = undefined;
 

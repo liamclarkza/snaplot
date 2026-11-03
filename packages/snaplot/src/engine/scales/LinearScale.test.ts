@@ -21,3 +21,15 @@ describe('LinearScale.tickFormat', () => {
     expect(scale.tickFormat(2)).toBe('2');
   });
 });
+
+describe('LinearScale.tickOrdinal', () => {
+  it('numbers a tick by its steps from zero, wherever the domain starts', () => {
+    const scale = new LinearScale('y', 0, 100);
+    expect(scale.ticks(6)).toEqual([0, 20, 40, 60, 80, 100]);
+    expect(scale.tickOrdinal(40)).toBe(2);
+    scale.min = 5;
+    scale.max = 105;
+    expect(scale.ticks(6)[0]).toBe(20);
+    expect(scale.tickOrdinal(40)).toBe(2);
+  });
+});

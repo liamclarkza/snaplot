@@ -133,6 +133,12 @@ export function renderAxes(
     const measure = (text: string) => measureLabel(text, theme.fontFamily, theme.fontSize);
     if ((!hasExplicitTicks || ac.thinTicks) && ticks.length > 1) {
       const half = theme.fontSize * 0.6;
+      // Generated ticks thin by their number on the scale's grid, so a panning or streaming axis
+      // keeps its labels (every second minute stays on the even minutes).
+      const ordinalOf =
+        !useCustomTicks && !hasExplicitTicks && scale.tickOrdinal
+          ? scale.tickOrdinal.bind(scale)
+          : undefined;
       const fitLabels = (values: number[]) => {
         const texts = values.map(tickLabel);
         const decades = scale.type === 'log' && Math.max(...values) >= 10 * Math.min(...values);
@@ -160,6 +166,7 @@ export function renderAxes(
               : LABEL_MIN_GAP
             : theme.fontSize * (decades ? 0.6 : 1.4),
           alignedEnds(values),
+          ordinalOf && ((i) => ordinalOf(values[i])),
         );
       };
       let kept = fitLabels(ticks);

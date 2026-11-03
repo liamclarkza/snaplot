@@ -292,6 +292,24 @@ export class TimeScale implements Scale {
     return out;
   }
 
+  /**
+   * A tick's number on the calendar of the last ticks() interval, counted in the scale's zone:
+   * minutes of the local day, so every second minute stays on the even minutes in a :45 zone too,
+   * and months from January, so every second month stays Jan / Mar / May.
+   */
+  tickOrdinal(value: number): number {
+    const interval = this.interval();
+    if (interval < MINUTE_MS) return Math.round(value / interval);
+    const p = parts(value, this.timeZone);
+    const units = (unit: number) => Math.round(interval / unit);
+    if (interval >= YEAR_MS) return Math.floor(p.y / units(YEAR_MS));
+    if (interval >= MONTH_MS) return Math.floor((p.y * 12 + p.mo) / units(MONTH_MS));
+    const day = Math.round(Date.UTC(p.y, p.mo, p.d) / DAY_MS);
+    if (interval >= DAY_MS) return Math.floor(day / units(DAY_MS));
+    if (interval >= HOUR_MS) return Math.floor((day * 24 + p.h) / units(HOUR_MS));
+    return Math.floor((day * 1440 + p.h * 60 + p.mi) / units(MINUTE_MS));
+  }
+
   private fmt(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
     if (!this.zoneKey) this.zoneKey = this.timeZone === 'UTC' ? 'UTC' : localZone();
     if (

@@ -114,3 +114,39 @@ describe('calendar-aligned ticks', () => {
     expect(label).not.toMatch(/:/);
   });
 });
+
+describe('tickOrdinal', () => {
+  const MINUTE = 60_000;
+  // 2026-06-05T16:00Z.
+  const NOW = 1780704000000;
+
+  it('numbers minute ticks by the minute of the local day, wherever the window starts', () => {
+    const scale = new TimeScale('x', NOW, NOW + 12 * MINUTE);
+    scale.setPixelRange(0, 600);
+    const ticks = scale.ticks(6);
+    expect(ticks[1] - ticks[0]).toBe(MINUTE);
+    const numbers = ticks.map((t) => scale.tickOrdinal(t));
+    expect(numbers.map((n, i) => n - numbers[0] - i)).toEqual(ticks.map(() => 0));
+    // Every second number is an even minute in the runtime's zone (npm run test:tz: a :45 zone).
+    for (const t of ticks)
+      expect(scale.tickOrdinal(t) % 2 === 0).toBe(new Date(t).getMinutes() % 2 === 0);
+
+    // A minute and a half on, the ticks both windows show keep their numbers.
+    scale.min += 1.5 * MINUTE;
+    scale.max += 1.5 * MINUTE;
+    scale.ticks(6);
+    expect(scale.tickOrdinal(ticks[3])).toBe(numbers[3]);
+  });
+
+  it('numbers month ticks from January', () => {
+    const start = new Date(2026, 0, 1).getTime();
+    const scale = new TimeScale('x', start, new Date(2027, 0, 1).getTime());
+    scale.setPixelRange(0, 640);
+    const ticks = scale.ticks(6);
+    expect(ticks.map((t) => new Date(t).getMonth())).toEqual([0, 2, 4, 6, 8, 10, 0]);
+    expect(ticks.map((t) => scale.tickOrdinal(t) - scale.tickOrdinal(start))).toEqual([
+      0, 1, 2, 3, 4, 5, 6,
+    ]);
+    expect(scale.tickOrdinal(start) % 2).toBe(0);
+  });
+});

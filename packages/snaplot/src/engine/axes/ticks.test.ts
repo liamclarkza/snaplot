@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { axisTickValues, thinTicks } from './ticks';
+import { axisTickValues, fitTicks, thinTicks } from './ticks';
 import type { Scale } from '../spec';
 
 function linearScale(min: number, max: number, generated: number[]): Scale {
@@ -54,5 +54,28 @@ describe('thinTicks', () => {
 
   it('never returns fewer than two entries for a multi-entry list', () => {
     expect(thinTicks([1, 2, 3, 4], 0).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('fitTicks', () => {
+  // Labels 12 px wide on ticks 10 px apart: every second one fits. `first` numbers the first tick.
+  const keptOf = (first: number, numbered: boolean) =>
+    fitTicks(
+      6,
+      (i) => [i * 10, i * 10 + 12],
+      (i) => String(first + i),
+      0,
+      false,
+      numbered ? (i) => first + i : undefined,
+    );
+
+  it('keeps every nth tick from the first when the ticks have no numbers', () => {
+    expect(keptOf(1, false)).toEqual([0, 2, 4]);
+  });
+
+  it('keeps the ticks whose number the stride divides, wherever the list starts', () => {
+    // Ticks 1 to 6, then 2 to 7 once the axis moves on a tick: both keep 2, 4 and 6.
+    expect(keptOf(1, true)).toEqual([1, 3, 5]);
+    expect(keptOf(2, true)).toEqual([0, 2, 4]);
   });
 });
