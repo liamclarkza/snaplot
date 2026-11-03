@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-03
+
 The overhaul, released as 0.13.0: a breaking release on the 0.x line, so `^0.12` ranges stay on 0.12
 until you upgrade and follow the migration guide. The design record is ADR 0002
 (`docs/decisions/0002-overhaul.md`); every intentional pixel change is a row of its visual ledger.
