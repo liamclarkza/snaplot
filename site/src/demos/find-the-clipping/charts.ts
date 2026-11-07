@@ -5,6 +5,7 @@
  */
 import type { ChartGroup, ChartProps, ColumnData, ReferenceRegion } from 'snaplot/solid';
 import { RULE, type Span, timecode } from './answer';
+import type { Spectrogram } from './fft';
 
 export const COLORS = {
   wave: '#5FD08A',
@@ -28,8 +29,14 @@ const theme = (surface: string) =>
 const TRACK = '#16181A';
 const PAGE = '#1B1D1F';
 
-/** Seconds as a timecode: mm:ss on whole seconds, mm:ss.mmm otherwise. */
-export const tc = (s: number) => timecode(s, Math.abs(s - Math.round(s)) > 1e-6);
+/**
+ * Seconds as a timecode: mm:ss on whole seconds, mm:ss.mmm otherwise. A time within a microsecond
+ * of a whole second is that second, so 69.9999999 reads 01:10, not 01:09.
+ */
+export const tc = (s: number) => {
+  const whole = Math.round(s);
+  return Math.abs(s - whole) > 1e-6 ? timecode(s, true) : timecode(whole, false);
+};
 const db = { maximumFractionDigits: 1, suffix: ' dB' };
 
 export interface Track {
@@ -136,6 +143,37 @@ export function lane(track: Track, c: number, group: ChartGroup): ChartProps {
   };
 }
 
+/** Hz as a short label: 400 Hz, 1.2 kHz, 16 kHz. */
+const hz = (value: number) =>
+  value >= 1000 ? `${Number((value / 1000).toPrecision(3))} kHz` : `${Math.round(value)} Hz`;
+
+/**
+ * The spectrogram of the whole file, in the lanes' window: frequency up a log axis, level in dBFS
+ * by colour. A clipped run splatters energy up to the top bands; a silence goes dark.
+ */
+export function spectrogramLane(track: Track, grid: Spectrogram, group: ChartGroup): ChartProps {
+  return {
+    series: [
+      {
+        type: 'heatmap' as const,
+        id: 'spectrogram',
+        label: 'Level',
+        data: grid,
+        domain: [-110, -30],
+        format: db,
+        colorScale: { title: 'dBFS', ticks: [-110, -90, -70, -50, -30] },
+      },
+    ],
+    axes: {
+      x: { format: tc, min: 0, max: track.duration },
+      y: { type: 'log', format: hz, ticks: [100, 1000, 10_000] },
+    },
+    legend: false,
+    theme: theme(TRACK),
+    group,
+  };
+}
+
 /** The spectrum of the stretch the lanes show, 20 Hz to Nyquist. */
 export function spectrumChart(sampleRate: number): ChartProps {
   return {
@@ -146,8 +184,7 @@ export function spectrumChart(sampleRate: number): ChartProps {
         type: 'log',
         min: 20,
         max: sampleRate / 2,
-        format: (hz) =>
-          hz >= 1000 ? `${Number((hz / 1000).toPrecision(3))} kHz` : `${Math.round(hz)} Hz`,
+        format: hz,
       },
       y: { format: db },
     },

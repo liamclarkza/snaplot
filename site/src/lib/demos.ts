@@ -7,8 +7,8 @@
  */
 export interface Demo {
   slug: string;
-  /** The title is the reader's question. */
-  question: string;
+  /** What the example is: its card's title and its page's title. */
+  name: string;
   framework: 'Vanilla JS' | 'React' | 'Solid';
   /** Who decides what with it. */
   task: string;
@@ -21,7 +21,7 @@ export interface Demo {
 export const DEMOS: readonly Demo[] = [
   {
     slug: 'max-q',
-    question: 'When does the rocket hit Max-Q?',
+    name: 'Launch telemetry',
     framework: 'Vanilla JS',
     task: 'A launch fan or flight-dynamics student follows the ascent and its key moments.',
     dataset: 'A simulated two-stage launch to orbit',
@@ -30,7 +30,7 @@ export const DEMOS: readonly Demo[] = [
   },
   {
     slug: 'hottest-year',
-    question: 'Was 2024 the hottest year on record?',
+    name: 'Global temperature record',
     framework: 'Vanilla JS',
     task: 'A reader checks how 2024 compares with every year since 1940.',
     dataset: 'Copernicus C3S / ECMWF, ERA5 via Climate Pulse',
@@ -38,17 +38,17 @@ export const DEMOS: readonly Demo[] = [
     rows: '31,710 days since 1940',
   },
   {
-    slug: 'pick-a-checkpoint',
-    question: 'Which checkpoint should we ship?',
+    slug: 'experiment-tracker',
+    name: 'ML experiment tracker',
     framework: 'React',
-    task: 'An ML engineer compares a baseline run with a regularised run.',
-    dataset: 'Training logs on the UCI Optical Recognition of Handwritten Digits',
-    licence: 'CC BY 4.0',
-    rows: '5,736 training and 120 validation rows',
+    task: 'An ML engineer compares pretraining runs and finds the one that diverged.',
+    dataset: 'Five simulated pretraining runs',
+    licence: 'Simulated',
+    rows: '15,000 steps and 150 evaluations, generated in the browser',
   },
   {
     slug: 'battery-payback',
-    question: 'Would a 5 kWh battery have paid for itself in this house?',
+    name: 'Home battery payback',
     framework: 'React',
     task: 'A homeowner with solar panels works out the payback from real usage.',
     dataset: 'Open Power System Data, Household Data 2020-04-15',
@@ -57,7 +57,7 @@ export const DEMOS: readonly Demo[] = [
   },
   {
     slug: 'find-the-clipping',
-    question: 'Where does this recording clip?',
+    name: 'Audio waveform editor',
     framework: 'Solid',
     task: 'A podcast editor finds clipped spans and long silences before publishing.',
     dataset: 'A NASA recording from the Internet Archive',
@@ -66,7 +66,7 @@ export const DEMOS: readonly Demo[] = [
   },
   {
     slug: 'deploy-482',
-    question: 'Did deploy #482 cause the p99 spike?',
+    name: 'Incident dashboard',
     framework: 'Solid',
     task: 'An on-call engineer decides whether to roll back.',
     dataset: 'A seeded service simulator',

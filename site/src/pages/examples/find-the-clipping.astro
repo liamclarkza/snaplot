@@ -1,6 +1,6 @@
 ---
 /**
- * S1 "Where does this recording clip?" (plan §10.2): a Solid waveform editor with its own layout
+ * S1 "Audio waveform editor" (plan §10.2): a Solid waveform editor with its own layout
  * and no Starlight chrome. The data is one public-domain recording, decoded in the browser; the
  * footer's attribution line is read from its SOURCE.md.
  */
@@ -25,7 +25,7 @@ const SOURCE_URL =
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>Where does this recording clip? · snaplot examples</title>
+    <title>Audio waveform editor · snaplot examples</title>
     <meta
       name="description"
       content="A waveform editor that finds clipped samples and long silences in a NASA recording, in Solid with snaplot."
@@ -39,8 +39,10 @@ const SOURCE_URL =
       <Editor client:only="solid-js" />
     </main>
     <footer class="demo-footer">
-      <a href={`${base}examples/`}>← Examples</a> · <a href={SOURCE_URL}>Source</a> · <span
-        >Data: <span data-attribution>{attribution}</span> ({licence})</span>
+      <p>
+        <a href={`${base}examples/`}>← Examples</a> · <a href={SOURCE_URL}>Source</a> · <span
+          >Data: <span data-attribution>{attribution}</span> ({licence})</span>
+      </p>
     </footer>
   </body>
 </html>

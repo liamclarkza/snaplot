@@ -162,8 +162,8 @@ p {
 }
 
 /*
- * Example cards, on the homepage and the hub: the page's picture, then its question. The whole
- * card is the question's link (its ::after covers the card); other links sit above it.
+ * Example cards, on the homepage and the hub: the page's picture, then its name. The whole
+ * card is the name's link (its ::after covers the card); other links sit above it.
  */
 .demo-card {
   position: relative;

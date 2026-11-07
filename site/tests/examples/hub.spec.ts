@@ -1,11 +1,12 @@
 // The examples hub (plan §10.3): an index of the six examples, two per framework, each with its
-// question, task, dataset, licence and size, a thumbnail Playwright took of the real page, and
+// name, task, dataset, licence and size, a thumbnail Playwright took of the real page, and
 // Open and Source links. Build first (`npm run build && npm run build:site`, then `npm run thumbs`).
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { fly } from '../../src/demos/max-q/flight';
+import { RUNS, STEPS } from '../../src/demos/experiment-tracker/runs';
 import { DEMOS } from '../../src/lib/demos';
 import { BASE, DESKTOP, PHONE, watch } from './page-checks';
 
@@ -26,9 +27,10 @@ const SIZES: Record<string, () => string[]> = {
       }
     ).temps.length.toLocaleString('en-US'),
   ],
-  'pick-a-checkpoint': () => [
-    lines('pick-a-checkpoint', 'train.csv').toLocaleString('en-US'),
-    String(lines('pick-a-checkpoint', 'val.csv')),
+  // 5 runs × 3,000 steps, and 5 runs × 30 evaluations.
+  'experiment-tracker': () => [
+    (RUNS.length * STEPS).toLocaleString('en-US'),
+    String((RUNS.length * STEPS) / 100),
   ],
   'battery-payback': () => [lines('battery-payback', 'hourly.csv').toLocaleString('en-US')],
   'find-the-clipping': () => [
@@ -79,13 +81,13 @@ test.describe('the examples hub', () => {
     await page.goto(`${BASE}examples/`);
     await expect(page.locator('main h1')).toHaveText('Examples');
     await expect(page.locator('main > p')).toHaveText([
-      'Each example answers one question with real or documented data; for one chart type at a time, with its code, see Chart types.',
+      'Each example is a small app on real, documented or simulated data; for one chart type at a time, with its code, see Chart types.',
     ]);
     expect(
       await page.locator('main > *').evaluateAll((els) => els.map((el) => el.tagName)),
     ).toEqual(['H1', 'P', 'UL']);
-    // Every heading is an example's question; every picture is a thumbnail.
-    await expect(page.locator('main h2')).toHaveText(DEMOS.map((demo) => demo.question));
+    // Every heading is an example's name; every picture is a thumbnail.
+    await expect(page.locator('main h2')).toHaveText(DEMOS.map((demo) => demo.name));
     expect(await page.locator('main img:not(.thumb)').count()).toBe(0);
     expect(problems).toEqual([]);
   });
@@ -149,7 +151,7 @@ test.describe('the examples hub', () => {
       await expect(open).toHaveAttribute('href', `${BASE}examples/${demo.slug}/`);
       const response = await request.get(`${BASE}examples/${demo.slug}/`);
       expect(response.status()).toBe(200);
-      expect(await response.text()).toContain(`<title>${demo.question}`);
+      expect(await response.text()).toContain(`<title>${demo.name}`);
     }
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fft, spectrum } from './fft';
+import { fft, spectrogram, spectrum } from './fft';
 
 /** The oracle: a direct O(n²) DFT, sharing no code with fft.ts. */
 function dft(x: Float64Array): { re: Float64Array; im: Float64Array } {
@@ -82,5 +82,39 @@ describe('[find-the-clipping] spectrum', () => {
     expect(spectrum([x], rate, 1000, 1100).size).toBe(256);
     expect(spectrum([x], rate, 0, x.length, 8).segments).toBe(8);
     expect(spectrum([x], rate, 0, x.length).freq[0]).toBeCloseTo(rate / size, 9);
+  });
+});
+
+describe('[find-the-clipping] spectrogram', () => {
+  it('puts a full-scale sine at 0 dBFS in the band holding its frequency, frame by frame', () => {
+    const rate = 44_100;
+    const sine = Float64Array.from({ length: 4096 }, (_, i) =>
+      Math.sin((2 * Math.PI * 1000 * i) / rate),
+    );
+    const s = spectrogram([sine], rate, 1024, 60, 60);
+    const frames = s.x.edges.length - 1;
+    expect(frames).toBe(4);
+    expect(s.x.edges[1]).toBeCloseTo(1024 / rate, 12);
+    const band = s.y.edges.findIndex((edge, j) => edge <= 1000 && s.y.edges[j + 1] > 1000);
+    for (let f = 0; f < frames; f++) {
+      const level = s.values[band * frames + f];
+      expect(level).toBeGreaterThan(-6);
+      expect(level).toBeLessThan(1);
+      // Two octaves up, the sine's Hann leakage is far below it.
+      const far = s.y.edges.findIndex((edge) => edge > 4000);
+      expect(s.values[far * frames + f]).toBeLessThan(level - 60);
+    }
+  });
+
+  it('reads silence as -140 dB, and both channels of a mono mix as one', () => {
+    const silent = new Float64Array(2048);
+    expect(Math.max(...spectrogram([silent], 48_000, 1024, 10).values)).toBe(-140);
+    const rate = 48_000;
+    const tone = Float64Array.from({ length: 2048 }, (_, i) =>
+      Math.sin((2 * Math.PI * 2000 * i) / rate),
+    );
+    const mono = spectrogram([tone], rate, 1024, 20).values;
+    const stereo = spectrogram([tone, tone], rate, 1024, 20).values;
+    for (let i = 0; i < mono.length; i++) expect(stereo[i]).toBeCloseTo(mono[i], 6);
   });
 });

@@ -1,0 +1,16 @@
+{
+  "slug": "experiment-tracker",
+  "path": "examples/experiment-tracker/",
+  "ready": "html[data-demo-ready]",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "query": "",
+  "closeUp": {
+    "x": 280,
+    "y": 48,
+    "width": 640,
+    "height": 400
+  }
+}

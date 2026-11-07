@@ -208,8 +208,8 @@ const examples = DEMOS.map((demo) => ({
 
   <section class="home-section" aria-labelledby="examples-title">
     <div class="section-head">
-      <h2 id="examples-title">Six questions, answered</h2>
-      <p>Each example answers one question with real or documented data.</p>
+      <h2 id="examples-title">Six examples</h2>
+      <p>Each example is a small app on real, documented or simulated data.</p>
       <a class="section-link" href={`${base}examples/`}
         >All examples <span class="arrow" aria-hidden="true">→</span></a
       >
@@ -242,9 +242,9 @@ const examples = DEMOS.map((demo) => ({
             <div class="demo-card-body">
               <h3>
                 {demo.page ? (
-                  <a href={`${base}examples/${demo.slug}/`}>{demo.question}</a>
+                  <a href={`${base}examples/${demo.slug}/`}>{demo.name}</a>
                 ) : (
-                  demo.question
+                  demo.name
                 )}
               </h3>
               <p class="demo-meta">
@@ -728,7 +728,7 @@ const examples = DEMOS.map((demo) => ({
     margin: 0;
   }
 
-  /* The examples: cards with the page's picture, the question and the framework. */
+  /* The examples: cards with the page's picture, the name and the framework. */
   ul.home-examples {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

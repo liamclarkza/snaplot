@@ -122,7 +122,8 @@ test.describe('find-the-clipping', () => {
     expect(from).toBeCloseTo(60, 0);
     expect(to).toBeCloseTo(70, 0);
     await expect(page.locator('.spectrum .caption')).toHaveText(
-      /^(00:59\.9\d\d|01:00\.0\d\d)–(01:09\.9\d\d|01:10\.0\d\d), 32 × 4096 samples$/,
+      // A bound within a microsecond of a whole second reads as that second.
+      /^(00:59\.9\d\d|01:00(\.0\d\d)?)–(01:09\.9\d\d|01:10(\.0\d\d)?), 32 × 4096 samples$/,
     );
   });
 
@@ -242,7 +243,7 @@ test.describe('find-the-clipping', () => {
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         ),
       ).toBeLessThanOrEqual(0);
-      await expect(page).toHaveTitle('Where does this recording clip? · snaplot examples');
+      await expect(page).toHaveTitle('Audio waveform editor · snaplot examples');
       await expect(page.locator('footer [data-attribution]')).toHaveText(attribution);
       await expect(page.locator('footer')).toContainText(`Data: ${attribution}`);
       await expect(page.locator('footer a', { hasText: '← Examples' })).toHaveAttribute(

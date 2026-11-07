@@ -86,3 +86,74 @@ export function spectrum(
   }
   return { freq, db, size, segments: count };
 }
+
+/** A spectrogram as a heatmap grid: frames along X (seconds), bands up Y (Hz), dBFS per cell. */
+export interface Spectrogram {
+  x: { edges: Float64Array };
+  y: { edges: Float64Array };
+  /** Band `j` of frame `i` at `j × frames + i`. */
+  values: Float64Array;
+}
+
+/**
+ * The spectrogram of the whole recording: the channels mixed to mono, Hann windows of `size`
+ * samples end to end, and each window's power pooled into `bands` log-spaced bands from `low` Hz
+ * to Nyquist (a band narrower than a bin reads the bin under its centre). Scaled as `spectrum`
+ * is, so a full-scale sine reads 0 dBFS; silent cells read −140 dB.
+ */
+export function spectrogram(
+  channels: readonly ArrayLike<number>[],
+  sampleRate: number,
+  size = 1024,
+  bands = 120,
+  low = 60,
+): Spectrogram {
+  const n = channels[0]?.length ?? 0;
+  const frames = Math.floor(n / size);
+  const nyquist = sampleRate / 2;
+  const edgesHz = Float64Array.from(
+    { length: bands + 1 },
+    (_, j) => low * (nyquist / low) ** (j / bands),
+  );
+  // The FFT bins each band averages: [first, last] by bin index (bin k is at k × rate / size).
+  const binHz = sampleRate / size;
+  const first = new Int32Array(bands);
+  const last = new Int32Array(bands);
+  for (let j = 0; j < bands; j++) {
+    const a = Math.ceil(edgesHz[j] / binHz);
+    const b = Math.min(size / 2, Math.floor(edgesHz[j + 1] / binHz));
+    const centre = Math.min(size / 2, Math.round(Math.sqrt(edgesHz[j] * edgesHz[j + 1]) / binHz));
+    first[j] = a <= b ? a : centre;
+    last[j] = a <= b ? b : centre;
+  }
+  const hann = Float64Array.from(
+    { length: size },
+    (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / size),
+  );
+  const gain = hann.reduce((s, w) => s + w, 0) / 2;
+  const scale = gain * gain * channels.length * channels.length;
+  const re = new Float64Array(size);
+  const im = new Float64Array(size);
+  const values = new Float64Array(frames * bands);
+  for (let f = 0; f < frames; f++) {
+    const start = f * size;
+    for (let i = 0; i < size; i++) {
+      let mix = 0;
+      for (const ch of channels) mix += ch[start + i];
+      re[i] = mix * hann[i];
+      im[i] = 0;
+    }
+    fft(re, im);
+    for (let j = 0; j < bands; j++) {
+      let power = 0;
+      for (let k = first[j]; k <= last[j]; k++) power += re[k] ** 2 + im[k] ** 2;
+      power /= last[j] - first[j] + 1;
+      values[j * frames + f] = Math.max(-140, 10 * Math.log10(power / scale));
+    }
+  }
+  return {
+    x: { edges: Float64Array.from({ length: frames + 1 }, (_, i) => (i * size) / sampleRate) },
+    y: { edges: edgesHz },
+    values,
+  };
+}

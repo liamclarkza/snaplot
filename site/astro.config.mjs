@@ -16,7 +16,10 @@ export default defineConfig({
   base: '/snaplot/',
   // Earlier builds of these docs called the chart types "Marks", one guide page; they are a
   // section now.
-  redirects: { '/guides/marks': '/snaplot/chart-types/' },
+  redirects: {
+    '/guides/marks': '/snaplot/chart-types/',
+    '/examples/pick-a-checkpoint': '/snaplot/examples/experiment-tracker/',
+  },
   // The dev server and `astro preview` take PORT, so parallel worktrees never collide.
   server: { host: '127.0.0.1', port: Number(process.env.PORT ?? 5336) },
   // A build prebundles dependencies in production mode. In the dev server's cache that swaps

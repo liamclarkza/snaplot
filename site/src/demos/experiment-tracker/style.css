@@ -1,0 +1,399 @@
+/* An experiment tracker: a run list down the left, a grid of metric charts on the right. Dark,
+   as such tools are read beside terminals and training logs; every colour is a token, and the
+   charts take the same ones. Greys are pure: any tint turns brown or blue beside the accent.
+   Rules are translucent, so one hairline reads the same on every surface. Sizes sit on a 4px
+   grid. Cards are set apart by their borders and surfaces alone. */
+.xt {
+  --bg: #181818;
+  --bg-1: #1f1f1f;
+  --bg-2: #282828;
+  --bg-3: #313131;
+  --fg: #e8e8e8;
+  --fg-1: #cccccc;
+  --muted: #9d9d9d;
+  --faint: #7a7a7a;
+  --rule: rgba(255, 255, 255, 0.07);
+  --rule-1: rgba(255, 255, 255, 0.14);
+  --accent: #ff8552;
+  --warn: #ff5c7a;
+  --warn-dim: rgba(255, 92, 122, 0.14);
+  --band: #242424;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --gutter: 16px;
+  --page: 20px;
+  --control: 28px;
+  --rail: 280px;
+  --r-xs: 3px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 6px;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+
+body.xt-page {
+  margin: 0;
+  background: #181818;
+  color: #e8e8e8;
+  font:
+    13px / 1.45 Inter,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.xt *,
+.xt-footer * {
+  box-sizing: border-box;
+}
+.xt a {
+  color: inherit;
+  text-decoration: none;
+}
+.xt button {
+  font: inherit;
+  color: inherit;
+}
+.xt button {
+  cursor: pointer;
+}
+.xt :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Shell ─────────────────────────────────────────────────────────── */
+.xt {
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  min-height: 100vh;
+  background: var(--bg);
+}
+.xt-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--page);
+  border-bottom: 1px solid var(--rule);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+}
+.xt-top .back {
+  color: var(--muted);
+}
+.xt-top .back:hover {
+  color: var(--fg);
+}
+.xt-top .sep {
+  color: var(--faint);
+}
+.xt-top h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+.xt-top .grow {
+  flex: 1;
+}
+.xt-top .note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.xt-project {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  min-height: calc(100vh - 48px);
+}
+
+/* ── Run list ──────────────────────────────────────────────────────── */
+.xt-side {
+  border-right: 1px solid var(--rule);
+  background: var(--bg-1);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 48px;
+  height: calc(100vh - 48px);
+}
+/* The header and the rows share one outer edge and one inner column, so the eyes stack. */
+.xt-run-head,
+.xt-run {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+.xt-run-head {
+  height: 30px;
+  flex: none;
+  margin: 8px 8px 0;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.xt-runs {
+  overflow: auto;
+  flex: 1;
+  margin: 0;
+  padding: 4px 8px 16px;
+  list-style: none;
+}
+.xt-run {
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  width: 100%;
+  border-radius: var(--r-sm);
+  background: none;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+.xt-run:hover {
+  background: var(--bg-2);
+}
+.xt-run .name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xt-run .when {
+  color: var(--muted);
+  font-size: 12px;
+}
+.xt-run.off .name,
+.xt-run.off .when {
+  color: var(--muted);
+}
+.xt-eye {
+  margin-left: -3px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  border-radius: var(--r-xs);
+  background: none;
+  color: var(--run-color, var(--muted));
+}
+.xt-eye.off {
+  color: var(--muted);
+}
+.xt-eye svg {
+  width: 16px;
+  height: 16px;
+}
+.xt-pill {
+  display: inline-flex;
+  border-radius: var(--r-md);
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+  background: var(--warn-dim);
+  color: var(--warn);
+}
+
+/* ── The chart grid ────────────────────────────────────────────────── */
+.xt-grid {
+  min-width: 0;
+  align-self: start;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gutter);
+  padding: var(--page) var(--page) 32px;
+}
+/* The run colours, as runs.ts gives them to the charts. */
+.run-0 {
+  --run-color: #56b4e9;
+}
+.run-1 {
+  --run-color: #e69f00;
+}
+.run-2 {
+  --run-color: #2ec79b;
+}
+.run-3 {
+  --run-color: #cc79a7;
+}
+.run-4 {
+  --run-color: #f0e442;
+}
+.xt-chart {
+  position: relative;
+  border: 1px solid var(--rule);
+  background: var(--bg-1);
+  border-radius: var(--r-md);
+  min-width: 0;
+}
+.xt-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 40px;
+  padding: 0 6px 0 16px;
+  background: var(--band);
+  border-bottom: 1px solid var(--rule);
+  border-radius: calc(var(--r-md) - 1px) calc(var(--r-md) - 1px) 0 0;
+}
+.xt-chart-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xt-icon {
+  border: 0;
+  background: none;
+  border-radius: var(--r-sm);
+  width: var(--control);
+  height: var(--control);
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  color: var(--muted);
+  flex: none;
+}
+.xt-icon:hover {
+  color: var(--fg);
+  background: var(--bg-2);
+}
+.xt-plot {
+  height: 240px;
+  margin: 8px 16px;
+  position: relative;
+}
+/* The values at the cursor sit under the chart, each run on a row. */
+.xt-readout {
+  font-size: 12px;
+  border-top: 1px solid var(--rule);
+}
+.xt-step {
+  padding: 8px 16px;
+  background: var(--band);
+  font-weight: 500;
+}
+/* Laid out like the run list: marker, name, then the value on the right edge, with no rules and
+   no column titles, as a colour, a name and a number need none. */
+.xt-legend {
+  max-height: 212px;
+  overflow: auto;
+  padding: 4px 0;
+  --snaplot-legend-row-radius: 0;
+}
+.xt-legend .snaplot-legend-table-root {
+  border-top: 0;
+}
+.xt-legend .snaplot-legend-step,
+.xt-legend thead {
+  display: none;
+}
+.xt-legend .snaplot-legend-cell {
+  padding: 4px 12px 4px 0;
+  border-bottom: 0;
+}
+.xt-legend .snaplot-legend-cell:first-child {
+  padding-left: 16px;
+  width: 40px;
+}
+.xt-legend .snaplot-legend-cell:nth-child(2) {
+  width: 100%;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-1);
+}
+.xt-legend .snaplot-legend-cell:last-child {
+  padding-right: 16px;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--fg);
+}
+td.snaplot-legend-cell {
+  font-variant-numeric: tabular-nums;
+}
+.xt-line {
+  display: block;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+}
+/* An expanded chart is a modal: it fills the view over a dimmed page, which stays put. */
+.xt-chart.full {
+  position: fixed;
+  inset: var(--page);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-lg);
+  border-color: var(--rule-1);
+}
+.xt-chart.full .xt-chart-head {
+  border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
+}
+.xt-chart.full .xt-plot {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.xt-chart.full .xt-legend {
+  max-height: 30vh;
+}
+.xt-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+  background: var(--scrim);
+  border: 0;
+}
+
+/* ── The examples footer ───────────────────────────────────────────── */
+.xt-footer {
+  padding: 16px 20px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  color: #9d9d9d;
+  font-size: 12px;
+}
+.xt-footer a {
+  color: #e8e8e8;
+}
+
+@media (max-width: 860px) {
+  .xt-project {
+    grid-template-columns: 1fr;
+  }
+  .xt-run {
+    height: 44px;
+  }
+  .xt-side {
+    position: static;
+    height: auto;
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .xt .xt-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .xt-top .note {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xt-run {
+    transition: none;
+  }
+}

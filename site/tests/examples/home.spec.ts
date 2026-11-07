@@ -323,10 +323,10 @@ test.describe('the homepage', () => {
     await expect(rows).toHaveCount(DEMOS.length);
     for (const demo of DEMOS) {
       const row = page.locator(`.home-examples > li[data-demo="${demo.slug}"]`);
-      await expect(row).toContainText(demo.question);
+      await expect(row).toContainText(demo.name);
       await expect(row).toContainText(`${demo.framework} · ${demo.dataset}`);
       if (existsSync(join(site, 'dist/examples', demo.slug, 'index.html'))) {
-        await expect(row.getByRole('link', { name: demo.question })).toHaveAttribute(
+        await expect(row.getByRole('link', { name: demo.name })).toHaveAttribute(
           'href',
           `${BASE}examples/${demo.slug}/`,
         );

@@ -9,8 +9,8 @@ import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-j
 import { type ClipReport, RULE, type Span, headline, rmsDb, scan, timecode } from './answer';
 import { type Audio, clipMarks, decode, waveformColumns } from './audio';
 import { ClipList } from './ClipList.solid';
-import { type Track, lane, overview, spectrumChart, tc } from './charts';
-import { spectrum } from './fft';
+import { type Track, lane, overview, spectrogramLane, spectrumChart, tc } from './charts';
+import { type Spectrogram, spectrogram, spectrum } from './fft';
 import { type Player, createPlayer } from './player';
 
 const BUNDLED = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}data/find-the-clipping/recording.mp3`;
@@ -64,6 +64,8 @@ export default function Editor() {
   const [position, setPosition] = createSignal(0);
   const [playing, setPlaying] = createSignal(false);
   const [current, setCurrent] = createSignal<Span | null>(null);
+  // The spectrogram of the whole file, computed after the first paint: it is the slowest step.
+  const [grid, setGrid] = createSignal<Spectrogram>();
   const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   let player: Player | undefined;
 
@@ -94,6 +96,7 @@ export default function Editor() {
       const duration = next.track.duration;
       setView(longest ? [Math.max(0, centre - 1), Math.min(duration, centre + 1)] : [0, duration]);
       setCurrent(longest);
+      setGrid(undefined);
       setLoaded(next);
       player.seek(longest ? Math.max(0, centre - 0.5) : 0);
       setStatus('');
@@ -104,7 +107,13 @@ export default function Editor() {
           'find-the-clipping:decoded',
           'find-the-clipping:painted',
         );
-        document.documentElement.dataset.demoReady = 'true';
+        // Then the spectrogram; the page is ready once it has painted too.
+        setTimeout(() => {
+          setGrid(spectrogram(audio.channels, audio.sampleRate));
+          requestAnimationFrame(() => {
+            document.documentElement.dataset.demoReady = 'true';
+          });
+        });
       });
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -252,7 +261,7 @@ export default function Editor() {
                 {touch
                   ? 'Double-tap and drag across the overview to inspect a stretch; pinch a channel to zoom.'
                   : 'Drag across the overview to inspect a stretch. In a channel, drag to zoom in, Shift-drag to move, double-click to see it all.'}{' '}
-                {`In each channel the thin line is the loudness (RMS) on the dB axis, and the dashed line the silence threshold, ${String(RULE.silenceDbfs).replace('-', '−')} dB.`}
+                {`In each channel the thin line is the loudness (RMS) on the dB axis, and the dashed line the silence threshold, ${String(RULE.silenceDbfs).replace('-', '−')} dB. In the spectrogram, a clipped run splatters energy into the top bands.`}
               </p>
             </section>
             <For each={l.audio.channels}>
@@ -277,6 +286,26 @@ export default function Editor() {
                 </section>
               )}
             </For>
+            <section class="lane spectrogram" aria-label="Spectrogram">
+              <span class="lane-name">Spectrogram</span>
+              <div class="plot">
+                <Show when={grid()} keyed>
+                  {(g) => (
+                    <Chart
+                      {...spectrogramLane(l.track, g, group)}
+                      class="host"
+                      data-chart="spectrogram"
+                      ariaLabel={`Spectrogram, ${tc(view()[0])} to ${tc(view()[1])}`}
+                      viewport={{ x: view() }}
+                      onViewportChange={(v) =>
+                        v.x ? show(+v.x[0], +v.x[1]) : show(0, l.track.duration)
+                      }
+                      ref={(chart) => chart && (exposed.spectrogram = chart)}
+                    />
+                  )}
+                </Show>
+              </div>
+            </section>
             <div class="analysis">
               <ClipList
                 report={l.report}

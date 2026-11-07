@@ -1,0 +1,39 @@
+---
+/**
+ * "ML experiment tracker" (plan §10.2, R1): a React demo on its own page, with its own layout.
+ * No Starlight chrome; only the thin examples footer is shared. The runs are simulated in the
+ * browser (src/demos/experiment-tracker/runs.ts).
+ */
+import '../../demos/experiment-tracker/style.css';
+import ExperimentTracker from '../../demos/experiment-tracker/main.react';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const source = 'https://github.com/liamclarkza/snaplot/tree/main/site/src/demos/experiment-tracker';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>ML experiment tracker · snaplot examples</title>
+    <meta
+      name="description"
+      content="An ML experiment tracker in React with snaplot: five simulated pretraining runs, a chart per metric linked by one cursor, and the values of every run at that step."
+    />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <meta property="og:image" content={new URL(`${base}examples/experiment-tracker.jpg`, Astro.site).href} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body class="xt-page">
+    <main>
+      <ExperimentTracker client:only="react">
+        <p slot="fallback">Loading the runs. This page needs JavaScript.</p>
+      </ExperimentTracker>
+    </main>
+    <footer class="xt-footer">
+      <a href={`${base}examples/`}>← Examples</a> · <a href={source}>Source</a> · Data: simulated in the browser
+    </footer>
+  </body>
+</html>

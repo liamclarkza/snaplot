@@ -309,6 +309,10 @@ tr[data-run] td:first-child button {
   font-size: 12px;
 }
 
+.demo-footer p {
+  margin: 0;
+}
+
 @media (max-width: 760px) {
   .analysis {
     grid-template-columns: minmax(0, 1fr);

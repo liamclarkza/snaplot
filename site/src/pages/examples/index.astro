@@ -2,7 +2,7 @@
 /**
  * The examples hub (plan §10.3): an index. One heading and one sentence, then a card per example
  * (three a row on wide screens): a thumbnail Playwright took of the real page (`npm run thumbs`),
- * its question, who decides what with it, the dataset with its licence and size, the framework,
+ * its name, who decides what with it, the dataset with its licence and size, the framework,
  * and Open and Source links.
  */
 import { existsSync } from 'node:fs';
@@ -22,7 +22,7 @@ const examples = DEMOS.map((demo) => ({
 
 <Site
   title="Examples · snaplot"
-  description="Each example answers one question with real or documented data."
+  description="Each example is a small app on real, documented or simulated data."
   current="examples"
 >
   <Fragment slot="head">
@@ -31,8 +31,8 @@ const examples = DEMOS.map((demo) => ({
   </Fragment>
   <h1>Examples</h1>
   <p class="intro">
-    Each example answers one question with real or documented data; for one chart type at a time,
-    with its code, see <a href={`${base}chart-types/`}>Chart types</a>.
+    Each example is a small app on real, documented or simulated data; for one chart type at a
+    time, with its code, see <a href={`${base}chart-types/`}>Chart types</a>.
   </p>
   <ul class="examples">
     {
@@ -63,8 +63,8 @@ const examples = DEMOS.map((demo) => ({
             <span class="demo-card-picture thumb-missing" />
           )}
           <div class="row-text demo-card-body">
-            <h2 class="demo-question">
-              {demo.page ? <a href={`${base}examples/${demo.slug}/`}>{demo.question}</a> : demo.question}
+            <h2 class="demo-name">
+              {demo.page ? <a href={`${base}examples/${demo.slug}/`}>{demo.name}</a> : demo.name}
             </h2>
             <p class="demo-task">{demo.task}</p>
             <p class="demo-meta">
@@ -101,7 +101,7 @@ const examples = DEMOS.map((demo) => ({
     font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
     line-height: 1.45;
   }
-  /* A grid of cards: each a picture, its question, who it is for and its data. The whole card is
+  /* A grid of cards: each a picture, its name, who it is for and its data. The whole card is
      the link to the page; Open and Source sit above that link. */
   ul.examples {
     display: grid;
@@ -126,7 +126,7 @@ const examples = DEMOS.map((demo) => ({
   .thumb-missing {
     aspect-ratio: 8 / 5;
   }
-  .demo-question {
+  .demo-name {
     margin: 0 0 0.5rem;
     font-size: 1.375rem;
     line-height: 1.2;
@@ -155,7 +155,7 @@ const examples = DEMOS.map((demo) => ({
     display: inline-flex;
     gap: 0.375rem;
   }
-  /* Open repeats the question's link; it stays for keyboards and readers, as a small pill. */
+  /* Open repeats the name's link; it stays for keyboards and readers, as a small pill. */
   .demo-links a {
     position: relative;
     z-index: 2;
