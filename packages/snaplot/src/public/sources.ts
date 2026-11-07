@@ -6,7 +6,7 @@
 import { fail } from '../engine/errors';
 import type { AxisSpec, ChartSpec, ColumnarData } from '../engine/spec';
 import type { AccessorLike, NormalizedOptions } from './normalize';
-import type { ColumnData, HistogramBins, RowId } from './types';
+import type { ColumnData, HeatmapGrid, HistogramBins, RowId } from './types';
 
 // ─── Kinds, ISO dates and categories ─────────────────────────────────
 
@@ -135,7 +135,9 @@ export type ColumnField =
   | { kind: 'field'; name: string }
   | { kind: 'accessor'; read: (row: unknown, index: number) => unknown }
   | { kind: 'encoding'; key: string; read: AccessorLike }
-  | { kind: 'counts' };
+  | { kind: 'counts' }
+  /** One bin of a heatmap row's values: element `bin` of the array `read` returns. */
+  | { kind: 'cell'; read: AccessorLike; bin: number };
 
 /** One ingested source and the identity retained beside its engine columns. */
 export interface SourceState<Row> {
@@ -143,7 +145,7 @@ export interface SourceState<Row> {
   declared: unknown;
   x?: AccessorLike;
   axis: string;
-  kind: 'rows' | 'columns' | 'bins';
+  kind: 'rows' | 'columns' | 'bins' | 'grid';
   /** Indices of the series that read it. */
   series: number[];
   /** A line-like series reads it, so X must be ascending. */
@@ -278,6 +280,16 @@ export function isBins(input: unknown): input is HistogramBins {
     !Array.isArray(input)
   );
 }
+export function isGrid(input: unknown): input is HeatmapGrid {
+  return (
+    !!input &&
+    typeof input === 'object' &&
+    'values' in input &&
+    'x' in input &&
+    'y' in input &&
+    !Array.isArray(input)
+  );
+}
 export function isColumns(input: unknown): input is ColumnData {
   return !!input && typeof input === 'object' && 'columns' in input && !Array.isArray(input);
 }
@@ -314,6 +326,20 @@ export function numeric(value: unknown, path: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value))
     fail(`${path} is ${describe(value)}; values must be finite numbers, or null for a gap.`);
   return value;
+}
+
+/**
+ * Element `bin` of a heatmap row's values (an array or typed array; a missing row or element is an
+ * empty cell), as a number; anything else throws.
+ */
+export function cellValue(values: unknown, bin: number, path: string): number {
+  if (values == null) return Number.NaN;
+  if (typeof values !== 'object' || typeof (values as ArrayLike<unknown>).length !== 'number')
+    fail(`${path} is ${describe(values)}; a heatmap row's values must be an array of numbers.`);
+  const value = (values as ArrayLike<unknown>)[bin];
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : numeric(value, `${path} [${bin}]`);
 }
 
 /** A source key for `IngestContext.unsorted`. */

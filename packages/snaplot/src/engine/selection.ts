@@ -165,7 +165,8 @@ export function pointsInSelection(engine: ChartCore, xRange: ScaleRange, yRange?
   for (let si = 0; si < engine.config.series.length; si++) {
     const series = engine.config.series[si];
     const store = engine.storeForSeries(si);
-    if (store.length === 0 || series.visible === false) continue;
+    // A heatmap's cells are not points.
+    if (store.length === 0 || series.visible === false || markOf(series).draw.cells) continue;
     const cloud = markOf(series).draw.cloud;
     const xColumnIdx = xColumnOf(series);
     const yColumnIdx = seriesYColumn(series);

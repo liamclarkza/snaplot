@@ -197,11 +197,16 @@ export function renderOverlay(engine: ChartCore): void {
       const visibleSeries = engine.config.series.filter((s) => s.visible !== false);
       const hasOnlyDiscreteMarks =
         visibleSeries.length > 0 && visibleSeries.every((s) => markOf(s).draw.x !== 'continuous');
+      const hasOnlyCells =
+        visibleSeries.length > 0 && visibleSeries.every((s) => markOf(s).draw.cells);
       const cursorCfg = {
         ...engine.config.cursor,
-        // A vertical line reads as an extra mark on grouped bars. The
-        // highlighted group already supplies a stronger positional cue.
-        xLine: engine.config.cursor?.xLine ?? !hasOnlyDiscreteMarks,
+        // A vertical line reads as an extra mark on grouped bars, where the highlighted group is
+        // the cue, and across a heatmap under the pointer, where the outlined cell is; a heatmap
+        // shows a group's cursor (no cell outlined) as the line.
+        xLine:
+          engine.config.cursor?.xLine ??
+          (hasOnlyCells ? !engine.cursorIsLocal : !hasOnlyDiscreteMarks),
       };
       renderCrosshair(
         ctx,

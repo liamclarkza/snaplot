@@ -30,7 +30,18 @@ export function chartPoint<Row>(
   values?: Partial<
     Pick<
       TooltipPoint,
-      'x' | 'y' | 'formattedX' | 'formattedY' | 'color' | 'xRange' | 'radius' | 'fields'
+      | 'x'
+      | 'y'
+      | 'formattedX'
+      | 'formattedY'
+      | 'color'
+      | 'xRange'
+      | 'yRange'
+      | 'radius'
+      | 'fields'
+      | 'value'
+      | 'formattedValue'
+      | 'bin'
     >
   >,
 ): ChartPoint<Row> {
@@ -69,11 +80,19 @@ export function chartPoint<Row>(
     formattedY: values?.formattedY ?? readout(view, series.yAxis ?? 'y', y),
     color: values?.color ?? view.engine.getLegendItems()[si]?.color ?? '',
     ...(values?.xRange ? { xRange: { ...values.xRange } } : {}),
+    ...(values?.yRange ? { yRange: { ...values.yRange } } : {}),
     ...(values?.radius !== undefined ? { radius: values.radius } : {}),
     ...(fields ? { fields } : {}),
   };
+  // A heatmap cell: its value is the third coordinate, which the series format writes.
+  if (values?.value !== undefined) {
+    point.value = values.value;
+    point.formattedValue = values.formattedValue ?? '';
+    if (values.bin !== undefined) point.bin = values.bin;
+  }
   const formatter = view.normalized.series[si]?.format;
-  if (formatter) point.formattedY = formatter(y, point);
+  if (formatter && point.value !== undefined) point.formattedValue = formatter(point.value, point);
+  else if (formatter) point.formattedY = formatter(y, point);
   return point;
 }
 /** A value readout at value precision (plan P9); the axis format still wins here. */
@@ -104,12 +123,30 @@ export function cursorSnapshot<Row>(
     points: Object.freeze(
       snapshot.points.map((point) =>
         Object.freeze(
-          chartPoint(view, point.seriesIndex, point.dataIndex, {
-            x: point.dataX,
-            y: point.value,
-            formattedY: point.formattedValue,
-            color: point.color,
-          }),
+          chartPoint(
+            view,
+            point.seriesIndex,
+            point.dataIndex,
+            point.cell
+              ? {
+                  x: point.dataX,
+                  y: point.cell.y,
+                  xRange: point.cell.xRange,
+                  yRange: point.cell.yRange,
+                  value: point.value,
+                  formattedX: point.cell.formattedX,
+                  formattedY: point.cell.formattedY,
+                  formattedValue: point.formattedValue,
+                  bin: point.cell.bin,
+                  color: point.color,
+                }
+              : {
+                  x: point.dataX,
+                  y: point.value,
+                  formattedY: point.formattedValue,
+                  color: point.color,
+                },
+          ),
         ),
       ),
     ),

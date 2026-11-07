@@ -19,6 +19,7 @@ import {
 const mod = snaplot as unknown as Loose;
 
 function seriesOptions(s: SeriesSpec): Record<string, unknown> {
+  if (s.type === 'heatmap') throw new Unsupported('no heatmap series before 0.14');
   return defined({
     id: s.id,
     label: s.id,
@@ -72,6 +73,9 @@ export function wrapV1(chart: Loose, el: HTMLElement, owned = true): BenchChart 
       return axis ? { min: axis.min, max: axis.max } : null;
     },
     plot: () => chart.getLayout().plot,
+    appendRows: () => {
+      throw new Unsupported('no row appends of heatmap rows before 0.14');
+    },
     append: (columns: Columns, seriesId?: string) =>
       chart.appendData({ columns }, seriesId ? { seriesId } : undefined),
     highlight: (id) => chart.setHighlight(id),

@@ -272,10 +272,17 @@ export interface TooltipPoint {
   label: string;
   /** Raw data-space X value. */
   x: number;
-  /** Raw X interval represented by the mark; present for histogram bins. */
+  /** Raw X interval represented by the mark; present for histogram bins and heatmap cells. */
   xRange?: ScaleRange;
-  /** Raw data-space Y value. */
+  /** Raw data-space Y value (a heatmap cell's vertical centre). */
   y: number;
+  /** A heatmap cell's interval on the vertical axis. */
+  yRange?: ScaleRange;
+  /** A heatmap cell's value, and its readout. */
+  value?: number;
+  formattedValue?: string;
+  /** A heatmap cell's bin within its row (`dataIndex` is the row). */
+  bin?: number;
   /** Resolved mark color for the swatch. */
   color: string;
   /** X value pre-formatted via the X axis `format`. */
@@ -339,6 +346,15 @@ export interface CursorSeriesPoint<TMeta = unknown> {
   value: number;
   /** Pre-formatted via the Y axis format (or `''` for missing values) */
   formattedValue: string;
+  /** The heatmap cell under the cursor: `value` is its value, `dataX` its horizontal centre. */
+  cell?: {
+    y: number;
+    xRange: ScaleRange;
+    yRange: ScaleRange;
+    bin: number;
+    formattedX: string;
+    formattedY: string;
+  };
   meta?: TMeta;
 }
 

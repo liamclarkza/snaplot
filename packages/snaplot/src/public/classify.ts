@@ -49,7 +49,19 @@ const PAINT_NEUTRAL: ReadonlySet<string> = new Set([
 ]);
 const STATE: ReadonlySet<string> = new Set(STATE_KEYS);
 /** Series fields that read the data; the rest of a series is its style. */
-const READERS = ['data', 'x', 'y', 'lower', 'upper', 'rowId', 'colorBy', 'sizeBy', 'tooltipFields'];
+const READERS = [
+  'data',
+  'x',
+  'y',
+  'lower',
+  'upper',
+  'rowId',
+  'colorBy',
+  'sizeBy',
+  'tooltipFields',
+  'values',
+  'bins',
+];
 
 /** Two data inputs are the same data: the same reference, or both empty arrays. */
 export function sameData(a: unknown, b: unknown): boolean {
@@ -109,14 +121,33 @@ function seriesWork(
       !sameData(sa.data, sb.data) ||
       Boolean(sa.colorBy) !== Boolean(sb.colorBy) ||
       Boolean(sa.sizeBy) !== Boolean(sb.sizeBy) ||
-      (sa.tooltipFields?.length ?? 0) !== (sb.tooltipFields?.length ?? 0)
+      (sa.tooltipFields?.length ?? 0) !== (sb.tooltipFields?.length ?? 0) ||
+      // A heatmap's rows' axis and its number of bins shape its source's columns.
+      sa.heatmap?.rows !== sb.heatmap?.rows ||
+      sa.heatmap?.bins?.lo.length !== sb.heatmap?.bins?.lo.length
     ) {
       work.data = true;
       return;
     }
-    const fa = [sa.x, sa.y, sa.lower, sa.upper, sa.rowId, ...encodingFields(sa)];
-    const fb = [sb.x, sb.y, sb.lower, sb.upper, sb.rowId, ...encodingFields(sb)];
-    const names = ['x', 'y', 'lower', 'upper', 'rowId', 'colorBy', 'sizeBy'];
+    const fa = [
+      sa.x,
+      sa.y,
+      sa.lower,
+      sa.upper,
+      sa.rowId,
+      sa.heatmap?.values,
+      ...encodingFields(sa),
+    ];
+    const fb = [
+      sb.x,
+      sb.y,
+      sb.lower,
+      sb.upper,
+      sb.rowId,
+      sb.heatmap?.values,
+      ...encodingFields(sb),
+    ];
+    const names = ['x', 'y', 'lower', 'upper', 'rowId', 'values', 'colorBy', 'sizeBy'];
     for (let f = 0; f < fa.length; f++) {
       const change = reader(fa[f], fb[f]);
       if (change === 'data') {

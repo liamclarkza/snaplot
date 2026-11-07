@@ -98,7 +98,7 @@ describe('renderScatterSegments cache keys', () => {
       label: 'heat',
       yColumn: 1,
       type: 'scatter',
-      heatmap: true,
+      renderMode: 'density',
     };
     const cache = new ScatterSeriesCache();
     const palettes = { categorical: [] };
@@ -150,7 +150,12 @@ describe('renderScatterSegments cache keys', () => {
     const xData = Float64Array.from({ length: 100 }, (_, i) => i);
     const yData = Float64Array.from({ length: 100 }, (_, i) => i % 4);
     const yScale = createScale(0, 4, 20, 0);
-    const series: SeriesSpec = { label: 'heat', yColumn: 1, type: 'scatter', heatmap: true };
+    const series: SeriesSpec = {
+      label: 'heat',
+      yColumn: 1,
+      type: 'scatter',
+      renderMode: 'density',
+    };
     const cache = new ScatterSeriesCache();
     // The points of an X range: what the viewport segments of a sorted store would hold.
     const asked: [number, number][] = [];
@@ -212,7 +217,7 @@ describe('renderScatterSegments cache keys', () => {
       label: 'heat',
       yColumn: 1,
       type: 'scatter',
-      heatmap: true,
+      renderMode: 'density',
     };
     const cacheA = new ScatterSeriesCache();
     const cacheB = new ScatterSeriesCache();

@@ -225,7 +225,11 @@
       "ratio": 1.5,
       "scenarios": ["react-rerender-200k-stable", "react-rerender-200k-inline"]
     },
-    "M14": { "ratio": 1.5, "scenarios": "*" }
+    "M14": { "ratio": 1.5, "scenarios": "*" },
+    "heatmap": {
+      "ratio": 1.5,
+      "scenarios": ["heatmap-waterfall-300x75", "heatmap-spectrogram-600x512"]
+    }
   },
   "overrides": [
     { "set": "*", "scenario": "line-pan-200k", "metric": "busy.median", "max": 1.2 },

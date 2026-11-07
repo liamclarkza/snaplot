@@ -1,0 +1,68 @@
+---
+title: Heatmap
+description: A grid of cells coloured by value, for spectrograms, waterfalls and 2D histograms.
+---
+
+import Example from '../../../components/Example.astro';
+
+A heatmap colours a grid of cells by value. Each row of your data holds a line of cells: its
+`values` (an array) fill the cells across `bins`, and its position runs along X, or up the plot
+when the series sets `y`. `appendData` adds rows, so a waterfall or a spectrogram scrolls as rows
+arrive, and `streaming.maxPoints` keeps the latest.
+
+The waterfall below is a simulated spectrum analyser: ten sweeps a second of a band from 400 to
+410 MHz, each a row of 100 bins, newest at the top, thirty seconds kept. A steady carrier, a
+drifting one and a transmitter hopping between channels stand above the noise floor.
+
+<Example name="chart-types/waterfall" />
+
+## Bins
+
+`bins` places the cells across each row, and a cell that is not in the grid is not drawn:
+
+- `{ start, step, count }`: `count` cells, `step` apart, the first centred on `start`.
+- `{ centers }`: each cell's centre. A cell reaches half way to its neighbours, and a step more
+  than 1.75 times the steps beside it is a gap, so a missing bin leaves a gap rather than
+  widening the bins beside it.
+- `{ edges }`: the cells' edges, one more than there are cells.
+
+Rows reach half way to their neighbours too. A pause of more than 2.5 typical steps between two
+rows is left empty, so a stream that stopped shows where, while a late or an early row does not.
+
+## Rows along X
+
+Without `y`, each row is a column of cells at the chart's `x`: a spectrogram, or a calendar of
+hours by day.
+
+<Example name="chart-types/heatmap-solar" />
+
+## Angles and missing values
+
+An angle, a phase or a time of day wraps around, so it takes `colors: 'cyclic'`, whose ends meet:
+355° and 5° get neighbouring colours. A `null`, `undefined` or `NaN` value draws in the empty
+colour, not as the lowest value: below, the simulated station's vane froze for six hours.
+
+<Example name="chart-types/heatmap-wind" />
+
+## 2D histograms
+
+[`histogram2d(x, y)`](/snaplot/reference/api/snaplot/functions/histogram2d/) counts pairs of values
+into a grid, which a heatmap takes as its `data`. Pass `bins` for counts per axis, or
+`xThresholds` and `yThresholds` for edges of your own. A grid of your own is
+`{ x: bins, y: bins, values }`, with one value per cell, row by row from the lowest Y.
+
+<Example name="chart-types/heatmap-histogram2d" />
+
+## Colours
+
+| Option | Default | |
+| --- | --- | --- |
+| `colors` | `'sequential'` | `'sequential'`, `'diverging'` (symmetric about zero) or `'cyclic'` (phases and angles), from the theme; or your own stops, low to high. |
+| `domain` | the values' extent | The values at the two ends of the colours. Set it on a stream, so the colours keep their meaning as rows arrive. |
+| `clamp` | `true` | Values past the domain take the end colours; `false` leaves them undrawn. Cyclic colours wrap. |
+| `emptyColor` | a tint of the theme's muted colour | The colour of a `null`, `undefined` or `NaN` value. |
+| `colorScale` | `true` | The colour scale beside the plot, with `title`, `ticks` and `format`. |
+
+The theme's `sequential`, `diverging` and `cyclic` tokens set the ramps, and each has a light and
+a dark default. The tooltip and `getCursor()` report the cell under the pointer: `x`, `y` and
+`value`, with the cell's `xRange` and `yRange`.

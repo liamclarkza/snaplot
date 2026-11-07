@@ -72,7 +72,28 @@ export const SERIES = keys(
   'colorBy',
   'sizeBy',
   'tooltipFields',
+  'values',
+  'bins',
+  'colors',
+  'domain',
+  'clamp',
+  'emptyColor',
+  'colorScale',
 );
+/** The options only a heatmap takes. */
+export const HEATMAP_ONLY = [
+  'values',
+  'bins',
+  'colors',
+  'domain',
+  'clamp',
+  'emptyColor',
+  'colorScale',
+];
+export const COLOR_SCALE = keys('title', 'ticks', 'format');
+export const BINS = keys('start', 'step', 'count', 'centers', 'edges');
+export const GRID = keys('x', 'y', 'values');
+export const COLOR_MAPS = ['sequential', 'diverging', 'cyclic'];
 export const AXIS = keys(
   'type',
   'title',
@@ -98,6 +119,7 @@ export const THEME_TOKENS = keys(
   'categorical',
   'sequential',
   'diverging',
+  'cyclic',
   'fontFamily',
   'fontSize',
 );
@@ -207,6 +229,7 @@ export const SERIES_TYPES: readonly SeriesType[] = [
   'bar',
   'scatter',
   'histogram',
+  'heatmap',
 ];
 export const AXIS_TYPES = ['linear', 'log', 'time', 'category'] as const;
 export const INTERPOLATIONS = ['linear', 'monotone', 'step-before', 'step-after', 'step-middle'];

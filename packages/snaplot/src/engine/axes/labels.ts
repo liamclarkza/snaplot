@@ -16,6 +16,8 @@ import { measureLabel } from '../layout';
 export interface LabelBox {
   /** The axis key in `axes` (`'x'`, `'y'`, `'y2'`, …). */
   axis: string;
+  /** The side a label of no axis sits on (a heatmap's colour scale); others take their axis'. */
+  position?: AxisPosition;
   /** A tick label, or the axis title (in the outer gutter strip, rotated on vertical axes). */
   kind: 'tick' | 'title';
   text: string;
@@ -44,6 +46,7 @@ export function resolveAxisCornerCollisions(
   const vertical: Array<{ label: LabelBox; position: 'left' | 'right' }> = [];
 
   for (const label of result.labels) {
+    if (label.position) continue;
     const position = layout.axes[label.axis]?.position;
     if (!position) continue;
     if (label.kind === 'title') continue;
@@ -118,8 +121,8 @@ export function updateDOMLabels(
   let used = 0;
 
   for (const label of axesResult.labels) {
-    const axisInfo = layout.axes[label.axis];
-    if (!axisInfo) continue;
+    const pos = label.position ?? layout.axes[label.axis]?.position;
+    if (!pos) continue;
 
     let el = pool[used] as HTMLSpanElement | undefined;
     if (!el) {
@@ -131,10 +134,9 @@ export function updateDOMLabels(
     // What the span shows, kept beside it, so a frame that moves nothing writes nothing.
     let shown = shownLabels.get(el);
     if (!shown) {
-      shown = { base: '', kind: label.kind, position: axisInfo.position, x: NaN, y: NaN, text: '' };
+      shown = { base: '', kind: label.kind, position: pos, x: NaN, y: NaN, text: '' };
       shownLabels.set(el, shown);
     }
-    const pos = axisInfo.position;
     if (shown.base !== baseStyle || shown.kind !== label.kind || shown.position !== pos) {
       el.style.cssText = baseStyle + (label.kind === 'title' ? TITLE_STYLE[pos] : TICK_STYLE[pos]);
       shown.base = baseStyle;

@@ -90,6 +90,11 @@ export function installCanvas(restorers: Array<() => void>): CanvasFake {
         height: h,
         data: new Uint8ClampedArray(Math.max(0, w * h * 4)),
       }),
+      createImageData: (w: number, h: number) => ({
+        width: w,
+        height: h,
+        data: new Uint8ClampedArray(Math.max(0, w * h * 4)),
+      }),
       getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
     };
     return new Proxy(state, {

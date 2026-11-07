@@ -44,6 +44,8 @@ export interface DebugSnapshot {
   };
   /** Axis labels of the last grid paint, in paint order. */
   labelBoxes(): DebugLabelBox[];
+  /** Heatmap bitmaps drawn from the data. */
+  readonly heatmapRasters: number;
 }
 
 export const DEBUG_SYMBOL = Symbol.for('snaplot.debug');

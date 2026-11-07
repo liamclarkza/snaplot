@@ -50,6 +50,8 @@ export interface Layout {
   plot: PixelRect;
   /** Each axis' side and area. */
   axes: Record<string, AxisArea>;
+  /** The area of a heatmap's colour scale, right of the plot and its right axes. */
+  colorScale?: PixelRect;
   /** The device pixel ratio. */
   dpr: number;
 }
@@ -85,6 +87,8 @@ export interface ThemeConfig {
   sequentialPalette?: string[];
   /** The diverging ramp. */
   divergingPalette?: string[];
+  /** The cyclic ramp (phase, angle, time of day): its last stop runs back into its first. */
+  cyclicPalette?: string[];
   /** The density ramp. */
   heatmapGradient?: string[];
   /** The axis line colour. */
@@ -206,7 +210,51 @@ export interface Scale {
  * Mark type for a series. Public bands name `lower` and `upper` fields;
  * histogram series consume explicit binning results. Defaults to `line`.
  */
-export type ChartType = 'line' | 'area' | 'band' | 'scatter' | 'bar' | 'histogram';
+export type ChartType = 'line' | 'area' | 'band' | 'scatter' | 'bar' | 'histogram' | 'heatmap';
+
+/** A heatmap's colour map: a theme ramp by name, or ramp stops (any CSS colour), low to high. */
+export type HeatmapColors = 'sequential' | 'diverging' | 'cyclic' | readonly string[];
+
+/**
+ * A heatmap series as the engine draws it (`SeriesSpec.heatmap`). The source's X column holds each
+ * row's position along `rows`; its cells across the other axis are the store columns `yColumn` to
+ * `yColumn + bins - 1`, one per bin.
+ */
+export interface HeatmapSpec {
+  /** The axis the rows run along: `'x'` (each row a column of cells) or `'y'` (a row of cells). */
+  rows: 'x' | 'y';
+  /** The bins across each row, ascending: bin `b` spans `[binLo[b], binHi[b]]`; gaps between are empty. */
+  binLo: Float64Array;
+  binHi: Float64Array;
+  /** Each bin's position: its centre as given, or the middle of its edges. */
+  binMid: Float64Array;
+  /**
+   * The rows' own spans (a grid's cells along `rows`), one per stored row. Without them a row
+   * spans half the way to its neighbours, and a step much wider than its neighbours' is a gap.
+   */
+  rowLo?: Float64Array;
+  rowHi?: Float64Array;
+  /** The colour map. */
+  colors: HeatmapColors;
+  /** The values at the two ends of the map; unset, the extent of the values (symmetric for diverging). */
+  domain?: readonly [number, number];
+  /** Values past the domain take the end colours; `false` leaves them undrawn. Cyclic maps wrap. */
+  clamp: boolean;
+  /** The colour of a cell with no value (null or NaN); unset, a quiet tint of the theme. */
+  emptyColor?: string;
+  /** The colour-scale legend beside the plot, or `false`. */
+  colorScale: false | HeatmapColorScale;
+}
+
+/** A heatmap's colour-scale legend: a bar of its map with ticks, beside the plot. */
+export interface HeatmapColorScale {
+  /** The title, drawn along the bar (a unit, a quantity). */
+  title?: string;
+  /** Explicit tick values; unset, nice ticks of the domain. */
+  ticks?: readonly number[];
+  /** The tick label format; unset, the series format, else automatic. */
+  format?: (value: number) => string;
+}
 
 /** Mark glyph for non-density scatter rendering. Defaults to `circle`. */
 export type ScatterPointShape = 'circle' | 'square' | 'diamond';
@@ -383,8 +431,8 @@ export interface SeriesSpec<TMeta = unknown> {
   /** The names of the X and Y values in a point's tooltip: an axis title or the field read. */
   xName?: string;
   yName?: string;
-  /** Force heatmap (density) rendering for scatter plots regardless of point count */
-  heatmap?: boolean;
+  /** A heatmap series' grid and colours (the spec's own section). */
+  heatmap?: HeatmapSpec;
   /** Heatmap bin size in CSS pixels (default: 1 = one bin per physical pixel) */
   heatmapBinSize?: number;
   /**

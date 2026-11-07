@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ChartType, SeriesSpec } from '../spec';
 import { markOf, TOOLTIP_RANKS, xColumnOf } from './index';
 
-const TYPES: ChartType[] = ['line', 'area', 'band', 'scatter', 'bar', 'histogram'];
+const TYPES: ChartType[] = ['line', 'area', 'band', 'scatter', 'bar', 'histogram', 'heatmap'];
 const series = (type: ChartType | undefined, extra: Partial<SeriesSpec> = {}): SeriesSpec => ({
   type,
   label: String(type),
@@ -29,8 +29,11 @@ describe('the mark registry (plan §3.1)', () => {
       scatter: ['continuous', false, true, 'sample', 0],
       bar: ['slot', true, false, 'none', 1],
       histogram: ['bin', true, false, 'none', 2],
+      // A grid of cells leads the tooltip with the cell under the pointer.
+      heatmap: ['continuous', false, false, 'none', 3],
     });
-    expect(TOOLTIP_RANKS).toEqual([1, 2]);
+    expect(TOOLTIP_RANKS).toEqual([1, 2, 3]);
+    expect(markOf(series('heatmap')).draw.cells).toBe(true);
   });
 
   it('reads X from the store unless a scatter names its own column', () => {
@@ -49,7 +52,7 @@ describe('the mark registry (plan §3.1)', () => {
 
   it('gives stroke marks no legend fill', () => {
     const fills = TYPES.map((type) => markOf(series(type)).draw.legendFill('#123456'));
-    expect(fills).toEqual([null, '#123456', '#123456', null, '#123456', '#123456']);
+    expect(fills).toEqual([null, '#123456', '#123456', null, '#123456', '#123456', '#123456']);
   });
 
   it('builds the registry whichever mark half is imported first (no load-order cycle)', async () => {

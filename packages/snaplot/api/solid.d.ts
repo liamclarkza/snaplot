@@ -433,17 +433,25 @@ export declare interface ChartPoint<Row = Record<string, any>> {
     rowId?: RowId;
     /** The X value: a number (epoch milliseconds on time axes) or a category label. */
     x: number | string;
-    /** The bin interval of a histogram point. */
+    /** The bin interval of a histogram point, or a heatmap cell's interval along X. */
     xRange?: ScaleRange;
-    /** The value. */
+    /** The value (a heatmap cell's vertical position: its value is `value`). */
     y: number;
+    /** A heatmap cell's interval along Y. */
+    yRange?: ScaleRange;
+    /** A heatmap cell's value. */
+    value?: number;
+    /** A heatmap cell's value as written. */
+    formattedValue?: string;
+    /** A heatmap cell's index among its row's bins (`rowIndex` is its row). */
+    bin?: number;
     /** The marker radius of a scatter point in CSS pixels. */
     radius?: number;
     /** Extra scatter fields from `tooltipFields`, `colorBy` and `sizeBy`. */
     fields?: readonly ChartPointField[];
     /** The X value as written. */
     formattedX: string;
-    /** The value as written. */
+    /** The value as written (a heatmap cell's vertical position). */
     formattedY: string;
     /** The point's colour. */
     color: string;
@@ -541,6 +549,22 @@ export declare interface ColorEncodingOptions<Row> {
 
 /** How a colour encoding reads its values. */
 export declare type ColorEncodingType = 'auto' | 'category' | 'continuous' | 'diverging';
+
+/**
+ * A heatmap's colours: a ramp of the theme (`'sequential'` for magnitudes, `'diverging'` for signed
+ * values around zero, `'cyclic'` for phases and angles), or your own stops, low to high.
+ */
+export declare type ColorMap = 'sequential' | 'diverging' | 'cyclic' | readonly string[];
+
+/** A heatmap's colour scale: a bar of its colours with ticks, beside the plot. */
+export declare interface ColorScaleOptions {
+    /** The title along the bar: a quantity or a unit. @defaultValue no title */
+    title?: string;
+    /** The tick values. @defaultValue round values across the domain */
+    ticks?: readonly number[];
+    /** How tick labels are written. @defaultValue the series `format`, else automatic */
+    format?: NumberFormat;
+}
 
 /**
  * Named typed columns. Every column has the same length; the X column must be
@@ -649,7 +673,137 @@ export declare type Field<Row, Value> = Extract<keyof {
 }, string>;
 
 /** The marks whose fields are read from rows. */
-declare type FieldSeries<Row> = LineSeriesOptions<Row> | BarSeriesOptions<Row> | BandSeriesOptions<Row> | ScatterSeriesOptions<Row>;
+declare type FieldSeries<Row> = LineSeriesOptions<Row> | BarSeriesOptions<Row> | BandSeriesOptions<Row> | ScatterSeriesOptions<Row> | HeatmapSeriesOptions<Row>;
+
+/**
+ * The cells along one axis of a heatmap: a regular step from the first cell's centre, the cells'
+ * centres, or their edges. Dates are read as epoch milliseconds.
+ *
+ * Cells given by centres reach half way to their neighbours; a step more than 1.75 times the
+ * steps beside it is a gap, drawn empty rather than bridged by stretched cells.
+ *
+ * @example
+ * ```ts
+ * { start: 2404, step: 1, count: 75 } // 2404, 2405, … 2478 MHz
+ * { centers: [0.5, 1, 2, 4, 8] }       // irregular centres
+ * { edges: [0, 10, 20, 50, 100] }      // four cells between five edges
+ * ```
+ */
+export declare type HeatmapBins = {
+    /** The centre of the first cell. */
+    start: number | Date;
+    /** The distance between centres, which is each cell's width. */
+    step: number;
+    /** The number of cells. */
+    count: number;
+} | {
+    /** Each cell's centre, ascending. */
+    centers: ArrayLike<number | Date>;
+} | {
+    /** The cells' edges, ascending: one more than there are cells. */
+    edges: ArrayLike<number | Date>;
+};
+
+/** Options every heatmap shares, however it reads its values. */
+declare interface HeatmapCommon {
+    /** The name shown in the tooltip. @defaultValue the `values` field name, else the id */
+    label?: string;
+    /** The key of the horizontal axis. @defaultValue `'x'` */
+    xAxis?: string;
+    /** The key of the vertical axis. @defaultValue `'y'` */
+    yAxis?: string;
+    /** The colours values map to. @defaultValue `'sequential'` */
+    colors?: ColorMap;
+    /**
+     * The values at the low and high ends of the colours.
+     * @defaultValue the extent of the values, symmetric about zero for `'diverging'`
+     */
+    domain?: readonly [number, number];
+    /**
+     * Values past the domain take the end colours; `false` leaves them undrawn. `'cyclic'` colours
+     * wrap instead, as an angle does.
+     * @defaultValue `true`
+     */
+    clamp?: boolean;
+    /**
+     * The colour of an empty cell: a `null`, `undefined` or `NaN` value, such as a channel that was
+     * never measured. A cell that is not in the grid at all is not drawn.
+     * @defaultValue a faint tint of the theme's muted colour
+     */
+    emptyColor?: string;
+    /** The colour scale beside the plot: `false` hides it. @defaultValue `true` */
+    colorScale?: boolean | ColorScaleOptions;
+    /** Opacity from 0 to 1. @defaultValue `1` */
+    opacity?: number;
+    /** How values are written in the tooltip and the colour scale. @defaultValue automatic */
+    format?: NumberFormat;
+}
+
+/**
+ * A grid of values for a heatmap, as {@link histogram2d} returns it: the cells along X and Y and
+ * one value per cell, row by row from the lowest Y. `null` and `NaN` are empty cells.
+ */
+export declare interface HeatmapGrid {
+    /** The cells along X. */
+    x: HeatmapBins;
+    /** The cells along Y. */
+    y: HeatmapBins;
+    /** One value per cell: the cell in X column `i` and Y row `j` at `j × (X cells) + i`. */
+    values: ArrayLike<number | null>;
+}
+
+/** A heatmap of a {@link HeatmapGrid}: a 2D histogram from {@link histogram2d}, or any matrix. */
+export declare interface HeatmapGridSeriesOptions extends HeatmapCommon {
+    /** The mark. */
+    type: 'heatmap';
+    /** The series id (a grid has no field to name it after). */
+    id: string;
+    /** The grid. */
+    data: HeatmapGrid;
+    /** A grid holds its own cells. */
+    values?: undefined;
+    /** A grid holds its own cells. */
+    bins?: undefined;
+}
+
+/**
+ * A heatmap whose rows each hold a line of cells: a spectrogram, a waterfall. Each row's `values`
+ * fill the cells across `bins`; the row's position runs along X (the chart's `x`, each row a column
+ * of cells) or, with `y`, up the plot (each row a row of cells). `appendData` adds rows, and
+ * `streaming.maxPoints` keeps the latest.
+ *
+ * @example
+ * ```ts
+ * // A waterfall: one row of 75 channels per procedure, newest at the top.
+ * { type: 'heatmap', y: 'time', values: 'magnitude', bins: { start: 2404, step: 1, count: 75 } }
+ * // A spectrogram: one column of frequency bins per frame.
+ * { type: 'heatmap', values: 'power', bins: { start: 0, step: 43.07, count: 512 } }
+ * ```
+ */
+export declare interface HeatmapSeriesOptions<Row> extends HeatmapCommon {
+    /** The mark. */
+    type: 'heatmap';
+    /**
+     * The series id. @defaultValue the `values` field name; required when `values` is a function
+     */
+    id?: string;
+    /**
+     * Each row's cells, in the order of `bins`: an array or typed array. `null`, `undefined` and
+     * `NaN` are empty cells; a short array leaves its last cells empty.
+     */
+    values: Accessor<Row, ArrayLike<number | null | undefined> | null | undefined>;
+    /** The cells across each row. */
+    bins: HeatmapBins;
+    /** Each row's horizontal position, when it differs from the chart's `x`. @defaultValue the chart's `x` */
+    x?: Accessor<Row, AxisValue>;
+    /**
+     * Each row's vertical position: the rows run up the plot and the bins across it, as in a
+     * waterfall. @defaultValue the rows run along X
+     */
+    y?: Accessor<Row, AxisValue>;
+    /** This series' row id, when it differs from the chart's `rowId`. @defaultValue the chart's `rowId` */
+    rowId?: Accessor<Row, RowId>;
+}
 
 /**
  * Count values into bins for a histogram series.
@@ -667,6 +821,50 @@ declare type FieldSeries<Row> = LineSeriesOptions<Row> | BarSeriesOptions<Row> |
  * ```
  */
 export declare function histogram(values: Float64Array | readonly number[], options?: HistogramOptions): HistogramBins;
+
+/** A 2D histogram: the grid a heatmap draws, and its largest count. */
+export declare interface Histogram2d extends HeatmapGrid {
+    /** The cells along X. */
+    x: {
+        /** The cells' edges, ascending: one more than there are cells. */
+        edges: Float64Array;
+    };
+    /** The cells along Y. */
+    y: {
+        /** The cells' edges, ascending: one more than there are cells. */
+        edges: Float64Array;
+    };
+    /** The count of each cell: X column `i`, Y row `j` at `j × (X cells) + i`. */
+    values: Float64Array;
+    /** The largest count. */
+    maxCount: number;
+}
+
+/**
+ * Count (x, y) pairs into a grid for a heatmap series.
+ *
+ * @example
+ * ```ts
+ * createChart(element, {
+ *   series: [{ type: 'heatmap', id: 'density', data: histogram2d(durations, sizes) }],
+ * });
+ * ```
+ */
+export declare function histogram2d(x: Float64Array | readonly number[], y: Float64Array | readonly number[], options?: Histogram2dOptions): Histogram2d;
+
+/** Options of {@link histogram2d}. */
+export declare interface Histogram2dOptions {
+    /**
+     * Bins per axis: a count from 1 to 10,000 or a rule for both, or `[x, y]`. An automatic count
+     * is capped at 200 per axis.
+     * @defaultValue `'freedman-diaconis'` on each axis
+     */
+    bins?: number | HistogramRule | readonly [number | HistogramRule, number | HistogramRule];
+    /** Explicit X edges, strictly increasing; not combined with an X bin count. @defaultValue from `bins` */
+    xThresholds?: ArrayLike<number>;
+    /** Explicit Y edges, strictly increasing; not combined with a Y bin count. @defaultValue from `bins` */
+    yThresholds?: ArrayLike<number>;
+}
 
 /**
  * Histogram bins: `edges.length === counts.length + 1`, edges strictly increasing. {@link
@@ -1074,7 +1272,7 @@ export declare type SeriesOptions<Row = Record<string, any>> = (FieldSeries<Row>
 }) | (FieldSeries<any> & {
     /** This series' own rows or columns. */
     data: SeriesData;
-}) | HistogramSeriesOptions;
+}) | HistogramSeriesOptions | HeatmapGridSeriesOptions;
 
 /** One series with its colour, mark and visibility: what a legend draws. */
 export declare interface SeriesState {
@@ -1097,7 +1295,7 @@ export declare interface SeriesState {
 }
 
 /** A mark type. */
-export declare type SeriesType = 'line' | 'area' | 'band' | 'bar' | 'scatter' | 'histogram';
+export declare type SeriesType = 'line' | 'area' | 'band' | 'bar' | 'scatter' | 'histogram' | 'heatmap';
 
 /** A size encoding: a field, or a field with options. */
 export declare type SizeEncoding<Row> = Numeric<Row> | SizeEncodingOptions<Row>;
@@ -1161,6 +1359,11 @@ export declare interface ThemeTokens {
      * @defaultValue a blue–red ramp for the mode
      */
     diverging?: readonly string[];
+    /**
+     * The ramp for cyclic values (phases, angles, times of day): its last stop runs back into its
+     * first. @defaultValue a hue wheel of even lightness for the mode
+     */
+    cyclic?: readonly string[];
     /** The font family of all chart text. @defaultValue the system UI font */
     fontFamily?: string;
     /** The axis text size in CSS pixels. @defaultValue `11` */

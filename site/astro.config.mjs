@@ -116,6 +116,7 @@ export default defineConfig({
             { slug: 'chart-types/bar' },
             { slug: 'chart-types/scatter' },
             { slug: 'chart-types/histogram' },
+            { slug: 'chart-types/heatmap' },
           ],
         },
         {

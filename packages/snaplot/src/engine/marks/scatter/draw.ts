@@ -55,7 +55,7 @@ const STAMP_CACHE_MAX = 512;
 export const SCATTER_DENSITY_THRESHOLD = 200_000;
 
 export function isDensityScatterSeries(series: SeriesSpec, pointCount: number): boolean {
-  const renderMode = series.renderMode ?? (series.heatmap ? 'density' : 'auto');
+  const renderMode = series.renderMode ?? 'auto';
   return (
     renderMode === 'density' || (renderMode === 'auto' && pointCount > SCATTER_DENSITY_THRESHOLD)
   );

@@ -6,6 +6,29 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A `type: 'heatmap'` series: a grid of cells coloured by value, for spectrograms, waterfalls and
+  2D histograms. Each row's `values` (an array or typed array) fill the cells across `bins`
+  (`{ start, step, count }`, `{ centers }` or `{ edges }`); the rows run along X at the chart's
+  `x`, or up the plot when the series sets `y`. `appendData` adds rows and `streaming.maxPoints`
+  keeps the latest, so a waterfall scrolls as rows arrive. A grid is also accepted as the series'
+  `data`.
+- `histogram2d(x, y, { bins, xThresholds, yThresholds })` counts pairs into a grid for a heatmap,
+  as `histogram()` does for a histogram.
+- Heatmap colours: `colors` (`'sequential'`, `'diverging'`, `'cyclic'` or your own stops),
+  `domain` (the values' extent by default, symmetric about zero when diverging), `clamp` and
+  `emptyColor`. `null`, `undefined` and `NaN` values draw in the empty colour, not as the low
+  end; a bin that is not in the grid (a step more than 1.75 times the steps beside it) or a pause
+  between rows (more than 2.5 typical steps) is left undrawn instead of stretching its neighbours.
+- A colour scale beside the plot for a heatmap (`colorScale: { title, ticks, format }`, or
+  `false`), with ticks of its domain.
+- A `cyclic` theme token: a hue wheel of even lightness for phases and angles, with a light and
+  a dark default.
+- `ChartPoint` reports a heatmap cell's `value`, `formattedValue`, `bin` and `yRange` beside its
+  `x`, `y` and `xRange`; the tooltip, `getCursor()` and `onPointClick` read the cell under the
+  pointer.
+
 ## [0.13.0] - 2026-11-03
 
 The overhaul, released as 0.13.0: a breaking release on the 0.x line, so `^0.12` ranges stay on 0.12

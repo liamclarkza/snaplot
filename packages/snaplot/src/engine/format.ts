@@ -270,6 +270,27 @@ export function formatReadout(
 }
 
 /**
+ * A heatmap cell's value readout: the series `format`, else the value at the precision of its
+ * colour domain's tick step (plus two decimals, P9). A cell's value is on no axis, so no axis
+ * format applies.
+ */
+export function formatCellValue(
+  ctx: FormatContext,
+  series: number,
+  value: number,
+  domain: readonly [number, number],
+): string {
+  const spec = ctx.config.series[series];
+  if (spec?.format) return spec.format(value);
+  const step = niceStep(
+    Math.min(domain[0], domain[1]),
+    Math.max(domain[0], domain[1]),
+    DEFAULT_TICK_COUNT,
+  );
+  return formatValue(value, { stepDecimals: stepDecimals(step), locale: ctx.config.locale });
+}
+
+/**
  * The X readout of `value` on axis `axis` (default `'x'`): `tooltip.xFormat`, else the axis
  * `format` (a category axis' labels), else the automatic readout: a time axis' readout format
  * (date plus time of day), a number at value precision.

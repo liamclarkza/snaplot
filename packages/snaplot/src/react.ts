@@ -17,8 +17,10 @@ export type { ChartProps, HostAttributes } from './react/Chart';
 export { LegendTable } from './react/LegendTable';
 export type { LegendTableProps } from './react/LegendTable';
 export { useChartState, useCursor } from './react/hooks';
-export { createChartGroup, histogram } from 'snaplot';
+export { createChartGroup, histogram, histogram2d } from 'snaplot';
 export type {
+  Histogram2d,
+  Histogram2dOptions,
   HistogramOptions,
   HistogramRule,
   LegendTableColumn,

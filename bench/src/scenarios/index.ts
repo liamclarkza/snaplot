@@ -1,6 +1,7 @@
 import { Unsupported } from '../api/types';
 import type { ScenarioResult } from '../metrics';
 import { api } from './api';
+import { heatmap } from './heatmap';
 import type { Ctx, Scenario } from './common';
 import { interaction } from './interaction';
 import { legacy } from './legacy';
@@ -9,7 +10,14 @@ import { streaming } from './streaming';
 
 export type { Ctx, Scenario };
 
-export const scenarios: Scenario[] = [...legacy, ...api, ...streaming, ...interaction, ...scale];
+export const scenarios: Scenario[] = [
+  ...legacy,
+  ...api,
+  ...streaming,
+  ...interaction,
+  ...scale,
+  ...heatmap,
+];
 
 export function findScenario(name: string): Scenario | undefined {
   return scenarios.find((s) => s.name === name);

@@ -16,10 +16,21 @@ export class Unsupported extends Error {
   }
 }
 
+/** A heatmap series: each row's `values` (an array) fill `bins`, its rows along X or up the plot. */
+export interface HeatmapSpec {
+  values: string;
+  bins: { start: number; step: number; count: number };
+  /** The rows run up the plot (a waterfall), positioned by the chart's X field. */
+  rowsOnY?: boolean;
+  domain?: [number, number];
+}
+
 export interface SeriesSpec {
   /** Series id; also its label. */
   id: string;
-  type: 'line' | 'scatter';
+  type: 'line' | 'scatter' | 'heatmap';
+  /** The heatmap's values and bins (0.14 onwards). */
+  heatmap?: HeatmapSpec;
   /** Y field. */
   y: string;
   /** X field when it differs from the chart's X (off-axis scatter). */
@@ -91,6 +102,8 @@ export interface BenchChart {
   plot(): PlotRect;
   /** Appends typed columns to the chart (or to one series' source). */
   append(columns: Columns, seriesId?: string): void;
+  /** Appends rows (the heatmap scenarios' rows hold arrays). */
+  appendRows(rows: readonly object[]): void;
   highlight(seriesId: string | null): void;
   redraw(): void;
   update(patch: PatchSpec): void;

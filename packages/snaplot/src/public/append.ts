@@ -9,8 +9,9 @@ import type { AxisSpec, ChartSpec, ColumnarData } from '../engine/spec';
 import { coordinate, type GroupMember, validateGroup } from './group';
 import { categoryAxisSpec, refreshColorCodes } from './describe';
 import { ingest } from './ingest';
-import type { NormalizedOptions } from './normalize';
+import type { AccessorLike, NormalizedOptions } from './normalize';
 import {
+  cellValue,
   describe,
   fieldLabel,
   type Ingested,
@@ -215,6 +216,10 @@ export function planAppend<Row>(
     const path = `appendData() to series "${ingested.seriesIds[source.series[0]]}"`;
     if (source.kind === 'bins' || isBins(data))
       fail('histogram bins cannot be appended; pass new histogram() bins with update({ series }).');
+    if (source.kind === 'grid')
+      fail(
+        `${path}: a heatmap grid cannot be appended; pass a new grid with update({ series }), or give the heatmap rows.`,
+      );
     if (source.kind === 'rows' && !Array.isArray(data))
       fail(
         `${path}: this data is rows, so append rows, not { columns }. A source is either rows or columns.`,
@@ -393,6 +398,16 @@ function planRows<Row>(
     });
     checkNewIds(source, rowIds, options, path);
   }
+  // A heatmap row's array, read once per row for all of its bins.
+  const arrays = new Map<AccessorLike, unknown[]>();
+  const arrayOf = (field: AccessorLike) => {
+    let values = arrays.get(field);
+    if (!values) {
+      values = rows.map((row, i) => read(field, row, index[i], `${path} values`));
+      arrays.set(field, values);
+    }
+    return values;
+  };
   // Value columns, in the source's schema.
   const columns: Float64Array[] = source.fields.map((field, c) => {
     const out = new Float64Array(count);
@@ -410,6 +425,10 @@ function planRows<Row>(
             ? value
             : numeric(value, `${path}: ${fieldLabel(reader)} of appended row ${i}`);
       }
+    } else if (field.kind === 'cell') {
+      const values = arrayOf(field.read);
+      for (let i = 0; i < count; i++)
+        out[i] = cellValue(values[i], field.bin, `${path}: values of appended row ${i}`);
     } else if (field.kind === 'encoding') {
       // The list is copied only when a label is new, so known labels change nothing.
       const known = ingested.encodings.get(field.key) ?? [];

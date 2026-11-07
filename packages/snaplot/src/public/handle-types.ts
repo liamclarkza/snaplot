@@ -66,17 +66,25 @@ export interface ChartPoint<Row = Record<string, any>> {
   rowId?: RowId;
   /** The X value: a number (epoch milliseconds on time axes) or a category label. */
   x: number | string;
-  /** The bin interval of a histogram point. */
+  /** The bin interval of a histogram point, or a heatmap cell's interval along X. */
   xRange?: ScaleRange;
-  /** The value. */
+  /** The value (a heatmap cell's vertical position: its value is `value`). */
   y: number;
+  /** A heatmap cell's interval along Y. */
+  yRange?: ScaleRange;
+  /** A heatmap cell's value. */
+  value?: number;
+  /** A heatmap cell's value as written. */
+  formattedValue?: string;
+  /** A heatmap cell's index among its row's bins (`rowIndex` is its row). */
+  bin?: number;
   /** The marker radius of a scatter point in CSS pixels. */
   radius?: number;
   /** Extra scatter fields from `tooltipFields`, `colorBy` and `sizeBy`. */
   fields?: readonly ChartPointField[];
   /** The X value as written. */
   formattedX: string;
-  /** The value as written. */
+  /** The value as written (a heatmap cell's vertical position). */
   formattedY: string;
   /** The point's colour. */
   color: string;

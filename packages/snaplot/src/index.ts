@@ -19,6 +19,7 @@
 export { createChart, createChartGroup } from './public/chart';
 export { createLegendTable } from './public/legend';
 export { histogram } from './public/histogram';
+export { histogram2d } from './public/histogram2d';
 export type * from './public/types';
 export type {
   LegendTableColumn,
@@ -26,3 +27,4 @@ export type {
   LegendTableOptions,
 } from './public/legend';
 export type { HistogramOptions, HistogramRule } from './public/histogram';
+export type { Histogram2d, Histogram2dOptions } from './public/histogram2d';

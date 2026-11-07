@@ -585,6 +585,11 @@ export interface MarkHit {
   readonly tooltipRank: number;
   /** The tooltip row of series `seriesIndex` at the cursor's X, or null (slot marks). */
   slotPoint?(engine: ChartCore, seriesIndex: number): TooltipPoint | null;
+  /**
+   * Whether a click at a plot pixel lands on a slot point, in place of the span and value test
+   * (a heatmap cell).
+   */
+  contains?(engine: ChartCore, point: TooltipPoint, pixelX: number, pixelY: number): boolean;
   /** The pixel span along X of a slot point's bar or bin, for a click (slot marks). */
   slotSpan?(
     engine: ChartCore,
@@ -737,6 +742,10 @@ export function emitPointClick(engine: ChartCore, pixelX: number, pixelY: number
     for (const point of slotTooltipPoints(engine, rank)) {
       const series = engine.config.series[point.seriesIndex];
       const hit = markOf(series).hit;
+      if (hit.contains) {
+        if (hit.contains(engine, point, pixelX, pixelY)) points.unshift(point);
+        continue;
+      }
       const xScale = engine.scales.get(series.xAxis ?? 'x');
       const yScale = engine.scales.get(series.yAxis ?? 'y');
       if (!xScale || !yScale || !hit.slotSpan || !Number.isFinite(point.y)) continue;

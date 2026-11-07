@@ -168,9 +168,23 @@ export function autoRangeHorizontal(engine: ChartCore): void {
       }
     };
     let hasBoundSeries = false;
+    // A grid of cells (a heatmap) gives its own extent, and its axis ends at its cells.
+    let hasCells = false;
     for (const [si, s] of engine.config.series.entries()) {
       if ((s.xAxis ?? 'x') !== key || s.visible === false) continue;
       hasBoundSeries = true;
+      const mark = markOf(s).draw;
+      if (mark.extent) {
+        hasCells = true;
+        const range = mark.extent(engine, s, engine.storeForSeries(si), 'x');
+        if (range && Number.isFinite(range[0]) && Number.isFinite(range[1])) {
+          hasXValue = true;
+          xMin = Math.min(xMin, range[0]);
+          xMax = Math.max(xMax, range[1]);
+          if (range[0] > 0) xPositiveMin = Math.min(xPositiveMin, range[0]);
+        }
+        continue;
+      }
       includeXColumn(xColumnOf(s), engine.storeForSeries(si));
     }
     if (!hasBoundSeries) includeXColumn(0, engine.sourceStores[0]);
@@ -210,7 +224,11 @@ export function autoRangeHorizontal(engine: ChartCore): void {
       engine.config.series.every((s) => s.visible === false || markOf(s).draw.cloud);
 
     if (scale.type === 'log') {
-      const [min, max] = paddedLogRange(xMin, xMax, ac.padding ?? AUTO_RANGE_PADDING);
+      const [min, max] = paddedLogRange(
+        xMin,
+        xMax,
+        ac.padding ?? (hasCells ? 0 : AUTO_RANGE_PADDING),
+      );
       scale.min = ac.min ?? min;
       scale.max = ac.max ?? max;
     } else if (xMin === xMax) {
@@ -259,7 +277,7 @@ export function autoRangeHorizontal(engine: ChartCore): void {
     // NEAR_ROUND of the span past it): 0–119 reads 0–120, but 1940–2025 stops at 2025 rather than
     // running on to 2040. `nice: true` rounds both sides. Bar X axes use their own slot plan
     // above; histogram bounds stay exact.
-    if (shouldNiceAutoRange(scale, ac, hasBarSeries)) {
+    if (shouldNiceAutoRange(scale, ac, hasBarSeries || (hasCells && ac.nice !== true))) {
       const [dataMin, dataMax] = [scale.min, scale.max];
       niceAutoRange(scale, ac.tickCount ?? DEFAULT_TICK_COUNT);
       if (!hasBarSeries && !isScatterOnly && ac.nice !== true) {
@@ -367,10 +385,19 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
       );
     };
 
+    let hasCells = false;
     for (const [si, s] of engine.config.series.entries()) {
       if ((s.yAxis ?? 'y') !== key || s.visible === false) continue;
 
       const store = engine.storeForSeries(si);
+      const mark = markOf(s).draw;
+      if (mark.extent) {
+        hasCells = true;
+        const range = mark.extent(engine, s, store, 'y');
+        if (range && Number.isFinite(range[0]) && Number.isFinite(range[1]))
+          includeRange([range[0], range[1]]);
+        continue;
+      }
       const xScale = engine.scales.get(s.xAxis ?? 'x') ?? engine.scales.get('x');
       const xColumnIdx = xColumnOf(s);
       let startIdx = 0;
@@ -407,14 +434,19 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
     }
 
     if (scale.type === 'log') {
-      const [min, max] = paddedLogRange(yMin, yMax, ac.padding ?? AUTO_RANGE_PADDING);
+      const [min, max] = paddedLogRange(
+        yMin,
+        yMax,
+        ac.padding ?? (hasCells ? 0 : AUTO_RANGE_PADDING),
+      );
       if (ac.min === undefined) scale.min = min;
       if (ac.max === undefined) scale.max = max;
     } else {
       // One domain policy (plan §5.1): nice rounding is the padding. The 5% pad applies only when
       // nice is off (or the axis sets its own padding), so a maximum of 100 reads 0–100.
-      const niced = shouldNiceAutoRange(scale, ac, false);
-      const pad = (yMax - yMin) * (ac.padding ?? (niced ? 0 : AUTO_RANGE_PADDING));
+      const niced = shouldNiceAutoRange(scale, ac, hasCells && ac.nice !== true);
+      // Cells end the axis: no padding past them.
+      const pad = (yMax - yMin) * (ac.padding ?? (niced || hasCells ? 0 : AUTO_RANGE_PADDING));
       const equalSpan = yMin === yMax ? (yMin === 0 ? 1 : Math.abs(yMin) * 0.1) : 0;
       if (ac.min === undefined) {
         const min = yMin - (equalSpan || pad);
@@ -426,7 +458,7 @@ export function autoRangeVertical(engine: ChartCore, fromViewport = false): void
       }
     }
 
-    if (shouldNiceAutoRange(scale, ac, false)) {
+    if (shouldNiceAutoRange(scale, ac, hasCells && ac.nice !== true)) {
       niceAutoRange(scale, ac.tickCount ?? DEFAULT_TICK_COUNT);
     }
     // One-signed data never gets an axis across zero (visuals-07, render-22).

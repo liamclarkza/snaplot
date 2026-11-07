@@ -16,8 +16,10 @@ import type {
   SelectionChange,
   Viewport,
 } from './handle-types';
+import type { HeatmapGridSeriesOptions, HeatmapSeriesOptions } from './heatmap-types';
 
 export type * from './handle-types';
+export type * from './heatmap-types';
 
 // ─── Data ────────────────────────────────────────────────────────────
 
@@ -266,7 +268,7 @@ export type AxisOptions =
 // ─── Series ──────────────────────────────────────────────────────────
 
 /** A mark type. */
-export type SeriesType = 'line' | 'area' | 'band' | 'bar' | 'scatter' | 'histogram';
+export type SeriesType = 'line' | 'area' | 'band' | 'bar' | 'scatter' | 'histogram' | 'heatmap';
 
 /**
  * Path shape between points. `monotone` never overshoots; the `step-*` variants place the riser
@@ -495,7 +497,8 @@ type FieldSeries<Row> =
   | LineSeriesOptions<Row>
   | BarSeriesOptions<Row>
   | BandSeriesOptions<Row>
-  | ScatterSeriesOptions<Row>;
+  | ScatterSeriesOptions<Row>
+  | HeatmapSeriesOptions<Row>;
 
 /** Data a series brings itself, instead of the chart's `data`. */
 export type SeriesData = readonly object[] | ColumnData;
@@ -523,7 +526,8 @@ export type SeriesOptions<Row = Record<string, any>> =
       /** This series' own rows or columns. */
       data: SeriesData;
     })
-  | HistogramSeriesOptions;
+  | HistogramSeriesOptions
+  | HeatmapGridSeriesOptions;
 
 // ─── Annotations ─────────────────────────────────────────────────────
 
@@ -673,6 +677,11 @@ export interface ThemeTokens {
    * @defaultValue a blue–red ramp for the mode
    */
   diverging?: readonly string[];
+  /**
+   * The ramp for cyclic values (phases, angles, times of day): its last stop runs back into its
+   * first. @defaultValue a hue wheel of even lightness for the mode
+   */
+  cyclic?: readonly string[];
   /** The font family of all chart text. @defaultValue the system UI font */
   fontFamily?: string;
   /** The axis text size in CSS pixels. @defaultValue `11` */

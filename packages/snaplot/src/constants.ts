@@ -78,6 +78,32 @@ export const PALETTE_DIVERGING_LIGHT = [
   '#b2182b',
 ] as const;
 
+/**
+ * Cyclic ramps for angles and phases: a hue wheel at one OKLCH lightness and chroma, so no hue
+ * stands out, its last stop running back into its first. Darker on light surfaces.
+ */
+export const PALETTE_CYCLIC_LIGHT = [
+  '#c25c5f',
+  '#b46d10',
+  '#868604',
+  '#2c965d',
+  '#00969f',
+  '#2d86c8',
+  '#8071c8',
+  '#af609f',
+] as const;
+
+export const PALETTE_CYCLIC_DARK = [
+  '#ed8b8b',
+  '#df9a53',
+  '#afb151',
+  '#66c189',
+  '#24c1c9',
+  '#65b2f1',
+  '#aa9df1',
+  '#d98dc9',
+] as const;
+
 export const PALETTE_DIVERGING_DARK = [
   '#60a5fa',
   '#244c85',
@@ -109,6 +135,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   categoricalPalette: [...PALETTE_CATEGORICAL_LIGHT],
   sequentialPalette: [...PALETTE_SEQUENTIAL_LIGHT],
   divergingPalette: [...PALETTE_DIVERGING_LIGHT],
+  cyclicPalette: [...PALETTE_CYCLIC_LIGHT],
   heatmapGradient: [...PALETTE_SEQUENTIAL_LIGHT],
   axisLineColor: '#c3c6cf',
   borderColor: '#c3c6cf',
@@ -139,6 +166,7 @@ export const DARK_THEME: ThemeConfig = {
   categoricalPalette: [...PALETTE_CATEGORICAL_DARK],
   sequentialPalette: [...PALETTE_SEQUENTIAL_DARK],
   divergingPalette: [...PALETTE_DIVERGING_DARK],
+  cyclicPalette: [...PALETTE_CYCLIC_DARK],
   heatmapGradient: [...PALETTE_SEQUENTIAL_DARK],
   axisLineColor: '#2a2d3a',
   borderColor: '#2a2d3a',

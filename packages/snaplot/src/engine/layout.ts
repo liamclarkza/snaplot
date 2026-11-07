@@ -11,6 +11,7 @@ import type { ChartCore } from './Engine';
 import { type FormatContext, formatTick } from './format';
 import { refreshCursor } from './cursor';
 import { settleRange } from './ranging';
+import { colorScaleWidth } from './marks/index';
 import { DirtyFlag } from './spec';
 
 /**
@@ -125,6 +126,8 @@ export function computeLayout(
    * end-label overhang reserved since its slide began (raised here when a wider label arrives).
    */
   sliding: ReadonlyMap<string, { half: number }> = NO_AXES,
+  /** The width a heatmap's colour scale takes right of the plot and its right axes (0: none). */
+  colorScale = 0,
 ): Layout {
   // Under chrome (a legend above the plot) the top gutter only has to hold half the top tick
   // label, so the legend sits with its plot rather than a blank band above it.
@@ -244,6 +247,9 @@ export function computeLayout(
     leftAxisWidth = symmetric;
     rightAxisWidth = symmetric;
   }
+  // A colour scale sits outside any right axis; the right padding is its own gap.
+  if (colorScale > 0)
+    rightAxisWidth = Math.max(rightAxisWidth, (hasRightAxis ? rightAxisWidth : 0) + colorScale);
 
   // Horizontal tick labels are centred on their ticks. Only reserve the part
   // that would actually escape the plot: bar categories and histogram bin
@@ -310,7 +316,7 @@ export function computeLayout(
           area: {
             left: plotLeft + plotWidth,
             top: plotTop,
-            width: rightAxisWidth,
+            width: rightAxisWidth - colorScale,
             height: plotHeight,
           },
         };
@@ -328,6 +334,16 @@ export function computeLayout(
       height: plotHeight,
     },
     axes,
+    ...(colorScale > 0
+      ? {
+          colorScale: {
+            left: plotLeft + plotWidth + rightAxisWidth - colorScale,
+            top: plotTop,
+            width: colorScale,
+            height: plotHeight,
+          },
+        }
+      : {}),
     dpr,
   };
 }
@@ -391,6 +407,7 @@ export function naturalGutters(engine: ChartCore): { left: number; right: number
       {},
       NO_CHROME,
       slidingNow(engine),
+      colorScaleReserve(engine),
     );
     engine.natural = {
       key,
@@ -477,6 +494,7 @@ export function updateLayout(engine: ChartCore): void {
     engine.plotInsets,
     reservedChrome(engine),
     slidingNow(engine),
+    colorScaleReserve(engine),
   );
   engine.layoutCacheKey = cacheKey;
   updateInteractionLayer(engine);
@@ -546,8 +564,15 @@ export function createLayoutCacheKey(engine: ChartCore, width: number, height: n
     engine.canvasManager.reservedChrome('top'),
     engine.canvasManager.reservedChrome('bottom'),
     slidingNow(engine).size ? [...slidingNow(engine).keys()].join(',') : '',
+    colorScaleReserve(engine),
     axes,
   ].join('|');
+}
+
+/** The width a heatmap's colour scale takes, measured as the axes' labels are. */
+function colorScaleReserve(engine: ChartCore): number {
+  const { fontFamily, fontSize } = engine.theme;
+  return colorScaleWidth(engine, (text) => measureLabel(text, fontFamily, fontSize));
 }
 
 /**

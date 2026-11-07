@@ -2,7 +2,7 @@
  * The shape `normalize()` returns (split from normalize.ts, which re-exports it): options checked,
  * defaulted and split into engine options, series, axes, annotations, state and callbacks.
  */
-import type { AxisSpec, ChartSpec, SelectionRange, SeriesSpec } from '../engine/spec';
+import type { AxisSpec, ChartSpec, HeatmapSpec, SelectionRange, SeriesSpec } from '../engine/spec';
 import type { AXIS_TYPES, CallbackKey } from './option-keys';
 import type {
   ChartGroup,
@@ -46,6 +46,33 @@ export interface NormalizedSeries {
   colorBy?: NormalizedEncoding;
   sizeBy?: NormalizedEncoding;
   tooltipFields?: NormalizedEncoding[];
+  /** A heatmap's values field, grid and colours. */
+  heatmap?: NormalizedHeatmap;
+}
+
+/** Cells along one axis, checked: their spans, positions, and whether they were given as Dates. */
+export interface NormalizedBins {
+  lo: Float64Array;
+  hi: Float64Array;
+  mid: Float64Array;
+  dates: boolean;
+}
+
+/** A heatmap series' own options, checked. */
+export interface NormalizedHeatmap {
+  /** The axis its rows run along (a grid's run along X). */
+  rows: 'x' | 'y';
+  /** Each row's values (rows form). */
+  values?: AccessorLike;
+  /** The cells across each row (rows form). */
+  bins?: NormalizedBins;
+  /** A grid's cells and values (grid form). */
+  grid?: { x: NormalizedBins; y: NormalizedBins; values: ArrayLike<number | null> };
+  colors: HeatmapSpec['colors'];
+  domain?: readonly [number, number];
+  clamp: boolean;
+  emptyColor?: string;
+  colorScale: HeatmapSpec['colorScale'];
 }
 
 /** One axis: the kind the caller asked for, its categories and its engine fields. */

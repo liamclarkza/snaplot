@@ -81,7 +81,7 @@ import {
   updateLayout,
   updateScalePixelRanges,
 } from './layout';
-import { legendItems, renderAllSeries } from './marks/index';
+import { drawColorScale, legendItems, renderAllSeries } from './marks/index';
 import type { ScatterSeriesCache } from './marks/scatter/draw';
 import type { ScatterPalettes, ScatterResolvers } from './marks/scatter/encoding';
 import { renderOverlay } from './render/overlay';
@@ -230,6 +230,8 @@ export class ChartCore implements EngineHost {
     renderCount: { grid: 0, data: 0, overlay: 0 },
     /** Points the last vertical auto-range read. */
     rangeScanPoints: 0,
+    /** Heatmap bitmaps drawn from the data (a repaint that changes nothing reuses its bitmap). */
+    heatmapRasters: 0,
   };
   lastDataPass: DataPassSeries[] = [];
   /** The labels of the last grid paint (the debug hook's `labelBoxes()`). */
@@ -797,6 +799,9 @@ export class ChartCore implements EngineHost {
         this.theme,
         this.config,
         customXTicks,
+      );
+      labels.labels.push(
+        ...drawColorScale(this, this.canvasManager.gridCtx, this.layout.colorScale),
       );
       updateDOMLabels(this.canvasManager.domLayer, labels, this.theme, this.layout);
       this.lastAxisLabels = labels.labels;

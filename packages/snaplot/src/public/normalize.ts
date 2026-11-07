@@ -8,10 +8,23 @@
  * is kept by reference; ingest reads it.
  */
 import { DARK_THEME, DEFAULT_THEME } from '../constants';
-import { isCssColor } from '../engine/theme/color';
 import { createTheme } from '../engine/theme/resolve';
 import { fail, hint, unknownSeries, warnOnce } from '../engine/errors';
-import { dateFormatter, type NumberFormatSpec, numberFormatter } from '../engine/format';
+import {
+  accessor,
+  checkKeys,
+  colorOption,
+  compileFormat,
+  dashOption,
+  describe,
+  enumValue,
+  finiteOption,
+  intake,
+  isPlain,
+  toNumber,
+  warnValue,
+} from './checks';
+import { normalizeHeatmap } from './heatmap';
 import type { AxisSpec, ChartSpec, SeriesSpec, ThemeConfig } from '../engine/spec';
 import type { ChartGroup, ChartOptions, ChartPlugin, DataSource, SeriesType } from './types';
 import {
@@ -19,8 +32,7 @@ import {
   AXIS_TYPES,
   CALLBACKS,
   COLOR_BY,
-  DATE_KEYS,
-  HINTS,
+  HEATMAP_ONLY,
   INTERACTION,
   INTERPOLATIONS,
   type Keys,
@@ -72,159 +84,6 @@ const PLUGIN_HINTS: Record<string, string> = {
   onDataUpdate: 'Removed in 0.13: listen with chart.subscribe() or chart.on().',
   onOptionsUpdate: 'Removed in 0.13: listen with chart.subscribe() or chart.on().',
 };
-
-// ─── Helpers ─────────────────────────────────────────────────────────
-
-function isPlain(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object') return false;
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-}
-
-const describe = (value: unknown): string =>
-  value === null
-    ? 'null'
-    : Array.isArray(value)
-      ? 'an array'
-      : typeof value === 'string'
-        ? `"${value}"`
-        : typeof value === 'object'
-          ? 'an object'
-          : String(value);
-
-/**
- * Copy plain objects and arrays (D16 intake copies). Data, the group and plugin
- * objects, functions, Dates and typed arrays are kept by reference.
- */
-export function intake<T>(value: T, key?: string): T {
-  if (key === 'data' || key === 'group') return value;
-  if (Array.isArray(value)) {
-    return value.map((item) => (key === 'plugins' ? item : intake(item))) as T;
-  }
-  if (!isPlain(value)) return value;
-  const out: Record<string, unknown> = {};
-  for (const [name, item] of Object.entries(value)) out[name] = intake(item, name);
-  return out as T;
-}
-
-/** Warn about keys of `value` outside `known`, naming each path; returns the known keys' object. */
-function checkKeys(value: Record<string, unknown>, known: Keys, path: string): void {
-  for (const [name, item] of Object.entries(value)) {
-    if (known.has(name) || item === undefined) continue;
-    const full = path ? `${path}.${name}` : name;
-    const general = full.replace(/\[\d+\]/g, '.*').replace(/^axes\.[^.]+/, 'axes.*');
-    const reason = HINTS[full] ?? HINTS[general] ?? HINTS[name];
-    warnOnce(
-      'unknown-option',
-      `"${full}" is not an option and is ignored.${reason ? ` ${reason}` : hint(name, known)}`,
-    );
-    // A removed object can hold keys with their own hint (`zoom.onZoom`).
-    if (isPlain(item))
-      for (const child of Object.keys(item))
-        if (HINTS[`${full}.${child}`])
-          warnOnce(
-            'unknown-option',
-            `"${full}.${child}" is not an option and is ignored. ${HINTS[`${full}.${child}`]}`,
-          );
-  }
-}
-
-function warnValue(path: string, value: unknown, allowed: readonly string[], fallback: string) {
-  warnOnce(
-    'invalid-option',
-    `${path} ${describe(value)} is not valid and is ignored; using ${fallback}. Use one of: ${allowed.join(', ')}.`,
-  );
-}
-
-function enumValue<T extends string>(
-  path: string,
-  value: unknown,
-  allowed: readonly T[],
-  fallback: T | undefined,
-): T | undefined {
-  if (value === undefined) return fallback;
-  if ((allowed as readonly unknown[]).includes(value)) return value as T;
-  warnValue(path, value, allowed, fallback === undefined ? 'the default' : `'${fallback}'`);
-  return fallback;
-}
-
-function toNumber(value: unknown, path: string): number {
-  const n = value instanceof Date ? value.getTime() : value;
-  if (typeof n !== 'number' || !Number.isFinite(n))
-    fail(`${path} must be a finite number or a valid Date, not ${describe(value)}.`);
-  return n;
-}
-
-function accessor(value: unknown, path: string): AccessorLike {
-  if (typeof value === 'string' || typeof value === 'function') return value as AccessorLike;
-  fail(`${path} must be a field name or a function of the row, not ${describe(value)}.`);
-}
-
-function finiteOption(value: unknown, path: string, min = 0, max = Infinity): number | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max)
-    return value;
-  warnOnce(
-    'invalid-option',
-    `${path} ${describe(value)} is not valid and is ignored; it must be a number from ${min}${max === Infinity ? ' up' : ` to ${max}`}.`,
-  );
-  return undefined;
-}
-
-/** An annotation colour: a string, or a warning (whether a string is a colour is M11's parser). */
-function colorOption(value: unknown, path: string): string | undefined {
-  if (value === undefined) return value;
-  if (typeof value === 'string') {
-    if (!isCssColor(value))
-      warnOnce(
-        'invalid-option',
-        `${path} "${value}" is not a CSS colour; the chart may not paint it.`,
-      );
-    return value;
-  }
-  warnOnce(
-    'invalid-option',
-    `${path} ${describe(value)} is not valid and is ignored; it must be a CSS colour string.`,
-  );
-  return undefined;
-}
-
-function dashOption(value: unknown, path: string): number[] | undefined {
-  if (value === undefined) return undefined;
-  if (
-    Array.isArray(value) &&
-    value.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0)
-  )
-    return [...value];
-  warnOnce('invalid-option', `${path} must be an array of non-negative numbers; it is ignored.`);
-  return undefined;
-}
-
-function isDateFormat(value: Record<string, unknown>): boolean {
-  return Object.keys(value).some((key) => DATE_KEYS.has(key));
-}
-
-/** A `format` option as a function, or `undefined`. */
-function compileFormat(
-  value: unknown,
-  path: string,
-  kind: 'number' | 'date' | 'auto',
-  locale: string | undefined,
-  timeZone: 'local' | 'UTC',
-): ((value: number) => string) | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value === 'function') return value as (value: number) => string;
-  if (!isPlain(value))
-    fail(`${path} must be a function or Intl format options, not ${describe(value)}.`);
-  const date = kind === 'date' || (kind === 'auto' && isDateFormat(value));
-  try {
-    return date
-      ? dateFormatter(value as Intl.DateTimeFormatOptions, locale, timeZone)
-      : numberFormatter(value as NumberFormatSpec, locale);
-  } catch (error) {
-    fail(`${path} has invalid Intl options: ${(error as Error).message}`);
-  }
-}
 
 // ─── normalize ───────────────────────────────────────────────────────
 
@@ -704,25 +563,51 @@ function normalizeSeries(
       `${name} has unknown type ${describe(value.type)}. Use one of: ${SERIES_TYPES.join(', ')}.`,
     );
   const histogram = type === 'histogram';
+  const heatmap = type === 'heatmap';
+  // A heatmap of a grid brings its cells; one of rows reads each row's values across its bins.
+  const grid = heatmap && isPlain(value.data) && 'values' in value.data;
   if (histogram) {
     const data = value.data as Record<string, unknown> | undefined;
     if (!data || !(data.edges instanceof Float64Array) || !(data.counts instanceof Float64Array))
       fail(
         `a histogram series takes histogram() bins as its data: { type: 'histogram', id, data: histogram(values) }.`,
       );
+  } else if (heatmap) {
+    if (!grid && (value.values === undefined || value.bins === undefined))
+      fail(
+        `${name} needs values and bins: { type: 'heatmap', values: 'field', bins: { start, step, count } }, or a grid as its data.`,
+      );
+    if (grid && (value.values !== undefined || value.bins !== undefined))
+      fail(
+        `${name} has a grid as its data, which holds its own values and bins: remove values and bins.`,
+      );
+    if (value.x !== undefined && value.y !== undefined)
+      fail(
+        `${name} sets both x and y: a heatmap's rows run along one axis. Give y for rows that run up the plot.`,
+      );
   } else if (value.y === undefined) {
     fail(`${name} needs y: the field name of its values, or a function of the row.`);
   }
+  if (!heatmap) {
+    const own = HEATMAP_ONLY.filter((key) => value[key] !== undefined);
+    if (own.length) fail(`${name} uses ${own.join(', ')}, which need type: 'heatmap'.`);
+  }
   if (type === 'band' && (value.lower === undefined || value.upper === undefined))
     fail(`band ${name} needs both lower and upper.`);
-  const id = value.id !== undefined ? value.id : typeof value.y === 'string' ? value.y : undefined;
+  const named = heatmap ? value.values : value.y;
+  const id = value.id !== undefined ? value.id : typeof named === 'string' ? named : undefined;
   if (typeof id !== 'string' || id.length === 0)
-    fail(`${name} needs an id: its y is not a field name.`);
+    fail(`${name} needs an id: its ${heatmap ? 'values are' : 'y is'} not a field name.`);
 
   const spec: Partial<SeriesSpec> = {};
   const color = value.color;
   let pointColor: NormalizedSeries['pointColor'];
-  if (typeof color === 'function') {
+  if (heatmap && color !== undefined) {
+    warnOnce(
+      'unknown-option',
+      `"${path}.color" is not an option of heatmap series and is ignored. Use colors.`,
+    );
+  } else if (typeof color === 'function') {
     pointColor = color as NormalizedSeries['pointColor'];
   } else if (color !== undefined) {
     if (typeof color !== 'string') fail(`${path}.color must be a CSS colour string.`);
@@ -778,8 +663,7 @@ function normalizeSeries(
   const normalized: NormalizedSeries = {
     index,
     id,
-    label:
-      typeof value.label === 'string' ? value.label : typeof value.y === 'string' ? value.y : id,
+    label: typeof value.label === 'string' ? value.label : typeof named === 'string' ? named : id,
     type,
     xAxis: value.xAxis === undefined ? 'x' : String(value.xAxis),
     yAxis: value.yAxis === undefined ? 'y' : String(value.yAxis),
@@ -790,7 +674,11 @@ function normalizeSeries(
   if (value.data !== undefined) normalized.data = value.data as DataSource<unknown>;
   if (value.x !== undefined) normalized.x = accessor(value.x, `${path}.x`);
   if (value.rowId !== undefined) normalized.rowId = accessor(value.rowId, `${path}.rowId`);
-  if (!histogram) normalized.y = accessor(value.y, `${path}.y`);
+  if (heatmap) {
+    // Rows that run up the plot are positioned by y: their X is the store's X.
+    if (value.y !== undefined) normalized.x = accessor(value.y, `${path}.y`);
+    normalized.heatmap = normalizeHeatmap(value, path, name, grid, locale);
+  } else if (!histogram) normalized.y = accessor(value.y, `${path}.y`);
   if (type === 'band') {
     normalized.lower = accessor(value.lower, `${path}.lower`);
     normalized.upper = accessor(value.upper, `${path}.upper`);

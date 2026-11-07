@@ -64,6 +64,8 @@ export interface DebugSnapshot {
   rangeScanPoints: number;
   /** Density binning passes over the data, summed over the density series. */
   densityRebins: number;
+  /** Heatmap bitmaps drawn from the data, summed over the heatmap series. */
+  heatmapRasters: number;
 }
 
 function countDataPass(pass: readonly DataPassSeries[]): { drawn: number; inView: number } {
@@ -142,6 +144,7 @@ export function debugSnapshot(engine: ChartCore): DebugSnapshot {
     hitVisits: engine.hitTester.lastVisits,
     rangeScanPoints: engine.debugCounters.rangeScanPoints,
     densityRebins: [...engine.scatterSeriesCaches.values()].reduce((sum, c) => sum + c.rebins, 0),
+    heatmapRasters: engine.debugCounters.heatmapRasters,
     plot: Object.freeze({ ...engine.layout.plot }),
     layout: engine.layout,
     theme: Object.freeze({ ...engine.theme }),

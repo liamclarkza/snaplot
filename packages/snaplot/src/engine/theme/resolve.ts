@@ -8,6 +8,8 @@ import {
   PALETTE_SEQUENTIAL_DARK,
   PALETTE_DIVERGING_LIGHT,
   PALETTE_DIVERGING_DARK,
+  PALETTE_CYCLIC_LIGHT,
+  PALETTE_CYCLIC_DARK,
 } from '../../constants';
 import { deepMerge } from '../merge';
 import { cssColor, isDarkColor, parseColor, resolveColor, withAlpha } from './color';
@@ -58,6 +60,8 @@ export interface CreateThemeTokens {
   sequential?: string[];
   /** Signed/centered-data ramp. */
   diverging?: string[];
+  /** Cyclic ramp (phases, angles): the last stop runs back into the first. */
+  cyclic?: string[];
   /** Density/heatmap ramp; defaults through the normal role cascade. */
   heatmap?: string[];
   /** The font family of chart text. */
@@ -107,6 +111,7 @@ export function createTheme(tokens: CreateThemeTokens): Partial<ThemeConfig> {
   }
   if (tokens.sequential !== undefined) theme.sequentialPalette = [...tokens.sequential];
   if (tokens.diverging !== undefined) theme.divergingPalette = [...tokens.diverging];
+  if (tokens.cyclic !== undefined) theme.cyclicPalette = [...tokens.cyclic];
   if (tokens.heatmap !== undefined) theme.heatmapGradient = [...tokens.heatmap];
   if (tokens.fontFamily !== undefined) theme.fontFamily = tokens.fontFamily;
   if (tokens.fontSize !== undefined) theme.fontSize = tokens.fontSize;
@@ -179,6 +184,7 @@ const PALETTE_FIELDS: (keyof ThemeConfig)[] = [
   'categoricalPalette',
   'sequentialPalette',
   'divergingPalette',
+  'cyclicPalette',
   'heatmapGradient',
 ];
 
@@ -240,6 +246,7 @@ function normalizeTheme(
   const defaultCategorical = dark ? PALETTE_CATEGORICAL_DARK : PALETTE_CATEGORICAL_LIGHT;
   const defaultSequential = dark ? PALETTE_SEQUENTIAL_DARK : PALETTE_SEQUENTIAL_LIGHT;
   const defaultDiverging = dark ? PALETTE_DIVERGING_DARK : PALETTE_DIVERGING_LIGHT;
+  const defaultCyclic = dark ? PALETTE_CYCLIC_DARK : PALETTE_CYCLIC_LIGHT;
   const customThemeSurface = !!userTheme || hasCssOverrides;
 
   const palette = clonePalette(theme.palette) ?? [...defaultCategorical];
@@ -255,6 +262,8 @@ function normalizeTheme(
     (customThemeSurface ? undefined : clonePalette(theme.divergingPalette)) ?? [
       ...defaultDiverging,
     ];
+  const cyclicPalette = clonePalette(userTheme?.cyclicPalette) ??
+    (customThemeSurface ? undefined : clonePalette(theme.cyclicPalette)) ?? [...defaultCyclic];
   const heatmapGradient = clonePalette(userTheme?.heatmapGradient) ??
     clonePalette(userTheme?.sequentialPalette) ??
     (customThemeSurface ? undefined : clonePalette(theme.heatmapGradient)) ?? [
@@ -267,6 +276,7 @@ function normalizeTheme(
     categoricalPalette,
     sequentialPalette,
     divergingPalette,
+    cyclicPalette,
     heatmapGradient,
   };
 }

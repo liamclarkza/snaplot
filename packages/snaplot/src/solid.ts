@@ -18,8 +18,10 @@ export { LegendTable } from './solid/LegendTable';
 export type { LegendTableProps } from './solid/LegendTable';
 export { createChartState, createCursor } from './solid/primitives';
 export type { MaybeChart } from './solid/primitives';
-export { createChartGroup, histogram } from 'snaplot';
+export { createChartGroup, histogram, histogram2d } from 'snaplot';
 export type {
+  Histogram2d,
+  Histogram2dOptions,
   HistogramOptions,
   HistogramRule,
   LegendTableColumn,

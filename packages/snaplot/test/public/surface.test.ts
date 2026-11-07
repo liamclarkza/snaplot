@@ -25,12 +25,14 @@ describe('[repo-19][frameworks-13] one entry and one name per concept', () => {
       'createChartGroup',
       'createLegendTable',
       'histogram',
+      'histogram2d',
     ]);
     expect(Object.keys(react).sort()).toEqual([
       'Chart',
       'LegendTable',
       'createChartGroup',
       'histogram',
+      'histogram2d',
       'useChartState',
       'useCursor',
     ]);
@@ -41,6 +43,7 @@ describe('[repo-19][frameworks-13] one entry and one name per concept', () => {
       'createChartState',
       'createCursor',
       'histogram',
+      'histogram2d',
     ]);
   });
 

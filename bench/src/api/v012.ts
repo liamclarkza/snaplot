@@ -81,6 +81,9 @@ function mount(el: HTMLElement, spec: ChartSpec): BenchChart {
       return axis ? { min: axis.min, max: axis.max } : null;
     },
     plot: () => chart.getLayout().plot,
+    appendRows: () => {
+      throw new Unsupported('no row appends of heatmap rows before 0.14');
+    },
     append: (columns: Columns) => {
       const arrays = fields.map((f) => columns[f]);
       if (arrays.some((a) => !a)) throw new Unsupported('v0.12.0 appends every column at once');

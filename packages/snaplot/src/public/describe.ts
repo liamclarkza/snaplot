@@ -5,6 +5,7 @@
  */
 import { fail, warnOnce } from '../engine/errors';
 import type { AxisSpec, ChartSpec, SeriesSpec } from '../engine/spec';
+import { cellColumns } from './heatmap';
 import { column, type IngestedData, xColumnIndex } from './ingest';
 import type { AccessorLike, NormalizedOptions, NormalizedSeries } from './normalize';
 import {
@@ -28,6 +29,14 @@ export function describeOptions<Row>(
 ): Pick<Ingested<Row>, 'spec' | 'seriesIds' | 'referenceLines' | 'referenceRegions'> {
   const { sources, seriesSources, categories, encodings, kinds } = data;
   const axisSpecs = baseAxes(n);
+  // A heatmap's bins given as Dates make the axis across its rows a time axis.
+  for (const s of n.series) {
+    const h = s.heatmap;
+    const across = h?.rows === 'y' ? s.xAxis : s.yAxis;
+    const dates = h?.grid ? h.grid.y.dates : h?.bins?.dates;
+    if (dates && n.axes[across]?.type === undefined)
+      axisSpecs[across] = { ...axisSpecs[across], type: axisSpecs[across]?.type ?? 'time' };
+  }
   // Axis types: inferred kinds, category geometry, kept types for empty inferred axes.
   for (const [key, kind] of kinds) {
     const axis = axisSpecs[key] ?? {};
@@ -147,6 +156,25 @@ function seriesSpec<Row>(
   if (s.yAxis !== 'y') spec.yAxis = s.yAxis;
   if (s.type === 'histogram') {
     spec.yColumn = 1;
+    return spec;
+  }
+  if (s.type === 'heatmap') {
+    const h = s.heatmap!;
+    const bins = h.grid ? h.grid.y : h.bins!;
+    // A grid's rows are its X cells, one per value column: column 1 on. Rows read their cells.
+    spec.yColumn = h.grid ? 1 : cellColumns(source, h.values!, s, bins.lo.length);
+    spec.heatmap = {
+      rows: h.rows,
+      binLo: bins.lo,
+      binHi: bins.hi,
+      binMid: bins.mid,
+      ...(h.grid ? { rowLo: h.grid.x.lo, rowHi: h.grid.x.hi } : {}),
+      colors: h.colors,
+      ...(h.domain ? { domain: h.domain } : {}),
+      clamp: h.clamp,
+      ...(h.emptyColor ? { emptyColor: h.emptyColor } : {}),
+      colorScale: h.colorScale,
+    };
     return spec;
   }
   spec.yColumn = column(source, s.y!, s, null);

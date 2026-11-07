@@ -39,6 +39,11 @@ import { barDraw } from './bar/draw';
 import { barHit } from './bar/hit';
 import { histogramDraw } from './histogram/draw';
 import { histogramHit } from './histogram/hit';
+import { heatmapDraw } from './heatmap/draw';
+import { heatmapHit } from './heatmap/hit';
+import { colorMapping } from './heatmap/colors';
+
+export { colorScaleWidth, drawColorScale } from './heatmap/scale';
 
 /** What the series pass hands a mark to draw one series on the data layer. */
 export interface SeriesPass {
@@ -86,6 +91,22 @@ export interface MarkDraw {
   readonly cloud: boolean;
   /** What a gesture changes in the drawing: M4 decimation of the runs, a sampling stride, or none. */
   readonly interaction: 'decimate' | 'sample' | 'none';
+  /**
+   * A grid of cells (heatmaps): its rows may run along either axis, so the series pass hands it
+   * every run (it culls its own), the cursor never snaps to its rows, and the axes range it by
+   * `extent`.
+   */
+  readonly cells?: boolean;
+  /**
+   * The series' extent along its X (`'x'`) or Y (`'y'`) axis, in place of its columns', or null
+   * without data. Axes holding such a series end at it (no rounding) unless `extent: 'pad'`.
+   */
+  extent?(
+    engine: ChartCore,
+    series: SeriesSpec,
+    store: DataStore,
+    axis: 'x' | 'y',
+  ): readonly [number, number] | null;
   /** The store column holding the series' X: 0 (the source's X) unless the mark reads another. */
   xColumn(series: SeriesSpec): number;
   /** Store columns besides `yColumn` that the value axis spans, in order (a band's bounds). */
@@ -110,6 +131,7 @@ const MARKS: Readonly<Record<ChartType, Mark>> = {
   scatter: { type: 'scatter', draw: scatterDraw, hit: scatterHit },
   bar: { type: 'bar', draw: barDraw, hit: barHit },
   histogram: { type: 'histogram', draw: histogramDraw, hit: histogramHit },
+  heatmap: { type: 'heatmap', draw: heatmapDraw, hit: heatmapHit },
 };
 
 /** The mark that draws `series` (a series without a `type` is a line). */
@@ -143,12 +165,39 @@ export function slotOf(
   return { index: slots.indexOf(series), count: slots.length };
 }
 
+/**
+ * The colour of a series: its own, its palette slot's, or, for a heatmap, the high end of its map
+ * (its legend swatch and its state's colour).
+ */
+export function seriesColor(engine: ChartCore, seriesIndex: number): string {
+  const series = engine.config.series[seriesIndex];
+  if (series.color) return series.color;
+  if (series.heatmap) {
+    const stops = colorMapping(engine, seriesIndex).stops;
+    return stops[stops.length - 1];
+  }
+  const palette = engine.categoricalPalette();
+  return palette[(series.paletteIndex ?? seriesIndex) % palette.length];
+}
+
+/** Whether a visible series is a grid of cells (a heatmap): it ranges and hit-tests on its own. */
+export function hasVisibleCells(engine: ChartCore): boolean {
+  return engine.config.series.some((s) => s.visible !== false && markOf(s).draw.cells === true);
+}
+
+/**
+ * The axis a series' store X lies on: its X axis, or its Y axis for a heatmap whose rows run up
+ * the plot.
+ */
+export function rowAxisOf(series: SeriesSpec): string {
+  return series.heatmap?.rows === 'y' ? (series.yAxis ?? 'y') : (series.xAxis ?? 'x');
+}
+
 /** The legend's items: one per series, with its mark's swatch fill. */
 export function legendItems(engine: ChartCore): LegendItem[] {
-  const palette = engine.categoricalPalette();
   return engine.config.series.map((series, seriesIndex) => {
     const type = series.type ?? 'line';
-    const color = series.color ?? palette[(series.paletteIndex ?? seriesIndex) % palette.length];
+    const color = seriesColor(engine, seriesIndex);
     const configuredFill = typeof series.fill === 'string' ? series.fill : null;
     const fill =
       series.fill === null ? null : (configuredFill ?? markOf(series).draw.legendFill(color));
@@ -228,7 +277,7 @@ export function renderAllSeries(engine: ChartCore): void {
     const type = series.type ?? 'line';
     const xColumnIdx = mark.xColumn(series);
     if (!engine.isValidColumn(xColumnIdx, store)) return;
-    const canCullByGlobalX = xColumnIdx === 0;
+    const canCullByGlobalX = xColumnIdx === 0 && mark.cells !== true;
     const [startIdx, endIdx] = canCullByGlobalX
       ? store.getViewportIndices(xScale.min, xScale.max)
       : [0, store.length - 1];

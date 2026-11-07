@@ -83,6 +83,7 @@ export function tooltipMeasurementKey(points: TooltipPoint[]): string {
         widths(point.label),
         widths(point.formattedX),
         widths(point.formattedY),
+        widths(point.formattedValue ?? ''),
         ...(point.fields ?? []).flatMap((field) => [widths(field.label), widths(field.formatted)]),
       ].join(':'),
     )
@@ -273,6 +274,23 @@ export class TooltipManager {
     const dot = (color: string) =>
       `<span class="snaplot-tooltip-dot" style="background:${escapeHtml(color)}"></span>`;
 
+    const pair = (key: string, value: string) =>
+      `<span class="snaplot-tooltip-key">${escapeHtml(key)}</span>\n<span class="snaplot-tooltip-value">${escapeHtml(value)}</span>\n`;
+
+    // A heatmap cell: a block naming its X, its Y and its value, then any other series' rows.
+    if (points.some((p) => p.value !== undefined)) {
+      let html = '';
+      for (const p of points) {
+        if (p.value === undefined) continue;
+        html += `<div class="snaplot-tooltip-block"><div class="snaplot-tooltip-title">${dot(p.color)}<span class="snaplot-tooltip-strong">${escapeHtml(p.label)}</span></div>
+        <div class="snaplot-tooltip-grid">${pair(p.xName ?? 'x', p.formattedX)}${pair(p.yName ?? 'y', p.formattedY)}${pair('value', p.formattedValue ?? '')}</div></div>`;
+      }
+      const rest = points.filter((p) => p.value === undefined);
+      if (rest.length)
+        html += `<div class="snaplot-tooltip-block">${this.defaultRender(rest)}</div>`;
+      return html;
+    }
+
     // A histogram point represents an interval, not an arbitrary coordinate.
     if (points.length === 1 && points[0].xRange) {
       const p = points[0];
@@ -287,8 +305,6 @@ export class TooltipManager {
     // each value named by its axis title or field (then the colour category and tooltipFields in
     // order). Coincident points are all listed.
     if (points.every((p) => p.radius !== undefined)) {
-      const pair = (key: string, value: string) =>
-        `<span class="snaplot-tooltip-key">${escapeHtml(key)}</span>\n<span class="snaplot-tooltip-value">${escapeHtml(value)}</span>\n`;
       const shown = points.slice(0, MAX_TOOLTIP_POINTS);
       let html = '';
       for (const p of shown) {

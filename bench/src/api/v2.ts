@@ -24,7 +24,19 @@ import {
 
 const mod = snaplot as unknown as Loose;
 
-function seriesOptions(s: SeriesSpec): Record<string, unknown> {
+function seriesOptions(s: SeriesSpec, x: string): Record<string, unknown> {
+  if (s.type === 'heatmap') {
+    if (typeof mod.histogram2d !== 'function') throw new Unsupported('this build has no heatmaps');
+    const h = s.heatmap!;
+    return defined({
+      id: s.id,
+      type: 'heatmap',
+      values: h.values,
+      bins: h.bins,
+      y: h.rowsOnY ? x : undefined,
+      domain: h.domain,
+    });
+  }
   return defined({
     id: s.id,
     label: s.id,
@@ -46,7 +58,7 @@ function options(spec: ChartSpec): Record<string, unknown> {
       x: { type: spec.xType },
       y: defined({ title: spec.yTitle, min: spec.yRange?.[0], max: spec.yRange?.[1] }),
     },
-    series: spec.series.map(seriesOptions),
+    series: spec.series.map((s) => seriesOptions(s, spec.x)),
     streaming: spec.maxPoints ? { maxPoints: spec.maxPoints } : undefined,
     // Like-for-like with v1, where a legend exists only as an add-on.
     legend: spec.addon === 'legend',
@@ -99,6 +111,7 @@ function wrapV2(chart: Loose, el: HTMLElement, owned = true, extra?: () => void)
     plot: () => plotRect(chart),
     append: (columns: Columns, seriesId?: string) =>
       chart.appendData({ columns }, seriesId ? { seriesId } : undefined),
+    appendRows: (rows) => chart.appendData(rows),
     highlight: (id) => chart.update({ highlight: id }),
     redraw: () => chart.redraw(),
     update: (patch) => {

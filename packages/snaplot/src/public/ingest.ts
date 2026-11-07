@@ -29,6 +29,7 @@ import type { ColumnarData } from '../engine/spec';
 import type { AccessorLike, NormalizedOptions, NormalizedSeries } from './normalize';
 import { describeOptions } from './describe';
 import { equivalent } from './options';
+import { cellColumns } from './heatmap';
 import {
   CategoryAxis,
   type ColumnField,
@@ -41,6 +42,7 @@ import {
   indexColumn,
   isBins,
   isColumns,
+  isGrid,
   isRowId,
   numeric,
   parseIso,
@@ -86,14 +88,21 @@ function ingestData<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>): In
   for (const s of n.series) {
     const input = s.data ?? n.data ?? EMPTY;
     const x = s.x ?? n.x;
-    if (!isBins(input) && x === undefined)
-      fail(`series "${s.id}" needs an x: set the chart's x, or the series' own x.`);
+    const grid = s.heatmap?.grid !== undefined;
+    if (!isBins(input) && !grid && x === undefined)
+      fail(
+        s.type === 'heatmap'
+          ? `series "${s.id}" needs an x for its rows (the chart's x, or the series' own), or a y to run them up the plot.`
+          : `series "${s.id}" needs an x: set the chart's x, or the series' own x.`,
+      );
     if (isBins(input) && s.type !== 'histogram')
       fail(`series "${s.id}" has histogram() bins as data, which need type: 'histogram'.`);
-    let pi = plans.findIndex((p) => p.input === input && p.x === x && p.axis === s.xAxis);
+    // A heatmap's rows lie on its Y axis when they run up the plot.
+    const axis = s.heatmap?.rows === 'y' ? s.yAxis : s.xAxis;
+    let pi = grid ? -1 : plans.findIndex((p) => p.input === input && p.x === x && p.axis === axis);
     if (pi < 0) {
       pi = plans.length;
-      plans.push({ input, x, axis: s.xAxis, series: [], ordered: false });
+      plans.push({ input, x: grid ? undefined : x, axis, series: [], ordered: false });
     }
     plans[pi].series.push(s.index);
     plans[pi].ordered ||= s.type !== 'scatter';
@@ -102,7 +111,9 @@ function ingestData<Row>(n: NormalizedOptions<Row>, ctx: IngestContext<Row>): In
 
   // Streamed sources are read again from what the chart retains, unless their data is replaced.
   const retained = plans.map((plan) =>
-    isBins(plan.input) ? undefined : ctx.retained?.(plan.input, plan.axis, plan.x),
+    isBins(plan.input) || isGrid(plan.input)
+      ? undefined
+      : ctx.retained?.(plan.input, plan.axis, plan.x),
   );
   // A source whose input and ingest options are unchanged is not read again (plan D16): it keeps
   // its X, rows and ids, and only the series columns it lacks are read.
@@ -189,7 +200,7 @@ function reusable<Row>(
   ctx: IngestContext<Row>,
 ): SourceState<Row> | undefined {
   const previous = ctx.previous;
-  if (!previous || isBins(plan.input)) return undefined;
+  if (!previous || isBins(plan.input) || isGrid(plan.input)) return undefined;
   if (ctx.replace !== undefined && plan.input === ctx.replace) return undefined;
   if (ctx.unsorted?.has(sourceKey(index, plan.axis))) return undefined;
   const before = previous.options;
@@ -208,6 +219,7 @@ function reusable<Row>(
     (source) =>
       !source.streamed &&
       source.kind !== 'bins' &&
+      source.kind !== 'grid' &&
       source.declared === plan.input &&
       source.x === plan.x &&
       source.axis === plan.axis &&
@@ -273,11 +285,17 @@ function ingestSource<Row>(
     retained?.unsorted === true || (ctx.unsorted?.has(sourceKey(index, plan.axis)) ?? false);
 
   if (isBins(plan.input)) return ingestBins(plan, plan.input, path, n, kinds);
+  const heatmap = n.series[plan.series[0]].heatmap;
+  if (heatmap?.grid) return ingestGrid(plan, heatmap.grid, path, n, kinds);
 
   const input = retained?.columns
     ? { columns: retained.columns, rowIds: retained.rowIds }
     : plan.input;
   if (isColumns(input)) {
+    if (plan.series.some((si) => n.series[si].heatmap))
+      fail(
+        `${path}: a heatmap reads rows, each holding an array of values; { columns } cannot hold arrays. Pass rows, or a grid as the series' data.`,
+      );
     const state = ingestColumns(plan, input, path, n, ctx, kinds, forceUnsorted);
     if (forceUnsorted && !plan.ordered) state.unsorted = true;
     if (retained) {
@@ -397,6 +415,47 @@ function ingestBins<Row>(
     head: 0,
     evicted: 0,
     nextIndex: edges.length,
+    streamed: false,
+  };
+}
+
+/**
+ * A heatmap grid as a source: one row per X cell (its position the store's X), one column per Y
+ * cell. Its cells' spans travel in the series spec (describe.ts).
+ */
+function ingestGrid<Row>(
+  plan: Plan,
+  grid: NonNullable<NonNullable<NormalizedSeries['heatmap']>['grid']>,
+  path: string,
+  n: NormalizedOptions<Row>,
+  kinds: Map<string, XKind>,
+): SourceState<Row> {
+  const columns = grid.x.mid.length;
+  const rows = grid.y.mid.length;
+  const out: Float64Array[] = [Float64Array.from(grid.x.mid)];
+  const fields: ColumnField[] = [{ kind: 'x' }];
+  for (let j = 0; j < rows; j++) {
+    const column = new Float64Array(columns);
+    for (let i = 0; i < columns; i++)
+      column[i] = numeric(grid.values[j * columns + i], `${path}: grid value ${j * columns + i}`);
+    out.push(column);
+    fields.push({ kind: 'counts' });
+  }
+  const time = grid.x.dates || requestedType(n, plan.axis) === 'time';
+  noteKind(kinds, plan.axis, time ? 'date' : 'number', path);
+  return {
+    declared: plan.input,
+    axis: plan.axis,
+    kind: 'grid',
+    series: plan.series,
+    ordered: true,
+    sortedX: true,
+    xKind: time ? 'date' : 'number',
+    columns: out as unknown as ColumnarData,
+    fields,
+    head: 0,
+    evicted: 0,
+    nextIndex: columns,
     streamed: false,
   };
 }
@@ -683,6 +742,10 @@ function addValueColumns<Row>(
   const used = new Set<number>();
   for (const si of plan.series) {
     const s = n.series[si];
+    if (s.heatmap?.values !== undefined) {
+      const first = cellColumns(state, s.heatmap.values, s, s.heatmap.bins!.lo.length);
+      for (let b = 0; b < s.heatmap.bins!.lo.length; b++) used.add(first + b);
+    }
     for (const field of [s.y, s.lower, s.upper])
       if (field !== undefined) used.add(column(state, field, s, null));
     for (const [role, encoding] of [
@@ -789,7 +852,8 @@ function epochWarning(
   n: NormalizedOptions<any>,
 ): void {
   for (const source of sources) {
-    if (source.kind === 'bins' || kinds.get(source.axis) !== 'number') continue;
+    if (source.kind === 'bins' || source.kind === 'grid' || kinds.get(source.axis) !== 'number')
+      continue;
     if (n.axes[source.axis]?.type !== undefined) continue;
     const x = source.columns[xColumnIndex(source)];
     if (x.length === 0) continue;

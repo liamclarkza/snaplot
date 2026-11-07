@@ -15,7 +15,7 @@ import type { DataStore } from './data/DataStore';
 import { formatBinRange, formatReadout, formatX, NO_FORMAT, NO_TOOLTIP_FORMAT } from './format';
 import { seriesYColumn } from './marks/columns';
 import { histogramBinIndexForDataX, histogramBinRange } from './marks/histogram/hit';
-import { markOf, xColumnOf } from './marks/index';
+import { hasVisibleCells, markOf, xColumnOf } from './marks/index';
 import { applyProximityHighlight, clearProximityHighlight } from './highlight';
 import { updateTooltipPoints, hasOnlyVisibleHistograms, resolveHistogramCursor } from './hit';
 import { isInPlotArea } from './layout';
@@ -75,7 +75,7 @@ export function setCursorDataX(
   for (let si = 0; si < engine.config.series.length; si++) {
     const sc = engine.config.series[si];
     const store = engine.storeForSeries(si);
-    if (sc.visible === false || !store.length) continue;
+    if (sc.visible === false || !store.length || markOf(sc).draw.cells) continue;
     const colIdx = seriesYColumn(sc);
     const yScale = engine.scales.get(sc.yAxis ?? 'y');
     if (!yScale || colIdx < 1 || colIdx > store.seriesCount) continue;
@@ -176,7 +176,8 @@ export function stepCursor(engine: ChartCore, to: 'prev' | 'next' | 'first' | 'l
   for (let si = 0; si < engine.config.series.length; si++) {
     const sc = engine.config.series[si];
     const store = engine.storeForSeries(si);
-    if (sc.visible === false || !store.length || xColumnOf(sc) !== 0) continue;
+    if (sc.visible === false || !store.length || xColumnOf(sc) !== 0 || markOf(sc).draw.cells)
+      continue;
     const xScale = engine.scales.get(sc.xAxis ?? 'x');
     const yScale = engine.scales.get(sc.yAxis ?? 'y');
     if (!xScale || !yScale) continue;
@@ -212,7 +213,7 @@ export function stepCursor(engine: ChartCore, to: 'prev' | 'next' | 'first' | 'l
 }
 
 export function canUseGlobalXCursor(engine: ChartCore): boolean {
-  if (engine.sourceStores.length > 1) return false;
+  if (engine.sourceStores.length > 1 || hasVisibleCells(engine)) return false;
   return !engine.config.series.some(
     (series) => series.visible !== false && xColumnOf(series) !== 0,
   );
@@ -355,6 +356,45 @@ export function fillSnapshot(
     if (shared ? column < 1 || column > store.seriesCount : !engine.isValidColumn(column, store))
       continue;
 
+    // A heatmap reads the cell under the pointer: it has no row at a fallback position.
+    if (!shared && markOf(series).draw.cells) {
+      const cell = source === 'cursor' ? markOf(series).hit.slotPoint?.(engine, si) : null;
+      if (!cell || cell.value === undefined) continue;
+      const point =
+        target.points[count] ??
+        (target.points[count] = {
+          seriesIndex: si,
+          dataIndex: cell.dataIndex,
+          label: series.label,
+          color: '',
+          value: cell.value,
+          formattedValue: '',
+        });
+      point.seriesIndex = si;
+      point.dataIndex = cell.dataIndex;
+      point.dataX = cell.x;
+      point.label = series.label;
+      point.color = cell.color;
+      point.value = cell.value;
+      point.formattedValue = cell.formattedValue ?? '';
+      point.cell = {
+        y: cell.y,
+        xRange: cell.xRange!,
+        yRange: cell.yRange!,
+        bin: cell.bin!,
+        formattedX: cell.formattedX,
+        formattedY: cell.formattedY,
+      };
+      point.meta = series.meta;
+      if (count === 0) {
+        target.dataIndex = cell.dataIndex;
+        target.dataX ??= cell.x;
+        target.formattedX = cell.formattedX;
+      }
+      count++;
+      continue;
+    }
+
     const histogram = shared ? onlyBins : markOf(series).draw.x === 'bin';
     const xColumn = shared ? 0 : xColumnOf(series);
     const dataIndex = shared ? row : seriesRow(engine, series, store, source, xColumn);
@@ -385,6 +425,7 @@ export function fillSnapshot(
     point.color = series.color ?? palette[(series.paletteIndex ?? si) % palette.length];
     point.value = value;
     point.formattedValue = formattedValue;
+    point.cell = undefined;
     point.meta = series.meta;
     if (!shared && count === 0) {
       target.dataIndex = dataIndex;

@@ -17,6 +17,7 @@ import { invalidateRangeCache, rangeForDataChange } from './ranging';
 import { unpinMissedAxes } from './viewport';
 import { reconcileSelectionForDataChange } from './selection';
 import { refreshCursor } from './cursor';
+import { rowAxisOf } from './marks/index';
 
 /** Replace a prepared configuration and its independent sources as one transaction. */
 export function replaceSources(
@@ -76,15 +77,24 @@ export function validateSources(
   }
 }
 
+/**
+ * The extent of the stores' X along a horizontal axis (every store's without one): the stores
+ * whose rows lie on it, so not a heatmap's whose rows run up the plot.
+ */
 export function sourceExtent(engine: ChartCore, axisKey?: string): [number, number] | null {
   let min = Infinity;
   let max = -Infinity;
+  const vertical = new Set(
+    engine.config.series.flatMap((series, si) =>
+      engine.isHorizontalAxis(rowAxisOf(series)) ? [] : [engine.storeForSeries(si)],
+    ),
+  );
   const stores =
     axisKey === undefined
-      ? engine.sourceStores
+      ? engine.sourceStores.filter((store) => !vertical.has(store))
       : new Set(
           engine.config.series.flatMap((series, si) =>
-            series.visible !== false && (series.xAxis ?? 'x') === axisKey
+            series.visible !== false && rowAxisOf(series) === axisKey
               ? [engine.storeForSeries(si)]
               : [],
           ),

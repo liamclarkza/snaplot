@@ -16,7 +16,7 @@ import { inferPosition, isInPlotArea } from './layout';
 import { seriesYColumn } from './marks/columns';
 import { INTERACTION_REFINE_MS } from '../constants';
 import { refreshCursor } from './cursor';
-import { interactionSamplingBudget, markOf, xColumnOf } from './marks/index';
+import { hasVisibleCells, interactionSamplingBudget, markOf, xColumnOf } from './marks/index';
 
 export function followWindow(engine: ChartCore): number | undefined {
   const follow = (engine.config.streaming as StreamingSpec | undefined)?.followWindow;
@@ -99,6 +99,12 @@ export function unpinMissedAxes(engine: ChartCore, config: ChartSpec): void {
     config.series.forEach((series, si) => {
       const store = engine.sourceStores[engine.seriesSources[si] ?? 0];
       if ((series.xAxis ?? 'x') !== key || !store?.length) return;
+      const extent = markOf(series).draw.extent?.(engine, series, store, 'x');
+      if (extent) {
+        min = Math.min(min, extent[0]);
+        max = Math.max(max, extent[1]);
+        return;
+      }
       const xColumn = xColumnOf(series);
       if (xColumn === 0) {
         min = Math.min(min, store.xAt(0));
@@ -465,7 +471,8 @@ function minimumSpan(
   const natural = engine.naturalExtent.get(scaleKey);
   let span = natural ? Math.abs(natural[1] - natural[0]) * 1e-9 : 0;
   const store = engine.sourceStores[0];
-  if (isHoriz && store && store.length >= 2) {
+  // A heatmap's rows may run up the plot: its own steps say nothing of X.
+  if (isHoriz && store && store.length >= 2 && !hasVisibleCells(engine)) {
     const i = Math.min(store.length - 1, Math.max(0, store.nearestXIndex(centre)));
     const left = i > 0 ? store.xAt(i) - store.xAt(i - 1) : Infinity;
     const right = i < store.length - 1 ? store.xAt(i + 1) - store.xAt(i) : Infinity;
@@ -552,6 +559,12 @@ export function resolveBounds(
   engine.config.series.forEach((series, si) => {
     if ((series.yAxis ?? 'y') !== scaleKey || series.visible === false) return;
     const store = engine.storeForSeries(si);
+    const cells = markOf(series).draw.extent?.(engine, series, store, 'y');
+    if (cells) {
+      min = Math.min(min, cells[0]);
+      max = Math.max(max, cells[1]);
+      return;
+    }
     const range = columnRange(
       engine,
       seriesYColumn(series) - 1,
