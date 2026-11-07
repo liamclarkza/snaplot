@@ -92,7 +92,8 @@ export const HEATMAP_ONLY = [
 ];
 export const COLOR_SCALE = keys('title', 'ticks', 'format');
 export const BINS = keys('start', 'step', 'count', 'centers', 'edges');
-export const GRID = keys('x', 'y', 'values');
+/** A grid, or a histogram2d() result as it is: its maxCount is read by no one but not unknown. */
+export const GRID = keys('x', 'y', 'values', 'maxCount');
 export const COLOR_MAPS = ['sequential', 'diverging', 'cyclic'];
 export const AXIS = keys(
   'type',

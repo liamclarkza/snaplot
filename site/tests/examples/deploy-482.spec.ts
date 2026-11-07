@@ -307,7 +307,7 @@ test.describe('deploy-482', () => {
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         ),
       ).toBeLessThanOrEqual(0);
-      await expect(page).toHaveTitle('Did deploy #482 cause the p99 spike? · snaplot examples');
+      await expect(page).toHaveTitle('Incident dashboard · snaplot examples');
       await expect(page.locator('footer [data-attribution]')).toHaveText(attribution);
       await expect(page.locator('footer')).toContainText(`Data: ${attribution}`);
       // The data's freshness stays on screen while reading the panels further down.

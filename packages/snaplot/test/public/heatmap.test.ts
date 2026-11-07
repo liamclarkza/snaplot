@@ -110,7 +110,7 @@ describe('heatmap rows', () => {
 });
 
 describe('heatmap grids', () => {
-  it('draws a histogram2d grid', () => {
+  it('draws a histogram2d grid, taken as it is without a warning', () => {
     const xs = [0, 0.5, 1.5, 2.5, 2.6];
     const ys = [0, 0.2, 1.1, 1.9, 1.95];
     const grid = histogram2d(xs, ys, { bins: [3, 2] });
@@ -120,6 +120,7 @@ describe('heatmap grids', () => {
     fakes.frames.flush();
     expect(range(chart, 'x')).toEqual([0, 2.6]);
     expect(range(chart, 'y')).toEqual([0, 1.95]);
+    expect(console.warn).not.toHaveBeenCalled();
   });
 });
 

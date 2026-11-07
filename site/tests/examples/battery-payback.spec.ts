@@ -99,7 +99,7 @@ test.describe('desktop, 1280 px', () => {
   }) => {
     const problems = watch(page);
     await open(page);
-    await expect(page).toHaveTitle(`${QUESTION} · snaplot examples`);
+    await expect(page).toHaveTitle('Home battery payback · snaplot examples');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(QUESTION);
     const { answer, year } = { answer: META.answer, year: META.year };
     await expect(page.locator('.r2-standfirst')).toHaveText(
