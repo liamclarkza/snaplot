@@ -7,7 +7,8 @@
 #   scripts/release.sh --dry-run 0.14.0-beta.0   (print the plan, change nothing)
 #
 # Bumps packages/snaplot/package.json, promotes the [Unreleased] section of CHANGELOG.md under
-# a dated [X.Y.Z] header (reseeding an empty Unreleased on top), commits and tags. It does NOT
+# a dated [X.Y.Z] header (reseeding an empty Unreleased on top), syncs the README's pinned
+# version (scripts/sync-readme.mjs), commits and tags. It does NOT
 # push; do that yourself when you are ready:
 #
 #   git push --follow-tags
@@ -127,7 +128,7 @@ Release plan (dry run; nothing was changed):
   channel      $channel
   branch       $branch
   CHANGELOG    '## [Unreleased]' ($(printf '%s\n' "$unreleased_body" | grep -c . || true) non-empty lines) becomes '## [$new] - $today'
-  commit       chore: release v$new   ($pkg, package-lock.json, CHANGELOG.md)
+  commit       chore: release v$new   ($pkg, package-lock.json, CHANGELOG.md, README.md)
   tag          v$new (annotated, local)
 
   then, by hand: git push --follow-tags
@@ -176,7 +177,11 @@ node -e "
   fs.writeFileSync('CHANGELOG.md', s);
 "
 
-git add "$pkg" package-lock.json CHANGELOG.md
+# The README's no-build CDN URL pins the version, and its install line says @next for a
+# prerelease; site/tests/readme.test.ts fails the release if they lag.
+node scripts/sync-readme.mjs
+
+git add "$pkg" package-lock.json CHANGELOG.md README.md
 git commit -m "chore: release v$new"
 git tag -a "v$new" -m "v$new"
 
