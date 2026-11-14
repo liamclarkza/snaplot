@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-14
+
 ### Added
 
 - A heatmap's `slice`: the row of cells under the cursor as a profile of its values (the
