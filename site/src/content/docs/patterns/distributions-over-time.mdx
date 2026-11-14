@@ -1,0 +1,91 @@
+---
+title: Distributions over time
+description: A heatmap of counts per moment, and slices that show one moment as a distribution.
+---
+
+import Example from '../../../components/Example.astro';
+
+To see how a distribution changes, bin the values of each moment on the same edges and draw each
+moment as a column of a [heatmap](/snaplot/chart-types/heatmap/): time along X, the value up the
+plot, the count as colour. A slice then reads one moment back out as a distribution.
+
+Below, each minute of a simulated service's latency is a column of counts. From 10:10 a slow
+dependency gives some requests a second mode near 390 ms. Two minutes are pinned: one before it,
+one at its worst.
+
+<Example name="chart-types/heatmap-slice" />
+
+## The data
+
+A row per moment holds that moment's counts, one per bin. `histogram()` makes them, given the
+same `thresholds` every time:
+
+```ts
+import { histogram } from 'snaplot';
+
+const edges = Array.from({ length: 61 }, (_, i) => i * 10); // 0 to 600 ms in 10 ms bins
+const rows = minutes.map((minute) => ({
+  minute: minute.time,
+  counts: histogram(minute.latencies, { thresholds: edges }).counts,
+}));
+
+// series: [{ type: 'heatmap', values: 'counts', bins: { edges } }]
+```
+
+`appendData` adds a row as each moment closes, so the same chart works on a stream.
+
+## Slices
+
+A slice is one row of the heatmap's cells as a profile of its values. The heatmap's `slice`
+option draws the row under the cursor in two places, and `slice: true` turns both on:
+
+- **In the tooltip** (`slice.tooltip`): a small picture of the row, scaled to its tallest bar,
+  with the cell under the pointer marked.
+- **In a panel** (`slice.panel`): on the heatmap's own value axis, beside the plot. It draws on
+  the heatmap's colour domain, so the length of a bar and the colour of its cell say the same
+  thing, and one slice compares with another. Set `domain` to choose its scale.
+
+Behind the slice, the panel draws the mean of the rows in view, which follows a zoom or a pan.
+While the cursor is away it shows the newest row, so on a stream it is the distribution right
+now. A chart too small to spare the room shows no panel. The
+[heatmap page](/snaplot/chart-types/heatmap/#slices) lists the options.
+
+## Pinned moments
+
+`slice.pins` keeps rows in view, by their position on the time axis: each is marked on the plot
+and outlined in the panel in a palette colour, so you can hold a normal minute beside the one
+under the cursor. `pins` is an option like any other, so pinning by click is a few lines: keep
+the positions, and toggle one on `point:click`.
+
+```ts
+const pins = new Set<number>();
+const series = () => [
+  { type: 'heatmap', values: 'counts', bins, slice: { panel: true, pins: [...pins] } },
+];
+
+const chart = createChart(element, { data, x: 'minute', series: series() });
+chart.on('point:click', (point) => {
+  const at = point.x as number;
+  if (!pins.delete(at)) pins.add(at);
+  chart.update({ series: series() });
+});
+```
+
+## A second chart of the slice
+
+For a full histogram of the moment, with its own axes, tooltip and size, draw the slice in a
+second chart.
+[`getSlice()`](/snaplot/reference/api/snaplot/interfaces/charthandle/#getslice) returns a row's
+values and the spans of its cells: the row under the cursor, the row at a position (`{ at }`), or
+the newest or first row as a fallback. It needs no `slice` option, and it follows a
+[group's](/snaplot/guides/linked-charts/) cursor too.
+[`sliceBins()`](/snaplot/reference/api/snaplot/functions/slicebins/) turns the slice into the
+bins of a [histogram](/snaplot/chart-types/histogram/) series.
+
+<Example name="chart-types/heatmap-slice-linked" />
+
+The heatmap draws its cursor line through the minute being read and turns its tooltip off, as
+the histogram is the readout. The histogram names the minute in its X title, and shades the
+latency bin under the pointer with a [reference region](/snaplot/guides/annotations-plugins/)
+from the hovered cell's `yRange`. It pins its Y axis (`max`), so the bars of one minute compare
+with the next instead of each filling the plot.

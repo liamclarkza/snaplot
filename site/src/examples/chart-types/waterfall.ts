@@ -21,6 +21,7 @@ export default function waterfall(el: HTMLElement) {
         domain: [-100, -55],
         format: { maximumFractionDigits: 1, suffix: ' dBm' },
         colorScale: { title: 'dBm' },
+        slice: { panel: { mean: false } },
       },
     ],
     axes: {

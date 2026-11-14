@@ -12,6 +12,11 @@ each with the code for Vanilla JS, React and Solid.
 
 <ChartTypeCards />
 
+Some plots are built from more than one type, or from a type and the cursor. Those are under
+Patterns: [Distributions](/snaplot/patterns/distributions/),
+[Distributions over time](/snaplot/patterns/distributions-over-time/) and
+[Spectrograms and waterfalls](/snaplot/patterns/spectrograms-waterfalls/).
+
 ## Options every type takes
 
 Every series takes `label`, `color`, `opacity`, `xAxis` and `yAxis`. The table lists what else
@@ -25,7 +30,7 @@ each type reads.
 | [`'bar'`](/snaplot/chart-types/bar/) | `y` | One bar per x value; several bar series share each slot. |
 | [`'scatter'`](/snaplot/chart-types/scatter/) | `y` | Points; `colorBy`, `sizeBy`, `tooltipFields`, `renderMode`. |
 | [`'histogram'`](/snaplot/chart-types/histogram/) | bins | `data` from [`histogram()`](/snaplot/reference/api/snaplot/functions/histogram/). |
-| [`'heatmap'`](/snaplot/chart-types/heatmap/) | `values`, `bins` | A row of cells per data row, or a grid as `data` from [`histogram2d()`](/snaplot/reference/api/snaplot/functions/histogram2d/); `colors`, `domain`. |
+| [`'heatmap'`](/snaplot/chart-types/heatmap/) | `values`, `bins` | A row of cells per data row, or a grid as `data` from [`histogram2d()`](/snaplot/reference/api/snaplot/functions/histogram2d/); `colors`, `domain`, `slice`. |
 
 ## Mixing types
 

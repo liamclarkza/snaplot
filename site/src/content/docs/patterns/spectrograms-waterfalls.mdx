@@ -1,0 +1,71 @@
+---
+title: Spectrograms and waterfalls
+description: Streaming heatmaps of a signal over time, with the live spectrum beside them.
+---
+
+import Example from '../../../components/Example.astro';
+
+A spectrogram and a waterfall both draw a signal's spectrum over time as a
+[heatmap](/snaplot/chart-types/heatmap/): each sweep or frame is a row of cells, one per
+frequency bin, coloured by power. They differ in which way time runs.
+
+## A waterfall
+
+Time runs up the plot and frequency across it. Give the series `y` for each row's time, and
+`bins` for the frequencies. The waterfall below is a simulated spectrum analyser: ten sweeps a
+second of a band from 400 to 410 MHz, each a row of 100 bins, newest at the top. A steady
+carrier, a drifting one and a transmitter hopping between channels stand above the noise floor.
+
+<Example name="chart-types/waterfall" />
+
+Three options make it a stream:
+
+- `appendData` adds each sweep as a row, and `streaming.maxPoints` keeps the latest, here 300
+  rows, which is thirty seconds. See [Updating and live data](/snaplot/guides/updating/).
+- `domain` fixes the values at the two ends of the colours. Without it the colours follow the
+  values' extent, so one loud sweep would repaint the whole history.
+- A pause of more than 2.5 typical steps between two rows is left empty, so a stream that
+  stopped shows where, while a late or an early row does not.
+
+## The live spectrum
+
+The panel above the plot is a slice: `slice: { panel: true }` draws one row as a profile on the
+frequency axis. While the cursor is away it shows the newest sweep, so it is the live spectrum;
+point at the waterfall and it shows the sweep under the cursor instead. It draws on the colour
+domain, so the fixed `domain` keeps its scale steady too.
+
+The panel can also draw the mean of the rows in view behind the slice. This example turns it off
+with `mean: false`; leave it on to see a signal against its recent average.
+[Distributions over time](/snaplot/patterns/distributions-over-time/#slices) covers the tooltip
+slice, pinned rows and reading a row with `getSlice()`.
+
+## A spectrogram
+
+Time runs along X and frequency up the plot. Leave out `y`, and each row is a column of cells at
+the chart's `x`:
+
+```ts
+createChart(element, {
+  data: frames, // [{ time, power: Float32Array(512) }, …]
+  x: 'time',
+  series: [
+    {
+      type: 'heatmap',
+      values: 'power',
+      bins: { start: 0, step: 43.07, count: 512 }, // Hz per FFT bin
+      domain: [-100, -20],
+      colorScale: { title: 'dB' },
+      slice: { panel: true },
+    },
+  ],
+});
+```
+
+Here the slice panel sits beside the plot, on the frequency axis. The
+[audio waveform editor](/snaplot/examples/find-the-clipping/) example has a spectrogram under its
+waveform.
+
+## Phase
+
+A phase or an angle wraps around, so it takes `colors: 'cyclic'`, whose ends meet. See
+[Angles and missing values](/snaplot/chart-types/heatmap/#angles-and-missing-values).

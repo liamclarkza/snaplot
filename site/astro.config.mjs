@@ -123,6 +123,14 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Patterns',
+          items: [
+            { slug: 'patterns/distributions' },
+            { slug: 'patterns/distributions-over-time' },
+            { slug: 'patterns/spectrograms-waterfalls' },
+          ],
+        },
+        {
           label: 'Guides',
           items: [
             { slug: 'guides/data' },

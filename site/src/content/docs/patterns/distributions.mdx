@@ -1,0 +1,65 @@
+---
+title: Distributions
+description: Histograms, shared bins, 2D histograms and density maps, and when to pick each.
+---
+
+import Example from '../../../components/Example.astro';
+
+A distribution shows how often each value occurs. Which chart draws it depends on how many sets
+of values you have and how many variables each value has.
+
+| You have | Draw | With |
+| --- | --- | --- |
+| One set of values | A histogram | [`histogram()`](/snaplot/reference/api/snaplot/functions/histogram/) and a `'histogram'` series |
+| Two sets to compare | Two histograms on the same bins | `histogram()` twice, with shared `thresholds` |
+| Pairs of values | A 2D histogram | [`histogram2d()`](/snaplot/reference/api/snaplot/functions/histogram2d/) and a `'heatmap'` series |
+| Very many points | A density map | A `'scatter'` series |
+| A set of values per moment | A heatmap of counts, sliced | [Distributions over time](/snaplot/patterns/distributions-over-time/) |
+
+snaplot counts values into bins for you with `histogram()` and `histogram2d()`. They are the only
+aggregations it does: group or resample other data before you pass it.
+
+## One set of values
+
+`histogram(values)` bins numbers on nice edges, and its result is the `data` of a
+[`type: 'histogram'`](/snaplot/chart-types/histogram/) series. Pass `{ bins }` for a bin count or
+a rule (`'sturges'`, `'scott'`), or `{ thresholds }` for edges of your own.
+
+<Example name="chart-types/histogram" />
+
+## Two sets on the same bins
+
+Two histograms compare only when their bins match. Bin both sets on the same edges: pass the same
+`thresholds` to each, or one histogram's `edges` to the other.
+
+<Example name="chart-types/histogram-compare" />
+
+## Pairs of values
+
+When each observation has two values, `histogram2d(x, y)` counts the pairs into a grid, and a
+[`type: 'heatmap'`](/snaplot/chart-types/heatmap/) series takes the grid as its `data`. Pass
+`bins` for counts per axis, or `xThresholds` and `yThresholds` for edges of your own. Below,
+20,000 simulated requests are counted by response size and duration.
+
+<Example name="chart-types/heatmap-histogram2d" />
+
+A few busy cells can take the whole colour range and leave the rest pale. Set the heatmap's
+`domain` below the largest count, as this example does, so the quieter structure still shows.
+
+A grid of your own works too: `{ x: bins, y: bins, values }`, with one value per cell, row by row
+from the lowest Y.
+
+## Very many points
+
+A [scatter](/snaplot/chart-types/scatter/#density) series needs no binning. Above 200,000 points
+in view, its default `renderMode: 'auto'` draws a density map coloured by how many points fall in
+each cell, and draws the points again once you zoom in far enough. Use it when you want to reach
+the single points; use a 2D histogram when you want counts you can read from a colour scale and a
+tooltip.
+
+## Over time
+
+When the distribution itself changes, as a service's latency does through an incident, bin each
+moment and draw the bins as a column of a heatmap.
+[Distributions over time](/snaplot/patterns/distributions-over-time/) shows how, and how to read
+one moment back out as a histogram.

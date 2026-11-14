@@ -45,6 +45,11 @@ const PAGES: Record<string, number> = {
   'chart-types/bar': 3,
   'chart-types/scatter': 2,
   'chart-types/histogram': 2,
+  'chart-types/heatmap': 3,
+  // The patterns: plots built from more than one type, or from a type and the cursor.
+  'patterns/distributions': 3,
+  'patterns/distributions-over-time': 2,
+  'patterns/spectrograms-waterfalls': 1,
   'guides/tooltips-legends': 2,
   'guides/zoom-pan-selection': 2,
   'guides/annotations-plugins': 2,

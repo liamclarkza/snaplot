@@ -7,12 +7,11 @@ import Example from '../../../components/Example.astro';
 
 A heatmap colours a grid of cells by value. Each row of your data holds a line of cells: its
 `values` (an array) fill the cells across `bins`, and its position runs along X, or up the plot
-when the series sets `y`. `appendData` adds rows, so a waterfall or a spectrogram scrolls as rows
-arrive, and `streaming.maxPoints` keeps the latest.
+when the series sets `y`. `appendData` adds rows, and `streaming.maxPoints` keeps the latest.
 
-The waterfall below is a simulated spectrum analyser: ten sweeps a second of a band from 400 to
-410 MHz, each a row of 100 bins, newest at the top, thirty seconds kept. A steady carrier, a
-drifting one and a transmitter hopping between channels stand above the noise floor.
+Below, a simulated spectrum analyser streams ten rows a second, each of 100 bins, newest at the
+top. [Spectrograms and waterfalls](/snaplot/patterns/spectrograms-waterfalls/) builds it step by
+step.
 
 <Example name="chart-types/waterfall" />
 
@@ -44,14 +43,24 @@ colour, not as the lowest value: below, the simulated station's vane froze for s
 
 <Example name="chart-types/heatmap-wind" />
 
-## 2D histograms
+## Grids
 
-[`histogram2d(x, y)`](/snaplot/reference/api/snaplot/functions/histogram2d/) counts pairs of values
-into a grid, which a heatmap takes as its `data`. Pass `bins` for counts per axis, or
-`xThresholds` and `yThresholds` for edges of your own. A grid of your own is
-`{ x: bins, y: bins, values }`, with one value per cell, row by row from the lowest Y.
+Instead of rows, a heatmap takes a whole grid as its `data`: `{ x: bins, y: bins, values }`, with
+one value per cell, row by row from the lowest Y.
+[`histogram2d(x, y)`](/snaplot/reference/api/snaplot/functions/histogram2d/) returns one, counting
+pairs of values into cells. See [Distributions](/snaplot/patterns/distributions/#pairs-of-values).
 
-<Example name="chart-types/heatmap-histogram2d" />
+## Slices
+
+A slice is one row of cells as a profile of its values: the distribution at a moment of a heatmap
+of counts, the spectrum of one frame of a spectrogram. `slice: true` turns on the tooltip and the
+panel. [Distributions over time](/snaplot/patterns/distributions-over-time/) shows them at work.
+
+| Option | Default | |
+| --- | --- | --- |
+| `slice.tooltip` | `false` | Draw the row under the cursor in the built-in tooltip, scaled to its tallest bar, with the cell under the pointer marked. |
+| `slice.panel` | `false` | A panel that shares the bin axis: beside the plot, or above it when the rows run up the plot. `{ size }` sets its width or height in CSS pixels (120 beside, 64 above), and `{ mean: false }` drops the mean of the rows in view. |
+| `slice.pins` | none | Positions of rows to keep: each is marked on the plot and outlined in the panel in a palette colour. |
 
 ## Colours
 
@@ -66,3 +75,9 @@ into a grid, which a heatmap takes as its `data`. Pass `bins` for counts per axi
 The theme's `sequential`, `diverging` and `cyclic` tokens set the ramps, and each has a light and
 a dark default. The tooltip and `getCursor()` report the cell under the pointer: `x`, `y` and
 `value`, with the cell's `xRange` and `yRange`.
+
+## Used in
+
+- [Distributions](/snaplot/patterns/distributions/): 2D histograms.
+- [Distributions over time](/snaplot/patterns/distributions-over-time/): counts per moment, and slices.
+- [Spectrograms and waterfalls](/snaplot/patterns/spectrograms-waterfalls/): streaming rows.

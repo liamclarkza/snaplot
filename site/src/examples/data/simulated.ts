@@ -8,6 +8,10 @@
  *   vane froze from 02:00 to 08:00 on day 10, so those hours are `null`.
  * - `requests`: 20,000 requests to a service: response size log-normal around 40 KB, duration
  *   12 ms plus 0.35 ms per KB plus log-normal noise, and 6% cache misses that take 60 ms more.
+ * - `latencyMinutes`: three hours of a service's request latency, one histogram a minute in
+ *   10 ms bins: log-normal around a median that creeps from 105 to 140 ms, 450 to 950 requests a
+ *   minute. From 10:10 to 10:55 a slow dependency gives up to 45% of requests a second mode near
+ *   390 ms, and after 11:20 the spread widens.
  */
 
 /** mulberry32, seeded: the same data on every load. */
@@ -67,4 +71,34 @@ export const requests: { size: number[]; duration: number[] } = (() => {
     duration.push(12 + 0.35 * kb + 8 * Math.exp(0.5 * gauss()) + miss);
   }
   return { size, duration };
+})();
+
+/** One minute of the service: how many requests took each latency. */
+export interface LatencyMinute {
+  /** The minute, ISO-8601 UTC. */
+  minute: string;
+  /** Requests per latency bin, in the order of `LATENCY_BINS`. */
+  counts: number[];
+}
+
+/** The latency bins: 60 bins of 10 ms from 0 to 600 ms, by their centres. */
+export const LATENCY_BINS = { start: 5, step: 10, count: 60 };
+
+export const latencyMinutes: LatencyMinute[] = (() => {
+  const rand = random(7);
+  const gauss = normal(rand);
+  const start = Date.UTC(2026, 10, 13, 9, 0);
+  return Array.from({ length: 180 }, (_, i) => {
+    const counts = new Array<number>(LATENCY_BINS.count).fill(0);
+    const requests = Math.round(700 + 250 * Math.sin(i / 28));
+    const slow = i > 70 && i < 115 ? 0.45 * Math.sin(((i - 70) / 45) * Math.PI) : 0;
+    const spread = 0.26 + (i > 140 ? 0.005 * (i - 140) : 0);
+    const median = 105 + 0.2 * i;
+    for (let k = 0; k < requests; k++) {
+      const ms =
+        rand() < slow ? 390 * Math.exp(0.13 * gauss()) : median * Math.exp(spread * gauss());
+      counts[Math.min(LATENCY_BINS.count - 1, Math.floor(ms / LATENCY_BINS.step))]++;
+    }
+    return { minute: new Date(start + i * 60_000).toISOString(), counts };
+  });
 })();
