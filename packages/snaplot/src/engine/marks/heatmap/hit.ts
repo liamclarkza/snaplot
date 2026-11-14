@@ -7,7 +7,8 @@ import type { ChartCore } from '../../Engine';
 import { formatCellValue, formatX } from '../../format';
 import type { MarkHit } from '../../hit';
 import type { ScaleRange, TooltipPoint } from '../../spec';
-import { cellAt, gridScales, rowSpans } from './cells';
+import { cellAt, gridScales, rowAt } from './cells';
+import { sliceProfile } from './slice';
 import { colorMapping, colorOf } from './colors';
 
 /** The cell of heatmap series `si` under a plot pixel, or null where there is no value. */
@@ -29,17 +30,9 @@ export function cellUnder(
   const bins = spec.binLo.length;
   const bin = cellAt(spec.binLo, spec.binHi, bins, binScale.pixelToData(across ? pixelY : pixelX));
   if (bin < 0) return null;
-  // The rows either side of the position, with their spans.
-  const position = rowScale.pixelToData(across ? pixelX : pixelY);
-  const near = store.upperBoundX(position);
-  const from = Math.max(0, near);
-  const to = Math.min(store.length - 1, near + 1);
-  const lo = new Float64Array(2);
-  const hi = new Float64Array(2);
-  rowSpans(store, spec, from, to, lo, hi);
-  const k = cellAt(lo, hi, to - from + 1, position);
-  if (k < 0) return null;
-  const row = from + k;
+  const span = { min: 0, max: 0 };
+  const row = rowAt(store, spec, rowScale.pixelToData(across ? pixelX : pixelY), span);
+  if (row < 0) return null;
   const first = series.yColumn ?? 1;
   if (first + bin > store.seriesCount) return null;
   const value = store.valueAt(first + bin, row);
@@ -47,15 +40,15 @@ export function cellUnder(
 
   // A lone row's span is unbounded: the cell is the window.
   const rowRange: ScaleRange = {
-    min: Number.isFinite(lo[k]) ? lo[k] : Math.min(rowScale.min, rowScale.max),
-    max: Number.isFinite(hi[k]) ? hi[k] : Math.max(rowScale.min, rowScale.max),
+    min: Number.isFinite(span.min) ? span.min : Math.min(rowScale.min, rowScale.max),
+    max: Number.isFinite(span.max) ? span.max : Math.max(rowScale.min, rowScale.max),
   };
   const binRange: ScaleRange = { min: spec.binLo[bin], max: spec.binHi[bin] };
-  const rowAt = store.xAt(row);
+  const rowPosition = store.xAt(row);
   const binAt = spec.binMid[bin];
   const mapping = colorMapping(engine, si);
-  const x = across ? rowAt : binAt;
-  const y = across ? binAt : rowAt;
+  const x = across ? rowPosition : binAt;
+  const y = across ? binAt : rowPosition;
   const xAxis = series.xAxis ?? 'x';
   const yAxis = series.yAxis ?? 'y';
   return {
@@ -74,6 +67,7 @@ export function cellUnder(
     formattedValue: formatCellValue(engine, si, value, [mapping.min, mapping.max]),
     xName: engine.config.axes?.[xAxis]?.title,
     yName: engine.config.axes?.[yAxis]?.title,
+    ...(spec.slice?.tooltip ? { slice: sliceProfile(engine, si, row, bin) } : {}),
   };
 }
 

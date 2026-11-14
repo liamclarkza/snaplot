@@ -11,7 +11,7 @@ import type { ChartCore } from './Engine';
 import { type FormatContext, formatTick } from './format';
 import { refreshCursor } from './cursor';
 import { settleRange } from './ranging';
-import { colorScaleWidth } from './marks/index';
+import { colorScaleWidth, slicePanel } from './marks/index';
 import { DirtyFlag } from './spec';
 
 /**
@@ -128,6 +128,11 @@ export function computeLayout(
   sliding: ReadonlyMap<string, { half: number }> = NO_AXES,
   /** The width a heatmap's colour scale takes right of the plot and its right axes (0: none). */
   colorScale = 0,
+  /**
+   * The room a heatmap's slice panel asks for: right of the plot and its right axes (inside the
+   * colour scale), or above the plot and its top axes. A chart too small to spare it has none.
+   */
+  slice: { side: 'right' | 'top'; size: number } | null = null,
 ): Layout {
   // Under chrome (a legend above the plot) the top gutter only has to hold half the top tick
   // label, so the legend sits with its plot rather than a blank band above it.
@@ -247,9 +252,28 @@ export function computeLayout(
     leftAxisWidth = symmetric;
     rightAxisWidth = symmetric;
   }
-  // A colour scale sits outside any right axis; the right padding is its own gap.
-  if (colorScale > 0)
-    rightAxisWidth = Math.max(rightAxisWidth, (hasRightAxis ? rightAxisWidth : 0) + colorScale);
+  // A slice panel and a colour scale sit outside any right axis, the panel nearer the plot whose
+  // bin axis it shares. The colour scale's right padding is its own gap; a panel alone keeps the
+  // edge margin. The panel yields when the plot would be left under one and a half times its size.
+  const rightAxis = hasRightAxis ? rightAxisWidth : 0;
+  let sliceRight = slice?.side === 'right' ? slice.size : 0;
+  const besidePlot = sliceRight + (colorScale > 0 ? colorScale : sliceRight > 0 ? EDGE_MARGIN : 0);
+  if (
+    sliceRight > 0 &&
+    containerWidth - leftAxisWidth - Math.max(rightAxisWidth, rightAxis + besidePlot) <
+      1.5 * sliceRight
+  )
+    sliceRight = 0;
+  const outside = sliceRight > 0 ? besidePlot : colorScale;
+  if (outside > 0) rightAxisWidth = Math.max(rightAxisWidth, rightAxis + outside);
+  // Above the plot it yields by the same measure.
+  let sliceTop = slice?.side === 'top' ? slice.size : 0;
+  if (
+    sliceTop > 0 &&
+    containerHeight - chrome.top - chrome.bottom - topAxisHeight - bottomAxisHeight - sliceTop <
+      1.5 * sliceTop
+  )
+    sliceTop = 0;
 
   // Horizontal tick labels are centred on their ticks. Only reserve the part
   // that would actually escape the plot: bar categories and histogram bin
@@ -276,11 +300,11 @@ export function computeLayout(
   }
 
   const plotLeft = leftAxisWidth;
-  const plotTop = chrome.top + topAxisHeight;
+  const plotTop = chrome.top + sliceTop + topAxisHeight;
   const plotWidth = Math.max(0, containerWidth - leftAxisWidth - rightAxisWidth);
   const plotHeight = Math.max(
     0,
-    containerHeight - chrome.top - chrome.bottom - topAxisHeight - bottomAxisHeight,
+    containerHeight - chrome.top - chrome.bottom - sliceTop - topAxisHeight - bottomAxisHeight,
   );
 
   // Build axis regions keyed by axis config key
@@ -290,7 +314,12 @@ export function computeLayout(
       case 'top':
         axes[key] = {
           position: 'top',
-          area: { left: plotLeft, top: chrome.top, width: plotWidth, height: topAxisHeight },
+          area: {
+            left: plotLeft,
+            top: chrome.top + sliceTop,
+            width: plotWidth,
+            height: topAxisHeight,
+          },
         };
         break;
       case 'bottom':
@@ -316,7 +345,7 @@ export function computeLayout(
           area: {
             left: plotLeft + plotWidth,
             top: plotTop,
-            width: rightAxisWidth - colorScale,
+            width: rightAxisWidth - outside,
             height: plotHeight,
           },
         };
@@ -344,6 +373,18 @@ export function computeLayout(
           },
         }
       : {}),
+    ...(sliceRight > 0
+      ? {
+          slice: {
+            left: plotLeft + plotWidth + rightAxis,
+            top: plotTop,
+            width: sliceRight,
+            height: plotHeight,
+          },
+        }
+      : sliceTop > 0
+        ? { slice: { left: plotLeft, top: chrome.top, width: plotWidth, height: sliceTop } }
+        : {}),
     dpr,
   };
 }
@@ -408,6 +449,7 @@ export function naturalGutters(engine: ChartCore): { left: number; right: number
       NO_CHROME,
       slidingNow(engine),
       colorScaleReserve(engine),
+      slicePanel(engine),
     );
     engine.natural = {
       key,
@@ -495,6 +537,7 @@ export function updateLayout(engine: ChartCore): void {
     reservedChrome(engine),
     slidingNow(engine),
     colorScaleReserve(engine),
+    slicePanel(engine),
   );
   engine.layoutCacheKey = cacheKey;
   updateInteractionLayer(engine);
@@ -553,6 +596,7 @@ export function createLayoutCacheKey(engine: ChartCore, width: number, height: n
       ac?.ticks ? ac.ticks.join(',') : '',
     ].join(':');
   }).join('|');
+  const slice = slicePanel(engine);
   return [
     width,
     height,
@@ -565,6 +609,7 @@ export function createLayoutCacheKey(engine: ChartCore, width: number, height: n
     engine.canvasManager.reservedChrome('bottom'),
     slidingNow(engine).size ? [...slidingNow(engine).keys()].join(',') : '',
     colorScaleReserve(engine),
+    slice ? `${slice.side}${slice.size}` : '',
     axes,
   ].join('|');
 }

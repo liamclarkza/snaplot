@@ -79,6 +79,7 @@ export const SERIES = keys(
   'clamp',
   'emptyColor',
   'colorScale',
+  'slice',
 );
 /** The options only a heatmap takes. */
 export const HEATMAP_ONLY = [
@@ -89,7 +90,10 @@ export const HEATMAP_ONLY = [
   'clamp',
   'emptyColor',
   'colorScale',
+  'slice',
 ];
+export const SLICE = keys('tooltip', 'panel', 'pins');
+export const SLICE_PANEL = keys('size', 'mean');
 export const COLOR_SCALE = keys('title', 'ticks', 'format');
 export const BINS = keys('start', 'step', 'count', 'centers', 'edges');
 /** A grid, or a histogram2d() result as it is: its maxCount is read by no one but not unknown. */

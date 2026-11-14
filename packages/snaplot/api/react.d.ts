@@ -240,6 +240,13 @@ export declare interface ChartHandle<Row = Record<string, any>> {
      */
     getCursor(options?: CursorOptions): CursorSnapshot<Row>;
     /**
+     * One row of a heatmap's cells: the row under the cursor, or the row at `at`, or `null` where
+     * there is none (and no `fallback`). `seriesId` names the heatmap; without it, the chart's
+     * first. A group's cursor counts for rows that run along X. An id that is not a heatmap of the
+     * chart throws.
+     */
+    getSlice(seriesId?: string, options?: SliceOptions): HeatmapSlice<Row> | null;
+    /**
      * Return every axis to its automatic range, as `update({ viewport: {} })` does, and report
      * the reset as `viewport:change` with `{}`.
      */
@@ -719,6 +726,11 @@ declare interface HeatmapCommon {
     emptyColor?: string;
     /** The colour scale beside the plot: `false` hides it. @defaultValue `true` */
     colorScale?: boolean | ColorScaleOptions;
+    /**
+     * The row of cells under the cursor as a profile, in the tooltip, in a panel or both; `true` is
+     * both. @defaultValue no slice
+     */
+    slice?: boolean | HeatmapSliceOptions;
     /** Opacity from 0 to 1. @defaultValue `1` */
     opacity?: number;
     /** How values are written in the tooltip and the colour scale. @defaultValue automatic */
@@ -789,6 +801,78 @@ export declare interface HeatmapSeriesOptions<Row> extends HeatmapCommon {
     y?: Accessor<Row, AxisValue>;
     /** This series' row id, when it differs from the chart's `rowId`. @defaultValue the chart's `rowId` */
     rowId?: Accessor<Row, RowId>;
+}
+
+/** One row of a heatmap's cells, as `getSlice()` reports it. */
+export declare interface HeatmapSlice<Row = Record<string, any>> {
+    /** The series id. */
+    seriesId: string;
+    /** The row's position along the rows' axis (epoch milliseconds on a time axis). */
+    position: number;
+    /** The position as written. */
+    formattedPosition: string;
+    /** The original row, for row data. */
+    row?: Row;
+    /** The row's index in the data you passed (before sorting), or among appended rows. */
+    rowIndex: number;
+    /** Each cell's value, in the order of the bins; `NaN` is an empty cell. */
+    values: Float64Array;
+    /** Each cell's interval across the row: cell `i` spans `min[i]` to `max[i]`. */
+    bins: {
+        /** Where each cell starts. */
+        min: Float64Array;
+        /** Where each cell ends. */
+        max: Float64Array;
+    };
+    /** What produced the slice. */
+    source: 'position' | 'cursor' | 'latest' | 'first';
+}
+
+/**
+ * A slice of a heatmap: the row of cells under the cursor, drawn as a profile of its values. Over
+ * a heatmap of counts it is the distribution at that moment; over a spectrogram, the spectrum.
+ *
+ * The panel draws profiles on the heatmap's colour domain, so the length of a cell's bar and the
+ * colour of the cell say the same thing, and slices compare with each other.
+ *
+ * @example
+ * ```ts
+ * // The distribution under the cursor in the tooltip and in a panel, and two pinned moments.
+ * { type: 'heatmap', values: 'counts', bins, slice: { tooltip: true, panel: true, pins: [t0, t1] } }
+ * ```
+ */
+export declare interface HeatmapSliceOptions {
+    /**
+     * Draw the slice in the built-in tooltip, scaled to its tallest bar, with the cell under the
+     * pointer marked. @defaultValue `false`
+     */
+    tooltip?: boolean;
+    /**
+     * A panel on the heatmap's bin axis: beside the plot, or above it when the rows run up the plot.
+     * It shows the slice at the cursor, and the newest row of a heatmap of rows when the cursor is
+     * away. A chart too small to spare the room shows no panel. @defaultValue `false`
+     */
+    panel?: boolean | HeatmapSlicePanelOptions;
+    /**
+     * Rows to keep in view, by their position along the rows' axis: each is marked on the plot and
+     * outlined in the panel in a colour of the palette, in order. A position between two rows pins
+     * the nearer. Toggle them on `point:click` to pin by click. @defaultValue none
+     */
+    pins?: readonly (number | Date)[];
+}
+
+/** The panel of a heatmap's {@link HeatmapSliceOptions | slice}. */
+export declare interface HeatmapSlicePanelOptions {
+    /**
+     * The panel's size in CSS pixels: its width beside the plot, or its height above it.
+     * @defaultValue `120` beside the plot, `64` above it
+     */
+    size?: number;
+    /**
+     * Draw the mean of the rows in view behind the slice, as a reference to compare it with (a
+     * sample of them past 256 rows). @defaultValue `true`
+     */
+    mean?: boolean;
 }
 
 /**
@@ -1293,6 +1377,30 @@ export declare interface SizeEncodingOptions<Row> {
     label?: string;
     /** How the field's value is written in the tooltip. @defaultValue automatic */
     format?: (value: number) => string;
+}
+
+/**
+ * A slice's cells as the bins of a histogram series: the distribution under the cursor of one
+ * chart, drawn by another. A gap between two cells becomes an empty bin, and an empty cell or a
+ * value below zero counts as 0, as a histogram has no other way to draw them.
+ *
+ * @example
+ * ```ts
+ * heatmap.on('cursor:change', () => {
+ *   const slice = heatmap.getSlice('latency', { fallback: 'latest' });
+ *   if (slice)
+ *     detail.update({ series: [{ type: 'histogram', id: 'slice', data: sliceBins(slice) }] });
+ * });
+ * ```
+ */
+export declare function sliceBins(slice: Pick<HeatmapSlice, 'values' | 'bins'>): HistogramBins;
+
+/** Options of `getSlice()`. */
+export declare interface SliceOptions {
+    /** The row at this position along the rows' axis. @defaultValue the row under the cursor */
+    at?: number | Date;
+    /** What to report when the cursor is not over a row. @defaultValue `'hide'` */
+    fallback?: 'hide' | 'latest' | 'first';
 }
 
 /** Streaming with `appendData`. */

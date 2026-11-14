@@ -5,6 +5,7 @@ import type { HeatmapSpec } from '../../spec';
 import {
   cellAt,
   pixelCells,
+  rowAt,
   rowSpans,
   spansFromCenters,
   spansFromEdges,
@@ -88,6 +89,20 @@ describe('heatmap cells', () => {
     rowSpans(store, spec, 0, x.length - 1, lo, hi);
     expect([...lo]).toEqual([-50, 50, 150, 290, 390, 450, 1450, 1550]);
     expect([...hi]).toEqual([50, 150, 290, 390, 450, 550, 1550, 1650]);
+  });
+
+  it('finds the row holding a position: none in a gap, past the ends or in an empty store', () => {
+    const spec = { rows: 'x' } as HeatmapSpec;
+    const store = new ColumnarStore([f([0, 1, 2, 10, 11]), f([0, 0, 0, 0, 0])]);
+    const span = { min: 0, max: 0 };
+    expect(rowAt(store, spec, 1.4, span)).toBe(1);
+    expect(span).toEqual({ min: 0.5, max: 1.5 });
+    expect(rowAt(store, spec, 1.5)).toBe(2);
+    expect(rowAt(store, spec, 6)).toBe(-1);
+    expect(rowAt(store, spec, 9.8)).toBe(3);
+    expect(rowAt(store, spec, -3)).toBe(-1);
+    expect(rowAt(store, spec, 40)).toBe(-1);
+    expect(rowAt(new ColumnarStore([f([]), f([])]), spec, 0)).toBe(-1);
   });
 
   it("uses a grid's own row spans, the last rows of them when a ring keeps fewer", () => {

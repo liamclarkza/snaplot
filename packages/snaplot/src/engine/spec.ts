@@ -52,6 +52,8 @@ export interface Layout {
   axes: Record<string, AxisArea>;
   /** The area of a heatmap's colour scale, right of the plot and its right axes. */
   colorScale?: PixelRect;
+  /** The area of a heatmap's slice panel: right of the plot and its right axes, or above the plot. */
+  slice?: PixelRect;
   /** The device pixel ratio. */
   dpr: number;
 }
@@ -244,6 +246,18 @@ export interface HeatmapSpec {
   emptyColor?: string;
   /** The colour-scale legend beside the plot, or `false`. */
   colorScale: false | HeatmapColorScale;
+  /** The slice: the row under the cursor as a profile (marks/heatmap/slice.ts). */
+  slice?: HeatmapSliceSpec;
+}
+
+/** A heatmap's slice: where the row under the cursor is drawn as a profile, and the rows kept. */
+export interface HeatmapSliceSpec {
+  /** Draw it in the built-in tooltip. */
+  tooltip: boolean;
+  /** The panel on the bin axis: its size in CSS pixels (unset: its side's default), or `false`. */
+  panel: false | { size?: number; mean: boolean };
+  /** The pinned rows' positions along the rows' axis. */
+  pins: readonly number[];
 }
 
 /** A heatmap's colour-scale legend: a bar of its map with ticks, beside the plot. */

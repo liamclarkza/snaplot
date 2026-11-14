@@ -262,6 +262,20 @@ export interface TouchConfig {
   longPressMs?: number;
 }
 
+/**
+ * One row of a heatmap as a profile, ready to draw at any size: each bin's place across the row
+ * and the length of its bar, all from 0 to 1.
+ */
+export interface SliceProfile {
+  /** Where each bin starts and ends across the row, as the bin axis spaces them. */
+  from: Float64Array;
+  to: Float64Array;
+  /** Each bin's value on the colour domain; `NaN` is an empty cell. */
+  length: Float64Array;
+  /** The bin to mark (the cell under the pointer), or -1. */
+  bin: number;
+}
+
 /** One row passed to a custom `tooltip.render`. */
 export interface TooltipPoint {
   /** Index of the owning series in `ChartSpec.series`. */
@@ -283,6 +297,8 @@ export interface TooltipPoint {
   formattedValue?: string;
   /** A heatmap cell's bin within its row (`dataIndex` is the row). */
   bin?: number;
+  /** The cell's row as a profile, for the built-in tooltip (a heatmap with `slice.tooltip`). */
+  slice?: SliceProfile;
   /** Resolved mark color for the swatch. */
   color: string;
   /** X value pre-formatted via the X axis `format`. */

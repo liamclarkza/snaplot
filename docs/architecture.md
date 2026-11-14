@@ -15,7 +15,7 @@ the end of this page.
 
 | Entry (`package.json#exports`) | Source | Runtime exports |
 |---|---|---|
-| `snaplot` | `index.ts` | `createChart`, `createChartGroup`, `createLegendTable`, `histogram` |
+| `snaplot` | `index.ts` | `createChart`, `createChartGroup`, `createLegendTable`, `histogram`, `histogram2d`, `sliceBins` |
 | `snaplot/react` | `react.ts` (`'use client'`) | `Chart`, `LegendTable`, `useChartState`, `useCursor`, `createChartGroup`, `histogram` |
 | `snaplot/solid` | `solid.ts` (+ an SSR build) | `Chart`, `LegendTable`, `createChartState`, `createCursor`, `createChartGroup`, `histogram` |
 
@@ -53,6 +53,7 @@ and the parts that hold DOM or timers.
 | `scales/` | linear, log and time scales, nice numbers, the affine fast path |
 | `marks/index.ts` | the mark registry (the only `series.type` lookup), the series pass and its gesture sampling, legend items |
 | `marks/<type>/draw.ts`, `hit.ts` | each mark's draw half and hit half |
+| `marks/heatmap/slice.ts` | a heatmap's slice: the row under the cursor, its panel and pins on the overlay, its profile for the tooltip |
 | `theme/resolve.ts`, `theme/color.ts` | theme resolution from the page; `parseColor` (any paintable CSS colour) |
 | `render/surface.ts` | canvases at whole device pixels, DPR, ResizeObserver, `reserveChrome`, the focusable root, the live region |
 | `render/scheduler.ts` | the per-chart frame scheduler, `nextFrame`, the shared theme, visibility, print and reduced-motion watchers |

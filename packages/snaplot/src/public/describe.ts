@@ -174,6 +174,7 @@ function seriesSpec<Row>(
       clamp: h.clamp,
       ...(h.emptyColor ? { emptyColor: h.emptyColor } : {}),
       colorScale: h.colorScale,
+      ...(h.slice ? { slice: h.slice } : {}),
     };
     return spec;
   }

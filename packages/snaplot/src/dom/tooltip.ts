@@ -1,4 +1,4 @@
-import type { TooltipPoint, TooltipConfig, ThemeConfig } from '../engine/spec';
+import type { SliceProfile, TooltipPoint, TooltipConfig, ThemeConfig } from '../engine/spec';
 import { TOOLTIP_OFFSET } from '../constants';
 import { isDarkColor } from '../engine/theme/color';
 import { prefersReducedMotion } from '../engine/render/scheduler';
@@ -24,7 +24,8 @@ export const TOOLTIP_CSS = `.snaplot-tooltip{padding:7px 10px;border-radius:6px;
 .snaplot-tooltip-name{display:flex;align-items:center;min-width:0;flex:1}
 .snaplot-tooltip-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .snaplot-tooltip-amount{font-weight:600;flex-shrink:0}
-.snaplot-tooltip-more{opacity:0.6;font-size:11px;margin-top:2px}`;
+.snaplot-tooltip-more{opacity:0.6;font-size:11px;margin-top:2px}
+.snaplot-tooltip-slice{display:block;margin-top:6px}`;
 
 /**
  * Cap on rows in the default multi-series tooltip. Beyond this the list is
@@ -46,12 +47,15 @@ interface TooltipPositionInput {
   viewportHeight: number;
   offset: number;
   pointerType?: 'mouse' | 'touch' | 'pen';
+  /** The side of the pointer to try first: `'left'` keeps clear of what sits right of the plot. */
+  side?: 'left' | 'right';
 }
 
 /** Pure placement helper kept exported for deterministic edge-collision tests. */
 export function computeTooltipPosition(input: TooltipPositionInput): { left: number; top: number } {
   const { clientX, clientY, width, height, viewportWidth, viewportHeight, offset, pointerType } =
     input;
+  const { side = 'right' } = input;
   const margin = TOOLTIP_VIEWPORT_MARGIN;
   const maxLeft = Math.max(margin, viewportWidth - width - margin);
   const maxTop = Math.max(margin, viewportHeight - height - margin);
@@ -67,7 +71,15 @@ export function computeTooltipPosition(input: TooltipPositionInput): { left: num
   }
 
   const right = clientX + offset;
-  const left = right + width <= viewportWidth - margin ? right : clientX - offset - width;
+  const before = clientX - offset - width;
+  const left =
+    side === 'left'
+      ? before >= margin
+        ? before
+        : right
+      : right + width <= viewportWidth - margin
+        ? right
+        : before;
   const below = clientY + offset;
   const top = below + height <= viewportHeight - margin ? below : clientY - offset - height;
   return { left: clampLeft(left), top: clampTop(top) };
@@ -84,10 +96,55 @@ export function tooltipMeasurementKey(points: TooltipPoint[]): string {
         widths(point.formattedX),
         widths(point.formattedY),
         widths(point.formattedValue ?? ''),
+        point.slice ? 'slice' : '',
         ...(point.fields ?? []).flatMap((field) => [widths(field.label), widths(field.formatted)]),
       ].join(':'),
     )
     .join('|');
+}
+
+/** The size of a heatmap slice in the tooltip, in CSS pixels. */
+const SLICE_WIDTH = 168;
+const SLICE_HEIGHT = 44;
+
+/**
+ * A heatmap row's profile as an inline SVG in the tooltip's text colour: a bar per bin, low bins
+ * on the left, the marked bin at full strength over a faint band (so a cell with a short bar
+ * still shows where it is). Bins are drawn per pixel column, each column the tallest of its bins,
+ * so a row of thousands of bins is as small a picture as one of ten.
+ */
+export function sliceSvg(profile: SliceProfile): string {
+  const width = SLICE_WIDTH;
+  const height = SLICE_HEIGHT;
+  const columns = new Float64Array(width).fill(-1);
+  const span = (b: number): [number, number] => {
+    const from = Math.max(0, Math.min(width - 1, Math.floor(profile.from[b] * width)));
+    return [from, Math.max(from + 1, Math.min(width, Math.round(profile.to[b] * width)))];
+  };
+  for (let b = 0; b < profile.length.length; b++) {
+    const length = profile.length[b];
+    if (!(length >= 0)) continue;
+    const [from, to] = span(b);
+    for (let x = from; x < to; x++) if (length > columns[x]) columns[x] = length;
+  }
+  const bar = (from: number, to: number, length: number) =>
+    `M${from} ${height}V${Math.round((height - length * (height - 1)) * 10) / 10}H${to}V${height}Z`;
+  let bars = '';
+  for (let x = 0; x < width; ) {
+    let end = x + 1;
+    while (end < width && columns[end] === columns[x]) end++;
+    if (columns[x] > 0) bars += bar(x, end, columns[x]);
+    x = end;
+  }
+  let marked = '';
+  if (profile.bin >= 0 && profile.bin < profile.length.length) {
+    const [from, to] = span(profile.bin);
+    const length = profile.length[profile.bin];
+    marked = `<rect x="${from}" width="${to - from}" height="${height}" fill="currentColor" opacity=".14"/>${
+      length > 0 ? `<path d="${bar(from, to, length)}" fill="currentColor"/>` : ''
+    }`;
+  }
+  return `<svg class="snaplot-tooltip-slice" width="${width}" height="${height + 1}" viewBox="0 0 ${width} ${height + 1}" aria-hidden="true"><path d="${bars}" fill="currentColor" opacity=".4"/>${marked}<path d="M0 ${height + 0.5}H${width}" stroke="currentColor" opacity=".35"/></svg>`;
 }
 
 /** Escape the five characters that matter for HTML attribute + text contexts. */
@@ -175,6 +232,7 @@ export class TooltipManager {
     clientY: number,
     config?: TooltipConfig,
     pointerType?: 'mouse' | 'touch' | 'pen',
+    side?: 'left' | 'right',
   ): void {
     if (points.length === 0) {
       this.hide();
@@ -248,6 +306,7 @@ export class TooltipManager {
       viewportHeight,
       offset,
       pointerType,
+      side,
     });
     this.el.style.transform = `translate3d(${position.left}px, ${position.top}px, 0)`;
   }
@@ -283,7 +342,7 @@ export class TooltipManager {
       for (const p of points) {
         if (p.value === undefined) continue;
         html += `<div class="snaplot-tooltip-block"><div class="snaplot-tooltip-title">${dot(p.color)}<span class="snaplot-tooltip-strong">${escapeHtml(p.label)}</span></div>
-        <div class="snaplot-tooltip-grid">${pair(p.xName ?? 'x', p.formattedX)}${pair(p.yName ?? 'y', p.formattedY)}${pair('value', p.formattedValue ?? '')}</div></div>`;
+        <div class="snaplot-tooltip-grid">${pair(p.xName ?? 'x', p.formattedX)}${pair(p.yName ?? 'y', p.formattedY)}${pair('value', p.formattedValue ?? '')}</div>${p.slice ? sliceSvg(p.slice) : ''}</div>`;
       }
       const rest = points.filter((p) => p.value === undefined);
       if (rest.length)

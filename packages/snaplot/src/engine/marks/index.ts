@@ -44,6 +44,7 @@ import { heatmapHit } from './heatmap/hit';
 import { colorMapping } from './heatmap/colors';
 
 export { colorScaleWidth, drawColorScale } from './heatmap/scale';
+export { cursorRow, drawSlice, readRow, slicePanel, sliceSeries } from './heatmap/slice';
 
 /** What the series pass hands a mark to draw one series on the data layer. */
 export interface SeriesPass {

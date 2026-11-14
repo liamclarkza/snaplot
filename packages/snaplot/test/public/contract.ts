@@ -30,6 +30,7 @@ export const HANDLE_MEMBERS = [
   'subscribe',
   'on',
   'getCursor',
+  'getSlice',
   'resetViewport',
   'resumeFollow',
   'setCursor',

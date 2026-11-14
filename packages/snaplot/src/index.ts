@@ -20,6 +20,7 @@ export { createChart, createChartGroup } from './public/chart';
 export { createLegendTable } from './public/legend';
 export { histogram } from './public/histogram';
 export { histogram2d } from './public/histogram2d';
+export { sliceBins } from './public/slice';
 export type * from './public/types';
 export type {
   LegendTableColumn,

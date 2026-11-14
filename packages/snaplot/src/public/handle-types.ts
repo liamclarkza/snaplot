@@ -10,9 +10,11 @@ import type {
   ChartOptions,
   ChartPatch,
   DataSource,
+  HeatmapSlice,
   RowId,
   ScaleRange,
   SeriesType,
+  SliceOptions,
 } from './types';
 
 // ─── State ───────────────────────────────────────────────────────────
@@ -289,6 +291,13 @@ export interface ChartHandle<Row = Record<string, any>> {
    * none), computed when asked.
    */
   getCursor(options?: CursorOptions): CursorSnapshot<Row>;
+  /**
+   * One row of a heatmap's cells: the row under the cursor, or the row at `at`, or `null` where
+   * there is none (and no `fallback`). `seriesId` names the heatmap; without it, the chart's
+   * first. A group's cursor counts for rows that run along X. An id that is not a heatmap of the
+   * chart throws.
+   */
+  getSlice(seriesId?: string, options?: SliceOptions): HeatmapSlice<Row> | null;
   /**
    * Return every axis to its automatic range, as `update({ viewport: {} })` does, and report
    * the reset as `viewport:change` with `{}`.

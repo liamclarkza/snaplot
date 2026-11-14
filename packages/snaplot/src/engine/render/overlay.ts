@@ -4,7 +4,7 @@ import type { ChartCore } from '../Engine';
 import { brushPixelRange } from '../selection';
 import { DirtyFlag } from '../spec';
 import { isDarkColor } from '../theme/color';
-import { markOf, slotOf, visibleSlots } from '../marks/index';
+import { drawSlice, markOf, slotOf, visibleSlots } from '../marks/index';
 import { crisp } from './crisp';
 
 /**
@@ -182,41 +182,54 @@ export function renderBrushSelection(
 // What the overlay layer shows each frame: crosshair, point indicators, the tooltip, the brush
 // band, the box being dragged and the tap ring.
 
+/**
+ * The crosshair this frame draws, with its vertical line decided, or null when it draws none: no
+ * cursor, a selection being dragged, the cursor turned off, or a chart of point clouds only.
+ */
+function crosshairConfig(engine: ChartCore): CursorConfig | null {
+  if (
+    engine.selectionBox !== null ||
+    engine.config.cursor?.show === false ||
+    engine.cursorX === null ||
+    engine.cursorY === null
+  )
+    return null;
+  const visibleSeries = engine.config.series.filter((s) => s.visible !== false);
+  if (visibleSeries.every((s) => markOf(s).draw.cloud)) return null;
+  const hasOnlyDiscreteMarks =
+    visibleSeries.length > 0 && visibleSeries.every((s) => markOf(s).draw.x !== 'continuous');
+  const hasOnlyCells = visibleSeries.length > 0 && visibleSeries.every((s) => markOf(s).draw.cells);
+  return {
+    ...engine.config.cursor,
+    // A vertical line reads as an extra mark on grouped bars, where the highlighted group is
+    // the cue, and across a heatmap under the pointer, where the outlined cell is; a heatmap
+    // shows a group's cursor (no cell outlined) as the line.
+    xLine:
+      engine.config.cursor?.xLine ?? (hasOnlyCells ? !engine.cursorIsLocal : !hasOnlyDiscreteMarks),
+  };
+}
+
 export function renderOverlay(engine: ChartCore): void {
   const ctx = engine.canvasManager.overlayCtx;
   const cursorEnabled = engine.config.cursor?.show !== false;
   const isSelecting = engine.selectionBox !== null;
 
+  // The crosshair of this frame; a heatmap's slice panel and pinned rows go under it.
+  const crosshair = crosshairConfig(engine);
+  drawSlice(engine, ctx, crosshair);
+
   // During active selection, hide crosshair/tooltip/dots, only show the selection box
   if (!isSelecting && cursorEnabled && engine.cursorX !== null && engine.cursorY !== null) {
-    // Draw crosshair, skip for scatter-only charts
-    const isScatterOnly = engine.config.series.every(
-      (s) => s.visible === false || markOf(s).draw.cloud,
-    );
-    if (!isScatterOnly) {
-      const visibleSeries = engine.config.series.filter((s) => s.visible !== false);
-      const hasOnlyDiscreteMarks =
-        visibleSeries.length > 0 && visibleSeries.every((s) => markOf(s).draw.x !== 'continuous');
-      const hasOnlyCells =
-        visibleSeries.length > 0 && visibleSeries.every((s) => markOf(s).draw.cells);
-      const cursorCfg = {
-        ...engine.config.cursor,
-        // A vertical line reads as an extra mark on grouped bars, where the highlighted group is
-        // the cue, and across a heatmap under the pointer, where the outlined cell is; a heatmap
-        // shows a group's cursor (no cell outlined) as the line.
-        xLine:
-          engine.config.cursor?.xLine ??
-          (hasOnlyCells ? !engine.cursorIsLocal : !hasOnlyDiscreteMarks),
-      };
+    if (crosshair) {
       renderCrosshair(
         ctx,
         engine.cursorX,
         engine.cursorY,
         engine.layout,
-        cursorCfg,
-        // `cursor.color` overrides the theme's crosshair colour when set,          // useful for matching a brand accent on one chart without changing
-        // the whole theme.
-        cursorCfg.color ?? engine.theme.crosshairColor,
+        crosshair,
+        // `cursor.color` overrides the theme's crosshair colour when set, useful for matching a
+        // brand accent on one chart without changing the whole theme.
+        crosshair.color ?? engine.theme.crosshairColor,
       );
     }
 
@@ -244,6 +257,9 @@ export function renderOverlay(engine: ChartCore): void {
       rect.top + (engine.mouseY ?? 0),
       engine.config.tooltip,
       engine.lastPointerType,
+      // A slice panel beside the plot shows the row the tooltip is about: the tooltip opens on
+      // the pointer's other side, so the two read together.
+      engine.layout.slice && engine.layout.slice.left > engine.layout.plot.left ? 'left' : 'right',
     );
   } else {
     engine.tooltipManager.hide();

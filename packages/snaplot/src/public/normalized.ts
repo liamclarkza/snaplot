@@ -73,6 +73,7 @@ export interface NormalizedHeatmap {
   clamp: boolean;
   emptyColor?: string;
   colorScale: HeatmapSpec['colorScale'];
+  slice?: HeatmapSpec['slice'];
 }
 
 /** One axis: the kind the caller asked for, its categories and its engine fields. */

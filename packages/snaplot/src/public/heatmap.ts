@@ -20,7 +20,7 @@ import type {
   NormalizedHeatmap,
   NormalizedSeries,
 } from './normalized';
-import { BINS, COLOR_MAPS, COLOR_SCALE, GRID } from './option-keys';
+import { BINS, COLOR_MAPS, COLOR_SCALE, GRID, SLICE, SLICE_PANEL } from './option-keys';
 import { cellValue, read, type SourceState } from './sources';
 
 /** A Date or a finite number, as a number. */
@@ -182,7 +182,46 @@ export function normalizeHeatmap(
     fail(
       `${path}.colorScale must be true, false or { title, ticks, format }, not ${describe(scale)}.`,
     );
+  const slice = normalizeSlice(value.slice, `${path}.slice`);
+  if (slice) out.slice = slice;
   return out;
+}
+
+/** A heatmap's slice: `true` is the tooltip and the panel; nothing drawn and no pin is no slice. */
+function normalizeSlice(value: unknown, path: string): NormalizedHeatmap['slice'] {
+  if (value === undefined || value === false) return undefined;
+  if (value === true) return { tooltip: true, panel: { mean: true }, pins: [] };
+  if (!isPlain(value))
+    fail(`${path} must be true, false or { tooltip, panel, pins }, not ${describe(value)}.`);
+  checkKeys(value, SLICE, path);
+  const flag = (key: string, source: Record<string, unknown>, at: string, fallback: boolean) => {
+    const v = source[key];
+    if (v === undefined) return fallback;
+    if (typeof v !== 'boolean') fail(`${at}.${key} must be true or false, not ${describe(v)}.`);
+    return v;
+  };
+  const tooltip = flag('tooltip', value, path, false);
+  let panel: NonNullable<NormalizedHeatmap['slice']>['panel'] = false;
+  if (value.panel === true) panel = { mean: true };
+  else if (isPlain(value.panel)) {
+    checkKeys(value.panel, SLICE_PANEL, `${path}.panel`);
+    const size = value.panel.size;
+    if (size !== undefined && (typeof size !== 'number' || !Number.isFinite(size) || size < 24))
+      fail(
+        `${path}.panel.size must be a number of CSS pixels of at least 24, not ${describe(size)}.`,
+      );
+    panel = {
+      ...(size === undefined ? {} : { size }),
+      mean: flag('mean', value.panel, `${path}.panel`, true),
+    };
+  } else if (value.panel !== undefined && value.panel !== false)
+    fail(`${path}.panel must be true, false or { size, mean }, not ${describe(value.panel)}.`);
+  let pins: number[] = [];
+  if (value.pins !== undefined) {
+    if (!Array.isArray(value.pins)) fail(`${path}.pins must be an array of numbers or Dates.`);
+    pins = value.pins.map((pin, i) => coordinate(pin, `${path}.pins[${i}]`));
+  }
+  return tooltip || panel || pins.length ? { tooltip, panel, pins } : undefined;
 }
 
 /**

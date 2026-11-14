@@ -81,7 +81,7 @@ import {
   updateLayout,
   updateScalePixelRanges,
 } from './layout';
-import { drawColorScale, legendItems, renderAllSeries } from './marks/index';
+import { drawColorScale, legendItems, renderAllSeries, sliceSeries } from './marks/index';
 import type { ScatterSeriesCache } from './marks/scatter/draw';
 import type { ScatterPalettes, ScatterResolvers } from './marks/scatter/encoding';
 import { renderOverlay } from './render/overlay';
@@ -777,6 +777,10 @@ export class ChartCore implements EngineHost {
    */
   private render(flags: DirtyFlag): void {
     if (this.destroyed) return;
+    // A heatmap's slice is drawn on the overlay from the data (its newest row, its pinned rows):
+    // new data repaints it too.
+    const slices = sliceSeries(this) >= 0;
+    if (slices && flags & DirtyFlag.DATA) flags |= DirtyFlag.OVERLAY;
 
     // Overlay-only frames are the cursor hot path. Layout/tick measurement is
     // only needed when grid or data layers redraw (resize/config/data/viewport).
@@ -825,6 +829,7 @@ export class ChartCore implements EngineHost {
         this.selection ||
         this.selectionBox ||
         this.tapFeedback ||
+        slices ||
         this.plugins.drawsIn('overlay')
       )
         this.canvasManager.activateOverlay();

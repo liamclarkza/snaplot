@@ -6,6 +6,20 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A heatmap's `slice`: the row of cells under the cursor as a profile of its values (the
+  distribution at a moment of a heatmap of counts, the spectrum of a spectrogram's frame).
+  `slice.tooltip` draws it in the built-in tooltip with the cell under the pointer marked;
+  `slice.panel` draws it in a panel on the bin axis, beside the plot or above it when the rows run
+  up the plot, over the mean of the rows in view, and shows the newest row of a stream while the
+  cursor is away; `slice.pins` keeps rows marked on the plot and outlined in the panel.
+  `slice: true` is the tooltip and the panel.
+- `chart.getSlice(seriesId?, { at, fallback })` returns one row of a heatmap's cells (its values
+  and their spans) at the cursor, at a position or at the newest or first row, and
+  `sliceBins(slice)` turns it into the bins of a histogram series, for a second chart of the
+  distribution under the cursor.
+
 ## [0.14.0] - 2026-11-08
 
 ### Added

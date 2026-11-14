@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { computeTooltipPosition, TooltipManager, tooltipMeasurementKey } from './tooltip';
+import { computeTooltipPosition, sliceSvg, TooltipManager, tooltipMeasurementKey } from './tooltip';
 import type { TooltipPoint } from '../engine/spec';
 import { lightTheme } from '../engine/theme/resolve';
 
@@ -21,6 +21,14 @@ describe('computeTooltipPosition', () => {
 
   it('flips to the cursor left near the right viewport edge', () => {
     expect(computeTooltipPosition({ ...base, clientX: 760 })).toEqual({ left: 568, top: 312 });
+  });
+
+  it('opens left of the cursor when asked, and right where the left has no room', () => {
+    expect(computeTooltipPosition({ ...base, side: 'left' })).toEqual({ left: 208, top: 312 });
+    expect(computeTooltipPosition({ ...base, side: 'left', clientX: 150 })).toEqual({
+      left: 162,
+      top: 312,
+    });
   });
 
   it('flips above the cursor near the bottom viewport edge', () => {
@@ -106,5 +114,35 @@ describe('tooltipMeasurementKey', () => {
     expect(element.style.transform).toContain('translate3d(');
     manager.destroy();
     vi.unstubAllGlobals();
+  });
+});
+
+describe('sliceSvg', () => {
+  const profile = (length: number[], bin = -1) => ({
+    from: Float64Array.from(length.map((_, i) => i / length.length)),
+    to: Float64Array.from(length.map((_, i) => (i + 1) / length.length)),
+    length: Float64Array.from(length),
+    bin,
+  });
+  const paths = (svg: string) => [...svg.matchAll(/ d="([^"]*)"/g)].map((match) => match[1]);
+
+  it('draws a bar per bin on a baseline, bars of one height as one', () => {
+    const [bars, baseline] = paths(sliceSvg(profile([0.5, 0.5, 1, 0])));
+    expect(bars).toBe('M0 44V22.5H84V44ZM84 44V1H126V44Z');
+    expect(baseline).toBe('M0 44.5H168');
+  });
+
+  it('leaves an empty cell out and marks the bin under the pointer', () => {
+    const svg = sliceSvg(profile([1, Number.NaN, 0.5, 0.25], 2));
+    const [bars, marked] = paths(svg);
+    expect(bars).toBe('M0 44V1H42V44ZM84 44V22.5H126V44ZM126 44V33.3H168V44Z');
+    expect(marked).toBe('M84 44V22.5H126V44Z');
+    expect(svg).toContain('<rect x="84" width="42" height="44"');
+  });
+
+  it('keeps a row of thousands of bins a small picture: the tallest bin per pixel column', () => {
+    const length = Array.from({ length: 4000 }, (_, i) => (i % 2 ? 1 : 0.1));
+    const [bars] = paths(sliceSvg(profile(length)));
+    expect(bars).toBe('M0 44V1H168V44Z');
   });
 });

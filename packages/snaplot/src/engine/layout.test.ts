@@ -168,3 +168,71 @@ describe('reserveChrome (render/surface.ts, the W5 contract the legend calls)', 
     ).toEqual(computeLayout(640, 240, config, scales, 1, 'sans-serif', FONT_SIZE));
   });
 });
+
+describe('computeLayout slice panel', () => {
+  const scales = new Map<string, Scale>([
+    ['x', scale('x', [0, 50, 100])],
+    ['y', scale('y', [0, 5, 10])],
+  ]);
+  const config = { series: [], axes: { x: {}, y: {} } } as ChartSpec;
+  const layout = (
+    slice: { side: 'right' | 'top'; size: number } | null,
+    colorScale = 0,
+    width = 640,
+    height = 240,
+  ) =>
+    computeLayout(
+      width,
+      height,
+      config,
+      scales,
+      1,
+      'sans-serif',
+      FONT_SIZE,
+      {},
+      undefined,
+      undefined,
+      colorScale,
+      slice,
+    );
+
+  it('sits against the plot, with the edge margin beyond it', () => {
+    const bare = layout(null);
+    const { plot, slice } = layout({ side: 'right', size: 120 });
+    expect(slice).toEqual({
+      left: plot.left + plot.width,
+      top: plot.top,
+      width: 120,
+      height: plot.height,
+    });
+    expect(plot.left + plot.width + 120 + EDGE_MARGIN).toBe(640);
+    expect(plot.left).toBe(bare.plot.left);
+  });
+
+  it('sits between the plot and the colour scale', () => {
+    const { plot, slice, colorScale } = layout({ side: 'right', size: 120 }, 64);
+    expect(slice?.left).toBe(plot.left + plot.width);
+    expect(colorScale?.left).toBe(plot.left + plot.width + 120);
+    expect(colorScale!.left + colorScale!.width).toBe(640);
+  });
+
+  it("sits above the plot and its top gutter, over the plot's width", () => {
+    const bare = layout(null);
+    const { plot, slice } = layout({ side: 'top', size: 64 });
+    expect(slice).toEqual({ left: plot.left, top: 0, width: plot.width, height: 64 });
+    expect(plot.top).toBe(bare.plot.top + 64);
+    expect(plot.height).toBe(bare.plot.height - 64);
+  });
+
+  it('yields when the plot would be left under one and a half times its size', () => {
+    const narrow = layout({ side: 'right', size: 120 }, 0, 330);
+    expect(narrow.slice).toBeUndefined();
+    expect(narrow.plot).toEqual(layout(null, 0, 330).plot);
+    expect(layout({ side: 'right', size: 120 }, 0, 400).slice).toBeDefined();
+    expect(layout({ side: 'top', size: 64 }, 0, 640, 150).slice).toBeUndefined();
+    // A colour scale keeps its room when the panel yields.
+    expect(layout({ side: 'right', size: 120 }, 64, 330).colorScale).toEqual(
+      layout(null, 64, 330).colorScale,
+    );
+  });
+});

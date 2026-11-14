@@ -30,6 +30,7 @@ import { ingest } from './ingest';
 import { mountLegend } from './legend';
 import { chartScale, cursorValue } from './axes';
 import { categoryItems, chartPoint, cursorSnapshot, selectionWithPoints } from './points';
+import { heatmapSlice } from './slice';
 import { type NormalizedOptions, type NormalizedState, normalize } from './normalize';
 import { equivalent, patchOptions } from './options';
 import { type Ingested, type IngestContext, retainedSource } from './sources';
@@ -46,6 +47,8 @@ import type {
   ChartScale,
   ChartState,
   CursorSnapshot,
+  HeatmapSlice,
+  SliceOptions,
   DataSource,
   Selection,
   SeriesState,
@@ -656,6 +659,12 @@ class Controller<Row> implements ChartHandle<Row>, GroupMember {
   /** The values under the cursor, or at a fallback position, computed when asked. */
   getCursor(options?: CursorOptions): CursorSnapshot<Row> {
     return cursorSnapshot(this, options);
+  }
+  /** One row of a heatmap's cells: at the cursor, at a position, or at a fallback row. */
+  getSlice(seriesId?: string, options?: SliceOptions): HeatmapSlice<Row> | null {
+    if (this.destroyed) return null;
+    settleRange(this.engine);
+    return heatmapSlice(this, seriesId, options);
   }
   /** Repaint a layer on the next frame; `'all'` (the default) also resolves the theme again. */
   redraw(layer: 'overlay' | 'data' | 'all' = 'all'): void {

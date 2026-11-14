@@ -216,6 +216,34 @@ export function rowSpans(
   }
 }
 
+const spanLo = new Float64Array(2);
+const spanHi = new Float64Array(2);
+
+/**
+ * The row of a heatmap's store whose span holds `position` along the rows' axis, or -1 (an empty
+ * store, a gap between rows, a position past the ends). `span` receives the row's span.
+ */
+export function rowAt(
+  store: DataStore,
+  spec: HeatmapSpec,
+  position: number,
+  span?: { min: number; max: number },
+): number {
+  if (store.length === 0) return -1;
+  // The rows either side of the position, with their spans.
+  const near = store.upperBoundX(position);
+  const from = Math.max(0, near);
+  const to = Math.min(store.length - 1, near + 1);
+  rowSpans(store, spec, from, to, spanLo, spanHi);
+  const k = cellAt(spanLo, spanHi, to - from + 1, position);
+  if (k < 0) return -1;
+  if (span) {
+    span.min = spanLo[k];
+    span.max = spanHi[k];
+  }
+  return from + k;
+}
+
 /** The scale a heatmap's rows run along and the one its bins run across. */
 export function gridScales(
   spec: HeatmapSpec,

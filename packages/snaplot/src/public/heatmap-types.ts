@@ -66,6 +66,53 @@ export interface ColorScaleOptions {
   format?: NumberFormat;
 }
 
+/** The panel of a heatmap's {@link HeatmapSliceOptions | slice}. */
+export interface HeatmapSlicePanelOptions {
+  /**
+   * The panel's size in CSS pixels: its width beside the plot, or its height above it.
+   * @defaultValue `120` beside the plot, `64` above it
+   */
+  size?: number;
+  /**
+   * Draw the mean of the rows in view behind the slice, as a reference to compare it with (a
+   * sample of them past 256 rows). @defaultValue `true`
+   */
+  mean?: boolean;
+}
+
+/**
+ * A slice of a heatmap: the row of cells under the cursor, drawn as a profile of its values. Over
+ * a heatmap of counts it is the distribution at that moment; over a spectrogram, the spectrum.
+ *
+ * The panel draws profiles on the heatmap's colour domain, so the length of a cell's bar and the
+ * colour of the cell say the same thing, and slices compare with each other.
+ *
+ * @example
+ * ```ts
+ * // The distribution under the cursor in the tooltip and in a panel, and two pinned moments.
+ * { type: 'heatmap', values: 'counts', bins, slice: { tooltip: true, panel: true, pins: [t0, t1] } }
+ * ```
+ */
+export interface HeatmapSliceOptions {
+  /**
+   * Draw the slice in the built-in tooltip, scaled to its tallest bar, with the cell under the
+   * pointer marked. @defaultValue `false`
+   */
+  tooltip?: boolean;
+  /**
+   * A panel on the heatmap's bin axis: beside the plot, or above it when the rows run up the plot.
+   * It shows the slice at the cursor, and the newest row of a heatmap of rows when the cursor is
+   * away. A chart too small to spare the room shows no panel. @defaultValue `false`
+   */
+  panel?: boolean | HeatmapSlicePanelOptions;
+  /**
+   * Rows to keep in view, by their position along the rows' axis: each is marked on the plot and
+   * outlined in the panel in a colour of the palette, in order. A position between two rows pins
+   * the nearer. Toggle them on `point:click` to pin by click. @defaultValue none
+   */
+  pins?: readonly (number | Date)[];
+}
+
 /** Options every heatmap shares, however it reads its values. */
 interface HeatmapCommon {
   /** The name shown in the tooltip. @defaultValue the `values` field name, else the id */
@@ -95,6 +142,11 @@ interface HeatmapCommon {
   emptyColor?: string;
   /** The colour scale beside the plot: `false` hides it. @defaultValue `true` */
   colorScale?: boolean | ColorScaleOptions;
+  /**
+   * The row of cells under the cursor as a profile, in the tooltip, in a panel or both; `true` is
+   * both. @defaultValue no slice
+   */
+  slice?: boolean | HeatmapSliceOptions;
   /** Opacity from 0 to 1. @defaultValue `1` */
   opacity?: number;
   /** How values are written in the tooltip and the colour scale. @defaultValue automatic */
@@ -152,4 +204,37 @@ export interface HeatmapGridSeriesOptions extends HeatmapCommon {
   values?: undefined;
   /** A grid holds its own cells. */
   bins?: undefined;
+}
+
+/** Options of `getSlice()`. */
+export interface SliceOptions {
+  /** The row at this position along the rows' axis. @defaultValue the row under the cursor */
+  at?: number | Date;
+  /** What to report when the cursor is not over a row. @defaultValue `'hide'` */
+  fallback?: 'hide' | 'latest' | 'first';
+}
+
+/** One row of a heatmap's cells, as `getSlice()` reports it. */
+export interface HeatmapSlice<Row = Record<string, any>> {
+  /** The series id. */
+  seriesId: string;
+  /** The row's position along the rows' axis (epoch milliseconds on a time axis). */
+  position: number;
+  /** The position as written. */
+  formattedPosition: string;
+  /** The original row, for row data. */
+  row?: Row;
+  /** The row's index in the data you passed (before sorting), or among appended rows. */
+  rowIndex: number;
+  /** Each cell's value, in the order of the bins; `NaN` is an empty cell. */
+  values: Float64Array;
+  /** Each cell's interval across the row: cell `i` spans `min[i]` to `max[i]`. */
+  bins: {
+    /** Where each cell starts. */
+    min: Float64Array;
+    /** Where each cell ends. */
+    max: Float64Array;
+  };
+  /** What produced the slice. */
+  source: 'position' | 'cursor' | 'latest' | 'first';
 }
