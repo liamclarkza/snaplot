@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-19
+
 ### Changed
 
 - One rule sizes every gutter around the plot: the 8 px edge margin plus the larger of the side's
