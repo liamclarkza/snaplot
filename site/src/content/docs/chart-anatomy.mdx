@@ -1,0 +1,96 @@
+---
+title: Chart anatomy
+description: The plot, the four gutters around it, and the one rule that sizes every gutter.
+---
+
+import ChartAnatomy from '../../components/ChartAnatomy.astro';
+import PlotAlignment from '../../components/PlotAlignment.astro';
+
+A chart fills its container (see [Sizing and layout](/snaplot/sizing/)). Inside it, the **plot**
+is where the marks draw, and four **gutters** around the plot hold the axes: tick marks, tick
+labels and titles. A legend takes a strip above or below them.
+
+The chart below draws its own layout over itself, measured from the chart as it rendered. Change
+its values and axes to see each gutter follow what it holds, and point at an entry in the key to
+find its region.
+
+<ChartAnatomy />
+
+## One rule for every side
+
+Each gutter is measured from what it holds, and every side follows the same rule:
+
+```
+gutter = max(minimum, round up(8 + max(own axis, overhang)))
+```
+
+- **Own axis** is the axis on that side, if it has one: a 4 px tick mark, a 4 px gap and its tick
+  labels, plus an 8 px gap and a line of text when it has a title. On the left and right the
+  widest label counts; on the top and bottom, one line of text.
+- **Overhang** is how far the other axis's end labels reach past the plot. Labels are centred on
+  their ticks, so the first and last x labels reach half their width into the left and right
+  gutters, and the y labels half their height into the top and bottom. It is reserved whether or
+  not a tick sits on the end, so the plot keeps its size while you pan, zoom or stream.
+- **8** is the edge margin: clear space between the outermost text and the edge of the chart, or
+  the edge of its legend.
+- **Round up** goes to the next 8 px on the left and right, so the plot keeps its width while a
+  label gains or loses a digit. The top and bottom hold lines of text and round up to a whole
+  pixel.
+- **Minimum** is `minGutters.y` on a side that holds a y axis and `minGutters.x` on a side that
+  holds an x axis, 0 unless you set it. A side with no axis has no minimum.
+
+Two y axes take the same room: when there is a second y axis on the right, the left and right
+gutters both take the wider of the two, so the plot stays centred between its axes. In a group
+that lines up its plots, each side can widen on its own to match the other members.
+
+| Side | Own axis | Overhang |
+| --- | --- | --- |
+| Left | The y axis: its widest tick label, tick, gap and title | Half the first x label |
+| Right | A second y axis, then a heatmap's slice panel and colour scale | Half the last x label |
+| Top | An x axis placed on top | Half a y label's height |
+| Bottom | The x axis: a line of tick labels, tick, gap and title | Half a y label's height |
+
+The plot gets whatever room is left. A chart with short labels has a wider plot, and the space
+between the edge and its labels is the edge margin plus at most 7 px of rounding, whatever the
+labels say.
+
+## Lining up plots
+
+Two charts get the same space before their labels, but the one with longer labels needs a wider
+gutter, so their plots start at different places. To line the plots up, give both charts the
+same left and right gutters.
+
+<PlotAlignment />
+
+- **In a group**, `alignPlots` (on by default) gives every member the widest member's left and
+  right gutters. See [Linked charts](/snaplot/guides/linked-charts/).
+- **Outside a group**, give each chart the same `minGutters.y`. Pick a width that holds the
+  widest labels you expect: a gutter never narrows below what it holds, so a wider label still
+  moves its plot.
+
+```ts
+createChart(lossElement, { ...lossOptions, minGutters: { y: 80 } });
+createChart(throughputElement, { ...throughputOptions, minGutters: { y: 80 } });
+```
+
+## Minimum gutters
+
+`minGutters` sets the least room the gutters that hold the axes keep, in CSS pixels:
+
+- `y` is the width of each gutter that holds a y axis: the left, and the right too when there is
+  a second y axis, since two y axes take the same room.
+- `x` is the height of the gutter that holds the x axis: the bottom, or the top for an x axis
+  placed on top.
+
+A gutter that already needs more keeps what it needs, and a side with no axis keeps no minimum.
+Besides lining charts up, a minimum keeps a gutter steady while an axis's labels change length.
+
+## Legend and panels
+
+- **The legend** takes a strip at the top, or at the bottom with `legend: { position: 'bottom' }`.
+  The gutters are measured from the strip, so the edge margin sits between the legend and the
+  plot's top labels.
+- **A heatmap's colour scale** sits at the right edge of the chart, outside any right axis.
+- **A heatmap's slice panel** sits beside the plot (120 px by default) or above it (64 px), next to
+  the bin axis it shares. It gives way when the plot would be left with less than one and a half
+  times its size.

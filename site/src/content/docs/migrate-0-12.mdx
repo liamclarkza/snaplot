@@ -37,6 +37,8 @@ to use instead, and the chart keeps its default, so a page keeps rendering while
    `interaction: { zoom, drag, bounds }`; `'analytical'` is `interaction: { zoom: 'xy' }`.
 9. **Size the container.** `width`, `autoResize` and `padding` are gone: the chart fills its
    element, which needs a height (or pass `height`). See [Sizing and layout](/snaplot/sizing/).
+   The gutters around the plot are measured from the axes; `minGutters: { x, y }` sets the least
+   room they keep (see [Chart anatomy](/snaplot/chart-anatomy/)).
 10. **Controlled props are state options.** In React and Solid, `viewport`, `selection`,
     `hiddenSeries` and `highlight` are props with `on…Change` callbacks; `onReady` is `ref`.
 

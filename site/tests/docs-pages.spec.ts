@@ -61,3 +61,31 @@ test('[docs-05] the sizing contract is on its own page and comes before the firs
   expect(order.indexOf('Size the container first')).toBeGreaterThanOrEqual(0);
   expect(order.indexOf('Size the container first')).toBeLessThan(order.indexOf('Mount a chart'));
 });
+
+test('the anatomy page measures the charts it draws over', async ({ page }) => {
+  await page.goto(`${BASE}chart-anatomy/`);
+  const figure = page.locator('snaplot-anatomy');
+  await figure.scrollIntoViewIfNeeded();
+  const gutters = figure.locator('[data-key-kind="gutter"] [data-value]');
+  await expect(gutters).toHaveText(/^left \d+, right \d+, top \d+, bottom \d+ px$/, {
+    timeout: 10_000,
+  });
+  const left = async () => Number(/^left (\d+)/.exec((await gutters.textContent()) ?? '')?.[1]);
+  const measured = await left();
+  // A minimum wider than the measured gutter is the gutter.
+  await figure.locator('[name="anatomy-min"]').fill('120');
+  await expect.poll(left).toBe(120);
+  await figure.locator('[name="anatomy-min"]').fill('0');
+  await expect.poll(left).toBe(measured);
+
+  const alignment = page.locator('snaplot-plot-alignment');
+  await alignment.scrollIntoViewIfNeeded();
+  const readout = alignment.locator('[data-readout]');
+  await expect(readout).toHaveText(/the plots start \d+ px and \d+ px from the edge/, {
+    timeout: 10_000,
+  });
+  for (const value of ['group', 'min']) {
+    await alignment.locator(`input[value="${value}"]`).check({ force: true });
+    await expect(readout).toHaveText(/both plots start \d+ px from the edge/);
+  }
+});

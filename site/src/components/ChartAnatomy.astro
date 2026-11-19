@@ -1,0 +1,356 @@
+---
+/**
+ * The chart anatomy figure (chart-anatomy.mdx): a live chart with its regions drawn over it,
+ * measured from the chart as it renders (lib/chart-anatomy.ts). The key names each region and
+ * gives its size; pointing at an entry picks its region out on the chart.
+ */
+const KEY = [
+  {
+    kind: 'plot',
+    name: 'Plot',
+    text: 'Where the marks draw. It takes whatever room the gutters leave.',
+  },
+  {
+    kind: 'gutter',
+    name: 'Gutters',
+    text: 'The four sides around the plot, each measured from what it holds.',
+  },
+  {
+    kind: 'label',
+    name: 'Tick labels and titles',
+    text: 'Measured as they render, in the axis font.',
+  },
+  {
+    kind: 'tick',
+    name: 'Tick marks and gaps',
+    text: 'A 4 px tick and a 4 px gap between each label and the plot.',
+  },
+  {
+    kind: 'edge',
+    name: 'Edge margin',
+    text: 'Kept clear between the outermost text and the edge of the chart or its legend.',
+  },
+  {
+    kind: 'legend',
+    name: 'Legend',
+    text: 'A strip above or below the gutters. They are measured from it.',
+  },
+];
+---
+
+<snaplot-anatomy class="anatomy not-content">
+  <div class="anatomy-controls">
+    <fieldset class="anatomy-choice">
+      <legend>Y values</legend>
+      <label
+        ><input type="radio" name="anatomy-labels" value="short" /><span>0 to 2</span></label
+      >
+      <label
+        ><input type="radio" name="anatomy-labels" value="decimal" checked /><span
+          >0.016 to 0.026</span
+        ></label
+      >
+      <label
+        ><input type="radio" name="anatomy-labels" value="long" /><span>0 to 1,200,000</span></label
+      >
+    </fieldset>
+    <fieldset class="anatomy-toggles">
+      <legend>Show</legend>
+      <label><input type="checkbox" name="anatomy-titles" /> Axis titles</label>
+      <label><input type="checkbox" name="anatomy-legend" checked /> Legend</label>
+      <label><input type="checkbox" name="anatomy-right" /> A second y axis</label>
+    </fieldset>
+    <label class="anatomy-range">
+      <span><code>minGutters.y</code></span>
+      <input type="range" name="anatomy-min" min="0" max="120" step="8" value="0" />
+      <output data-min-output>unset</output>
+    </label>
+  </div>
+  <div class="anatomy-stage">
+    <div class="anatomy-chart" data-chart></div>
+    <svg class="anatomy-overlay" aria-hidden="true" data-overlay>
+      <defs>
+        <pattern
+          id="anatomy-hatch"
+          width="5"
+          height="5"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <line x1="0" y1="0" x2="0" y2="5" class="anatomy-hatch-line"></line>
+        </pattern>
+      </defs>
+    </svg>
+  </div>
+  <ul class="anatomy-key">
+    {
+      KEY.map((entry) => (
+        <li tabindex="0" data-key-kind={entry.kind}>
+          <span class={`anatomy-swatch anatomy-swatch-${entry.kind}`} aria-hidden="true" />
+          <span class="anatomy-key-text">
+            <strong>{entry.name}</strong>
+            <span class="num" data-value />
+            <span class="anatomy-key-note">{entry.text}</span>
+          </span>
+        </li>
+      ))
+    }
+  </ul>
+</snaplot-anatomy>
+
+<style is:global>
+  /* Shared by ChartAnatomy.astro and PlotAlignment.astro: the overlay's regions. */
+  .anatomy-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .anatomy-overlay [data-kind] {
+    transition: opacity 0.15s var(--snaplot-ease);
+  }
+  .anatomy-overlay .is-dim {
+    opacity: 0.08;
+  }
+  .anatomy-gutter {
+    fill: color-mix(in srgb, var(--snaplot-series-1) 9%, transparent);
+  }
+  .anatomy-label {
+    fill: color-mix(in srgb, var(--snaplot-series-1) 20%, transparent);
+    stroke: var(--snaplot-series-1);
+    stroke-width: 0.75;
+  }
+  .anatomy-tick {
+    fill: color-mix(in srgb, var(--snaplot-series-2) 38%, transparent);
+  }
+  .anatomy-edge {
+    fill: url(#anatomy-hatch);
+  }
+  .anatomy-hatch-line {
+    stroke: color-mix(in srgb, var(--snaplot-accent) 70%, transparent);
+    stroke-width: 1.5;
+  }
+  .anatomy-legend {
+    fill: color-mix(in srgb, var(--snaplot-ink-secondary) 14%, transparent);
+  }
+  .anatomy-plot {
+    fill: none;
+    stroke: var(--snaplot-ink);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+  }
+  .anatomy-guide-label {
+    stroke: var(--snaplot-accent);
+    stroke-width: 1.5;
+  }
+  .anatomy-guide-plot {
+    stroke: var(--snaplot-ink);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .anatomy-overlay [data-kind] {
+      transition: none;
+    }
+  }
+</style>
+
+<style>
+  .anatomy {
+    display: grid;
+    gap: 1rem;
+    margin-block: 1.5rem;
+  }
+  .anatomy-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    align-items: end;
+    font-size: var(--sl-text-sm);
+  }
+  .anatomy-controls fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+  .anatomy-controls legend,
+  .anatomy-range > span {
+    color: var(--snaplot-ink-secondary);
+    margin-block-end: 0.35rem;
+    padding: 0;
+  }
+  .anatomy-choice {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .anatomy-choice legend {
+    width: 100%;
+  }
+  /* Each option stretches to the row and centres its text, so options in another font line up. */
+  .anatomy-choice label {
+    position: relative;
+    display: flex;
+    cursor: pointer;
+  }
+  .anatomy-choice input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+  .anatomy-choice span {
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--snaplot-rule-strong);
+    margin-inline-start: -1px;
+    color: var(--snaplot-ink-secondary);
+    background: var(--snaplot-raised);
+  }
+  .anatomy-choice label:first-of-type span {
+    border-start-start-radius: var(--snaplot-radius-sm);
+    border-end-start-radius: var(--snaplot-radius-sm);
+    margin-inline-start: 0;
+  }
+  .anatomy-choice label:last-of-type span {
+    border-start-end-radius: var(--snaplot-radius-sm);
+    border-end-end-radius: var(--snaplot-radius-sm);
+  }
+  .anatomy-choice input:checked + span {
+    background: var(--snaplot-ink);
+    border-color: var(--snaplot-ink);
+    color: var(--snaplot-background);
+  }
+  .anatomy-choice input:focus-visible + span {
+    outline: 2px solid var(--snaplot-accent);
+    outline-offset: 2px;
+  }
+  .anatomy-choice label:hover input:not(:checked) + span {
+    color: var(--snaplot-ink);
+  }
+  .anatomy-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+  }
+  .anatomy-toggles legend {
+    width: 100%;
+  }
+  .anatomy-toggles label {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+    cursor: pointer;
+  }
+  .anatomy-toggles input,
+  .anatomy-range input {
+    accent-color: var(--snaplot-accent);
+  }
+  .anatomy-range {
+    display: grid;
+    grid-template-columns: minmax(8rem, 12rem) 5rem;
+    column-gap: 0.75rem;
+    align-items: center;
+  }
+  .anatomy-range > span {
+    grid-column: 1 / -1;
+  }
+  .anatomy-range output {
+    font-family: var(--snaplot-font-mono);
+    font-size: var(--sl-text-xs);
+  }
+  .anatomy-stage {
+    position: relative;
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius-sm);
+  }
+  .anatomy-chart {
+    height: 19rem;
+  }
+  .anatomy-key {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 0.25rem 1.5rem;
+  }
+  .anatomy-key li {
+    display: grid;
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+    gap: 0.6rem;
+    padding: 0.5rem 0.5rem;
+    margin: 0;
+    border-radius: var(--snaplot-radius-sm);
+    cursor: default;
+  }
+  .anatomy-key li:hover,
+  .anatomy-key li.is-active {
+    background: var(--snaplot-surface);
+  }
+  .anatomy-key li:focus-visible {
+    outline: 2px solid var(--snaplot-accent);
+    outline-offset: 1px;
+  }
+  .anatomy-key-text {
+    display: grid;
+    gap: 0.1rem;
+    font-size: var(--sl-text-sm);
+    line-height: 1.45;
+    min-width: 0;
+  }
+  .anatomy-key-text strong {
+    color: var(--snaplot-ink);
+  }
+  .anatomy-key-text .num {
+    font-family: var(--snaplot-font-mono);
+    font-size: var(--sl-text-xs);
+    color: var(--snaplot-ink);
+  }
+  .anatomy-key-note {
+    color: var(--snaplot-ink-secondary);
+  }
+  .anatomy-swatch {
+    width: 1.25rem;
+    height: 0.9rem;
+    margin-top: 0.2rem;
+    border-radius: 0;
+    border: 1px solid var(--snaplot-rule-strong);
+  }
+  .anatomy-swatch-plot {
+    border: 1px dashed var(--snaplot-ink);
+  }
+  .anatomy-swatch-gutter {
+    background: color-mix(in srgb, var(--snaplot-series-1) 12%, transparent);
+  }
+  .anatomy-swatch-label {
+    background: color-mix(in srgb, var(--snaplot-series-1) 24%, transparent);
+    border-color: var(--snaplot-series-1);
+  }
+  .anatomy-swatch-tick {
+    background: color-mix(in srgb, var(--snaplot-series-2) 38%, transparent);
+  }
+  .anatomy-swatch-edge {
+    background: repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--snaplot-accent) 70%, transparent) 0 1.5px,
+      transparent 1.5px 4px
+    );
+  }
+  .anatomy-swatch-legend {
+    background: color-mix(in srgb, var(--snaplot-ink-secondary) 16%, transparent);
+  }
+  @media (max-width: 40rem) {
+    .anatomy-chart {
+      height: 16rem;
+    }
+  }
+</style>
+
+<script>
+  import { defineChartAnatomy } from '../lib/chart-anatomy';
+
+  defineChartAnatomy();
+</script>

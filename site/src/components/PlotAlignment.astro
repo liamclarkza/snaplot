@@ -1,0 +1,145 @@
+---
+/**
+ * Two live charts whose y labels differ (chart-anatomy.mdx), each with a line where its labels
+ * start and a dashed line where its plot starts: measured on their own, linked by a group, or
+ * given the same minGutters.y (lib/chart-anatomy.ts). Its styles for the overlay come from
+ * ChartAnatomy.astro, which the page also renders.
+ */
+const CHOICES = [
+  { value: 'measured', text: 'Each as measured', checked: true },
+  { value: 'group', text: 'In a group' },
+  { value: 'min', text: 'minGutters: { y: 80 }' },
+];
+---
+
+<snaplot-plot-alignment class="alignment not-content">
+  <fieldset class="alignment-choice">
+    <legend>Line the plots up</legend>
+    {
+      CHOICES.map((choice) => (
+        <label>
+          <input type="radio" name="alignment" value={choice.value} checked={choice.checked} />
+          <span>{choice.text}</span>
+        </label>
+      ))
+    }
+  </fieldset>
+  <div class="alignment-charts">
+    <div class="alignment-stage">
+      <div class="alignment-chart" data-chart data-labels="decimal"></div>
+      <svg class="anatomy-overlay" aria-hidden="true" data-overlay>
+        <defs>
+          <pattern
+            id="alignment-hatch"
+            width="5"
+            height="5"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(45)"
+          >
+            <line x1="0" y1="0" x2="0" y2="5" class="anatomy-hatch-line"></line>
+          </pattern>
+        </defs>
+      </svg>
+    </div>
+    <div class="alignment-stage">
+      <div class="alignment-chart" data-chart data-labels="long"></div>
+      <svg class="anatomy-overlay" aria-hidden="true" data-overlay></svg>
+    </div>
+  </div>
+  <p class="alignment-readout" aria-live="polite" data-readout></p>
+</snaplot-plot-alignment>
+
+<style>
+  .alignment {
+    display: grid;
+    gap: 0.75rem;
+    margin-block: 1.5rem;
+  }
+  .alignment-choice {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--sl-text-sm);
+  }
+  .alignment-choice legend {
+    width: 100%;
+    padding: 0;
+    margin-block-end: 0.35rem;
+    color: var(--snaplot-ink-secondary);
+  }
+  /* Each option stretches to the row and centres its text, so options in another font line up. */
+  .alignment-choice label {
+    position: relative;
+    display: flex;
+    cursor: pointer;
+  }
+  .alignment-choice input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+  .alignment-choice span {
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--snaplot-rule-strong);
+    margin-inline-start: -1px;
+    color: var(--snaplot-ink-secondary);
+    background: var(--snaplot-raised);
+  }
+  .alignment-choice label:first-of-type span {
+    border-start-start-radius: var(--snaplot-radius-sm);
+    border-end-start-radius: var(--snaplot-radius-sm);
+    margin-inline-start: 0;
+  }
+  .alignment-choice label:last-of-type span {
+    border-start-end-radius: var(--snaplot-radius-sm);
+    border-end-end-radius: var(--snaplot-radius-sm);
+    font-family: var(--snaplot-font-mono);
+    font-size: var(--sl-text-xs);
+  }
+  .alignment-choice input:checked + span {
+    background: var(--snaplot-ink);
+    border-color: var(--snaplot-ink);
+    color: var(--snaplot-background);
+  }
+  .alignment-choice input:focus-visible + span {
+    outline: 2px solid var(--snaplot-accent);
+    outline-offset: 2px;
+  }
+  .alignment-choice label:hover input:not(:checked) + span {
+    color: var(--snaplot-ink);
+  }
+  .alignment-charts {
+    display: grid;
+    border: 1px solid var(--snaplot-rule);
+    border-radius: var(--snaplot-radius-sm);
+  }
+  .alignment-stage {
+    position: relative;
+  }
+  .alignment-stage + .alignment-stage {
+    border-top: 1px solid var(--snaplot-rule);
+  }
+  .alignment-chart {
+    height: 10rem;
+  }
+  .alignment-readout {
+    margin: 0;
+    font-size: var(--sl-text-sm);
+    color: var(--snaplot-ink-secondary);
+  }
+  :global(.anatomy-blank) {
+    fill: url(#alignment-hatch);
+  }
+</style>
+
+<script>
+  import { defineChartAnatomy } from '../lib/chart-anatomy';
+
+  defineChartAnatomy();
+</script>

@@ -99,7 +99,12 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Start',
-          items: [{ slug: 'introduction' }, { slug: 'first-chart' }, { slug: 'sizing' }],
+          items: [
+            { slug: 'introduction' },
+            { slug: 'first-chart' },
+            { slug: 'sizing' },
+            { slug: 'chart-anatomy' },
+          ],
         },
         {
           label: 'Frameworks',
