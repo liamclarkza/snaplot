@@ -65,7 +65,8 @@ describe('computeLayout edge margin', () => {
       { series: [], axes: { x: { title: 'Learning rate' }, y: {} } } as ChartSpec,
       scales,
     );
-    expect(base.axes.x.area.height).toBe(44);
+    // Tick 4 + gap 4 + a 16.8 px line + the 8 px edge margin, up to a whole pixel: no floor.
+    expect(base.axes.x.area.height).toBe(33);
     expect(titled.axes.x.area.height).toBe(58);
   });
 
@@ -112,7 +113,132 @@ describe('computeLayout edge margin', () => {
 
     const rightGutter = layout.width - layout.plot.left - layout.plot.width;
     expect(layout.plot.left).toBeGreaterThan(rightGutter);
-    expect(rightGutter).toBe(12);
+    // Half of 'SIN' and the edge margin, up to 8 px: the last label's overhang, not the Y axis.
+    expect(rightGutter).toBe(24);
+  });
+});
+
+describe('computeLayout: one rule for every side', () => {
+  // Edge margin + the larger of the side's own axis and the other axis's end labels, rounded up
+  // (left and right to 8 px), raised to the side's minimum. No floors.
+  const short = new Map<string, Scale>([
+    ['x', scale('x', [0, 5, 10])],
+    ['y', scale('y', [0, 1, 2])],
+  ]);
+  const gutters = (layout: ReturnType<typeof layoutFor>) => ({
+    top: layout.plot.top,
+    right: layout.width - layout.plot.left - layout.plot.width,
+    bottom: layout.height - layout.plot.top - layout.plot.height,
+    left: layout.plot.left,
+  });
+
+  it('measures every side from what it holds', () => {
+    const layout = layoutFor({ series: [], axes: { x: {}, y: {} } } as ChartSpec, short);
+    expect(gutters(layout)).toEqual({
+      // Half a label's height (0.6 × 12) and the edge margin.
+      top: Math.ceil(FONT_SIZE * 0.6 + EDGE_MARGIN),
+      // Half of '10' and the edge margin, up to 8 px.
+      right: Math.ceil((CHAR_W + EDGE_MARGIN) / 8) * 8,
+      // Tick, gap, a 16.8 px line and the edge margin.
+      bottom: Math.ceil(AXIS_TICK_LENGTH + AXIS_LABEL_GAP + FONT_SIZE * 1.4 + EDGE_MARGIN),
+      // '2', tick, gap and the edge margin, up to 8 px.
+      left: Math.ceil((CHAR_W + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + EDGE_MARGIN) / 8) * 8,
+    });
+  });
+
+  it('keeps the edge margin on a side that holds nothing', () => {
+    const layout = layoutFor({ series: [], axes: {} } as ChartSpec, short);
+    expect(gutters(layout)).toEqual({
+      top: EDGE_MARGIN,
+      right: EDGE_MARGIN,
+      bottom: EDGE_MARGIN,
+      left: EDGE_MARGIN,
+    });
+  });
+
+  it('gives the same blank before the labels whatever they say', () => {
+    const blank = (ticks: number[]) => {
+      const scales = new Map<string, Scale>([
+        ['x', scale('x', [0, 5, 10])],
+        ['y', scale('y', ticks)],
+      ]);
+      const layout = layoutFor({ series: [], axes: { x: {}, y: {} } } as ChartSpec, scales);
+      const label = String(Math.max(...ticks)).length * CHAR_W;
+      return layout.plot.left - AXIS_TICK_LENGTH - AXIS_LABEL_GAP - label;
+    };
+    // Within the 8 px rounding of each other, and never under the edge margin.
+    for (const ticks of [
+      [0, 1, 2],
+      [0, 50, 100],
+      [0, 5000, 10000],
+      [0, 500000, 1000000],
+    ]) {
+      expect(blank(ticks)).toBeGreaterThanOrEqual(EDGE_MARGIN);
+      expect(blank(ticks)).toBeLessThan(EDGE_MARGIN + 8);
+    }
+  });
+
+  it('raises the gutters holding each kind of axis to its minimum, and no others', () => {
+    const measured = gutters(layoutFor({ series: [], axes: { x: {}, y: {} } } as ChartSpec, short));
+    const layout = layoutFor(
+      { series: [], axes: { x: {}, y: {} }, minGutters: { x: 40, y: 64 } } as ChartSpec,
+      short,
+    );
+    // The y axis is on the left and the x axis below: the top and right hold no axis.
+    expect(gutters(layout)).toEqual({ ...measured, left: 64, bottom: 40 });
+  });
+
+  it('never narrows a gutter below what it holds', () => {
+    const measured = gutters(layoutFor({ series: [], axes: { x: {}, y: {} } } as ChartSpec, short));
+    const layout = layoutFor(
+      { series: [], axes: { x: {}, y: {} }, minGutters: { x: 1, y: 1 } } as ChartSpec,
+      short,
+    );
+    expect(gutters(layout)).toEqual(measured);
+  });
+
+  it('reaches a second y axis, which takes the same width as the first', () => {
+    const scales = new Map<string, Scale>([...short, ['y2', scale('y2', [0, 1, 2])]]);
+    const layout = layoutFor(
+      { series: [], axes: { x: {}, y: {}, y2: {} }, minGutters: { y: 64 } } as ChartSpec,
+      scales,
+    );
+    expect(gutters(layout).left).toBe(64);
+    expect(gutters(layout).right).toBe(64);
+  });
+
+  it('keeps no minimum on a side that holds no axis', () => {
+    const layout = layoutFor(
+      { series: [], axes: {}, minGutters: { x: 40, y: 64 } } as ChartSpec,
+      short,
+    );
+    expect(gutters(layout)).toEqual({
+      top: EDGE_MARGIN,
+      right: EDGE_MARGIN,
+      bottom: EDGE_MARGIN,
+      left: EDGE_MARGIN,
+    });
+  });
+
+  it("widens only its own side of a two-axis chart for a group's aligned gutter", () => {
+    const scales = new Map<string, Scale>([...short, ['y2', scale('y2', [0, 1, 2])]]);
+    const config = { series: [], axes: { x: {}, y: {}, y2: {} } } as ChartSpec;
+    const own = gutters(layoutFor(config, scales));
+    expect(own.left).toBe(own.right);
+    // Another member's wider labels set the group's left; this chart's right stays its own, so
+    // its plot ends where the others' do.
+    const layout = layoutFor(config, scales, { left: own.left + 40, right: own.right });
+    expect(gutters(layout).left).toBe(own.left + 40);
+    expect(gutters(layout).right).toBe(own.right);
+  });
+
+  it("takes a group's aligned gutter when it is wider than the minimum", () => {
+    const layout = layoutFor(
+      { series: [], axes: { x: {}, y: {} }, minGutters: { y: 64 } } as ChartSpec,
+      short,
+      { left: 80 },
+    );
+    expect(layout.plot.left).toBe(80);
   });
 });
 

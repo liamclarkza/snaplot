@@ -110,7 +110,7 @@ describe('[arch-15] removed options name their replacement', () => {
 
   it(
     '[arch-15] padding warns with its replacement',
-    removed('padding', { padding: { left: 60 } }, /padding/),
+    removed('padding', { padding: { left: 60 } }, /minGutters/),
   );
   it('[arch-15] width warns with its replacement', removed('width', { width: 640 }, /width/));
   it(

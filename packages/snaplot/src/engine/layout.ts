@@ -3,7 +3,6 @@ import {
   AXIS_LABEL_GAP,
   AXIS_TICK_LENGTH,
   AXIS_TITLE_GAP,
-  DEFAULT_PADDING,
   DEFAULT_TICK_COUNT,
   EDGE_MARGIN,
 } from '../constants';
@@ -15,10 +14,22 @@ import { colorScaleWidth, slicePanel } from './marks/index';
 import { DirtyFlag } from './spec';
 
 /**
- * Computes layout regions using the outside-in algorithm:
- * 1. Start with total container dimensions
- * 2. Reserve space for axes (measured from widest tick label)
- * 3. Plot area gets whatever remains
+ * Computes layout regions outside in: each side's gutter is measured from what it holds, and the
+ * plot gets whatever remains. One rule sizes every side:
+ *
+ *   gutter = max(minimum, ⌈EDGE_MARGIN + max(own axis, overhang)⌉)
+ *
+ * - own axis: the side's axis, if it has one: tick, label gap, its labels (the widest on the left
+ *   and right, one line on the top and bottom) and a title strip. 0 without an axis.
+ * - overhang: how far the other axis's end labels reach past the plot: half the first or last
+ *   horizontal label into the left and right, half a vertical label's height into the top and
+ *   bottom. Reserved whether or not a tick sits on the end, so the plot keeps its size while a
+ *   pan, a zoom or a stream moves the ticks.
+ * - ⌈ ⌉ rounds the left and right up to 8 px, so the plot does not jitter while labels change
+ *   width; the top and bottom (a line of text) up to a whole pixel.
+ * - minimum: on a side holding an axis, `minGutters.x` or `minGutters.y` for its kind of axis
+ *   (0 unless set). Two y axes then take the wider of their gutters, so a y minimum reaches both
+ *   sides. A group's aligned gutters (`PlotInsets`) apply after that, side by side.
  *
  * Viewport changes re-run this (tick labels depend on the domain), so it
  * must stay cheap: text is measured on a detached canvas, never through
@@ -79,23 +90,10 @@ export function inferPosition(key: string, explicit?: AxisPosition): AxisPositio
   return key === 'y' ? 'left' : 'right';
 }
 
-function horizontalFraction(scale: Scale, value: number): number {
-  let min = Math.min(scale.min, scale.max);
-  let max = Math.max(scale.min, scale.max);
-  let current = value;
-  if (scale.type === 'log' && min > 0 && max > 0 && current > 0) {
-    min = Math.log(min);
-    max = Math.log(max);
-    current = Math.log(current);
-  }
-  if (min === max) return 0.5;
-  return Math.max(0, Math.min(1, (current - min) / (max - min)));
-}
-
 /**
  * The minimum side gutters a chart group's `alignPlots` asks for (plan D17): the widest gutter of
- * any member, so every member's plot starts and ends at the same x. Omitted sides keep the
- * defaults (left 56, right 24); a measured gutter still grows past them.
+ * any member, so every member's plot starts and ends at the same x (a member's gutter already
+ * includes its own `minGutters`). A measured gutter still grows past them.
  */
 export interface PlotInsets {
   left?: number;
@@ -134,24 +132,21 @@ export function computeLayout(
    */
   slice: { side: 'right' | 'top'; size: number } | null = null,
 ): Layout {
-  // Under chrome (a legend above the plot) the top gutter only has to hold half the top tick
-  // label, so the legend sits with its plot rather than a blank band above it.
-  const padding: { top: number; right: number; bottom: number; left: number } = {
-    top: chrome.top > 0 ? Math.max(12, Math.ceil(fontSize * 0.6) + 4) : DEFAULT_PADDING.top,
-    right: insets.right ?? DEFAULT_PADDING.right,
-    bottom: DEFAULT_PADDING.bottom,
-    left: insets.left ?? DEFAULT_PADDING.left,
-  };
-
-  // Accumulate space needed per side from all configured axes
-  let leftAxisWidth = padding.left;
-  let rightAxisWidth = padding.right;
-  let bottomAxisHeight = padding.bottom;
-  let topAxisHeight = padding.top;
+  // Every side starts at the edge margin: a side with nothing to hold still keeps the plot's own
+  // ink off the container's edge. The measures below only grow them, and a side holding an axis
+  // grows to at least that kind of axis's minimum. A group's aligned gutters come last.
+  const minX = config.minGutters?.x ?? 0;
+  const minY = config.minGutters?.y ?? 0;
+  let leftAxisWidth = EDGE_MARGIN;
+  let rightAxisWidth = EDGE_MARGIN;
+  let bottomAxisHeight = EDGE_MARGIN;
+  let topAxisHeight = EDGE_MARGIN;
 
   const lineHeight = fontSize * 1.4;
-  // Axis titles live in a distinct outer strip. Padding is the minimum total
-  // gutter on every side; title space is not added on top of caller padding.
+  // How far a vertical axis's label reaches above or below its tick (the renderer's fitting
+  // measure too): the overhang an end label puts into the top or bottom gutter.
+  const labelHalfHeight = fontSize * 0.6;
+  // Axis titles live in a distinct outer strip, beyond the tick labels.
   const titleStrip = EDGE_MARGIN + lineHeight + AXIS_TITLE_GAP;
 
   const formats: FormatContext = { config, scales };
@@ -161,12 +156,10 @@ export function computeLayout(
   const axisConfigs = config.axes ?? {};
   let hasLeftAxis = false;
   let hasRightAxis = false;
-  const horizontalEdges: Array<{
-    firstHalf: number;
-    lastHalf: number;
-    firstFraction: number;
-    lastFraction: number;
-  }> = [];
+  // Half the first and last label of each horizontal axis.
+  const horizontalEdges: Array<{ firstHalf: number; lastHalf: number }> = [];
+  // Whether any vertical axis (or a colour scale) draws labels centred on its ticks.
+  let verticalLabels = colorScale > 0;
 
   for (const [key, ac] of Object.entries(axisConfigs)) {
     const pos = inferPosition(key, ac.position);
@@ -194,12 +187,17 @@ export function computeLayout(
         const width = measureLabel(format(t), fontFamily, fontSize);
         if (width > maxWidth) maxWidth = width;
       }
+      // Category labels sit inside their slots, so they reach no further than the plot.
+      if (ticks.length > 0 && !ac.thinTicks) verticalLabels = true;
       // Tick mark + label gap + label width + optional title strip, rounded
       // up to an 8px step. Quantizing keeps the gutter stable while tick
       // labels shift by a character during pan/zoom, so the plot rect does
       // not jitter and the layout stays reusable across gesture frames.
       const titleSpace = ac.title ? titleStrip : EDGE_MARGIN;
-      const needed = Math.ceil((maxWidth + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + titleSpace) / 8) * 8;
+      const needed = Math.max(
+        minY,
+        Math.ceil((maxWidth + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + titleSpace) / 8) * 8,
+      );
       if (pos === 'left') {
         leftAxisWidth = Math.max(leftAxisWidth, needed);
       } else {
@@ -218,32 +216,37 @@ export function computeLayout(
       if (ticks.length > 0 && !ac.thinTicks) {
         const firstHalf = measureLabel(format(ticks[0]), fontFamily, fontSize) / 2;
         const lastHalf = measureLabel(format(ticks[ticks.length - 1]), fontFamily, fontSize) / 2;
-        // A sliding window's ticks cross both edges as it moves: reserve each end's whole
-        // overhang, as if a tick sat on it, so the plot keeps its width instead of narrowing
-        // while a label nears an edge and widening once it has gone.
+        // A sliding window's labels cross both edges as it moves: each end reserves the wider
+        // label, and the reservation only grows while the window slides (a label gaining a digit
+        // as the values cross 100,000,000), so the plot moves once, not back and forth.
         const slide = sliding.get(key);
-        const slides = slide !== undefined;
-        // The reservation only grows while the window slides (a label gaining a digit as the
-        // values cross 100,000,000), so the plot moves once, not back and forth.
         const half = Math.max(firstHalf, lastHalf, slide?.half ?? 0);
         if (slide) slide.half = half;
-        horizontalEdges.push({
-          firstHalf: slides ? half : firstHalf,
-          lastHalf: slides ? half : lastHalf,
-          firstFraction: slides ? 0 : horizontalFraction(scale, ticks[0]),
-          lastFraction: slides ? 1 : horizontalFraction(scale, ticks[ticks.length - 1]),
-        });
+        horizontalEdges.push(slide ? { firstHalf: half, lastHalf: half } : { firstHalf, lastHalf });
       }
-      const needed = Math.ceil(
-        AXIS_TICK_LENGTH +
-          AXIS_LABEL_GAP +
-          lineHeight +
-          (ac.title ? AXIS_TITLE_GAP + lineHeight : 0) +
-          EDGE_MARGIN,
+      const needed = Math.max(
+        minX,
+        Math.ceil(
+          AXIS_TICK_LENGTH +
+            AXIS_LABEL_GAP +
+            lineHeight +
+            (ac.title ? AXIS_TITLE_GAP + lineHeight : 0) +
+            EDGE_MARGIN,
+        ),
       );
       if (pos === 'bottom') bottomAxisHeight = Math.max(bottomAxisHeight, needed);
       else topAxisHeight = Math.max(topAxisHeight, needed);
     }
+  }
+
+  // A vertical label is centred on its tick, so the end labels reach half a label past the plot's
+  // top and bottom. Reserved whether or not a tick sits on the end: a vertical domain follows the
+  // data while streaming, and a gutter that tracked its end tick would make the plot's height
+  // jitter. The top under a legend keeps the same edge margin from the legend.
+  if (verticalLabels) {
+    const overhang = Math.ceil(labelHalfHeight + EDGE_MARGIN);
+    topAxisHeight = Math.max(topAxisHeight, overhang);
+    bottomAxisHeight = Math.max(bottomAxisHeight, overhang);
   }
 
   // Symmetric: when both left and right axes have labels, use the wider for both
@@ -275,29 +278,20 @@ export function computeLayout(
   )
     sliceTop = 0;
 
-  // Horizontal tick labels are centred on their ticks. Only reserve the part
-  // that would actually escape the plot: bar categories and histogram bin
-  // ticks are inset by their geometry, while an exact domain endpoint still
-  // needs half its label outside the plot. Two cheap passes account for the
-  // small plot-width change introduced by the first reservation.
-  for (let pass = 0; pass < 2; pass++) {
-    const provisionalWidth = Math.max(0, containerWidth - leftAxisWidth - rightAxisWidth);
-    let requiredLeft = leftAxisWidth;
-    let requiredRight = rightAxisWidth;
-    for (const edge of horizontalEdges) {
-      const leftOverflow = edge.firstHalf - edge.firstFraction * provisionalWidth;
-      const rightOverflow = edge.lastHalf - (1 - edge.lastFraction) * provisionalWidth;
-      if (leftOverflow > 0) {
-        requiredLeft = Math.max(requiredLeft, Math.ceil(leftOverflow + EDGE_MARGIN));
-      }
-      if (rightOverflow > 0) {
-        requiredRight = Math.max(requiredRight, Math.ceil(rightOverflow + EDGE_MARGIN));
-      }
-    }
-    if (requiredLeft === leftAxisWidth && requiredRight === rightAxisWidth) break;
-    leftAxisWidth = requiredLeft;
-    rightAxisWidth = requiredRight;
+  // Horizontal tick labels are centred on their ticks, so the end labels reach half a label past
+  // the plot's left and right. Reserved whether or not a tick sits on the end, as the vertical
+  // labels' are, and rounded up to 8 px as the axes beside them are: the plot keeps its width while
+  // a pan, a zoom or a stream moves the ticks along.
+  for (const edge of horizontalEdges) {
+    leftAxisWidth = Math.max(leftAxisWidth, Math.ceil((edge.firstHalf + EDGE_MARGIN) / 8) * 8);
+    rightAxisWidth = Math.max(rightAxisWidth, Math.ceil((edge.lastHalf + EDGE_MARGIN) / 8) * 8);
   }
+
+  // A group's aligned gutters, after everything the chart measures (they are the widest members'
+  // measures): a chart with two y axes keeps its own right side when only the left must widen to
+  // line up, so its plot still ends where the others' do.
+  leftAxisWidth = Math.max(leftAxisWidth, insets.left ?? 0);
+  rightAxisWidth = Math.max(rightAxisWidth, insets.right ?? 0);
 
   const plotLeft = leftAxisWidth;
   const plotTop = chrome.top + sliceTop + topAxisHeight;
@@ -605,6 +599,7 @@ export function createLayoutCacheKey(engine: ChartCore, width: number, height: n
     engine.theme.fontSize,
     engine.plotInsets.left,
     engine.plotInsets.right,
+    gutterKey(engine.config.minGutters),
     engine.canvasManager.reservedChrome('top'),
     engine.canvasManager.reservedChrome('bottom'),
     slidingNow(engine).size ? [...slidingNow(engine).keys()].join(',') : '',
@@ -613,6 +608,9 @@ export function createLayoutCacheKey(engine: ChartCore, width: number, height: n
     axes,
   ].join('|');
 }
+
+const gutterKey = (min: ChartSpec['minGutters']): string =>
+  min ? `${min.x ?? ''},${min.y ?? ''}` : '';
 
 /** The width a heatmap's colour scale takes, measured as the axes' labels are. */
 function colorScaleReserve(engine: ChartCore): number {

@@ -630,6 +630,20 @@ export interface LegendOptions {
   position?: 'top' | 'bottom';
 }
 
+/** The least room the gutters that hold each kind of axis keep, in CSS pixels. */
+export interface MinGutters {
+  /**
+   * The gutter that holds an x axis: its height below the plot, or above it for an x axis
+   * placed on top.
+   */
+  x?: number;
+  /**
+   * Each gutter that holds a y axis: its width left of the plot, and right of it for a second
+   * y axis. Two y axes always take the same width, so the plot stays centred between them.
+   */
+  y?: number;
+}
+
 /** Streaming with `appendData`. */
 export interface StreamingOptions {
   /** Keep at most this many rows per source; older rows are dropped. @defaultValue unbounded */
@@ -783,6 +797,14 @@ export interface ChartOptions<Row = Record<string, any>> {
   theme?: 'auto' | 'light' | 'dark' | ThemeTokens;
   /** The built-in legend: `'auto'` shows it for two or more series. @defaultValue `'auto'` */
   legend?: boolean | 'auto' | LegendOptions;
+  /**
+   * The least room the gutters that hold the axes keep, in CSS pixels. A gutter is measured from
+   * what it holds (its axis's ticks, labels and title, and the ends of the other axis's labels)
+   * plus an 8 px margin from the edge; a minimum makes it at least that wide. Give charts stacked
+   * outside a group the same `y` to line up their plots.
+   * @defaultValue `{}`, every gutter as measured
+   */
+  minGutters?: MinGutters;
   /**
    * The locale of numbers and dates (BCP 47).
    * @defaultValue the page's `lang`, else the runtime's

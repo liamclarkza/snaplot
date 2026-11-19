@@ -179,19 +179,6 @@ export const DARK_THEME: ThemeConfig = {
   tooltipBorderColor: 'rgba(255, 255, 255, 0.1)',
 };
 
-/**
- * Default padding around the plot area (CSS pixels).
- * Based on 8px grid: top/right get 24px breathing room,
- * bottom gets 44px for x-axis labels + tick marks,
- * left gets 56px for y-axis labels (measured dynamically but this is the minimum).
- */
-export const DEFAULT_PADDING = {
-  top: 24,
-  right: 24,
-  bottom: 44,
-  left: 56,
-} as const;
-
 /** Minimum gap between axis labels (CSS pixels) */
 export const LABEL_MIN_GAP = 12;
 

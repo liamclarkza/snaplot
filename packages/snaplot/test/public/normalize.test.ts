@@ -892,3 +892,66 @@ describe('options whose behaviour lands later are accepted quietly', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe('minGutters', () => {
+  const base = { data: rows, x: 't', series: [{ y: 'cpu' }] };
+  const gutters = (chart: ChartHandle<any>) => {
+    const { width, height, plot } = debug(chart).layout;
+    return {
+      top: plot.top,
+      right: width - plot.left - plot.width,
+      bottom: height - plot.top - plot.height,
+      left: plot.left,
+    };
+  };
+
+  it('raises the gutters holding the x and y axes and leaves the others as measured', () => {
+    const measured = gutters(mount(base));
+    const chart = mount({ ...base, minGutters: { y: 96, x: 48 } });
+    expect(gutters(chart)).toEqual({ ...measured, left: 96, bottom: 48 });
+  });
+
+  it('never narrows a gutter below what it holds', () => {
+    const measured = gutters(mount(base));
+    expect(gutters(mount({ ...base, minGutters: { x: 1, y: 1 } }))).toEqual(measured);
+  });
+
+  it('reaches a second y axis', () => {
+    const chart = mount({
+      data: rows,
+      x: 't',
+      series: [{ y: 'cpu' }, { y: 'mem', yAxis: 'y2' }],
+      minGutters: { y: 96 },
+    });
+    expect(gutters(chart).left).toBe(96);
+    expect(gutters(chart).right).toBe(96);
+  });
+
+  it('applies and clears through update()', () => {
+    const chart = mount(base);
+    const measured = gutters(chart);
+    chart.update({ minGutters: { y: 120 } });
+    fakes.frames.flush();
+    expect(gutters(chart).left).toBe(120);
+    chart.update({ minGutters: undefined });
+    fakes.frames.flush();
+    expect(gutters(chart)).toEqual(measured);
+  });
+
+  it('warns about an invalid value or a side name, and ignores it', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const measured = gutters(mount(base));
+    const chart = mount({ ...base, minGutters: { y: -8, x: 'wide', left: 64 } });
+    expect(gutters(chart)).toEqual(measured);
+    const text = warn.mock.calls.map((call) => String(call[0])).join('\n');
+    expect(text).toMatch(/minGutters\.y -8 is not valid and is ignored/);
+    expect(text).toMatch(/minGutters\.x/);
+    expect(text).toMatch(/minGutters\.left/);
+  });
+
+  it('throws for a value that is not an object of axes', () => {
+    expect(thrown(() => mount({ ...base, minGutters: 64 }))).toMatch(
+      /minGutters must be an object of axes/,
+    );
+  });
+});

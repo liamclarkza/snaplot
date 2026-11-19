@@ -37,6 +37,24 @@ describe('[dataapi-01][frameworks-06][interact-01] the final group model', () =>
     expect(debug(a).plot.left).toBe(debug(b).plot.left);
   });
 
+  it('lines up both plot edges of a member with two y axes and one with one', () => {
+    const group = createChartGroup();
+    const a = mount<Row>(fakes, {
+      data: rows(21),
+      x: 't',
+      series: [{ y: 'cpu' }, { y: 'disk', yAxis: 'y2' }],
+      group,
+    });
+    const b = mount<Row>(fakes, { data: rows(21), x: 't', series: [{ y: 'mem' }], group });
+    const edges = (chart: FinalHandle<Row>) => {
+      const { left, width } = debug(chart).plot;
+      return [left, left + width];
+    };
+    // b's wider labels set the left, a's second axis the right: both plots span the same x.
+    expect(edges(a)).toEqual(edges(b));
+    expect(debug(a).plot.left).toBeGreaterThan(debug(a).layout.width - edges(a)[1]);
+  });
+
   it('[frameworks-06][interact-01] a peer reports only the axes it pins, never its own Y', () => {
     const group = createChartGroup();
     const onViewportChange = vi.fn();

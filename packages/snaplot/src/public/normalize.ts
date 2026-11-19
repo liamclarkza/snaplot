@@ -35,6 +35,7 @@ import {
   HEATMAP_ONLY,
   INTERACTION,
   INTERPOLATIONS,
+  GUTTERS,
   type Keys,
   LEGEND,
   LINE,
@@ -319,6 +320,19 @@ export function normalize<Row>(input: ChartOptions<Row>): NormalizedOptions<Row>
         )!,
       };
     } else fail(`legend must be true, false, 'auto' or { position }, not ${describe(raw.legend)}.`);
+  }
+  if (raw.minGutters !== undefined) {
+    if (!isPlain(raw.minGutters))
+      fail(
+        `minGutters must be an object of axes, such as { y: 64 }, not ${describe(raw.minGutters)}.`,
+      );
+    checkKeys(raw.minGutters, GUTTERS, 'minGutters');
+    const axes: NonNullable<ChartSpec['minGutters']> = {};
+    for (const axis of ['x', 'y'] as const) {
+      const px = finiteOption(raw.minGutters[axis], `minGutters.${axis}`);
+      if (px !== undefined) axes[axis] = px;
+    }
+    engine.minGutters = axes;
   }
   // Options whose behaviour later milestones land, as final spec fields (plan §3.2).
   engine.legend = legend;

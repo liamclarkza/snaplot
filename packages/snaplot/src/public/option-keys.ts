@@ -40,6 +40,7 @@ export const TOP = keys(
   'tooltip',
   'theme',
   'legend',
+  'minGutters',
   'locale',
   'timeZone',
   'viewport',
@@ -129,6 +130,7 @@ export const THEME_TOKENS = keys(
   'fontSize',
 );
 export const LEGEND = keys('position');
+export const GUTTERS = keys('x', 'y');
 export const LINE = keys('axis', 'value', 'label', 'color', 'dash', 'lineWidth');
 export const REGION = keys('axis', 'from', 'to', 'label', 'color', 'opacity');
 export const COLOR_BY = keys('field', 'type', 'palette', 'domain', 'label', 'format');
@@ -148,7 +150,8 @@ export const HINTS: Record<string, string> = {
   // Top level.
   width: 'Removed in 0.13: size the container with CSS; the chart follows it.',
   autoResize: 'Removed in 0.13: charts always follow their container.',
-  padding: 'Removed in 0.13: the gutters are measured from the axis labels.',
+  padding:
+    'Removed in 0.13: the gutters are measured from the axis labels; minGutters: { x, y } sets the least room they keep.',
   zoom: "Removed in 0.13: use interaction: { zoom: 'x' | 'xy' | 'none', bounds }.",
   'zoom.onZoom': 'Observe zoom with onViewportChange.',
   pan: "Removed in 0.13: use interaction: { drag: 'pan' }; panning follows interaction.zoom.",

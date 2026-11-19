@@ -695,6 +695,8 @@ export interface ChartSpec<TMeta = unknown> {
   interaction?: InteractionSpec;
   /** The public `legend` option (M8's automatic legend and M12b's views read it). */
   legend?: boolean | 'auto' | { position: 'top' | 'bottom' };
+  /** The public `minGutters`: the least room the gutters holding x and y axes keep (layout.ts). */
+  minGutters?: { x?: number; y?: number };
   /** BCP 47 locale for ticks and readouts; unset uses the runtime's (M10 reads it). */
   locale?: string;
   /**

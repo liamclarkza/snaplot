@@ -33,6 +33,7 @@ export const OPTION_KEYS = [
   'tooltip',
   'theme',
   'legend',
+  'minGutters',
   'locale',
   'timeZone',
   'viewport',

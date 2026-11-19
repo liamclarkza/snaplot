@@ -6,6 +6,34 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- One rule sizes every gutter around the plot: the 8 px edge margin plus the larger of the side's
+  own axis (tick, gap, labels and title) and how far the other axis's end labels reach past the
+  plot, rounded up to 8 px on the left and right and to a whole pixel on the top and bottom. The
+  fixed minimums (56 px left, 24 px right and top, 44 px bottom) are gone, so the space before
+  the tick labels is the same whatever they say, and a chart with short labels gets a wider plot.
+  The top gutter is now measured too: half a label's height and the edge margin, also under a
+  legend (15 px at 11 px labels, was 12). The end x labels' overhang is reserved whether or not a
+  tick sits on the end, so a pan no longer narrows the plot on its first frame. Every chart's plot
+  moves or grows a little (visual ledger V67).
+
+### Added
+
+- `minGutters: { x, y }`: the least room the gutters that hold the axes keep, in CSS pixels. `y`
+  is the width of each gutter holding a y axis (the left, and the right too with a second y axis,
+  since two y axes take the same width), and `x` the height of the one holding the x axis. Give
+  charts stacked outside a group the same `y` to line up their plots. A gutter that needs more
+  keeps what it needs.
+- A Chart anatomy page in the docs: the plot, the gutters and the rule that sizes them, drawn over
+  live charts.
+
+### Fixed
+
+- In a chart group, a member with two y axes lines up on both edges with members that have one.
+  `alignPlots` widened both of its sides to the widest member's left gutter, so its plot ended
+  short of the others'; now each side takes the group's gutter for that side.
+
 ## [0.15.0] - 2026-11-14
 
 ### Added
