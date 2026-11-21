@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-21
+
 ### Changed
 
 - The left and right gutters round up to a whole pixel, as the top and bottom do, instead of to
