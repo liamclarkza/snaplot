@@ -21,6 +21,9 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Tick labels with a comma or a point are measured as wide as they are drawn. Labels use tabular
+  figures, which a font does not kern, but the measure kerned its digits against the punctuation:
+  `1,000,000` came out about 2 px short, which the 8 px rounding used to hide.
 - The Chart anatomy page's figure for lining up plots boxes the lower chart's labels when you
   scroll down to it; it drew that chart before it painted.
 

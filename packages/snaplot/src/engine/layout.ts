@@ -51,7 +51,9 @@ let lastWidths: Map<string, number> | null = null;
 
 /**
  * The width of a label as the DOM shows it, in CSS pixels. Labels use tabular figures, which the
- * canvas cannot set: every digit is measured as a `0`, the width tabular digits share.
+ * canvas cannot set: every digit counts as a `0`, the width tabular digits share, and the rest of
+ * the label is measured on its own. A font kerns its proportional digits against a comma or a
+ * point but not its tabular ones, so measuring `0,000` whole comes out short of the label drawn.
  */
 export function measureLabel(text: string, fontFamily: string, fontSize: number): number {
   if (typeof document === 'undefined') return text.length * 7;
@@ -73,7 +75,11 @@ export function measureLabel(text: string, fontFamily: string, fontSize: number)
     if (!measureCtx) return text.length * 7;
   }
   measureCtx.font = fontSize + 'px ' + fontFamily;
-  const width = measureCtx.measureText(text.replace(/\d/g, '0')).width;
+  const rest = text.replace(/\d/g, '');
+  const digits = text.length - rest.length;
+  const width =
+    (digits > 0 ? digits * measureCtx.measureText('0').width : 0) +
+    (rest ? measureCtx.measureText(rest).width : 0);
 
   if (lastWidths.size >= MEASURE_CACHE_MAX) lastWidths.clear();
   lastWidths.set(text, width);

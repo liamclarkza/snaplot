@@ -47,6 +47,33 @@ test.describe('axis label measurement', () => {
     for (const label of yLabels) expect(label.left - (host?.left ?? 0)).toBeGreaterThanOrEqual(6);
   });
 
+  // The gutter rounds up to a whole pixel, so a label measured short of what the page draws would
+  // reach into the edge margin. A font kerns its proportional digits against a comma or a point
+  // but not its tabular ones: `1,000,000` measured whole on the canvas came out 1.7 px short.
+  for (const [name, values, pattern] of [
+    ['commas', [90_000, 600_000, 1_180_000], /,/],
+    ['points', [0.0164, 0.021, 0.0256], /^0\.0\d+$/],
+  ] as const) {
+    test(`y labels with ${name} start the edge margin from the edge, to within a pixel`, async ({
+      harnessPage: page,
+    }) => {
+      await page.evaluate((values) => {
+        window.harness.mount({
+          data: values.map((v, t) => ({ t, v })),
+          x: 't',
+          series: [{ y: 'v' }],
+        });
+      }, values);
+      await settle(page);
+      const { host, labels } = await labelRects(page);
+      const yLabels = labels.filter((label) => pattern.test(label.text));
+      expect(yLabels.length).toBeGreaterThan(0);
+      const start = Math.min(...yLabels.map((label) => label.left)) - (host?.left ?? 0);
+      expect(start).toBeGreaterThanOrEqual(8 - 0.05);
+      expect(start).toBeLessThan(9);
+    });
+  }
+
   test('[gap-environments-07] a 24 px minimum label font keeps every label inside the container', async ({
     harnessPage: page,
   }) => {
