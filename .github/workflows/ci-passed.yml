@@ -1,0 +1,53 @@
+name: CI passed
+
+# Publishing and deploying reuse the CI run `main` already had for their commit instead of running
+# every gate again: this waits for that run (ci.yml, on `main`) to finish and fails unless it
+# passed. So `git push --follow-tags` works: the tag's publish waits for the push's CI.
+#
+# The commit is the one that triggered the caller, or, for a workflow_run trigger, the commit of
+# the run that triggered it. A commit with no CI run on `main` (a tag on a commit `main` does not
+# have) fails after five minutes; run ci.yml on `main` by hand for a commit whose push skipped it.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI on main passed for this commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Wait for the commit's CI run on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 300))
+          while true; do
+            run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main \
+              --commit "$SHA" --limit 1 --json status,conclusion,url --jq '.[0] // empty')
+            if [[ -n "$run" ]]; then
+              url=$(jq -r .url <<<"$run")
+              if [[ $(jq -r .status <<<"$run") == completed ]]; then
+                conclusion=$(jq -r .conclusion <<<"$run")
+                if [[ "$conclusion" == success ]]; then
+                  echo "CI passed for $SHA: $url"
+                  exit 0
+                fi
+                echo "::error::CI for $SHA concluded '$conclusion': $url"
+                exit 1
+              fi
+              echo "Waiting for $url"
+            elif ((SECONDS > deadline)); then
+              echo "::error::No CI run on main for $SHA. Push the commit to main before tagging it."
+              exit 1
+            fi
+            sleep 30
+          done

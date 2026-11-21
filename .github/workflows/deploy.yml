@@ -1,15 +1,18 @@
 name: Deploy docs
 
 # Builds the library, then the docs site, and deploys it to GitHub Pages (D32: the docs follow
-# npm). It runs after the full CI workflow passes, and refuses to deploy a version that npm does
-# not serve yet: a prerelease must be `snaplot@next`, a release `snaplot@latest` (D1).
+# npm). It needs the CI run `main` had for its commit to have passed (ci-passed.yml), and refuses
+# to deploy a version that npm does not serve: a prerelease must be `snaplot@next`, a release
+# `snaplot@latest` (D1).
 #
-# Runs on version tags (D32) and by manual dispatch.
+# Runs when Publish & Release passes, for the tagged commit, and by manual dispatch on `main`.
+# It runs from `main` either way: the github-pages environment deploys only from `main`.
 
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
+  workflow_run:
+    workflows: ['Publish & Release']
+    types: [completed]
 
 permissions:
   contents: read
@@ -21,7 +24,12 @@ concurrency:
 
 jobs:
   ci:
-    uses: ./.github/workflows/ci.yml
+    # A failed or cancelled publish deploys nothing.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    uses: ./.github/workflows/ci-passed.yml
+    permissions:
+      actions: read
+      contents: read
 
   build:
     name: Build the site
@@ -29,20 +37,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The tagged commit after a publish; `main` when dispatched.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
       - name: Refuse a version npm does not serve yet
+        env:
+          # Just after a publish npm can take a minute or two to serve the version.
+          ATTEMPTS: ${{ github.event_name == 'workflow_run' && 20 || 1 }}
         run: |
           VERSION=$(node -p "require('./packages/snaplot/package.json').version")
           if [[ "$VERSION" == *-* ]]; then TAG=next; else TAG=latest; fi
-          PUBLISHED=$(npm view "snaplot@$TAG" version 2>/dev/null || true)
-          if [[ "$PUBLISHED" != "$VERSION" ]]; then
-            echo "::error::snaplot@$TAG on npm is '${PUBLISHED:-none}', not $VERSION. Publish first (scripts/release.sh), then deploy the docs."
-            exit 1
-          fi
-          echo "Deploying the docs for snaplot@$TAG = $VERSION."
+          for ((i = 1; i <= ATTEMPTS; i++)); do
+            PUBLISHED=$(npm view "snaplot@$TAG" version 2>/dev/null || true)
+            if [[ "$PUBLISHED" == "$VERSION" ]]; then
+              echo "Deploying the docs for snaplot@$TAG = $VERSION."
+              exit 0
+            fi
+            if ((i < ATTEMPTS)); then sleep 15; fi
+          done
+          echo "::error::snaplot@$TAG on npm is '${PUBLISHED:-none}', not $VERSION. Publish first (scripts/release.sh), then deploy the docs."
+          exit 1
       - run: npm ci
       - run: npm run build
       - name: Build the site

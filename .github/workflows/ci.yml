@@ -1,19 +1,20 @@
 name: CI
 
 # The quality gates (plan §11.3), one job per gate, running the same commands as
-# `npm run verify` and the gate scripts do locally. deploy.yml and publish.yml call this
-# workflow and `needs:` it, so nothing deploys or publishes unless every blocking job passes.
+# `npm run verify` and the gate scripts do locally. publish.yml and deploy.yml do not run it
+# again: they wait for this workflow's run on `main` for their commit (ci-passed.yml) and stop
+# unless it passed.
 #
 # Blocking: lint (G1), types (G2), unit (G3), ledger (G4), package (G5), size (G6), api (G7),
 # palettes (G8, advisory inside the script until M11), browser (G9), geometry (G10),
 # docs (G11), conformance (from M13).
-# Advisory: visual (G10 screenshots, blocking from M14) and bench (G12).
+# Advisory: bench (G12). The G10 screenshots are compared locally against a ref
+# (`npm run test:visual -- --against <ref>`), not in CI.
 
 on:
   push:
     branches: [main]
   pull_request:
-  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -213,7 +214,7 @@ jobs:
   geometry:
     name: Geometry (G10)
     runs-on: ubuntu-latest
-    # The same image as the visual job: the 24 px minimum-font fixture needs full Chromium.
+    # The pinned Playwright image: the 24 px minimum-font fixture needs full Chromium.
     container: mcr.microsoft.com/playwright:v1.61.1-noble
     steps:
       - uses: actions/checkout@v6
@@ -222,8 +223,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Label and ink checks on the fixture app (built from source); they need no baselines,
-      # so they block on every platform while the screenshots stay advisory.
+      # Label and ink checks on the fixture app (built from source); they need no baselines.
       - run: npx playwright test --project geometry
         working-directory: packages/snaplot
       - uses: actions/upload-artifact@v7
@@ -235,33 +235,6 @@ jobs:
             packages/snaplot/test-results/
           if-no-files-found: ignore
           retention-days: 7
-
-  visual:
-    name: Visual (G10, advisory until M14)
-    runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.61.1-noble
-    # Report-only until M14 approves the final baselines; M14 removes this line.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      # Compares against the committed Linux baselines (refresh them with update-snapshots.yml).
-      - run: npx playwright test --project visual
-        working-directory: packages/snaplot
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: visual-report
-          path: |
-            packages/snaplot/playwright-report/
-            packages/snaplot/test-results/
-          if-no-files-found: ignore
-          retention-days: 14
 
   bench:
     name: Bench A/B (G12, advisory)

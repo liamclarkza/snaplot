@@ -9,8 +9,8 @@ over one fixture app:
   blocking on every platform.
 
 Agents run them in local macOS Chromium. The committed baselines are the `-darwin` set.
-`scripts/visual-docker.sh` is the optional Linux path for CI and the `update-snapshots` workflow, which
-produce the `-linux` set.
+`scripts/visual-docker.sh` is the optional Linux path, which produces the `-linux` set. CI runs only
+the geometry checks; compare screenshots locally with `npm run test:visual -- --against <ref>`.
 
 ## Commands
 

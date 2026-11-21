@@ -13,9 +13,10 @@
 #
 #   git push --follow-tags
 #
-# The tag push triggers .github/workflows/publish.yml: the CI gates, the package, size and API
-# gates again, then npm publish (`--tag next` and a GitHub prerelease for X.Y.Z-beta.N,
-# `latest` otherwise) and a GitHub Release.
+# The tag push triggers .github/workflows/publish.yml: it waits for the commit's CI run on main
+# to pass, runs the package, size and API gates again, then npm publish (`--tag next` and a
+# GitHub prerelease for X.Y.Z-beta.N, `latest` otherwise) and a GitHub Release. When it passes,
+# deploy.yml deploys the docs.
 
 set -euo pipefail
 
@@ -196,5 +197,5 @@ To ship, push the commit and tag together:
 
     git push --follow-tags
 
-The tag push triggers: CI gates → verify → npm publish --tag $dist_tag → GitHub Release.
+The tag push triggers: CI on main passes → verify → npm publish --tag $dist_tag → GitHub Release → docs deploy.
 EOF

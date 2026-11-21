@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Optional Linux path for the visual gate (plan §11.3 G10). Agents run `npm run test:visual` in
-# local macOS Chromium (EXECUTION.md rule 1) and never need this script. CI and the maintainer's
-# `update-snapshots` workflow use it to compare or refresh the `-linux` baselines in the pinned
-# Playwright image, without touching the host's darwin node_modules.
+# local macOS Chromium (EXECUTION.md rule 1) and never need this script. It compares against or
+# refreshes the `-linux` baselines in the pinned Playwright image, without touching the host's
+# darwin node_modules. CI no longer runs the screenshots; it runs only the geometry checks.
 #
 #   scripts/visual-docker.sh [--against <ref>] [--update] [--platform linux/amd64|linux/arm64]
 #                            [-- <args for npm run test:visual>]

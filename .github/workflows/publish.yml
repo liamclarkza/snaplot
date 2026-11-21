@@ -2,7 +2,8 @@ name: Publish & Release
 
 # Single entry point driven by version tags (scripts/release.sh). A `vX.Y.Z` or `vX.Y.Z-beta.N`
 # push runs:
-#   1. ci: the full CI workflow (every blocking gate).
+#   1. ci: waits for the CI run `main` had for the tagged commit and stops unless it passed
+#      (ci-passed.yml), so the gates do not run twice.
 #   2. verify: the tag matches package.json and the version pattern; the package, size and API
 #      gates (G5-G7) again on this exact build; the matching CHANGELOG section; the packed
 #      tarball as an artifact.
@@ -12,7 +13,8 @@ name: Publish & Release
 #   4. release: a GitHub Release (marked prerelease for -beta.N) with the extracted changelog as
 #      body and the tarball as an asset.
 #
-# Nothing publishes if ci or verify fails; no Release is created if publish fails.
+# Nothing publishes if ci or verify fails; no Release is created if publish fails. When this
+# workflow passes, deploy.yml deploys the docs for the tagged commit.
 
 on:
   push:
@@ -27,7 +29,10 @@ concurrency:
 
 jobs:
   ci:
-    uses: ./.github/workflows/ci.yml
+    uses: ./.github/workflows/ci-passed.yml
+    permissions:
+      actions: read
+      contents: read
 
   verify:
     needs: ci

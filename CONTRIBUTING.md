@@ -29,8 +29,9 @@ Requires Node ≥ 22. Uses npm workspaces (`packages/snaplot` + `site`).
 ## Quality gates
 
 `npm run verify` runs G1 to G3 (and the build). CI (`.github/workflows/ci.yml`) runs every gate
-as its own job on each pull request and push to `main`; `deploy.yml` and `publish.yml` call it
-and run only if it passes. Every workflow declares its `permissions:`.
+as its own job on each pull request and push to `main`. `publish.yml` and `deploy.yml` do not run
+it again: they wait for the CI run `main` had for their commit (`ci-passed.yml`) and stop unless it
+passed. Every workflow declares its `permissions:`.
 
 | # | Gate | Command | CI |
 |---|---|---|---|
@@ -43,7 +44,7 @@ and run only if it passes. Every workflow declares its `permissions:`.
 | G7 | API | `npm run build && npm run check:api` | blocking |
 | G8 | Palettes | `npm run check:palettes` | blocking |
 | G9 | Browser | `npm run test:browser` (Chromium, WebKit and Firefox smoke) | blocking |
-| G10 | Visual | `npm run test:visual -- --against <ref>` (writes `test-results/visual/contact-sheet.html`) | advisory in CI; review every changed shot and describe an intended pixel change in the commit body |
+| G10 | Visual | `npm run test:visual -- --against <ref>` (writes `test-results/visual/contact-sheet.html`) | screenshots: local only; review every changed shot and describe an intended pixel change in the commit body. Geometry (`--project geometry`): blocking |
 | G11 | Docs | `npm run build:site`, `npm run check:examples` | blocking |
 | G12 | Perf | `npm run bench:ab -- --base <ref>` | advisory in CI |
 
@@ -134,7 +135,9 @@ Flow is "edit CHANGELOG as you go, cut a release with one script":
 
 `.github/workflows/publish.yml` runs four jobs in sequence:
 
-1. **ci**, the whole CI workflow (every blocking gate).
+1. **ci**, waits for the CI run `main` had for the tagged commit and stops
+   unless it passed. The gates do not run twice, and `--follow-tags` is safe:
+   the publish waits for the push's CI.
 2. **verify**, tag must match `packages/snaplot/package.json` and be
    `X.Y.Z` or `X.Y.Z-beta.N`; re-runs the package, size and API gates on
    this build; extracts the matching `CHANGELOG.md` section for the release
@@ -148,5 +151,7 @@ Flow is "edit CHANGELOG as you go, cut a release with one script":
    asset is the packed tarball.
 
 A failed `ci` or `verify` blocks publish and release; a failed `publish-npm`
-blocks release. If either npm or GitHub is flaky mid-publish, re-run the
+blocks release. When the workflow passes, `deploy.yml` builds the docs for the
+tagged commit and deploys them to GitHub Pages, once npm serves the version.
+To deploy the docs between releases, run `deploy.yml` by hand on `main`. If either npm or GitHub is flaky mid-publish, re-run the
 failed job only, don't re-tag.
