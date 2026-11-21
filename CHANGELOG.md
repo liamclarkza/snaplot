@@ -6,6 +6,11 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The Chart anatomy page's figure for lining up plots boxes the lower chart's labels when you
+  scroll down to it; it drew that chart before it painted.
+
 ## [0.16.0] - 2026-11-19
 
 ### Changed

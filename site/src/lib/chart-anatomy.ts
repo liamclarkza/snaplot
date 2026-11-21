@@ -145,10 +145,16 @@ function afterPaint(run: () => void): void {
   requestAnimationFrame(() => requestAnimationFrame(run));
 }
 
-/** Mounts `start` once the element is first on screen; `stop` runs when it leaves the page. */
+/**
+ * Mounts `start` once the element is first on screen; `stop` runs when it leaves the page. It
+ * draws again whenever it resizes or a chart's labels change: a chart well below the viewport
+ * paints only as it is scrolled toward, after the figure's first draw.
+ */
 abstract class OnSight extends HTMLElement {
   #observer: IntersectionObserver | undefined;
   #resize: ResizeObserver | undefined;
+  #labels: MutationObserver | undefined;
+  #pending = false;
   #started = false;
   #gone = false;
 
@@ -161,8 +167,13 @@ abstract class OnSight extends HTMLElement {
       void import('snaplot').then((snaplot) => {
         if (this.#gone) return;
         this.start(snaplot);
-        this.#resize = new ResizeObserver(() => afterPaint(() => this.draw()));
+        this.#resize = new ResizeObserver(() => this.redraw());
         this.#resize.observe(this);
+        // The overlays sit beside the chart hosts, so drawing them changes nothing watched here.
+        this.#labels = new MutationObserver(() => this.redraw());
+        for (const host of this.querySelectorAll('[data-chart]')) {
+          this.#labels.observe(host, { childList: true, subtree: true, characterData: true });
+        }
       });
     });
     this.#observer.observe(this);
@@ -172,7 +183,18 @@ abstract class OnSight extends HTMLElement {
     this.#gone = true;
     this.#observer?.disconnect();
     this.#resize?.disconnect();
+    this.#labels?.disconnect();
     this.stop();
+  }
+
+  /** Draws once the charts have repainted; any number of calls in a frame draw once. */
+  protected redraw(): void {
+    if (this.#pending) return;
+    this.#pending = true;
+    afterPaint(() => {
+      this.#pending = false;
+      this.draw();
+    });
   }
 
   protected abstract start(snaplot: typeof import('snaplot')): void;
@@ -240,7 +262,7 @@ class SnaplotAnatomy extends OnSight {
       item.addEventListener('focus', () => this.#highlight(kind));
       item.addEventListener('blur', () => this.#highlight(null));
     }
-    afterPaint(() => this.draw());
+    this.redraw();
   }
 
   protected stop(): void {
@@ -262,7 +284,7 @@ class SnaplotAnatomy extends OnSight {
     const output = this.querySelector('[data-min-output]');
     if (output) output.textContent = this.#state.min > 0 ? px(this.#state.min) : 'unset';
     this.#chart?.setOptions(anatomyOptions(this.#state));
-    afterPaint(() => this.draw());
+    this.redraw();
   }
 
   #highlight(kind: string | null): void {
@@ -348,7 +370,7 @@ class SnaplotAnatomy extends OnSight {
 
 type Alignment = 'measured' | 'group' | 'min';
 
-/** Wide enough for the longer labels' gutter: theirs is 72 px at the site's 12 px labels. */
+/** Wide enough for the longer labels' gutter at the site's 12 px labels. */
 const ALIGN_MIN = 80;
 
 function alignedOptions(
@@ -388,10 +410,10 @@ class SnaplotPlotAlignment extends OnSight {
         for (const { chart, labels } of this.#charts) {
           chart.setOptions(alignedOptions(labels, this.#alignment, group));
         }
-        afterPaint(() => this.draw());
+        this.redraw();
       });
     }
-    afterPaint(() => this.draw());
+    this.redraw();
   }
 
   protected stop(): void {

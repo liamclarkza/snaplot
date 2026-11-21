@@ -89,3 +89,22 @@ test('the anatomy page measures the charts it draws over', async ({ page }) => {
     await expect(readout).toHaveText(/both plots start \d+ px from the edge/);
   }
 });
+
+test('the alignment figure boxes a chart that paints after its first draw', async ({ page }) => {
+  await page.goto(`${BASE}chart-anatomy/`);
+  const alignment = page.locator('snaplot-plot-alignment');
+  // Scrolled down to the figure's top edge: it mounts, but its lower chart is far enough below
+  // the viewport that snaplot holds its paint until it is scrolled toward.
+  await alignment.evaluate((node) => {
+    scrollTo(0, node.getBoundingClientRect().top + scrollY - innerHeight + 4);
+  });
+  await expect(alignment.locator('[data-readout]')).toHaveText(/the plots start/, {
+    timeout: 10_000,
+  });
+  const lower = alignment.locator('.alignment-stage').last();
+  await lower.scrollIntoViewIfNeeded();
+  // The lower chart's y labels get their boxes once it paints.
+  await expect(lower.locator('[data-overlay] .anatomy-label')).not.toHaveCount(0, {
+    timeout: 10_000,
+  });
+});
