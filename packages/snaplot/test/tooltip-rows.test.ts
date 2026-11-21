@@ -190,7 +190,7 @@ describe('cursor options', () => {
       chart.destroy();
       return Number(shown?.[1]);
     };
-    expect(left(40) - left()).toBe(28);
+    expect(left(40) - left()).toBeCloseTo(28);
   });
 
   it('validates cursor options and tooltip.offset', () => {

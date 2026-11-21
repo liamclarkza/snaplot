@@ -51,8 +51,8 @@ function scaleTicks(engine: ChartCore, si: number): ScaleTicks | null {
 
 /**
  * The width the colour scale takes on the right of the plot, in CSS pixels (0 without one): the
- * gap, the bar, its ticks and widest label, and its title strip, rounded up to 8 px so the plot
- * keeps its width while a streaming domain changes a label by a digit.
+ * gap, the bar, its ticks and widest label, and its title strip, rounded up to a whole pixel as the
+ * axes are, so its labels end the edge margin from the edge.
  */
 export function colorScaleWidth(engine: ChartCore, measure: (text: string) => number): number {
   const si = colorScaleSeries(engine);
@@ -63,7 +63,7 @@ export function colorScaleWidth(engine: ChartCore, measure: (text: string) => nu
   for (const label of ticks.labels) widest = Math.max(widest, measure(label));
   const lineHeight = engine.theme.fontSize * 1.4;
   const title = ticks.options.title ? EDGE_MARGIN + lineHeight + AXIS_TITLE_GAP : EDGE_MARGIN;
-  return Math.ceil((GAP + BAR + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + widest + title) / 8) * 8;
+  return Math.ceil(GAP + BAR + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + widest + title);
 }
 
 /**

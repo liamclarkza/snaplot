@@ -25,8 +25,9 @@ import { DirtyFlag } from './spec';
  *   horizontal label into the left and right, half a vertical label's height into the top and
  *   bottom. Reserved whether or not a tick sits on the end, so the plot keeps its size while a
  *   pan, a zoom or a stream moves the ticks.
- * - ⌈ ⌉ rounds the left and right up to 8 px, so the plot does not jitter while labels change
- *   width; the top and bottom (a line of text) up to a whole pixel.
+ * - ⌈ ⌉ rounds up to a whole pixel, so the labels start the edge margin from the edge whatever
+ *   they say. Only the overhang into the left and right rounds up to 8 px: it follows whichever
+ *   label sits at the end of the axis, which changes as a pan moves the ticks along.
  * - minimum: on a side holding an axis, `minGutters.x` or `minGutters.y` for its kind of axis
  *   (0 unless set). Two y axes then take the wider of their gutters, so a y minimum reaches both
  *   sides. A group's aligned gutters (`PlotInsets`) apply after that, side by side.
@@ -189,14 +190,15 @@ export function computeLayout(
       }
       // Category labels sit inside their slots, so they reach no further than the plot.
       if (ticks.length > 0 && !ac.thinTicks) verticalLabels = true;
-      // Tick mark + label gap + label width + optional title strip, rounded
-      // up to an 8px step. Quantizing keeps the gutter stable while tick
-      // labels shift by a character during pan/zoom, so the plot rect does
-      // not jitter and the layout stays reusable across gesture frames.
+      // Tick mark + label gap + label width + the edge margin or title strip, rounded up to a
+      // whole pixel only: the labels sit against the axis, so any more rounding would land
+      // before them and charts side by side would start their labels in different places.
+      // Labels use tabular figures, so their width changes only when they gain or lose a
+      // character; `minGutters.y` holds a gutter steady through that.
       const titleSpace = ac.title ? titleStrip : EDGE_MARGIN;
       const needed = Math.max(
         minY,
-        Math.ceil((maxWidth + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + titleSpace) / 8) * 8,
+        Math.ceil(maxWidth + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + titleSpace),
       );
       if (pos === 'left') {
         leftAxisWidth = Math.max(leftAxisWidth, needed);
@@ -280,8 +282,9 @@ export function computeLayout(
 
   // Horizontal tick labels are centred on their ticks, so the end labels reach half a label past
   // the plot's left and right. Reserved whether or not a tick sits on the end, as the vertical
-  // labels' are, and rounded up to 8 px as the axes beside them are: the plot keeps its width while
-  // a pan, a zoom or a stream moves the ticks along.
+  // labels' are, and rounded up to 8 px: the end label changes each time a pan or a zoom moves a
+  // tick past the end, and a time axis's labels differ in width by their letters, so the step
+  // keeps the plot's width through most of those changes.
   for (const edge of horizontalEdges) {
     leftAxisWidth = Math.max(leftAxisWidth, Math.ceil((edge.firstHalf + EDGE_MARGIN) / 8) * 8);
     rightAxisWidth = Math.max(rightAxisWidth, Math.ceil((edge.lastHalf + EDGE_MARGIN) / 8) * 8);

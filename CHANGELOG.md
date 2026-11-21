@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The left and right gutters round up to a whole pixel, as the top and bottom do, instead of to
+  8 px. The labels sit against their axis, so the rounding landed before them: at 11 px labels
+  a chart reading `0.0` to `0.6` had about 15 px before its labels and one reading `0` to `5` had
+  9 px. Now the y labels start the 8 px edge margin from the edge, to within a pixel, whatever
+  they say, so charts side by side start their labels on one line. A heatmap's colour scale rounds
+  the same way. The overhang of the x axis's end labels still rounds up to 8 px, since it changes
+  each time a pan moves a tick past the end. Plots move left or widen by up to 7 px (visual ledger
+  V68). To keep a gutter steady while its labels change length, set `minGutters.y`.
+
 ### Fixed
 
 - The Chart anatomy page's figure for lining up plots boxes the lower chart's labels when you

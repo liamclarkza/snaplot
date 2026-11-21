@@ -55,8 +55,8 @@ describe('computeLayout edge margin', () => {
       scales,
       { left: 8 },
     );
-    expect(titled.plot.left).toBeGreaterThan(base.plot.left);
-    expect(titled.plot.left % 8).toBe(0);
+    // A 16.8 px line and the 8 px gap before the labels, up to a whole pixel.
+    expect(titled.plot.left).toBe(Math.ceil(base.plot.left + FONT_SIZE * 1.4 + 8));
   });
 
   it('reserves a full title strip below a labelled bottom axis', () => {
@@ -120,7 +120,7 @@ describe('computeLayout edge margin', () => {
 
 describe('computeLayout: one rule for every side', () => {
   // Edge margin + the larger of the side's own axis and the other axis's end labels, rounded up
-  // (left and right to 8 px), raised to the side's minimum. No floors.
+  // (to a whole pixel, the end labels' overhang to 8 px), raised to the side's minimum. No floors.
   const short = new Map<string, Scale>([
     ['x', scale('x', [0, 5, 10])],
     ['y', scale('y', [0, 1, 2])],
@@ -141,8 +141,8 @@ describe('computeLayout: one rule for every side', () => {
       right: Math.ceil((CHAR_W + EDGE_MARGIN) / 8) * 8,
       // Tick, gap, a 16.8 px line and the edge margin.
       bottom: Math.ceil(AXIS_TICK_LENGTH + AXIS_LABEL_GAP + FONT_SIZE * 1.4 + EDGE_MARGIN),
-      // '2', tick, gap and the edge margin, up to 8 px.
-      left: Math.ceil((CHAR_W + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + EDGE_MARGIN) / 8) * 8,
+      // '2', tick, gap and the edge margin, up to a whole pixel.
+      left: Math.ceil(CHAR_W + AXIS_TICK_LENGTH + AXIS_LABEL_GAP + EDGE_MARGIN),
     });
   });
 
@@ -166,7 +166,7 @@ describe('computeLayout: one rule for every side', () => {
       const label = String(Math.max(...ticks)).length * CHAR_W;
       return layout.plot.left - AXIS_TICK_LENGTH - AXIS_LABEL_GAP - label;
     };
-    // Within the 8 px rounding of each other, and never under the edge margin.
+    // The edge margin, plus less than a pixel of rounding.
     for (const ticks of [
       [0, 1, 2],
       [0, 50, 100],
@@ -174,7 +174,38 @@ describe('computeLayout: one rule for every side', () => {
       [0, 500000, 1000000],
     ]) {
       expect(blank(ticks)).toBeGreaterThanOrEqual(EDGE_MARGIN);
-      expect(blank(ticks)).toBeLessThan(EDGE_MARGIN + 8);
+      expect(blank(ticks)).toBeLessThan(EDGE_MARGIN + 1);
+    }
+  });
+
+  it('starts the y labels of two charts side by side in the same place', () => {
+    // One chart's labels read 0.0 to 0.6, the other's 0 to 5: rounding the gutter up to 8 px
+    // put 3 px more before the first chart's labels than the second's.
+    const charts = [
+      { ticks: [0, 0.2, 0.4, 0.6], format: (value: number) => value.toFixed(1) },
+      { ticks: [0, 1, 2, 3, 4, 5], format: (value: number) => String(value) },
+    ];
+    for (const position of ['left', 'right'] as const) {
+      const blanks = charts.map(({ ticks, format }) => {
+        const scales = new Map<string, Scale>([
+          ['x', scale('x', [0, 5, 10])],
+          ['y', scale('y', ticks)],
+        ]);
+        const layout = layoutFor(
+          { series: [], axes: { x: {}, y: { format, position } } } as ChartSpec,
+          scales,
+        );
+        const label = Math.max(...ticks.map((tick) => format(tick).length * CHAR_W));
+        const axis = AXIS_TICK_LENGTH + AXIS_LABEL_GAP + label;
+        // Before the labels on the left; after them, to the edge, on the right.
+        return position === 'left'
+          ? layout.plot.left - axis
+          : layout.width - layout.plot.left - layout.plot.width - axis;
+      });
+      for (const blank of blanks) {
+        expect(blank).toBeGreaterThanOrEqual(EDGE_MARGIN);
+        expect(blank).toBeLessThan(EDGE_MARGIN + 1);
+      }
     }
   });
 

@@ -33,9 +33,9 @@ gutter = max(minimum, round up(8 + max(own axis, overhang)))
   not a tick sits on the end, so the plot keeps its size while you pan, zoom or stream.
 - **8** is the edge margin: clear space between the outermost text and the edge of the chart, or
   the edge of its legend.
-- **Round up** goes to the next 8 px on the left and right, so the plot keeps its width while a
-  label gains or loses a digit. The top and bottom hold lines of text and round up to a whole
-  pixel.
+- **Round up** goes to the next whole pixel. Only the overhang into the left and right goes to
+  the next 8 px: it follows whichever x label sits at the end, which changes as you pan, and the
+  step keeps the plot's width through most of those changes.
 - **Minimum** is `minGutters.y` on a side that holds a y axis and `minGutters.x` on a side that
   holds an x axis, 0 unless you set it. A side with no axis has no minimum.
 
@@ -50,9 +50,9 @@ that lines up its plots, each side can widen on its own to match the other membe
 | Top | An x axis placed on top | Half a y label's height |
 | Bottom | The x axis: a line of tick labels, tick, gap and title | Half a y label's height |
 
-The plot gets whatever room is left. A chart with short labels has a wider plot, and the space
-between the edge and its labels is the edge margin plus at most 7 px of rounding, whatever the
-labels say.
+The plot gets whatever room is left. A chart with short labels has a wider plot, and its y
+labels start the edge margin from the edge, to within a pixel, whatever they say. They sit
+further in only when the first x label reaches further into the gutter than they do.
 
 ## Lining up plots
 
